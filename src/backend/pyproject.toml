@@ -1,11 +1,10 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.116.1",
-    "pydantic>=2.11.7",
-    "uvicorn>=0.35.0",
+    "fastapi",
+    "uvicorn",
 ]
+
+[tool.uv.scripts]
+dev = "uvicorn src.backend.main:app --reload --host 0.0.0.0 --port 8000"
