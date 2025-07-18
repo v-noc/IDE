@@ -36,15 +36,13 @@ version = "0.1.0"
 source = { virtual = "src/backend" }
 dependencies = [
     { name = "fastapi" },
-    { name = "pydantic" },
     { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", specifier = ">=0.116.1" },
-    { name = "pydantic", specifier = ">=2.11.7" },
-    { name = "uvicorn", specifier = ">=0.35.0" },
+    { name = "fastapi" },
+    { name = "uvicorn" },
 ]
 
 [[package]]
