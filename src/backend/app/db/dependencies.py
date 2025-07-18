@@ -1,5 +1,4 @@
-from .orm import CollectionManager
-from ..models.user import User
+from .service import db_service
 
-def get_user_collection() -> CollectionManager[User]:
-    return CollectionManager("users", User)
+def get_db_service():
+    return db_service
