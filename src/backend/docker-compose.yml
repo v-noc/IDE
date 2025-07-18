@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  arangodb:
+    image: arangodb:latest
+    ports:
+      - "8529:8529"
+    environment:
+      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD}
+      - ARANGO_DB=${ARANGO_DB}
+      - ARANGO_USER=${ARANGO_USER}
+      - ARANGO_PASSWORD=${ARANGO_PASSWORD}
+    volumes:
+      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+      - arangodb_data:/var/lib/arangodb3
+      - arangodb_apps_data:/var/lib/arangodb3-apps
+
+volumes:
+  arangodb_data:
+  arangodb_apps_data:

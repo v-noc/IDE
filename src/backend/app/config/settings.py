@@ -5,10 +5,10 @@ class Settings(BaseSettings):
 
     APP_ENV: str = "development"
     ARANGO_HOST: str = "http://localhost:8529"
-    ARANGO_USER: str = "root"
-    ARANGO_PASSWORD: str = ""
+    ARANGO_USER: str = "app_user"
+    ARANGO_PASSWORD: str = "app_password"
     ARANGO_DB: str = "_system"
-
+    PORT: int = 8000
     def is_development(self) -> bool:
         return self.APP_ENV == "development"
 

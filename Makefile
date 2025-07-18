@@ -17,7 +17,15 @@ install-backend:
 	@echo ">>> Installing backend dependencies..."
 	@uv pip install -r src/backend/requirements.txt --python .venv/bin/python
 
-run-backend:
+start-db:
+	@echo ">>> Starting ArangoDB..."
+	@docker-compose -f src/backend/docker-compose.yml --env-file src/backend/.env up -d
+
+stop-db:
+	@echo ">>> Stopping ArangoDB..."
+	@docker-compose -f src/backend/docker-compose.yml --env-file src/backend/.env down
+
+run-backend: start-db
 	@echo ">>> Starting backend development server..."
 	@cd src/backend && ../../.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
