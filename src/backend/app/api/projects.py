@@ -1,63 +1,59 @@
 """
-API endpoints for managing projects.
+API endpoints for managing projects using the Domain API.
 """
 from fastapi import APIRouter, Depends, HTTPException
-from ...models.project import Project, NewProject
-from ...db.service import DatabaseService, db_service
-from ...graph.builder import GraphBuilder
+from ...models.project import NewProject
+from ...models.node import NodePosition
+from ...domain.manager import CodeGraphManager, code_graph_manager
 from ...graph.validator import GraphValidator
+from ...db.service import db_service # Import db_service directly for the validator
 
 router = APIRouter()
 
-@router.post("/projects/", response_model=Project, status_code=201)
-def create_project(project: NewProject, db: DatabaseService = Depends(get_db_service)):
-    """
-    Create a new project.
-    """
-    new_project = Project(**project.model_dump())
-    created_project = db.projects.create(new_project)
-    return created_project
+def get_manager():
+    """Dependency to get the CodeGraphManager."""
+    return code_graph_manager
 
-@router.get("/projects/{project_key}", response_model=Project)
-def get_project(project_key: str, db: DatabaseService = Depends(get_db_service)):
+@router.post("/projects/", status_code=201)
+def create_project(project: NewProject, manager: CodeGraphManager = Depends(get_manager)):
     """
-    Get a project by its key.
+    Create a new project using the domain manager.
     """
-    project = db.projects.get(project_key)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return project
+    created_project = manager.create_project(
+        name=project.name,
+        path=f"/path/to/{project.name}", # Example path
+        description=project.description
+    )
+    return {"message": f"Project '{created_project.name}' created.", "key": created_project.project_model.key}
 
-@router.post("/projects/{project_key}/scan", status_code=202)
-def scan_project(project_key: str, db: DatabaseService = Depends(get_db_service)):
+@router.post("/projects/example", status_code=201)
+def create_example_project(manager: CodeGraphManager = Depends(get_manager)):
     """
-    Trigger a graph build for a project.
-    This is an asynchronous task.
+    An example endpoint demonstrating the power of the domain API to build a
+    code graph with just a few lines of code.
     """
-    project = db.projects.get(project_key)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    # 1. Create a project
+    project = manager.create_project(name="ExampleProject", path="/path/to/example")
 
-    # In a real application, this would be sent to a background worker (e.g., Celery).
-    # For this example, we run it synchronously.
-    graph_builder = GraphBuilder(db)
-    graph_builder.build_graph_for_project(project)
+    # 2. Add files and functions
+    file_a = project.add_file("/path/to/example/file_a.py")
+    func_x = file_a.add_function("function_x", NodePosition(line_no=1, col_offset=0, end_line_no=5, end_col_offset=10))
     
-    return {"message": "Project scan initiated."}
+    file_b = project.add_file("/path/to/example/file_b.py")
+    func_y = file_b.add_function("function_y", NodePosition(line_no=3, col_offset=0, end_line_no=8, end_col_offset=20))
+
+    # 3. Create a relationship between them
+    func_x.add_call(func_y, NodePosition(line_no=4, col_offset=4, end_line_no=4, end_col_offset=15))
+
+    return {"message": "Example project created successfully."}
+
 
 @router.get("/projects/{project_key}/validate")
-def validate_project(project_key: str, db: DatabaseService = Depends(get_db_service)):
+def validate_project(project_key: str):
     """
     Validate the graph of a project.
+    (Note: db_service is used directly here as validator is not yet in domain)
     """
-    project = db.projects.get(project_key)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-        
-    validator = GraphValidator(db)
+    validator = GraphValidator(db_service)
     report = validator.validate_project_graph(project_key)
     return report
-
-# Helper dependency
-def get_db_service():
-    return db_service
