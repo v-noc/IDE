@@ -1,31 +1,37 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from .api import root, health
 from .db.client import get_db
 
 
-app = FastAPI(
-    title="V-NOC API",
-    version="1.0.0",
-    description="API for the V-NOC project",
-)
+from contextlib import asynccontextmanager
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database connection on startup"""
-    # Test the database connection
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Context manager for the application's lifespan.
+    Handles startup and shutdown events.
+    """
+    # Startup
     db = get_db()
     try:
-        # Verify connection by getting database info
         db.properties()
         print("✅ Database connection established successfully")
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
         raise
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Clean up database connections on shutdown"""
+    
+    yield
+    
+    # Shutdown
     print("🔄 Shutting down database connections...")
+
+app = FastAPI(
+    title="V-NOC API",
+    version="1.0.0",
+    description="API for the V-NOC project",
+    lifespan=lifespan
+)
 
 # Include routers
 app.include_router(root.router)
