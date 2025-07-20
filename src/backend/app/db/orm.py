@@ -14,8 +14,6 @@ class ArangoCollection(Generic[T]):
     A generic, typed wrapper around an ArangoDB collection that handles
     Pydantic model validation, creation, and retrieval for both documents and edges.
     """
-    _db: StandardDatabase | None = None
-
     def __init__(self, collection_name: str, model: Type[T]):
         self.collection_name = collection_name
         self.model = model
@@ -32,10 +30,8 @@ class ArangoCollection(Generic[T]):
 
     @property
     def db(self) -> StandardDatabase:
-        """Memoized database connection."""
-        if self._db is None:
-            self._db = get_db()
-        return self._db
+        """Get the current database connection."""
+        return get_db()
 
     @property
     def collection(self) -> StandardCollection:
@@ -151,7 +147,7 @@ class ArangoCollection(Generic[T]):
         Finds nodes related to a starting node through a given edge collection.
         """
         # Ensure the edge collection exists before querying against it.
-        _ = edge_collection.collection
+        _ = edge_collection._get_or_create_collection(edge=True)
 
         if direction not in ["outbound", "inbound", "any"]:
             raise ValueError("Direction must be 'outbound', 'inbound', or 'any'.")

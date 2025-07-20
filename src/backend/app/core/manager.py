@@ -1,6 +1,7 @@
 """
 The CodeGraphManager: the main entry point for the Domain API.
 """
+from typing import List
 from .project import Project
 from ..models import node, properties
 from ..db import collections as db
@@ -44,6 +45,13 @@ class CodeGraphManager:
 
         # 2. Return the hydrated domain object
         return Project(project_node)
+
+    def get_all_projects(self) -> List[Project]:
+        """
+        Retrieves all projects from the database.
+        """
+        project_nodes = db.nodes.find({"node_type": "project"})
+        return [Project(node) for node in project_nodes]
 
 # A default instance for use in API endpoints
 code_graph_manager = CodeGraphManager()

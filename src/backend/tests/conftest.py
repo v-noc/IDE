@@ -4,18 +4,19 @@ import pytest
 from arango import ArangoClient
 from app.config.settings import settings
 import time
+import os
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def test_db_name():
-    """Generate a unique test database name for the entire test session."""
-    return f"test_db_{int(time.time())}"
+    """Generate a unique test database name for each test function."""
+    return f"test_db_{int(time.time())}_{hash(os.urandom(4))}"
 
 @pytest.fixture(scope="session")
 def arango_client():
     """Provides a client to the ArangoDB instance for the test session."""
     return ArangoClient(hosts=settings.ARANGO_HOST)
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def setup_test_database(arango_client, test_db_name):
     """
     Creates a new database for the test session, yields a connection to it,
