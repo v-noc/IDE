@@ -51,12 +51,18 @@ class ArangoCollection(Generic[T]):
             return self.adapter.validate_python(doc)
         return self.model.model_validate(doc)
 
-    def _get_or_create_collection(self, edge: bool = False) -> StandardCollection:
+    def _get_or_create_collection(self, edge: bool | None = None) -> StandardCollection:
         """
         Retrieves the collection or creates it if it doesn't exist.
         If the collection exists but has the wrong type (edge vs document),
         it is recreated.
         """
+        if edge is None:
+            # If edge is not specified, infer from the model type.
+            # This is a bit of a hack, but it's the most reliable way to
+            # determine the collection type without a major refactor.
+            edge = issubclass(self.model, BaseEdge)
+
         if self.db.has_collection(self.collection_name):
             collection = self.db.collection(self.collection_name)
             # Return existing collection if type is correct
@@ -133,6 +139,35 @@ class ArangoCollection(Generic[T]):
         Deletes all documents in the collection.
         """
         self.collection.truncate()
+
+    def find_related(
+        self,
+        start_node_id: str,
+        edge_collection: "ArangoCollection",
+        direction: str = "outbound",
+        filter_by_type: str | None = None
+    ) -> list[T]:
+        """
+        Finds nodes related to a starting node through a given edge collection.
+        """
+        # Ensure the edge collection exists before querying against it.
+        _ = edge_collection.collection
+
+        if direction not in ["outbound", "inbound", "any"]:
+            raise ValueError("Direction must be 'outbound', 'inbound', or 'any'.")
+
+        query = f"""
+        FOR node IN 1..1 {direction.upper()} @start_node_id {edge_collection.collection_name}
+        """
+        bind_vars = {"start_node_id": start_node_id}
+
+        if filter_by_type:
+            query += " FILTER node.node_type == @node_type"
+            bind_vars["node_type"] = filter_by_type
+        
+        query += " RETURN node"
+
+        return self.aql(query, bind_vars)
         
     def __getitem__(self, key: str) -> T | None:
         return self.get(key)

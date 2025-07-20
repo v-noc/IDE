@@ -12,6 +12,10 @@ class Folder(DomainObject[node.FolderNode]):
     other folders.
     """
     @property
+    def name(self) -> str:
+        return self.model.name
+
+    @property
     def path(self) -> str:
         return self.model.properties.path
 
@@ -58,3 +62,21 @@ class Folder(DomainObject[node.FolderNode]):
 
         # 3. Return the hydrated Folder domain object
         return Folder(created_folder_node)
+
+    def get_files(self) -> list[File]:
+        """Retrieves all files directly contained within this folder."""
+        file_nodes = db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.contains_edges,
+            filter_by_type="file"
+        )
+        return [File(node) for node in file_nodes]
+
+    def get_folders(self) -> list['Folder']:
+        """Retrieves all sub-folders directly contained within this folder."""
+        folder_nodes = db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.contains_edges,
+            filter_by_type="folder"
+        )
+        return [Folder(node) for node in folder_nodes]

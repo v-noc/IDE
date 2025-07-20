@@ -13,6 +13,10 @@ class File(DomainObject[node.FileNode]):
     functions, classes, and imports.
     """
     @property
+    def name(self) -> str:
+        return self.model.name
+
+    @property
     def path(self) -> str:
         return self.model.properties.path
 

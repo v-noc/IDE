@@ -57,6 +57,19 @@ def test_graph_creation(temp_project_dir):
     assert db.contains_edges.find({"_from": main_file.id, "_to": my_class.id}, limit=1)
     assert db.contains_edges.find({"_from": main_file.id, "_to": my_func.id}, limit=1)
 
+    # Verify get_files and get_folders
+    project_files = project.get_files()
+    assert len(project_files) == 0  # No files directly in project
+    project_folders = project.get_folders()
+    assert len(project_folders) == 1
+    assert project_folders[0].name == "src"
+
+    src_files = src_folder.get_files()
+    assert len(src_files) == 1
+    assert src_files[0].name == "main.py"
+    src_folders = src_folder.get_folders()
+    assert len(src_folders) == 0  # No subfolders in src
+
     # 4. Teardown
     db.nodes.truncate()
     db.contains_edges.truncate()
