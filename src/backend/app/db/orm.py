@@ -1,96 +1,138 @@
-from typing import Type, TypeVar, Generic
+# src/backend/app/db/orm.py
+
+from typing import Type, TypeVar, Generic, Union, get_origin
+from pydantic import BaseModel, TypeAdapter
 from arango.collection import StandardCollection
-from pydantic import BaseModel
-from datetime import datetime
+from arango.database import StandardDatabase
 from .client import get_db
-from ..models.base import BaseDocument, BaseEdge
+from ..models.base import ArangoBase, BaseEdge
 
-T = TypeVar("T", bound=BaseDocument)
-E = TypeVar("E", bound=BaseEdge)
+T = TypeVar('T', bound=ArangoBase)
 
-class CollectionManager(Generic[T]):
+class ArangoCollection(Generic[T]):
+    """
+    A generic, typed wrapper around an ArangoDB collection that handles
+    Pydantic model validation, creation, and retrieval for both documents and edges.
+    """
+    _db: StandardDatabase | None = None
+
     def __init__(self, collection_name: str, model: Type[T]):
         self.collection_name = collection_name
         self.model = model
-        self.db = get_db()
-        self._collection = self._get_or_create_collection()
+        
+        # Use TypeAdapter for Unions or Annotated types containing Unions.
+        # hasattr check is a reliable way to detect Annotated types.
+        if get_origin(model) is Union or hasattr(model, '__metadata__'):
+            self.adapter = TypeAdapter(model)
+        else:
+            self.adapter = None
 
-    def _get_or_create_collection(self) -> StandardCollection:
-        if not self.db.has_collection(self.collection_name):
-            return self.db.create_collection(self.collection_name)
-        return self.db.collection(self.collection_name)
+        # Defer collection creation until it's first accessed.
+        self._collection: StandardCollection | None = None
 
-    def create(self, data: BaseModel) -> T:
-        """Create a new document."""
-        meta = self._collection.insert(data.model_dump())
-        new_doc = self._collection.get(meta["_key"])
-        return self.model(**new_doc)
+    @property
+    def db(self) -> StandardDatabase:
+        """Memoized database connection."""
+        if self._db is None:
+            self._db = get_db()
+        return self._db
+
+    @property
+    def collection(self) -> StandardCollection:
+        """Memoized collection instance."""
+        if self._collection is None:
+            # Default to creating a document collection. `create` will handle edges.
+            self._collection = self._get_or_create_collection(edge=False)
+        return self._collection
+
+    def _validate(self, doc: dict) -> T:
+        """Validate a document using the model or adapter."""
+        if self.adapter:
+            return self.adapter.validate_python(doc)
+        return self.model.model_validate(doc)
+
+    def _get_or_create_collection(self, edge: bool = False) -> StandardCollection:
+        """
+        Retrieves the collection or creates it if it doesn't exist.
+        If the collection exists but has the wrong type (edge vs document),
+        it is recreated.
+        """
+        if self.db.has_collection(self.collection_name):
+            collection = self.db.collection(self.collection_name)
+            # Return existing collection if type is correct
+            if collection.properties()['edge'] is edge:
+                return collection
+            # Otherwise, delete it so it can be recreated with the correct type
+            self.db.delete_collection(self.collection_name)
+
+        return self.db.create_collection(self.collection_name, edge=edge)
+
 
     def get(self, key: str) -> T | None:
-        doc = self._collection.get(key)
+        """
+        Retrieves a document by its key and validates it with the Pydantic model.
+        Returns None if the document is not found.
+        """
+        doc = self.collection.get(key)
         if doc:
-            return self.model(**doc)
+            return self._validate(doc)
         return None
 
-    def find(self, filters: dict) -> list[T]:
-        cursor = self._collection.find(filters)
-        return [self.model(**doc) for doc in cursor]
+    def create(self, doc_data: T) -> T:
+        """
+        Inserts a new document from a Pydantic model.
+        Returns the fully populated, validated model from the database.
+        """
+        is_edge = isinstance(doc_data, BaseEdge)
+        # Ensure collection is of the correct type before inserting
+        self._collection = self._get_or_create_collection(edge=is_edge)
 
-    def update(self, key: str, data: BaseModel) -> T:
-        """Update a document."""
-        update_data = data.model_dump(exclude_unset=True)
-        # Ensure updated_at is always current
-        update_data["updated_at"] = datetime.utcnow()
+        dump = doc_data.model_dump(by_alias=True, exclude_none=True)
+        meta = self.collection.insert(dump, overwrite=True)
         
-        self._collection.update(key, update_data)
-        updated_doc = self._collection.get(key)
-        return self.model(**updated_doc)
+        new_doc = self.collection.get(meta["_key"])
+        return self._validate(new_doc)
+
+    def update(self, key: str, patch_data: BaseModel) -> T:
+        """
+        Updates a document with new data.
+        Returns the updated, validated model.
+        """
+        dump = patch_data.model_dump(exclude_unset=True)
+        self.collection.update(key, dump)
+        
+        updated_doc = self.collection.get(key)
+        return self._validate(updated_doc)
 
     def delete(self, key: str) -> bool:
-        return self._collection.delete(key)
+        """
+        Deletes a document by its key.
+        Returns True if deletion was successful, False otherwise.
+        """
+        try:
+            return self.collection.delete(key)
+        except Exception:
+            return False
 
+    def find(self, filters: dict, limit: int | None = None) -> list[T]:
+        """
+        Finds documents using a filter dictionary.
+        """
+        cursor = self.collection.find(filters, limit=limit)
+        return [self._validate(doc) for doc in cursor]
 
-class EdgeManager(Generic[E]):
-    def __init__(self, collection_name: str, model: Type[E]):
-        self.collection_name = collection_name
-        self.model = model
-        self.db = get_db()
-        self._collection = self._get_or_create_collection()
+    def aql(self, query: str, bind_vars: dict | None = None) -> list[T]:
+        """
+        Executes a raw AQL query and validates the results against the model.
+        """
+        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+        return [self._validate(doc) for doc in cursor]
 
-    def _get_or_create_collection(self) -> StandardCollection:
-        if not self.db.has_collection(self.collection_name):
-            return self.db.create_collection(self.collection_name, edge=True)
-        return self.db.collection(self.collection_name)
-
-    def create(self, from_doc_id: str, to_doc_id: str, data: BaseModel) -> E:
-        """Create a new edge."""
-        edge_data = data.model_dump()
-        edge_data["_from"] = from_doc_id
-        edge_data["_to"] = to_doc_id
+    def truncate(self):
+        """
+        Deletes all documents in the collection.
+        """
+        self.collection.truncate()
         
-        meta = self._collection.insert(edge_data)
-        new_edge = self._collection.get(meta["_key"])
-        return self.model(**new_edge)
-
-    def get(self, key: str) -> E | None:
-        edge = self._collection.get(key)
-        if edge:
-            return self.model(**edge)
-        return None
-
-    def find(self, filters: dict) -> list[E]:
-        cursor = self._collection.find(filters)
-        return [self.model(**doc) for doc in cursor]
-
-    def update(self, key: str, data: BaseModel) -> E:
-        """Update an edge."""
-        update_data = data.model_dump(exclude_unset=True)
-        # Ensure updated_at is always current
-        update_data["updated_at"] = datetime.utcnow()
-        
-        self._collection.update(key, update_data)
-        updated_edge = self._collection.get(key)
-        return self.model(**updated_edge)
-
-    def delete(self, key: str) -> bool:
-        return self._collection.delete(key)
+    def __getitem__(self, key: str) -> T | None:
+        return self.get(key)

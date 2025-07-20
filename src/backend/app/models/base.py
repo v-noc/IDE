@@ -1,20 +1,35 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
-from datetime import datetime
 
-class BaseDocument(BaseModel):
+class ArangoBase(BaseModel):
     """
-    A base model for all document collections in ArangoDB.
-    Includes common audit fields and the document key.
+    The base model for all ArangoDB documents. It defines the system
+    attributes `_key` and `_id`, allowing them to be used as standard
+    Pydantic fields `key` and `id`.
     """
-    key: Optional[str] = Field(None, alias="_key", description="The unique key of the document.")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="The timestamp when the document was created.")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="The timestamp when the document was last updated.")
+    key: Optional[str] = Field(None, alias='_key')
+    id: Optional[str] = Field(None, alias='_id')
 
-class BaseEdge(BaseDocument):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_encoders={
+            # Add any custom JSON encoders if needed
+        },
+    )
+
+class BaseNode(ArangoBase):
     """
-    A base model for all edge collections in ArangoDB.
-    Includes the mandatory _from and _to fields for linking documents.
+    A base model for all node documents, ensuring a 'node_type' field
+    is always present to distinguish between different types of nodes
+    in the 'nodes' collection.
     """
-    from_doc_id: str = Field(..., alias="_from", description="The document ID of the source of the edge.")
-    to_doc_id: str = Field(..., alias="_to", description="The document ID of the destination of the edge.")
+    node_type: str
+
+class BaseEdge(ArangoBase):
+    """
+    A base model for all edge documents. It includes the mandatory
+    `_from` and `_to` fields required by ArangoDB for linking documents.
+    """
+    from_id: str = Field(..., alias='_from')
+    to_id: str = Field(..., alias='_to')
+    edge_type: str

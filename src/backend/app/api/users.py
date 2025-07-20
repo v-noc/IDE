@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
-from ..db.dependencies import get_db_service
-from ..db.service import DatabaseService
+from arango.database import StandardDatabase
+from ..db.client import get_db
 from ..models.user import NewUser, User, UpdateUser
 from ..models.follows import Follows, NewFollows
+from ..db import collections as db
 
 router = APIRouter()
 

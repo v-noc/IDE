@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from .api import users, root, health, projects
+from .api import root, health
 from .db.client import get_db
-from .db.dependencies import get_db_service
+
 
 app = FastAPI(
     title="V-NOC API",
@@ -30,8 +30,7 @@ async def shutdown_event():
 # Include routers
 app.include_router(root.router)
 app.include_router(health.router, tags=["health"])
-app.include_router(users.router, prefix="/users", tags=["users"])
-app.include_router(projects.router, prefix="/projects", tags=["projects"])
+# app.include_router(users.router, prefix="/users", tags=["users"])
+# app.include_router(projects.router, prefix="/projects", tags=["projects"])
 
-# Add dependency injection for database service
-app.dependency_overrides[get_db_service] = get_db_service
+

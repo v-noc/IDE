@@ -3,7 +3,7 @@ Pydantic models for the 'properties' field of a Node, based on NodeType.
 """
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
-from .node import NodePosition
+from .shared import NodePosition
 
 class BaseProperties(BaseModel):
     """A base model for all properties to ensure consistency."""
@@ -27,6 +27,7 @@ class ClassProperties(BaseProperties):
     position: NodePosition
     fields: List[Dict[str, Any]] = Field(default_factory=list, description="Class attributes or fields.")
     
-class ImportProperties(BaseProperties):
-    position: NodePosition
-    module: str | None = Field(None, description="The module from which something is imported, if applicable.")
+class PackageProperties(BaseProperties):
+    """Properties for a PackageNode."""
+    version: str | None = None
+    source: str | None = None  # e.g., "pypi"

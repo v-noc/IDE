@@ -2,19 +2,21 @@
 name = "backend"
 version = "0.1.0"
 dependencies = [
-    "fastapi",
-    "uvicorn",
-    "python-arango",
-    "pydantic",
-    "pydantic-settings",
+  "fastapi",
+  "uvicorn",
+  "python-arango",
+  "pydantic",
+  "pydantic-settings",
+  "pytest-mock>=3.14.1",
 ]
 
 [project.optional-dependencies]
-test = [
-    "pytest",
-    "httpx",
-    "pytest-asyncio",
-]
+test = ["pytest", "httpx", "pytest-asyncio"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests/unit", "tests/e2e"]
+python_files = ["test_*.py", "*_test.py"]
 
 [tool.uv.scripts]
 dev = "uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"

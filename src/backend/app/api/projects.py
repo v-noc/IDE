@@ -2,17 +2,17 @@
 API endpoints for managing projects using the Domain API.
 """
 from fastapi import APIRouter, Depends, HTTPException
-from ...models.project import NewProject
-from ...models.node import NodePosition
-from ...domain.manager import CodeGraphManager, code_graph_manager
-from ...graph.validator import GraphValidator
-from ...db.service import db_service # Import db_service directly for the validator
+from app.models.project import NewProject
+from app.models.node import NodePosition
+from app.core.manager import CodeGraphManager
+from app.db.client import get_db
+from arango.database import StandardDatabase
 
 router = APIRouter()
 
-def get_manager():
+def get_manager() -> CodeGraphManager:
     """Dependency to get the CodeGraphManager."""
-    return code_graph_manager
+    return CodeGraphManager()
 
 @router.post("/projects/", status_code=201)
 def create_project(project: NewProject, manager: CodeGraphManager = Depends(get_manager)):
@@ -48,12 +48,13 @@ def create_example_project(manager: CodeGraphManager = Depends(get_manager)):
     return {"message": "Example project created successfully."}
 
 
+from app.services.validator import GraphValidator
+
 @router.get("/projects/{project_key}/validate")
-def validate_project(project_key: str):
+def validate_project(project_key: str, db: StandardDatabase = Depends(get_db)):
     """
     Validate the graph of a project.
-    (Note: db_service is used directly here as validator is not yet in domain)
     """
-    validator = GraphValidator(db_service)
+    validator = GraphValidator(db)
     report = validator.validate_project_graph(project_key)
     return report

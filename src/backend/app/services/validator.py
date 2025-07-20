@@ -1,15 +1,15 @@
 """
 Validates the integrity of the ArangoDB graph.
 """
-from ..db.service import DatabaseService
+from arango.database import StandardDatabase
 
 class GraphValidator:
     """
     Performs validation checks on the graph for a given project.
     """
-    def __init__(self, db_service: DatabaseService):
-        self.db = db_service
-        self.aql = self.db.db.aql
+    def __init__(self, db: StandardDatabase):
+        self.db = db
+        self.aql = self.db.aql
 
     def validate_project_graph(self, project_key: str) -> dict:
         """
