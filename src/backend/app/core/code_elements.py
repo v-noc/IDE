@@ -10,6 +10,15 @@ from ..db import collections as db
 
 class Function(DomainObject[node.FunctionNode]):
     """A domain object representing a function."""
+    @property
+    def inputs(self) -> list[dict]:
+        """Returns the list of input parameters."""
+        return self.model.properties.inputs
+    
+    @property
+    def outputs(self) -> list[dict]:
+        """Returns the list of output parameters."""
+        return self.model.properties.outputs
     
     def add_call(self, target: Union['Function', 'Class'], position: node.NodePosition):
         """Creates a 'calls' edge from this function to a target element."""
@@ -44,6 +53,16 @@ class Function(DomainObject[node.FunctionNode]):
             usage_positions=usage_positions
         )
         db.uses_import_edges.create(import_edge)
+
+    def add_input(self, name: str, position: node.NodePosition, **kwargs):
+        """Adds an input parameter to the function's properties."""
+        self.model.properties.inputs.append({"name": name, "position": position, **kwargs})
+        db.nodes.create(self.model)
+
+    def add_output(self, name: str, position: node.NodePosition, **kwargs):
+        """Adds an output/return value to the function's properties."""
+        self.model.properties.outputs.append({"name": name, "position": position, **kwargs})
+        db.nodes.create(self.model)
 
     
 class Class(DomainObject[node.ClassNode]):
@@ -102,3 +121,8 @@ class Class(DomainObject[node.ClassNode]):
             usage_positions=usage_positions
         )
         db.uses_import_edges.create(import_edge)
+
+    def add_field(self, name: str, position: node.NodePosition, **kwargs):
+        """Adds a field to the class's properties."""
+        self.model.properties.fields.append({"name": name, "position": position, **kwargs})
+        db.nodes.create(self.model)
