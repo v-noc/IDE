@@ -91,12 +91,7 @@ class Folder(DomainObject[node.FolderNode]):
         """
         Retrieves all descendants of this folder and formats them as a tree.
         """
-        aql = f"""
-        FOR v, e, p IN 1..100 OUTBOUND '{self.id}' {db.contains_edges.collection_name}
-            RETURN {{ "vertex": v, "parent_id": p.vertices[-2]._id }}
-        """
-        
-        cursor = db.nodes.db.aql.execute(aql)
+        cursor = db.contains_edges.get_descendant_tree_query(self.id)
         
         node_map = {self.id: {"node": self.model.model_dump(), "children": []}}
         

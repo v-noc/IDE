@@ -1,6 +1,6 @@
 # src/backend/app/db/edge_orm.py
 
-from typing import Type, TypeVar, Generic
+from typing import Type, TypeVar, Generic, List, Dict, Any
 from pydantic import BaseModel
 from arango.collection import StandardCollection
 from arango.database import StandardDatabase
@@ -75,3 +75,13 @@ class ArangoEdgeCollection(Generic[T]):
     def truncate(self):
         """Deletes all edges in the collection."""
         self.collection.truncate()
+
+    def get_descendant_tree_query(self, start_node_id: str) -> List[Dict[str, Any]]:
+        """
+        Executes a graph traversal to fetch all descendants of a start node.
+        """
+        aql = f"""
+        FOR v, e, p IN 1..100 OUTBOUND '{start_node_id}' {self.collection_name}
+            RETURN {{ "vertex": v, "parent_id": p.vertices[-2]._id }}
+        """
+        return list(self.db.aql.execute(aql))
