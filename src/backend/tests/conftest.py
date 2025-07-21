@@ -64,7 +64,7 @@ def setup_test_database(test_settings, test_db_name, monkeypatch_session):
     if not sys_db.has_database(test_db_name):
         sys_db.create_database(test_db_name)
 
-    sys_db.update_permission( # This was the error
+    sys_db.update_permission(
         username=test_settings.ARANGO_USER,
         database=test_db_name,
         permission="rw"
@@ -80,12 +80,13 @@ def clean_collections():
     """
     Function-scoped fixture to ensure a clean state for each test.
     """
-    from app.db.client import get_db
-    
-    db = get_db()
-    for collection in db.collections():
-        if not collection["system"]:
-            db.collection(collection["name"]).truncate()
+    from app.db import collections as db_collections
+    from app.db.node_orm import ArangoNodeCollection
+    from app.db.edge_orm import ArangoEdgeCollection
+
+    for collection in db_collections.__dict__.values():
+        if isinstance(collection, (ArangoNodeCollection, ArangoEdgeCollection)):
+            collection.truncate()
     yield
 
 @pytest.fixture

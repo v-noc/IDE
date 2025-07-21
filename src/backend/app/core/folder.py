@@ -5,6 +5,7 @@ from .base import DomainObject
 from .file import File
 from ..models import node, edges, properties
 from ..db import collections as db
+from typing import List, Dict, Any
 
 class Folder(DomainObject[node.FolderNode]):
     """
@@ -85,3 +86,36 @@ class Folder(DomainObject[node.FolderNode]):
             filter_by_type="folder"
         )
         return [Folder(node) for node in folder_nodes]
+
+    def get_descendant_tree(self) -> Dict[str, Any]:
+        """
+        Retrieves all descendants of this folder and formats them as a tree.
+        """
+        aql = f"""
+        FOR v, e, p IN 1..100 OUTBOUND '{self.id}' {db.contains_edges.collection_name}
+            RETURN {{ "vertex": v, "parent_id": p.vertices[-2]._id }}
+        """
+        
+        cursor = db.nodes.db.aql.execute(aql)
+        
+        node_map = {self.id: {"node": self.model.model_dump(), "children": []}}
+        
+        for item in cursor:
+            node_data = item['vertex']
+            parent_id = item['parent_id']
+            
+            node_id = node_data['_id']
+            if node_id not in node_map:
+                node_map[node_id] = {"node": node_data, "children": []}
+            
+            if parent_id in node_map:
+                node_map[parent_id]["children"].append(node_map[node_id])
+
+        def build_tree(node_id):
+            node_info = node_map[node_id]
+            return {
+                **node_info["node"],
+                "children": [build_tree(child["node"]["_id"]) for child in node_info["children"]]
+            }
+
+        return build_tree(self.id)

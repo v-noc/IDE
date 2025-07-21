@@ -1,31 +1,29 @@
-# src/backend/app/db/orm.py
+# src/backend/app/db/node_orm.py
 
 from typing import Type, TypeVar, Generic, Union, get_origin
 from pydantic import BaseModel, TypeAdapter
 from arango.collection import StandardCollection
 from arango.database import StandardDatabase
 from .client import get_db
-from ..models.base import ArangoBase, BaseEdge
+from ..models.base import ArangoBase
+from .edge_orm import ArangoEdgeCollection
 
 T = TypeVar('T', bound=ArangoBase)
 
-class ArangoCollection(Generic[T]):
+class ArangoNodeCollection(Generic[T]):
     """
-    A generic, typed wrapper around an ArangoDB collection that handles
-    Pydantic model validation, creation, and retrieval for both documents and edges.
+    A generic, typed wrapper around an ArangoDB document collection that handles
+    Pydantic model validation, creation, and retrieval.
     """
     def __init__(self, collection_name: str, model: Type[T]):
         self.collection_name = collection_name
         self.model = model
         
-        # Use TypeAdapter for Unions or Annotated types containing Unions.
-        # hasattr check is a reliable way to detect Annotated types.
         if get_origin(model) is Union or hasattr(model, '__metadata__'):
             self.adapter = TypeAdapter(model)
         else:
             self.adapter = None
 
-        # Defer collection creation until it's first accessed.
         self._collection: StandardCollection | None = None
 
     @property
@@ -37,8 +35,7 @@ class ArangoCollection(Generic[T]):
     def collection(self) -> StandardCollection:
         """Memoized collection instance."""
         if self._collection is None:
-            # Default to creating a document collection. `create` will handle edges.
-            self._collection = self._get_or_create_collection(edge=False)
+            self._collection = self._get_or_create_collection()
         return self._collection
 
     def _validate(self, doc: dict) -> T:
@@ -47,33 +44,21 @@ class ArangoCollection(Generic[T]):
             return self.adapter.validate_python(doc)
         return self.model.model_validate(doc)
 
-    def _get_or_create_collection(self, edge: bool | None = None) -> StandardCollection:
+    def _get_or_create_collection(self) -> StandardCollection:
         """
-        Retrieves the collection or creates it if it doesn't exist.
-        If the collection exists but has the wrong type (edge vs document),
-        it is recreated.
+        Retrieves the document collection or creates it if it doesn't exist.
         """
-        if edge is None:
-            # If edge is not specified, infer from the model type.
-            # This is a bit of a hack, but it's the most reliable way to
-            # determine the collection type without a major refactor.
-            edge = issubclass(self.model, BaseEdge)
-
         if self.db.has_collection(self.collection_name):
             collection = self.db.collection(self.collection_name)
-            # Return existing collection if type is correct
-            if collection.properties()['edge'] is edge:
+            if not collection.properties()['edge']:
                 return collection
-            # Otherwise, delete it so it can be recreated with the correct type
             self.db.delete_collection(self.collection_name)
 
-        return self.db.create_collection(self.collection_name, edge=edge)
-
+        return self.db.create_collection(self.collection_name, edge=False)
 
     def get(self, key: str) -> T | None:
         """
         Retrieves a document by its key and validates it with the Pydantic model.
-        Returns None if the document is not found.
         """
         doc = self.collection.get(key)
         if doc:
@@ -83,38 +68,11 @@ class ArangoCollection(Generic[T]):
     def create(self, doc_data: T) -> T:
         """
         Inserts a new document from a Pydantic model.
-        Returns the fully populated, validated model from the database.
         """
-        is_edge = isinstance(doc_data, BaseEdge)
-        # Ensure collection is of the correct type before inserting
-        self._collection = self._get_or_create_collection(edge=is_edge)
-
         dump = doc_data.model_dump(by_alias=True, exclude_none=True)
         meta = self.collection.insert(dump, overwrite=True)
-        
         new_doc = self.collection.get(meta["_key"])
         return self._validate(new_doc)
-
-    def update(self, key: str, patch_data: BaseModel) -> T:
-        """
-        Updates a document with new data.
-        Returns the updated, validated model.
-        """
-        dump = patch_data.model_dump(exclude_unset=True)
-        self.collection.update(key, dump)
-        
-        updated_doc = self.collection.get(key)
-        return self._validate(updated_doc)
-
-    def delete(self, key: str) -> bool:
-        """
-        Deletes a document by its key.
-        Returns True if deletion was successful, False otherwise.
-        """
-        try:
-            return self.collection.delete(key)
-        except Exception:
-            return False
 
     def find(self, filters: dict, limit: int | None = None) -> list[T]:
         """
@@ -131,31 +89,29 @@ class ArangoCollection(Generic[T]):
         return [self._validate(doc) for doc in cursor]
 
     def truncate(self):
-        """
-        Deletes all documents in the collection.
-        """
+        """Deletes all documents in the collection."""
         self.collection.truncate()
 
     def find_related(
         self,
         start_node_id: str,
-        edge_collection: "ArangoCollection",
+        edge_collection: "ArangoEdgeCollection",
         direction: str = "outbound",
         filter_by_type: str | None = None
     ) -> list[T]:
         """
         Finds nodes related to a starting node through a given edge collection.
         """
-        # Ensure the edge collection exists before querying against it.
-        _ = edge_collection._get_or_create_collection(edge=True)
-
         if direction not in ["outbound", "inbound", "any"]:
             raise ValueError("Direction must be 'outbound', 'inbound', or 'any'.")
 
         query = f"""
-        FOR node IN 1..1 {direction.upper()} @start_node_id {edge_collection.collection_name}
+        FOR node IN 1..1 {direction.upper()} @start_node_id @@edge_collection
         """
-        bind_vars = {"start_node_id": start_node_id}
+        bind_vars = {
+            "start_node_id": start_node_id,
+            "@edge_collection": edge_collection.collection_name
+        }
 
         if filter_by_type:
             query += " FILTER node.node_type == @node_type"
@@ -167,3 +123,17 @@ class ArangoCollection(Generic[T]):
         
     def __getitem__(self, key: str) -> T | None:
         return self.get(key)
+
+    def get_all_descendants(self, start_node_id: str, edge_collection: "ArangoEdgeCollection") -> list[T]:
+        """
+        Retrieves all descendants of a starting node.
+        """
+        query = """
+        FOR node IN 1..10 OUTBOUND @start_node_id @@edge_collection
+            RETURN node
+        """
+        bind_vars = {
+            "start_node_id": start_node_id,
+            "@edge_collection": edge_collection.collection_name
+        }
+        return self.aql(query, bind_vars)
