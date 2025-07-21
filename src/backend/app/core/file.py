@@ -19,6 +19,10 @@ class File(DomainObject[node.FileNode]):
     @property
     def path(self) -> str:
         return self.model.properties.path
+    
+    @property
+    def absolute_path(self) -> str:
+        return self.path + self.name
 
     def add_function(self, name: str, position: node.NodePosition, **kwargs) -> Function:
         """Adds a new function to this file."""

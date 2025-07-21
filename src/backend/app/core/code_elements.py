@@ -45,6 +45,7 @@ class Function(DomainObject[node.FunctionNode]):
         )
         db.uses_import_edges.create(import_edge)
 
+    
 class Class(DomainObject[node.ClassNode]):
     """A domain object representing a class."""
     

@@ -66,7 +66,7 @@ def test_get_descendant_tree():
     user_folder.add_file(file_name="user.py", file_path=user_folder.absolute_path + "/")
 
     tree = src_folder.get_descendant_tree()
-    pprint.pprint(project.get_descendant_tree())
+    # pprint.pprint(project.get_descendant_tree())
     assert tree["name"] == "src"
     assert len(tree["children"]) == 1
     
