@@ -4,6 +4,7 @@ def test_project_creation(temp_project_dir):
     manager = CodeGraphManager()
     projects = manager.get_all_projects()
     assert len(projects) == 0
+    
     project = manager.create_project(name="test", path=temp_project_dir)
     assert project is not None
 

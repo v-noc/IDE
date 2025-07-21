@@ -18,6 +18,11 @@ class Folder(DomainObject[node.FolderNode]):
     @property
     def path(self) -> str:
         return self.model.properties.path
+    
+    @property
+    def absolute_path(self) -> str:
+        return self.path + self.name
+    
 
     def add_file(self, file_name: str, file_path: str) -> File:
         """Adds a new file to this folder."""
