@@ -73,6 +73,13 @@ class ArangoNodeCollection(Generic[T]):
         meta = self.collection.insert(dump, overwrite=True)
         new_doc = self.collection.get(meta["_key"])
         return self._validate(new_doc)
+    
+    def update(self, doc_data: T) -> T:
+        """
+        Updates an existing document from a Pydantic model.
+        """
+        dump = doc_data.model_dump(by_alias=True, exclude_none=True)
+        self.collection.update(dump)
 
     def find(self, filters: dict, limit: int | None = None) -> list[T]:
         """

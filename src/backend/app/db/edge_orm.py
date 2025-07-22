@@ -64,6 +64,13 @@ class ArangoEdgeCollection(Generic[T]):
         meta = self.collection.insert(dump, overwrite=True)
         new_doc = self.collection.get(meta["_key"])
         return self._validate(new_doc)
+    
+    def update(self, edge_data: T) -> T:
+        """
+        Updates an existing edge from a Pydantic model.
+        """
+        dump = edge_data.model_dump(by_alias=True, exclude_none=True)
+        self.collection.update(dump)
 
     def find(self, filters: dict, limit: int | None = None) -> list[T]:
         """

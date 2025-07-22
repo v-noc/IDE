@@ -57,12 +57,12 @@ class Function(DomainObject[node.FunctionNode]):
     def add_input(self, name: str, position: node.NodePosition, **kwargs):
         """Adds an input parameter to the function's properties."""
         self.model.properties.inputs.append({"name": name, "position": position, **kwargs})
-        db.nodes.create(self.model)
+        db.nodes.update(self.model)
 
     def add_output(self, name: str, position: node.NodePosition, **kwargs):
         """Adds an output/return value to the function's properties."""
         self.model.properties.outputs.append({"name": name, "position": position, **kwargs})
-        db.nodes.create(self.model)
+        db.nodes.update(self.model)
 
     
 class Class(DomainObject[node.ClassNode]):
@@ -125,4 +125,4 @@ class Class(DomainObject[node.ClassNode]):
     def add_field(self, name: str, position: node.NodePosition, **kwargs):
         """Adds a field to the class's properties."""
         self.model.properties.fields.append({"name": name, "position": position, **kwargs})
-        db.nodes.create(self.model)
+        db.nodes.update(self.model)
