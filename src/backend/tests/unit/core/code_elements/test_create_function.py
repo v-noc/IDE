@@ -74,3 +74,4 @@ def test_create_function_with_inputs_and_outputs(created_function):
     }
     assert function.inputs == [expected_input]
     assert function.outputs == [expected_output]
+    

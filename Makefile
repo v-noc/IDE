@@ -31,7 +31,7 @@ run-backend: start-db
 
 test-backend:
 	@echo ">>> Running backend tests..."
-	@.venv/bin/python -m pytest src/backend/tests
+	@.venv/bin/python -m pytest -s src/backend/tests
 
 # ====================================================================================
 #  FRONTEND
