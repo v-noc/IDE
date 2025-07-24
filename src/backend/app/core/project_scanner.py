@@ -1,8 +1,8 @@
 # src/backend/app/services/project_scanner.py
-from ..core.parser.file_navigator import FileNavigator
-from ..core.parser.python.ast_cache import ASTCache
-from ..core.parser.python.symbol_table import SymbolTable
-from ..core.parser.python.file_parser import PythonFileParser
+from .parser.file_navigator import FileNavigator
+from .parser.python.ast_cache import ASTCache
+from .parser.python.symbol_table import SymbolTable
+from .parser.python.file_parser import PythonFileParser
 # Import your db collections here, e.g., from ..db import collections
 
 class ProjectScanner:
