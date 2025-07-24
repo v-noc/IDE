@@ -38,6 +38,44 @@ When the `CallVisitor` needs to resolve a call target, the `SymbolTable`'s `reso
 
 This is a graph traversal, but it can be implemented efficiently with targeted AQL queries that the `SymbolTable` can construct and execute via the ORM.
 
+## Visualizing Scope Persistence
+
+The following diagram illustrates how scopes and variables are persisted in the graph.
+
+```mermaid
+graph TD
+    subgraph "File: main.py"
+        F1(FileNode: main.py);
+    end
+
+    subgraph "File: user.py"
+        F2(FileNode: user.py);
+        C1(ClassNode: User);
+        M1(FunctionNode: get_name);
+        F2 -- CONTAINS --> C1;
+        C1 -- CONTAINS --> M1;
+    end
+
+    subgraph "Scope within main()"
+        FN1(FunctionNode: main);
+        V1(VariableNode: my_user);
+        F1 -- CONTAINS --> FN1;
+        FN1 -- DEFINES --> V1;
+        V1 -- INSTANCE_OF --> C1;
+    end
+
+    subgraph "Call Resolution"
+        CALL(Call to my_user.get_name());
+        FN1 -- EXECUTES --> CALL;
+        CALL -- RESOLVES_TO --> M1;
+    end
+```
+
+This graph shows:
+-   The `main` function `CONTAINS` a `VariableNode` for `my_user`.
+-   The `my_user` variable is an `INSTANCE_OF` the `User` class.
+-   A call to `my_user.get_name()` inside `main` can be resolved by first finding the type of `my_user` (by following the `DEFINES` and `INSTANCE_OF` edges) and then finding the `get_name` method on the `User` class.
+
 ## Loading Scopes from the Database
 
 With this design, the scope information is **fully persisted in the graph**. When the analysis is complete, the database contains a complete and queryable representation of every scope and the variables defined within it.

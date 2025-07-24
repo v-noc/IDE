@@ -13,6 +13,26 @@ The parser will not interact directly with the database. Its sole responsibility
 
 ## Component Breakdown
 
+```mermaid
+graph TD
+    A[API Request] --> B(ProjectScanner);
+    B --> C{FileNavigator};
+    B --> D(PythonFileParser);
+    D --> E{ASTCache};
+    D --> F(DeclarationVisitor);
+    D --> G(Detail Visitor Pipeline);
+    G --> H(SymbolTable);
+    B -- Creates/Updates via ORM --> I[(ArangoDB)];
+
+    subgraph "Second Pass (Detailing)"
+        G
+    end
+
+    subgraph "First Pass (Declarations)"
+        F
+    end
+```
+
 1.  **`FileNavigator` (`core/parser/file_navigator.py`)**
     *   **Responsibility:** File discovery.
     *   **Function:** Scans a project directory and finds all `.py` files. This component already exists and will be used as-is.
@@ -24,12 +44,12 @@ The parser will not interact directly with the database. Its sole responsibility
 3.  **Visitors (`core/parser/python/visitors/`)**
     *   **Responsibility:** AST traversal and raw data extraction.
     *   **`DeclarationVisitor`:** Performs the first pass. It finds all `ast.ClassDef` and `ast.FunctionDef` nodes.
-    *   **`DetailVisitor`:** Performs the second pass. It finds `ast.Call`, `ast.Import`, `ast.ImportFrom`, and analyzes the bodies of functions to understand control flow and dependencies.
-    *   **[► Read Detailed Design](./visitors/VISITOR_DESIGN.md)**
+    *   **`DetailVisitor` (Pipeline):** Performs the second pass through a series of single-purpose visitors (Control Flow, Dependencies, etc.).
+    *   **[► Read Detailed Design](./visitors/README.md)**
 
 4.  **`SymbolTable` (`core/parser/python/symbol_table.py`)**
     *   **Responsibility:** The "brain" of the parser. It tracks all symbols, their scopes, and their corresponding database `_id`s.
-    *   **Function:** It provides the critical resolution logic. When the `DetailVisitor` finds a call like `u.foo()`, the `SymbolTable` is responsible for figuring out that `u` is an alias for `utils.py` and that the target is the `foo` function within that file. It then provides the database `_id` for that function so a `CallEdge` can be created.
+    *   **Function:** It provides the critical resolution logic. When a visitor finds a call like `u.foo()`, the `SymbolTable` is responsible for figuring out that `u` is an alias for `utils.py` and that the target is the `foo` function within that file. It then provides the database `_id` for that function so an edge can be created.
     *   **[► Read Detailed Design](./python/SYMBOL_TABLE_DESIGN.md)**
 
 5.  **`PythonFileParser` (`core/parser/python/file_parser.py`)**

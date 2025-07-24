@@ -1,80 +1,78 @@
 # Control Flow Analysis Design
 
-This document details the plan to extend the parser to analyze and model control flow structures (`if`, `match`, `for`, `while`). This involves extending the database schema and creating a dedicated visitor to handle the logic.
+This document details the plan to extend the parser to analyze and model control flow structures (`if`, `match`, `for`, `while`). This updated design uses a true **Control Flow Graph (CFG)** or "Execution Graph" model, which is simpler and more powerful than the previous `BRANCHES` edge design.
 
-## Core Principle: Control Flow as Nodes
+## Core Principle: An Execution Graph
 
-The fundamental design choice is to represent control flow blocks as distinct nodes in the graph. This allows us to attach detailed properties to them (like the conditions of an `if` statement) and to link them to the code that executes within them.
+Instead of connecting blocks with a generic `BRANCHES` edge, we will use a single, directed `EXECUTES` edge to represent the actual flow of execution. This creates a clear, queryable graph of how a program runs.
 
 ## 1. Schema Extensions
 
-We will extend the models in `app/models/` to support these new structures.
+### Node Types (Unchanged)
+We will still create nodes for control flow blocks, but they will be simpler:
+-   `IfNode`
+-   `ForLoopNode`
+-   `WhileLoopNode`
+-   `MatchNode`
+-   `CaseNode`
+-   We will also now create a `CallNode` for each function call, to serve as a node in the execution graph.
 
-### New Node Types
+### New Edge Type: `EXECUTES`
+This is the most important change. We will add one new edge type to `edges.py`.
 
-The `Node` discriminated union in `node.py` will be extended with:
+-   **`EXECUTES`**: A directed edge representing the unconditional next step in execution.
+    -   `_from`: Any node in the execution graph (a `FunctionNode`, `IfNode`, `CallNode`, etc.).
+    -   `_to`: The very next node in the execution sequence.
+    -   `branch`: An optional string property, either `"true"` or `"false"`, used only on the two outgoing edges from an `IfNode`.
 
--   **`IfNode`**: Represents an `if` or `elif` block.
-    -   `properties`:
-        -   `condition_str`: `str` - The string representation of the condition (e.g., `user.is_active()`).
-        -   `condition_expr`: `dict` - A structured representation of the condition. For `x > 5`, this would be `{ "left": "x", "op": "Gt", "right": "5" }`. For complex conditions, this can be a nested dictionary.
--   **`ElseNode`**: Represents an `else` block. It has no specific properties.
--   **`ForLoopNode`**: Represents a `for` loop.
-    -   `properties`:
-        -   `target_str`: `str` - The loop variable (e.g., `user`).
-        -   `iterable_str`: `str` - The expression being iterated over (e.g., `active_users`).
--   **`WhileLoopNode`**: Represents a `while` loop. Its properties are identical to `IfNode`.
--   **`MatchNode`**: Represents a `match` statement.
-    -   `properties`:
-        -   `subject_str`: `str` - The variable or value being matched.
--   **`CaseNode`**: Represents a `case` block within a `match`.
-    -   `properties`:
-        -   `pattern_str`: `str` - The string representation of the case pattern.
+## 2. Visualizing the Execution Graph
 
-### New Edge Types
+Consider this code:
+```python
+def my_func(x):
+    if x > 10:
+        foo()
+    else:
+        bar()
+    baz()
+```
 
-The `edges.py` model will be extended with:
+The graph structure becomes a clear, directed flow:
 
--   **`BRANCHES`**: This edge links control flow nodes together sequentially.
-    -   `_from`: `FunctionNode` -> `_to`: First `IfNode` or `ForLoopNode` in the function.
-    -   `_from`: `IfNode` -> `_to`: The next `IfNode` (`elif`) or `ElseNode`.
-    -   `_from`: `IfNode` -> `_to`: The first `CallNode` or other statement inside its body.
-    -   `_from`: `ForLoopNode` -> `_to`: The first statement inside its body.
--   **`CONDITION_OF`**: This is a critical new edge for linking conditions directly to function calls.
-    -   `_from`: `IfNode` or `WhileLoopNode` -> `_to`: A `FunctionNode` that is called *within* the condition expression.
-    -   **Example:** For `if user.is_active():`, this edge would link the `IfNode` for the `if` statement directly to the `FunctionNode` for `is_active`.
+```mermaid
+graph TD
+    A(FunctionNode: my_func) --> B(IfNode: x > 10);
+    B -- "EXECUTES (branch: true)" --> C(CallNode: foo);
+    B -- "EXECUTES (branch: false)" --> D(CallNode: bar);
+    C --> E(CallNode: baz);
+    D --> E;
+```
+This is much cleaner and more powerful than the previous design.
 
-## 2. The `ControlFlowVisitor`
+## 3. The `ControlFlowVisitor`
 
-A new, dedicated visitor will be added to the second-pass pipeline. It will run **before** the `CallVisitor` but after the `TypeInferenceVisitor`.
-
-**Inherits from:** `ast.NodeVisitor`
-
-**Purpose:** To identify all control flow statements, create the corresponding `Node` and `Edge` models, and add them to the `VisitorContext` results.
+The visitor's job is now to build this execution graph.
 
 ### `visit_If(self, node: ast.If)`
--   **Logic:** This is the most complex method.
-    1.  **Create `IfNode`:** It creates an `IfNode` for the current `if` block.
-    2.  **Parse Condition:** It will parse `node.test`.
-        -   It will generate the `condition_str` using `ast.unparse`.
-        -   It will recursively parse the expression to create the `condition_expr` dictionary.
-        -   **If `node.test` is an `ast.Call`:** It will use the `SymbolTable` to resolve the call target. If successful, it will create a `CONDITION_OF` edge linking the new `IfNode` to the resolved `FunctionNode`.
-    3.  **Link to Body:** It will create `BRANCHES` edges from the `IfNode` to the statements inside `node.body`.
-    4.  **Handle `orelse`:** It will recursively call itself on the `node.orelse` block. If the `orelse` is another `ast.If`, it creates another `IfNode` (for an `elif`). If it's a simple block, it creates an `ElseNode`. It then creates a `BRANCHES` edge from the current `IfNode` to the `elif`/`else` node.
+-   **Logic:**
+    1.  Create the `IfNode`.
+    2.  Link the previous statement (the "cursor") to this `IfNode` with an `EXECUTES` edge.
+    3.  Recursively visit the `body` block, passing the `IfNode` as the new cursor. The first statement in the `body` will be linked from the `IfNode` with an `EXECUTES` edge where `branch="true"`.
+    4.  Keep track of the last statement in the `body` block.
+    5.  Recursively visit the `orelse` block, passing the `IfNode` as the cursor. The first statement in the `orelse` block will be linked from the `IfNode` with an `EXECUTES` edge where `branch="false"`.
+    6.  Keep track of the last statement in the `orelse` block.
+    7.  The new "cursor" for subsequent statements will be the set of all statements that were the last in their respective blocks (e.g., the `foo()` and `bar()` call nodes in the example).
 
 ### `visit_For(self, node: ast.For)`
 -   **Logic:**
-    1.  Creates a `ForLoopNode`.
-    2.  Parses `node.target` and `node.iter` to populate the node's properties.
-    3.  If `node.iter` is a function call, it resolves it and creates a `CONDITION_OF` edge (semantically, it's a call that *governs* the loop).
-    4.  Creates `BRANCHES` edges to the statements inside `node.body`.
+    1.  Create the `ForLoopNode`.
+    2.  Link the previous statement to this `ForLoopNode`.
+    3.  Recursively visit the `body`, linking the `ForLoopNode` to the first statement in the body.
+    4.  The last statement in the `body` gets an `EXECUTES` edge pointing back to the `ForLoopNode`, creating the loop.
+    5.  The `ForLoopNode` itself becomes the new cursor for the statement that follows the loop.
 
-### `visit_While(self, node: ast.While)`
--   **Logic:** Very similar to `visit_If`. It creates a `WhileLoopNode` and parses the `node.test` condition, creating a `CONDITION_OF` edge if the condition is a direct function call.
+## 4. Impact on Other Components
+-   **`CallVisitor` is removed:** We no longer need a separate `CallVisitor`. The `ControlFlowVisitor` will now be responsible for creating `CallNode`s as it encounters them in the execution graph. This further simplifies the pipeline.
+-   **Schema:** The schema is simpler, requiring only one new `EXECUTES` edge instead of multiple complex ones.
 
-## 3. Impact on Architecture
-
--   The `PARSER_ARCHITECTURE.md` needs to be updated to include the `ControlFlowVisitor` in the second-pass pipeline. It should run after type inference but before the main `CallVisitor`.
--   The `CallVisitor`'s job becomes simpler. It still finds all calls, but the `ControlFlowVisitor` has already created the graph structure that gives those calls context.
-
-This design provides a much richer, more queryable graph. We can now ask questions like: "Show me all function calls that only happen if `user.is_admin` is true" or "Find all loops that iterate over the result of the `get_all_users` function."
+This updated design is a significant improvement. It's easier to implement, less prone to errors, and produces a graph that is a true, queryable representation of the program's execution paths.
