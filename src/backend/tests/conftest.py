@@ -8,12 +8,16 @@ def pytest_configure(config):
     """
     This hook runs before pytest collects any tests.
     It sets the necessary environment variables to ensure the application
-    loads the test configuration.
+    loads the test configuration and clears any cached settings.
     """
     os.environ["APP_ENV"] = "test"
     conftest_dir = Path(__file__).parent
     env_file_path = conftest_dir / ".env.test"
     os.environ["ENV_FILE"] = str(env_file_path)
+    
+    # Clear the lru_cache for get_settings to ensure the new env vars are used
+    from app.config.settings import get_settings
+    get_settings.cache_clear()
 
 # --- Fixtures ---
 

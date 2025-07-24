@@ -14,22 +14,19 @@ class DeclarationVisitor(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Identifies a function definition."""
-        # TODO: Implement the logic to record a function declaration.
-        # Remember not to call generic_visit() for top-level functions.
-        pass
+        self.declared_functions.append(node)
+        # We do not call generic_visit here to avoid traversing into the function body
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Identifies a class definition."""
-        # TODO: Implement the logic to record a class declaration.
-        # Remember to call generic_visit() to find nested methods.
-        pass
+        self.declared_classes.append(node)
+        # We call generic_visit to find nested methods and classes
+        self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
         """Identifies an 'import ...' statement."""
-        # TODO: Implement the logic to record an import.
-        pass
+        self.imports.append(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         """Identifies a 'from ... import ...' statement."""
-        # TODO: Implement the logic to record a from-import.
-        pass
+        self.imports.append(node)

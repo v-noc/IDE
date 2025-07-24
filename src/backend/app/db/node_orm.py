@@ -1,8 +1,9 @@
 # src/backend/app/db/node_orm.py
 
-from typing import Type, TypeVar, Generic, Union, get_origin
-from pydantic import BaseModel, TypeAdapter
+from typing import Type, TypeVar, Generic, Union, get_origin, Optional
+from pydantic import TypeAdapter
 from arango.collection import StandardCollection
+from arango.exceptions import DocumentGetError
 from arango.database import StandardDatabase
 from .client import get_db
 from ..models.base import ArangoBase
@@ -10,10 +11,11 @@ from .edge_orm import ArangoEdgeCollection
 
 T = TypeVar('T', bound=ArangoBase)
 
+
 class ArangoNodeCollection(Generic[T]):
     """
-    A generic, typed wrapper around an ArangoDB document collection that handles
-    Pydantic model validation, creation, and retrieval.
+    A generic, typed wrapper around an ArangoDB document collection that
+    handles Pydantic model validation, creation, and retrieval.
     """
     def __init__(self, collection_name: str, model: Type[T]):
         self.collection_name = collection_name
@@ -58,12 +60,14 @@ class ArangoNodeCollection(Generic[T]):
 
     def get(self, key: str) -> T | None:
         """
-        Retrieves a document by its key and validates it with the Pydantic model.
+        Retrieves a document by its key and validates it with the Pydantic
+        model.
         """
-        doc = self.collection.get(key)
-        if doc:
-            return self._validate(doc)
-        return None
+        try:
+            doc = self.collection.get(key)
+            return self._validate(doc) if doc else None
+        except DocumentGetError:
+            return None
 
     def create(self, doc_data: T) -> T:
         """
@@ -88,6 +92,18 @@ class ArangoNodeCollection(Generic[T]):
         cursor = self.collection.find(filters, limit=limit)
         return [self._validate(doc) for doc in cursor]
 
+    def find_one(self, filters: dict) -> T | None:
+        """
+        Finds a single document using a filter dictionary.
+        Fixed: Now properly handles empty results.
+        """
+        try:
+            cursor = self.collection.find(filters, limit=1)
+            doc = next(cursor, None)  # Get first result or None
+            return self._validate(doc) if doc else None
+        except StopIteration:
+            return None
+
     def aql(self, query: str, bind_vars: dict | None = None) -> list[T]:
         """
         Executes a raw AQL query and validates the results against the model.
@@ -99,6 +115,13 @@ class ArangoNodeCollection(Generic[T]):
         """Deletes all documents in the collection."""
         self.collection.truncate()
 
+    def find(self, filters: dict, limit: Optional[int] = None) -> list[T]:
+        """
+        Finds documents using a filter dictionary.
+        """
+        cursor = self.collection.find(filters, limit=limit)
+        return [self._validate(doc) for doc in cursor]
+    
     def find_related(
         self,
         start_node_id: str,
@@ -110,7 +133,9 @@ class ArangoNodeCollection(Generic[T]):
         Finds nodes related to a starting node through a given edge collection.
         """
         if direction not in ["outbound", "inbound", "any"]:
-            raise ValueError("Direction must be 'outbound', 'inbound', or 'any'.")
+            raise ValueError(
+                "Direction must be 'outbound', 'inbound', or 'any'."
+            )
 
         query = f"""
         FOR node IN 1..1 {direction.upper()} @start_node_id @@edge_collection
@@ -131,7 +156,9 @@ class ArangoNodeCollection(Generic[T]):
     def __getitem__(self, key: str) -> T | None:
         return self.get(key)
 
-    def get_all_descendants(self, start_node_id: str, edge_collection: "ArangoEdgeCollection") -> list[T]:
+    def get_all_descendants(
+        self, start_node_id: str, edge_collection: "ArangoEdgeCollection"
+    ) -> list[T]:
         """
         Retrieves all descendants of a starting node.
         """
