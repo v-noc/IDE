@@ -10,7 +10,7 @@ except ModuleNotFoundError:
 class FileNavigator:
     def __init__(self, root_path: str, ignore_file_name: str = ".gitignore"):
         self.root_path = Path(root_path)
-        print(f"Root path: {self.root_path.absolute()}")
+       
         self.ignore_file_name = ignore_file_name
         self.spec = self._load_ignore_spec()
 
