@@ -6,6 +6,7 @@ from .project import Project
 from ..models import node, properties
 from ..db import collections as db
 
+
 class CodeGraphManager:
     """
     Provides high-level methods to create and load projects, serving as the
@@ -30,6 +31,20 @@ class CodeGraphManager:
         # 3. Return the hydrated domain object
         return Project(created_node)
 
+    def create_project_with_scan(self, name: str, path: str) -> Project:
+        """
+        Creates a new project and performs a full scan to build the complete
+        folder/file hierarchy with declarations.
+        """
+        from .parser.project_scanner import ProjectScanner
+        
+        # Create scanner and run full scan
+        scanner = ProjectScanner(path)
+        scanner.scan()
+        
+        # Return the created project
+        return scanner.project
+
     def load_project(self, project_key: str) -> Project:
         """
         Loads an existing project from the database by its key and returns a
@@ -41,7 +56,9 @@ class CodeGraphManager:
             raise ValueError(f"Project with key '{project_key}' not found.")
         
         if not isinstance(project_node, node.ProjectNode):
-            raise TypeError(f"Document with key '{project_key}' is not a ProjectNode.")
+            raise TypeError(
+                f"Document with key '{project_key}' is not a ProjectNode."
+            )
 
         # 2. Return the hydrated domain object
         return Project(project_node)
@@ -52,6 +69,7 @@ class CodeGraphManager:
         """
         project_nodes = db.nodes.find({"node_type": "project"})
         return [Project(node) for node in project_nodes]
+
 
 # A default instance for use in API endpoints
 code_graph_manager = CodeGraphManager()

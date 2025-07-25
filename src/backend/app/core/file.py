@@ -7,6 +7,7 @@ from .code_elements import Function, Class
 from ..models import node, edges, properties
 from ..db import collections as db
 
+
 class File(DomainObject[node.FileNode]):
     """
     A domain object representing a file, which contains code elements like
@@ -23,11 +24,14 @@ class File(DomainObject[node.FileNode]):
     @property
     def absolute_path(self) -> str:
         return self.path + self.name
-    
 
-    def add_function(self, name: str, position: node.NodePosition, **kwargs) -> Function:
+    def add_function(
+        self, name: str, position: node.NodePosition, **kwargs
+    ) -> Function:
         """Adds a new function to this file."""
-        qname = f"{self.path}::{name}"
+        # Use the file's qname as base and append function name
+        file_qname = self.model.qname
+        qname = f"{file_qname}.{name}"
         
         # 1. Create the FunctionNode model
         func_props = properties.FunctionProperties(position=position, **kwargs)
@@ -50,9 +54,13 @@ class File(DomainObject[node.FileNode]):
         # 3. Return the hydrated Function domain object
         return Function(created_func_node)
 
-    def add_class(self, name: str, position: node.NodePosition, **kwargs) -> Class:
+    def add_class(
+        self, name: str, position: node.NodePosition, **kwargs
+    ) -> Class:
         """Adds a new class to this file."""
-        qname = f"{self.path}::{name}"
+        # Use the file's qname as base and append class name
+        file_qname = self.model.qname
+        qname = f"{file_qname}.{name}"
 
         # 1. Create the ClassNode model
         class_props = properties.ClassProperties(position=position, **kwargs)
@@ -77,11 +85,20 @@ class File(DomainObject[node.FileNode]):
 
     def get_functions(self) -> List[Function]:
         """Retrieves all functions contained within this file."""
-        query = """
-        FOR node IN 1..1 OUTBOUND @file_id contains
-          FILTER node.node_type == 'function'
-          RETURN node
-        """
-        bind_vars = {"file_id": self.id}
-        results = db.nodes.aql(query, bind_vars)
-        return [Function(node_model) for node_model in results]
+        function_nodes = db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.contains_edges,
+            direction="outbound",
+            filter_by_type="function"
+        )
+        return [Function(node_model) for node_model in function_nodes]
+
+    def get_classes(self) -> List[Class]:
+        """Retrieves all classes contained within this file."""
+        class_nodes = db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.contains_edges,
+            direction="outbound",
+            filter_by_type="class"
+        )
+        return [Class(node_model) for node_model in class_nodes]

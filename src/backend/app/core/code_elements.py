@@ -20,6 +20,17 @@ class Function(DomainObject[node.FunctionNode]):
         """Returns the list of output parameters."""
         return self.model.properties.outputs
     
+    @property
+    def name(self) -> str:
+        """Returns the name of the function."""
+        return self.model.name
+    
+    @property
+    def qname(self) -> str:
+        """Returns the qualified name of the function."""
+        return self.model.qname
+    
+    
     def add_call(self, target: Union['Function', 'Class'], position: node.NodePosition):
         """Creates a 'calls' edge from this function to a target element."""
         if not isinstance(target, (Function, Class)):
@@ -67,6 +78,15 @@ class Function(DomainObject[node.FunctionNode]):
     
 class Class(DomainObject[node.ClassNode]):
     """A domain object representing a class."""
+    @property
+    def name(self) -> str:
+        """Returns the name of the class."""
+        return self.model.name
+    
+    @property
+    def qname(self) -> str:
+        """Returns the qualified name of the class."""
+        return self.model.qname
     
     def add_method(self, name: str, position: node.NodePosition, **kwargs) -> Function:
         """

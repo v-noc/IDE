@@ -8,6 +8,7 @@ from .folder import Folder
 from ..models import node, edges, properties
 from ..db import collections as db
 
+
 class Project(DomainObject[node.ProjectNode]):
     """
     A domain object representing a project, which is the root container for
@@ -27,10 +28,13 @@ class Project(DomainObject[node.ProjectNode]):
 
     def add_file(self, file_name: str, file_path: str) -> File:
         """Adds a new file directly to the project's root."""
+        # Generate qname following the dot notation pattern
+        file_qname = file_path.replace(self.path, "").lstrip("/").replace(".py", "").replace("/", ".")
+        
         # 1. Create the FileNode model
         file_node_model = node.FileNode(
             name=file_name,
-            qname=file_path,
+            qname=file_qname,
             node_type="file",
             properties=properties.FileProperties(path=file_path)
         )
@@ -49,10 +53,13 @@ class Project(DomainObject[node.ProjectNode]):
 
     def add_folder(self, folder_name: str, folder_path: str) -> Folder:
         """Adds a new folder directly to the project's root."""
+        # Generate qname following the dot notation pattern
+        folder_qname = folder_path.replace(self.path, "").lstrip("/").replace("/", ".")
+        
         # 1. Create the FolderNode model
         folder_node_model = node.FolderNode(
             name=folder_name,
-            qname=folder_path,
+            qname=folder_qname,
             node_type="folder",
             properties=properties.FolderProperties(path=folder_path)
         )

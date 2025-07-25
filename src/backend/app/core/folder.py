@@ -7,6 +7,7 @@ from ..models import node, edges, properties
 from ..db import collections as db
 from typing import List, Dict, Any
 
+
 class Folder(DomainObject[node.FolderNode]):
     """
     A domain object representing a folder, which can contain files and
@@ -27,10 +28,15 @@ class Folder(DomainObject[node.FolderNode]):
 
     def add_file(self, file_name: str, file_path: str) -> File:
         """Adds a new file to this folder."""
+        # Generate qname following the dot notation pattern
+        # Use the parent folder's path as base
+        parent_base = self.path.rstrip("/")
+        file_qname = file_path.replace(parent_base, "").lstrip("/").replace(".py", "").replace("/", ".")
+        
         # 1. Create the FileNode model
         file_node_model = node.FileNode(
             name=file_name,
-            qname=file_path,
+            qname=file_qname,
             node_type="file",
             properties=properties.FileProperties(path=file_path)
         )
@@ -49,10 +55,15 @@ class Folder(DomainObject[node.FolderNode]):
 
     def add_folder(self, folder_name: str, folder_path: str) -> 'Folder':
         """Adds a new sub-folder to this folder."""
+        # Generate qname following the dot notation pattern
+        # Use the parent folder's path as base
+        parent_base = self.path.rstrip("/")
+        folder_qname = folder_path.replace(parent_base, "").lstrip("/").replace("/", ".")
+        
         # 1. Create the FolderNode model
         folder_node_model = node.FolderNode(
             name=folder_name,
-            qname=folder_path,
+            qname=folder_qname,
             node_type="folder",
             properties=properties.FolderProperties(path=folder_path)
         )

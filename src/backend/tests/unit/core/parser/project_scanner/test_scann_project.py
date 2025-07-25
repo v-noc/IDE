@@ -2,6 +2,7 @@
 import pytest
 from app.core.parser.project_scanner import ProjectScanner
 from app.db import collections
+from app.core.manager import CodeGraphManager
 
 # Marks all tests in this file as using the 'clear_db' fixture
 pytestmark = pytest.mark.usefixtures("clear_db")
@@ -20,14 +21,15 @@ def test_scan_project_declaration_pass(sample_project_path):
     # 3. Assertions
     # Check that the correct nodes were created
     all_nodes = collections.nodes.find({})
-    for node in all_nodes:
-        print(node.qname," ",node.node_type," ",node.name)
+    
+   
     # Project (1)
+    # Folders (1): models
     # Files (4): main.py, utils.py, models/user.py, models/__init__, 
     # Classes (3): MainApp, UtilityClass, User
     # Functions (7): start_app, MainApp.run, MainApp.__init__, helper_function, 
     #                UtilityClass.do_something, User.__init__, User.get_name
-    assert len(all_nodes) == 1 + 5 + 3 + 7, "Should create the correct number of nodes"
+    assert len(all_nodes) == 1 + 5 + 3 + 7 + 1, "Should create the correct number of nodes"
 
     # Find specific nodes by their qualified name (qname)
     main_app_node = collections.nodes.find_one({"qname": "main.MainApp"})
@@ -49,3 +51,46 @@ def test_scan_project_declaration_pass(sample_project_path):
     helper_func_node = collections.nodes.find_one({"qname": "utils.helper_function"})
     assert helper_func_node is not None
     assert helper_func_node.node_type == "function"
+
+def test_tree_structure(sample_project_path):
+    """
+    Tests that the tree structure is correctly created.
+    """
+    scanner = ProjectScanner(sample_project_path)
+    scanner.scan()
+
+    manager = CodeGraphManager()
+    projects = manager.get_all_projects()
+    assert len(projects) == 1
+
+    project = projects[0]
+    
+    folders = project.get_folders()
+    files = project.get_files()
+
+
+    assert len(folders) == 1
+    assert len(files) == 3
+    
+    models_folder = folders[0]
+    assert (len(models_folder.get_files()) == 2)
+    assert (len(models_folder.get_folders()) == 0)
+
+    main_file = files[0]
+
+    assert (len(main_file.get_functions()) == 3)
+    assert (len(main_file.get_classes()) == 1)
+
+    utils_file = files[1]
+
+    for func in utils_file.get_functions():
+        print(f"Function: {func.name} {func.qname}")
+
+    assert (len(utils_file.get_functions()) == 2)
+    assert (len(utils_file.get_classes()) == 1)
+
+    utils_class = utils_file.get_classes()[0]
+    assert (utils_class.name == "UtilityClass")
+
+    helper_func = utils_file.get_functions()[0]
+    assert (helper_func.name == "helper_function")
