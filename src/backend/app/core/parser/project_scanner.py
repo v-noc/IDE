@@ -1,6 +1,6 @@
 # src/backend/app/core/parser/project_scanner.py
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Set
 from .file_navigator import FileNavigator
 from .python.ast_cache import ASTCache
 from .python.symbol_table import SymbolTable
@@ -8,8 +8,9 @@ from .python.file_parser import PythonFileParser
 from ..manager import CodeGraphManager
 from ..tree_builder import build_tree_from_paths
 from ...db import collections
-from ...models.edges import BelongsToEdge, ContainsEdge
-from ...models.node import NodePosition
+from ...models.edges import BelongsToEdge, ContainsEdge, UsesImportEdge
+from ...models.node import NodePosition, PackageNode
+from ...models.properties import PackageProperties
 
 
 class ProjectScanner:
@@ -28,6 +29,7 @@ class ProjectScanner:
             self.ast_cache, self.symbol_table, self.project_path
         )
         self.code_graph_manager = CodeGraphManager()
+        self.created_packages: Set[str] = set()
 
     def create_nodes_and_edges_from_tree(
         self, 
@@ -97,9 +99,79 @@ class ProjectScanner:
             self.project_path, ""
         ).lstrip("/").replace(".py", "").replace("/", ".")
 
+    def _create_package_node(self, package_qname: str) -> str:
+        """
+        Creates a PackageNode for an external package.
+        
+        Args:
+            package_qname: The fully qualified name of the package
+            
+        Returns:
+            The database ID of the created package node
+        """
+        if package_qname in self.created_packages:
+            return self.symbol_table.get_symbol_id(package_qname)
+        
+        # Create the package node
+        package_node = PackageNode(
+            name=package_qname.split('.')[-1],  # Last part as name
+            qname=package_qname,
+            properties=PackageProperties()
+        )
+        
+        # Save to database
+        created_package = collections.nodes.create(package_node)
+        
+        # Update symbol table
+        self.symbol_table.add_symbol(package_qname, created_package.id)
+        
+        # Link package to project with BelongsToEdge
+        belongs_to_edge = BelongsToEdge(
+            _from=created_package.id,
+            _to=self.project.id
+        )
+        collections.belongs_to_edges.create(belongs_to_edge)
+        
+        # Mark as created
+        self.created_packages.add(package_qname)
+        
+        return created_package.id
+
+    def _process_dependency_edges(self, edges: list) -> None:
+        """
+        Processes the dependency edges from the detail pass, creating 
+        package nodes as needed and linking them properly.
+        
+        Args:
+            edges: List of UsesImportEdge models with target_qname metadata
+        """
+        for edge in edges:
+            if not isinstance(edge, UsesImportEdge):
+                continue
+                
+            target_qname = getattr(edge, 'target_qname', None)
+            if not target_qname:
+                continue
+            
+            # Check if it's a local module or external package
+            if self.symbol_table.is_local_module(target_qname):
+                # It's a local module - find the existing node ID
+                target_id = self.symbol_table.get_symbol_id(target_qname)
+                if target_id:
+                    edge._to = target_id
+                    collections.uses_import_edges.create(edge)
+                else:
+                    print(f"Warning: Local module {target_qname} not found")
+            else:
+                # It's an external package - create package node if needed
+                package_id = self._create_package_node(target_qname)
+                edge._to = package_id
+                collections.uses_import_edges.create(edge)
+
     def scan(self) -> None:
         """
         Orchestrates the entire scanning process for a project.
+        This now includes Phase 2: Dependency and Import Resolution.
         """
         # Create the main project using CodeGraphManager
         project_name = os.path.basename(self.project_path)
@@ -163,13 +235,41 @@ class ProjectScanner:
                 )
                 collections.belongs_to_edges.create(belongs_to_edge)
 
-        # Third Pass (to be implemented)
-        # for file_path in py_files:
-        #     edge_models = self.file_parser.run_detail_pass(file_path)
-        #     for edge in edge_models:
-        #         collections.edges.create(edge)
+        # Third Pass: Phase 2 - Process dependencies and imports
+        print("Processing dependencies and imports...")
+        for file_path in py_files:
+            # Get the file qname and find the corresponding file node
+            file_qname = self.get_file_qname_from_path(file_path)
+            file_node_id = self.symbol_table._qname_to_id.get(file_qname)
+            
+            if not file_node_id:
+                continue
+                
+            # Run the detail pass to get dependency edges
+            dependency_edges = self.file_parser.run_detail_pass(
+                file_path, file_node_id
+            )
+            
+            # Process the edges, creating package nodes as needed
+            self._process_dependency_edges(dependency_edges)
 
         print(
-            "Project scan complete. "
-            "Folder hierarchy and declarations processed."
+            f"Project scan complete. "
+            f"Processed {len(py_files)} files, "
+            f"created {len(self.created_packages)} package nodes."
         )
+    
+    def get_scan_summary(self) -> Dict[str, Any]:
+        """
+        Returns a summary of the scanning results.
+        
+        Returns:
+            Dictionary containing scan statistics and information
+        """
+        return {
+            "project_path": self.project_path,
+            "project_id": self.project.id if hasattr(self, 'project') else None,
+            "total_symbols": len(self.symbol_table._qname_to_id),
+            "created_packages": list(self.created_packages),
+            "cached_files": len(self.ast_cache._cache) if hasattr(self.ast_cache, '_cache') else 0
+        }

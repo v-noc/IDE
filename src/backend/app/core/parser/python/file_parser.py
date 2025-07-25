@@ -4,7 +4,15 @@ from typing import List
 from .ast_cache import ASTCache
 from .symbol_table import SymbolTable
 from .visitors.declaration_visitor import DeclarationVisitor
-from ....models.node import FunctionNode, ClassNode, NodePosition
+from .visitors.detail_visitor.dependency_visitor import (
+    DependencyVisitor
+)
+from .visitors.detail_visitor.visitor_context import (
+    VisitorContext
+)
+from ....models.node import (
+    FunctionNode, ClassNode, NodePosition
+)
 from ....models.properties import FunctionProperties, ClassProperties
 from ....models.base import ArangoBase
 
@@ -94,9 +102,74 @@ class PythonFileParser:
                 ))
         
         return nodes
-    def run_detail_pass(self, file_path: str) -> List[ArangoBase]:
+    
+    def run_detail_pass(self, file_path: str, file_id: str) -> List[ArangoBase]:
         """
         Runs the second pass to analyze dependencies and control flow.
-        (To be implemented in later phases)
+        
+        This method processes imports and their usage, creating UsesImportEdge
+        models that link functions/classes to the symbols they import.
+        
+        Args:
+            file_path: The path to the Python file being analyzed
+            file_id: The database ID of the file node
+            
+        Returns:
+            List of edge models representing dependencies
         """
-        return []
+        # Get the cached AST for this file
+        tree = self.ast_cache.get(file_path)
+        if tree is None:
+            # If AST is not cached, try to parse the file again
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                tree = ast.parse(content, filename=file_path)
+                self.ast_cache.set(file_path, tree)
+            except (OSError, SyntaxError) as e:
+                print(f"Error parsing {file_path} in detail pass: {e}")
+                return []
+        
+        # Create visitor context for the detail analysis pipeline
+        context = VisitorContext(
+            file_id=file_id,
+            ast_tree=tree,
+            symbol_table=self.symbol_table
+        )
+        
+        # Initialize the visitor pipeline for Phase 2
+        # In future phases, additional visitors will be added here
+        
+        # Phase 2: Dependency Resolution
+        dependency_visitor = DependencyVisitor(context)
+        dependency_visitor.visit(tree)
+        
+        # Future phases will add:
+        # Phase 3: Control Flow Analysis
+        # control_flow_visitor = ControlFlowVisitor(context)
+        # control_flow_visitor.visit(tree)
+        
+        # Phase 4: Type Inference  
+        # type_inference_visitor = TypeInferenceVisitor(context)
+        # type_inference_visitor.visit(tree)
+        
+        return context.results
+    
+    def clear_cache(self, file_path: str) -> None:
+        """
+        Clears the cached AST for a specific file.
+        Useful during development when files are modified.
+        
+        Args:
+            file_path: The path to the file whose cache should be cleared
+        """
+        self.ast_cache.clear(file_path)
+    
+    def get_cached_files(self) -> List[str]:
+        """
+        Gets all files that have cached ASTs.
+        
+        Returns:
+            List of file paths with cached ASTs
+        """
+        return list(self.ast_cache._cache.keys())
