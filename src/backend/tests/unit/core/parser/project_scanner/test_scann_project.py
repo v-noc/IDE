@@ -27,11 +27,17 @@ def test_scan_project_declaration_pass(sample_project_path):
         from_node = collections.nodes.get(edge.from_id)
         to_node = collections.nodes.get(edge.to_id)
         print(f"  from_id qname: {getattr(from_node, 'qname', None)}")
-        print(f"  to_id qname: {getattr(to_node, 'qname', None)}")
+
+       
+        print(f"  to_id qname: {getattr(to_node, 'qname', None)} {to_node.model_dump_json()}")
         print("")
 
   
     print(f"All edges: {len(all_edges)}")
+
+    for node in all_nodes:
+        print(f"Node: {node.qname} {node.node_type} {node.model_dump_json()}")
+        print("")
 
     # Project (1)
     # Folders (1): models

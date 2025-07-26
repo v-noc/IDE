@@ -1,16 +1,18 @@
 # src/backend/app/core/parser/project_scanner.py
 import os
-from typing import Dict, Any, Set
+from typing import Dict, Any
+
+from app.db import collections
+from app.models.edges import BelongsToEdge, ContainsEdge, UsesImportEdge
+from app.models.node import PackageNode
+from app.models.properties import PackageProperties
+
 from .file_navigator import FileNavigator
 from .python.ast_cache import ASTCache
 from .python.symbol_table import SymbolTable
 from .python.file_parser import PythonFileParser
 from ..manager import CodeGraphManager
 from ..tree_builder import build_tree_from_paths
-from ...db import collections
-from ...models.edges import BelongsToEdge, ContainsEdge, UsesImportEdge
-from ...models.node import PackageNode
-from ...models.properties import PackageProperties
 
 
 class ProjectScanner:
@@ -19,17 +21,18 @@ class ProjectScanner:
     the advanced two-pass analysis system.
     """
     def __init__(self, project_path: str):
-        self.project_path = os.path.abspath(project_path)
-        self.file_navigator = FileNavigator(
-            self.project_path, "v-noc.toml"
-        )
-        self.ast_cache = ASTCache()
-        self.symbol_table = SymbolTable()
-        self.file_parser = PythonFileParser(
-            self.ast_cache, self.symbol_table, self.project_path
-        )
+        self.project_path = project_path
+        self.file_navigator = FileNavigator(project_path)
         self.code_graph_manager = CodeGraphManager()
-        self.created_packages: Set[str] = set()
+        self.file_parser = PythonFileParser(
+            ast_cache=ASTCache(),
+            symbol_table=SymbolTable(),
+            project_root=project_path
+        )
+        self.symbol_table = self.file_parser.symbol_table
+        self.created_packages: set = set()
+        # Track package name -> ID mapping
+        self.package_ids: Dict[str, str] = {}
 
     def create_nodes_and_edges_from_tree(
         self, 
@@ -50,9 +53,13 @@ class ProjectScanner:
                     self.project_path, ""
                 ).lstrip("/").replace(".py", "").replace("/", ".")
                 
+                # Make path relative to project
+                relative_path = (current_path.replace(self.project_path, "")
+                                .lstrip("/"))
+                
                 file_node = parent_node.add_file(
                     file_name=name,
-                    file_path=current_path
+                    file_path=relative_path
                 )
                 
                 # Link file to project with BelongsToEdge
@@ -71,9 +78,13 @@ class ProjectScanner:
                     self.project_path, ""
                 ).lstrip("/").replace("/", ".")
                 
+                # Make path relative to project
+                relative_path = (current_path.replace(self.project_path, "")
+                                .lstrip("/"))
+                
                 folder_node = parent_node.add_folder(
                     folder_name=name,
-                    folder_path=current_path
+                    folder_path=relative_path
                 )
                 
                 # Link folder to project with BelongsToEdge
@@ -101,7 +112,8 @@ class ProjectScanner:
 
     def _create_package_node(self, package_qname: str) -> str:
         """
-        Creates a PackageNode for an external package.
+        Creates a package node for an external package if it doesn't exist.
+        Only creates one node per base package and tracks imported paths.
         
         Args:
             package_qname: The fully qualified name of the package
@@ -109,21 +121,37 @@ class ProjectScanner:
         Returns:
             The database ID of the created package node
         """
-        if package_qname in self.created_packages:
-            return self.symbol_table.get_symbol_id(package_qname)
+        # Extract base package name (e.g., "pydantic" from 
+        # "pydantic.BaseModel")
+        base_package = package_qname.split('.')[0]
+        
+        # Check if base package already exists
+        if base_package in self.created_packages:
+            print(f"Package {base_package} already created")
+            existing_package_id = self.package_ids.get(base_package)
+            if existing_package_id:
+                # Update the existing package with new imported path
+                existing_node = collections.nodes.get(existing_package_id)
+                if (existing_node and package_qname not in 
+                        existing_node.properties.imported_paths):
+                    existing_node.properties.imported_paths.append(
+                        package_qname
+                    )
+                    collections.nodes.update(existing_node)
+                return existing_package_id
         
         # Create the package node
         package_node = PackageNode(
-            name=package_qname.split('.')[-1],  # Last part as name
-            qname=package_qname,
-            properties=PackageProperties()
+            name=base_package,  # Use base package as name
+            qname=base_package,  # Use base package as qname
+            properties=PackageProperties(imported_paths=[package_qname])
         )
         
         # Save to database
         created_package = collections.nodes.create(package_node)
         
-        # Update symbol table
-        self.symbol_table.add_symbol(package_qname, created_package.id)
+        # Track the package ID for future lookups
+        self.package_ids[base_package] = created_package.id
         
         # Link package to project with BelongsToEdge
         belongs_to_edge = BelongsToEdge(
@@ -132,8 +160,8 @@ class ProjectScanner:
         )
         collections.belongs_to_edges.create(belongs_to_edge)
         
-        # Mark as created
-        self.created_packages.add(package_qname)
+        # Mark base package as created
+        self.created_packages.add(base_package)
         
         return created_package.id
 
@@ -231,6 +259,7 @@ class ProjectScanner:
                 collections.contains_edges.create(contains_edge)
                 
                 # Link declared nodes to project with BelongsToEdge
+                # Not Sure the usage of this edge (might be removed)
                 belongs_to_edge = BelongsToEdge(
                     _from=created_node.id,
                     _to=self.project.id
