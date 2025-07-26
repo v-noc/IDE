@@ -23,7 +23,8 @@ class DependencyContextManager:
     def __init__(self, context: VisitorContext):
         self.context = context
         self.current_consumer_id: Optional[str] = None
-    
+        self.class_stack: list = []  # Track class hierarchy for proper qname construction
+
     def visit_function_def(
         self, 
         node: ast.FunctionDef, 
@@ -39,7 +40,15 @@ class DependencyContextManager:
         """
         # Get the function's qname by constructing it from the file context
         file_qname = get_file_qname_from_context(self.context)
-        function_qname = f"{file_qname}.{node.name}"
+        
+        # Build the function qname considering class hierarchy
+        if self.class_stack:
+            # If we're inside a class, it's a method
+            class_path = ".".join(self.class_stack)
+            function_qname = f"{file_qname}.{class_path}.{node.name}"
+        else:
+            # Top-level function
+            function_qname = f"{file_qname}.{node.name}"
         
         # Look up the function's database ID from the symbol table
         function_id = self.context.symbol_table._qname_to_id.get(
@@ -56,7 +65,7 @@ class DependencyContextManager:
             
             # Restore previous consumer context
             self.current_consumer_id = previous_consumer
-    
+
     def visit_class_def(
         self, 
         node: ast.ClassDef, 
@@ -69,9 +78,13 @@ class DependencyContextManager:
             node: The ast.ClassDef node
             visit_body_callback: Callback to visit the class body
         """
-        # Get the class's qname by constructing it from the file context
+        # Push the class onto the stack
+        self.class_stack.append(node.name)
+        
+        # Get the class's qname by constructing it from the file context  
         file_qname = get_file_qname_from_context(self.context)
-        class_qname = f"{file_qname}.{node.name}"
+        class_path = ".".join(self.class_stack)
+        class_qname = f"{file_qname}.{class_path}"
         
         # Look up the class's database ID from the symbol table
         class_id = self.context.symbol_table._qname_to_id.get(class_qname)
@@ -81,11 +94,17 @@ class DependencyContextManager:
             previous_consumer = self.current_consumer_id
             self.current_consumer_id = class_id
             
-            # Visit the class body to find import usages
+            # Visit the class body to find import usages and nested functions
             visit_body_callback(node)
             
             # Restore previous consumer context
             self.current_consumer_id = previous_consumer
+        else:
+            # Even if class not found, still visit body to process methods
+            visit_body_callback(node)
+        
+        # Pop the class from the stack
+        self.class_stack.pop()
     
     def get_current_consumer_id(self) -> Optional[str]:
         """

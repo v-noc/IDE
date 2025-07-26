@@ -12,6 +12,7 @@ class MainApp:
         print("App is running")
 
 def start_app():
+    utils.helper_function()
     app = MainApp()
     app.run()
 

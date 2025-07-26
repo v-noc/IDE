@@ -30,11 +30,14 @@ class Function(DomainObject[node.FunctionNode]):
         """Returns the qualified name of the function."""
         return self.model.qname
     
-    
-    def add_call(self, target: Union['Function', 'Class'], position: node.NodePosition):
+    def add_call(
+        self, target: Union['Function', 'Class'], position: node.NodePosition
+    ):
         """Creates a 'calls' edge from this function to a target element."""
         if not isinstance(target, (Function, Class)):
-            raise TypeError("Call target must be a Function or Class domain object.")
+            raise TypeError(
+                "Call target must be a Function or Class domain object."
+            )
             
         call_edge_model = edges.CallEdge(
             _from=self.id,
@@ -59,6 +62,7 @@ class Function(DomainObject[node.FunctionNode]):
             _from=self.id,
             _to=target.id,
             target_symbol=target_symbol,
+            target_qname=target.qname,
             alias=alias,
             import_position=import_position,
             usage_positions=usage_positions
@@ -67,12 +71,16 @@ class Function(DomainObject[node.FunctionNode]):
 
     def add_input(self, name: str, position: node.NodePosition, **kwargs):
         """Adds an input parameter to the function's properties."""
-        self.model.properties.inputs.append({"name": name, "position": position, **kwargs})
+        self.model.properties.inputs.append({
+            "name": name, "position": position, **kwargs
+        })
         db.nodes.update(self.model)
 
     def add_output(self, name: str, position: node.NodePosition, **kwargs):
         """Adds an output/return value to the function's properties."""
-        self.model.properties.outputs.append({"name": name, "position": position, **kwargs})
+        self.model.properties.outputs.append({
+            "name": name, "position": position, **kwargs
+        })
         db.nodes.update(self.model)
 
     
@@ -136,6 +144,7 @@ class Class(DomainObject[node.ClassNode]):
             _from=self.id,
             _to=target.id,
             target_symbol=target_symbol,
+            target_qname=target.qname,
             alias=alias,
             import_position=import_position,
             usage_positions=usage_positions

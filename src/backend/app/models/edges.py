@@ -23,6 +23,13 @@ class UsesImportEdge(BaseEdge):
     """
     edge_type: str = "uses_import"
     target_symbol: str = Field(..., description="The specific symbol being imported (e.g., 'Request').")
+    target_qname: str = Field(
+        ..., 
+        description=(
+            "The fully qualified name of the target module/package "
+            "(e.g., 'requests.models')."
+        )
+    )
     alias: str | None = Field(None, description="The alias used for the import (e.g., 'np').")
     import_position: NodePosition = Field(..., description="The position of the 'import' statement.")
     usage_positions: list[NodePosition] = Field(default_factory=list, description="A list of all positions where the import is used.")

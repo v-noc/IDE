@@ -96,7 +96,7 @@ def test_func():
         assert len(usage_edges) >= 1
         # Should have an edge for json.loads usage
         json_usage = [edge for edge in usage_edges 
-                     if getattr(edge, 'target_qname', '') == 'json']
+                     if getattr(edge, 'target_symbol', '') == 'json']
         assert len(json_usage) >= 1
     
     def test_analysis_summary(self):
@@ -201,7 +201,7 @@ def func():
         
         # Verify edge properties are preserved
         for edge in usage_edges:
-            assert hasattr(edge, 'target_qname')
+            assert hasattr(edge, 'target_symbol')
             assert hasattr(edge, 'alias')
             assert hasattr(edge, 'target_symbol')
             assert hasattr(edge, 'import_position')

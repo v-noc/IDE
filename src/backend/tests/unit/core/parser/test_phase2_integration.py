@@ -7,10 +7,10 @@ from parsing imports to creating dependency edges and package nodes.
 
 import tempfile
 import os
-from src.backend.app.core.parser.python.symbol_table import SymbolTable
-from src.backend.app.core.parser.python.file_parser import PythonFileParser
-from src.backend.app.core.parser.python.ast_cache import ASTCache
-from src.backend.app.models.edges import UsesImportEdge
+from app.core.parser.python.symbol_table import SymbolTable
+from app.core.parser.python.file_parser import PythonFileParser
+from app.core.parser.python.ast_cache import ASTCache
+from app.models.edges import UsesImportEdge
 
 
 class TestPhase2Integration:
@@ -58,20 +58,27 @@ def main_func():
                 declared_nodes = self.file_parser.run_declaration_pass(
                     f.name, test_code
                 )
-                
                 # Verify function was declared
                 assert len(declared_nodes) == 1
                 func_node = declared_nodes[0]
                 assert func_node.name == "main_func"
                 
                 # Add the function to symbol table
-                self.symbol_table.add_symbol(func_node.qname, "func_main")
+                self.symbol_table.add_symbol(func_node.qname, "func_main_id")
+                
+                # Add the file to symbol table so context manager can find it
+                file_qname = f.name.replace(self.project_root, "").lstrip("/").replace(".py", "").replace("/", ".")
+                self.symbol_table.add_symbol(file_qname, "file_main")
+                
+                # Debug: Check if function is in symbol table
+               
                 
                 # Run detail pass
                 dependency_edges = self.file_parser.run_detail_pass(
                     f.name, "file_main"
                 )
                 
+               
                 # Verify import edges were created
                 usage_edges = [
                     edge for edge in dependency_edges 
@@ -122,6 +129,10 @@ def process_data():
                 func_node = declared_nodes[0]
                 self.symbol_table.add_symbol(func_node.qname, "func_process")
                 
+                # Add the file to symbol table so context manager can find it
+                file_qname = f.name.replace(self.project_root, "").lstrip("/").replace(".py", "").replace("/", ".")
+                self.symbol_table.add_symbol(file_qname, "file_process")
+
                 dependency_edges = self.file_parser.run_detail_pass(
                     f.name, "file_process"
                 )
@@ -187,6 +198,10 @@ def use_relatives():
                 func_node = declared_nodes[0]
                 self.symbol_table.add_symbol(func_node.qname, "func_relatives")
                 
+                # Add the file to symbol table so context manager can find it
+                file_qname = file_path.replace(self.project_root, "").lstrip("/").replace(".py", "").replace("/", ".")
+                self.symbol_table.add_symbol(file_qname, "file_relatives")
+
                 dependency_edges = self.file_parser.run_detail_pass(
                     file_path, "file_relatives"
                 )
@@ -230,6 +245,10 @@ def make_request():
                 func_node = declared_nodes[0]
                 self.symbol_table.add_symbol(func_node.qname, "func_request")
                 
+                # Add the file to symbol table so context manager can find it
+                file_qname = f.name.replace(self.project_root, "").lstrip("/").replace(".py", "").replace("/", ".")
+                self.symbol_table.add_symbol(file_qname, "file_request")
+
                 dependency_edges = self.file_parser.run_detail_pass(
                     f.name, "file_request"
                 )

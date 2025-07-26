@@ -9,7 +9,7 @@ from ..manager import CodeGraphManager
 from ..tree_builder import build_tree_from_paths
 from ...db import collections
 from ...models.edges import BelongsToEdge, ContainsEdge, UsesImportEdge
-from ...models.node import NodePosition, PackageNode
+from ...models.node import PackageNode
 from ...models.properties import PackageProperties
 
 
@@ -149,23 +149,25 @@ class ProjectScanner:
             if not isinstance(edge, UsesImportEdge):
                 continue
                 
-            target_qname = getattr(edge, 'target_qname', None)
+            target_qname = edge.target_qname
             if not target_qname:
                 continue
             
             # Check if it's a local module or external package
-            if self.symbol_table.is_local_module(target_qname):
+            is_local = self.symbol_table.is_local_module(target_qname)
+            
+            if is_local:
                 # It's a local module - find the existing node ID
                 target_id = self.symbol_table.get_symbol_id(target_qname)
                 if target_id:
-                    edge._to = target_id
+                    edge.to_id = target_id
                     collections.uses_import_edges.create(edge)
                 else:
                     print(f"Warning: Local module {target_qname} not found")
             else:
                 # It's an external package - create package node if needed
                 package_id = self._create_package_node(target_qname)
-                edge._to = package_id
+                edge.to_id = package_id
                 collections.uses_import_edges.create(edge)
 
     def scan(self) -> None:
@@ -268,8 +270,14 @@ class ProjectScanner:
         """
         return {
             "project_path": self.project_path,
-            "project_id": self.project.id if hasattr(self, 'project') else None,
+            "project_id": (
+                self.project.id 
+                if hasattr(self, 'project') else None
+            ),
             "total_symbols": len(self.symbol_table._qname_to_id),
             "created_packages": list(self.created_packages),
-            "cached_files": len(self.ast_cache._cache) if hasattr(self.ast_cache, '_cache') else 0
+            "cached_files": (
+                len(self.ast_cache._cache) 
+                if hasattr(self.ast_cache, '_cache') else 0
+            )
         }

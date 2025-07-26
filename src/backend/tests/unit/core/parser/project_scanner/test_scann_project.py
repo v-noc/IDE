@@ -21,8 +21,18 @@ def test_scan_project_declaration_pass(sample_project_path):
     # 3. Assertions
     # Check that the correct nodes were created
     all_nodes = collections.nodes.find({})
-    
-   
+    all_edges = collections.uses_import_edges.find({})
+    for edge in all_edges:
+        print(f"Edge: {edge.target_qname} {edge.alias} {edge.from_id} {edge.to_id} {edge.import_position.line_no}")
+        from_node = collections.nodes.get(edge.from_id)
+        to_node = collections.nodes.get(edge.to_id)
+        print(f"  from_id qname: {getattr(from_node, 'qname', None)}")
+        print(f"  to_id qname: {getattr(to_node, 'qname', None)}")
+        print("")
+
+  
+    print(f"All edges: {len(all_edges)}")
+
     # Project (1)
     # Folders (1): models
     # Files (4): main.py, utils.py, models/user.py, models/__init__, 
@@ -83,9 +93,7 @@ def test_tree_structure(sample_project_path):
 
     utils_file = files[1]
 
-    for func in utils_file.get_functions():
-        print(f"Function: {func.name} {func.qname}")
-
+    
     assert (len(utils_file.get_functions()) == 2)
     assert (len(utils_file.get_classes()) == 1)
 

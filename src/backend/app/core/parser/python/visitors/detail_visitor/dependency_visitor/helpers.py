@@ -111,13 +111,11 @@ def create_usage_edge(
         _from=current_consumer_id,
         _to="",  # Will be resolved by scanner when creating package nodes
         target_symbol=target_symbol,
+        target_qname=target_qname,
         alias=alias,
         import_position=import_position,
         usage_positions=[usage_position]
     )
-    
-    # Store additional metadata for the scanner to process
-    usage_edge.target_qname = target_qname  # Store as custom attribute
     
     context.results.append(usage_edge)
 

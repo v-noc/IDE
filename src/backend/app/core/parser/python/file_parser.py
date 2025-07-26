@@ -48,7 +48,7 @@ class PythonFileParser:
 
         nodes: List[ArangoBase] = []
         processed_funcs = set()
-
+        
         for class_node in visitor.declared_classes:
             class_qname = self._get_qname(file_path, [class_node.name])
             nodes.append(ClassNode(
