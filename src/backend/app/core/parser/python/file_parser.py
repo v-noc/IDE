@@ -8,6 +8,9 @@ from .visitors.detail_visitor.dependency_visitor import (
     DependencyVisitor
 )
 from .visitors.detail_visitor.call_visitor import CallVisitor
+from .visitors.detail_visitor.type_inference_visitor import (
+    TypeInferenceVisitor
+)
 from .visitors.detail_visitor.visitor_context import (
     VisitorContext
 )
@@ -16,6 +19,7 @@ from app.models.node import (
 )
 from app.models.properties import FunctionProperties, ClassProperties
 from app.models.base import ArangoBase
+
 
 class PythonFileParser:
     """
@@ -161,14 +165,14 @@ class PythonFileParser:
         call_visitor = CallVisitor(context)
         call_visitor.visit(tree)
         
+        # Phase 4: Type Inference (enabled now)
+        type_inference_visitor = TypeInferenceVisitor(context)
+        type_inference_visitor.visit(tree)
+        
         # Future phases will add:
         # Phase 3: Control Flow Analysis
         # control_flow_visitor = ControlFlowVisitor(context)
         # control_flow_visitor.visit(tree)
-        
-        # Phase 4: Type Inference  
-        # type_inference_visitor = TypeInferenceVisitor(context)
-        # type_inference_visitor.visit(tree)
         
         return context.results
     

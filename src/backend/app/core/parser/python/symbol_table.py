@@ -13,6 +13,9 @@ class SymbolTable:
         self._file_id_to_imports: Dict[str, Dict[str, str]] = {}
         self._package_table: Dict[str, str] = {}
         self._scope_stack: List[str] = []
+        # Type information cache
+        self._function_return_types: Dict[str, str] = {}
+        self._variable_types: Dict[str, str] = {}  # file_id:var_name -> type
 
     def add_symbol(self, qname: str, db_id: str) -> None:
         """Caches a symbol's qname and its database ID."""
@@ -203,6 +206,116 @@ class SymbolTable:
                 packages[qname] = node_id
         return packages
 
+    # === NEW TYPE INFERENCE METHODS ===
+    
+    def set_function_return_type(self, function_qname: str, return_type: str) -> None:
+        """
+        Caches the return type of a function for type inference.
+        
+        Args:
+            function_qname: The fully qualified name of the function
+            return_type: The return type string
+        """
+        self._function_return_types[function_qname] = return_type
+    
+    def get_function_return_type(self, function_qname: str) -> Optional[str]:
+        """
+        Gets the cached return type of a function.
+        
+        Args:
+            function_qname: The fully qualified name of the function
+            
+        Returns:
+            The return type string if known, None otherwise
+        """
+        return self._function_return_types.get(function_qname)
+    
+    def set_variable_type(self, file_id: str, variable_name: str, var_type: str) -> None:
+        """
+        Caches the type of a variable within a file scope.
+        
+        Args:
+            file_id: The database ID of the file
+            variable_name: The name of the variable
+            var_type: The type string
+        """
+        key = f"{file_id}:{variable_name}"
+        self._variable_types[key] = var_type
+    
+    def get_variable_type(self, file_id: str, variable_name: str) -> Optional[str]:
+        """
+        Gets the cached type of a variable within a file scope.
+        
+        Args:
+            file_id: The database ID of the file
+            variable_name: The name of the variable
+            
+        Returns:
+            The type string if known, None otherwise
+        """
+        key = f"{file_id}:{variable_name}"
+        return self._variable_types.get(key)
+    
+    def resolve_call_type(
+        self, 
+        file_id: str, 
+        call_target: str, 
+        call_type: str = "function"
+    ) -> Optional[str]:
+        """
+        Resolves the return type of a function call.
+        
+        Args:
+            file_id: The database ID of the file where the call is made
+            call_target: The name of the function/method being called
+            call_type: Type of call ("function", "method", "constructor")
+            
+        Returns:
+            The expected return type if it can be resolved, None otherwise
+        """
+        # First, try to resolve as an import
+        import_qname = self.resolve_import_qname(file_id, call_target)
+        if import_qname:
+            # Check if we have type information for this imported function
+            return self.get_function_return_type(import_qname)
+        
+        # Try to resolve as a local function
+        # This requires building the qname from the current file context
+        file_node_id = file_id  # Simplified for now
+        
+        # Check if it's a local function call
+        if self.is_local_module(call_target):
+            return self.get_function_return_type(call_target)
+        
+        # For method calls, this would need more sophisticated resolution
+        # involving object types and class hierarchies
+        
+        return None
+    
+    def infer_assignment_type(
+        self, 
+        file_id: str, 
+        assignment_value: str, 
+        assignment_type: str = "call"
+    ) -> Optional[str]:
+        """
+        Infers the type of an assignment based on its value.
+        
+        Args:
+            file_id: The database ID of the file
+            assignment_value: The value being assigned (function name, etc.)
+            assignment_type: Type of assignment ("call", "literal", "variable")
+            
+        Returns:
+            The inferred type if possible, None otherwise
+        """
+        if assignment_type == "call":
+            return self.resolve_call_type(file_id, assignment_value)
+        elif assignment_type == "variable":
+            return self.get_variable_type(file_id, assignment_value)
+        # For literals, the type inference visitor handles this directly
+        return None
+
     def debug_symbol_table(self) -> None:
         """
         Prints the current state of the symbol table for debugging.
@@ -218,4 +331,12 @@ class SymbolTable:
         print(f"File imports: {len(self._file_id_to_imports)}")
         for file_id, imports in self._file_id_to_imports.items():
             print(f"  {file_id}: {imports}")
+        
+        print(f"Function return types: {len(self._function_return_types)}")
+        for func_qname, return_type in self._function_return_types.items():
+            print(f"  {func_qname} -> {return_type}")
+        
+        print(f"Variable types: {len(self._variable_types)}")
+        for var_key, var_type in self._variable_types.items():
+            print(f"  {var_key} -> {var_type}")
         print("=========================")

@@ -341,7 +341,7 @@ class Class(DomainObject[node.ClassNode]):
         )
         db.uses_import_edges.create(import_edge)
 
-    def add_field(self, filed: TypeKeyValuesProperties):
+    def add_field(self, field: TypeKeyValuesProperties):
         """Adds a field to the class's properties."""
-        self.model.properties.fields.append(filed)
+        self.model.properties.fields.append(field)
         db.nodes.update(self.model)
