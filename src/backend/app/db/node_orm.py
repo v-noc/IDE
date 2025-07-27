@@ -150,7 +150,8 @@ class ArangoNodeCollection(Generic[T]):
         start_node_id: str,
         edge_collection: "ArangoEdgeCollection",
         direction: str = "outbound",
-        filter_by_type: str | None = None
+        filter_by_type: str | None = None,
+        limit: int = 1
     ) -> list[T]:
         """
         Finds nodes related to a starting node through a given edge collection.
@@ -161,7 +162,7 @@ class ArangoNodeCollection(Generic[T]):
             )
 
         query = f"""
-        FOR node IN 1..1 {direction.upper()} @start_node_id @@edge_collection
+        FOR node IN 1..{limit} {direction.upper()} @start_node_id @@edge_collection
         """
         bind_vars = {
             "start_node_id": start_node_id,

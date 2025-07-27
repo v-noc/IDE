@@ -62,7 +62,7 @@ def test_nested_folder_structure(complex_project_path):
     project = projects[0]
     
     # Check folder hierarchy
-    all_folders = project.get_folders()
+    all_folders = project.get_all_folders()
     folder_names = [folder.name for folder in all_folders]
     
     expected_folders = ["utils", "models", "services", "data"]

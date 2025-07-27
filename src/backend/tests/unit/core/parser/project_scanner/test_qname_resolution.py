@@ -108,11 +108,7 @@ def test_qname_uniqueness(complex_project_path):
     
     all_nodes = collections.nodes.find({})
     qnames = [node.qname for node in all_nodes if hasattr(node, 'qname')]
-    for node in all_nodes:
-        print(" ")
-        print(f"Qname: {node.qname} ")
-        print(f"Node: {node.model_dump_json()}")
-        print(" ")
+
     # Check for duplicates
     seen_qnames = set()
     duplicates = set()
