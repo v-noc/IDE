@@ -1,0 +1,13 @@
+[
+  {
+    "label": "debug parser",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
+    "program": "/Users/yared/Documents/Programing/ide/v-noc/src/backend/tests/unit/core/parser/runner_test.py",
+    "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
+    "env": {
+      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"
+    }
+  }
+]
