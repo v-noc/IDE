@@ -28,6 +28,10 @@ class File(DomainObject[node.FileNode]):
     def absolute_path(self) -> str:
         return self.path + self.name
     
+    @property
+    def key(self) -> str:
+        return self.model.key
+    
     def get_project(self) -> 'Project':
         """Returns the project this file belongs to by following belongs_to edge."""
         from .project import Project

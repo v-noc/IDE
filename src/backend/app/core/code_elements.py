@@ -18,6 +18,10 @@ if TYPE_CHECKING:
 class Function(DomainObject[node.FunctionNode]):
     """A domain object representing a function."""
     @property
+    def key(self) -> str:
+        return self.model.key
+    
+    @property
     def name(self) -> str:
         """Returns the name of the function."""
         return self.model.name
@@ -132,6 +136,11 @@ class Function(DomainObject[node.FunctionNode]):
 
 class Class(DomainObject[node.ClassNode]):
     """A domain object representing a class."""
+
+    @property
+    def key(self) -> str:
+        return self.model.key
+
     @property
     def name(self) -> str:
         """Returns the name of the class."""

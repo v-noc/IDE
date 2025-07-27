@@ -25,6 +25,13 @@ class Folder(DomainObject[node.FolderNode]):
     def absolute_path(self) -> str:
         return self.path + self.name
 
+    @property
+    def key(self) -> str:
+        return self.model.key
+    
+
+
+
     def add_file(self, file_name: str, file_path: str) -> File:
         """Adds a new file to this folder."""
         # Generate qname using the shared utility method
