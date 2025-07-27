@@ -4,6 +4,7 @@ from typing import Dict, Any
 
 from app.db import collections
 from app.models.edges import BelongsToEdge, ContainsEdge, UsesImportEdge
+from app.models import edges
 from app.models.node import PackageNode
 from app.models.properties import PackageProperties
 
@@ -13,6 +14,7 @@ from .python.symbol_table import SymbolTable
 from .python.file_parser import PythonFileParser
 from ..manager import CodeGraphManager
 from ..tree_builder import build_tree_from_paths
+from ..code_elements import Class
 
 
 class ProjectScanner:
@@ -55,7 +57,7 @@ class ProjectScanner:
                 
                 # Make path relative to project
                 relative_path = (current_path.replace(self.project_path, "")
-                                .lstrip("/"))
+                                 .lstrip("/"))
                 
                 file_node = parent_node.add_file(
                     file_name=name,
@@ -80,7 +82,7 @@ class ProjectScanner:
                 
                 # Make path relative to project
                 relative_path = (current_path.replace(self.project_path, "")
-                                .lstrip("/"))
+                                 .lstrip("/"))
                 
                 folder_node = parent_node.add_folder(
                     folder_name=name,
@@ -193,13 +195,15 @@ class ProjectScanner:
                     edge.to_id = target_id
                     collections.uses_import_edges.create(edge)
                 else:
-                    print(f"Warning: Local module {target_qname} not found {self.symbol_table}" )
+                    print(f"Warning: Local module {target_qname} not found "
+                          f"{self.symbol_table}")
             else:
                 
                 # It's an external package - create package node if needed
                 package_id = self._create_package_node(target_qname)
                 edge.to_id = package_id
                 collections.uses_import_edges.create(edge)
+
 
     def scan(self) -> None:
         """
@@ -248,11 +252,29 @@ class ProjectScanner:
                 file_path, content
             )
             
+            # Create nodes and track class-method relationships
+            class_nodes = {}  # qname -> node_id mapping for classes
+            method_parent_mapping = {}  # method_node_id -> class_node_id
+            
             for node in declared_nodes:
                 created_node = collections.nodes.create(node)
                 self.symbol_table.add_symbol(
                     created_node.qname, created_node.id
                 )
+                
+                # Track class nodes for method linking
+                if created_node.node_type == 'class':
+                    class_nodes[created_node.qname] = created_node.id
+                elif created_node.node_type == 'function':
+                    # Check if this is a method (has parent class in qname)
+                    qname_parts = created_node.qname.split('.')
+                    if len(qname_parts) >= 2:
+                        # Try to find parent class by removing last part of qname
+                        potential_class_qname = '.'.join(qname_parts[:-1])
+                        if potential_class_qname in class_nodes:
+                            method_parent_mapping[created_node.id] = (
+                                class_nodes[potential_class_qname]
+                            )
                 
                 # Link declared nodes to their file with ContainsEdge
                 contains_edge = ContainsEdge(
@@ -269,6 +291,19 @@ class ProjectScanner:
                     _to=self.project.id
                 )
                 collections.belongs_to_edges.create(belongs_to_edge)
+            
+            # Create implements edges for method-class relationships
+            for method_id, class_id in method_parent_mapping.items():
+                implements_edge = edges.ImplementsEdge(
+                    _from=class_id,
+                    _to=method_id
+                )
+                collections.implements_edges.create(implements_edge)
+                method_node = collections.nodes.get(method_id)
+                class_node = collections.nodes.get(class_id)
+                if method_node and class_node:
+                    print(f"Linked method {method_node.name} to "
+                          f"class {class_node.name}")
 
         # Third Pass: Phase 2 - Process dependencies and imports
         

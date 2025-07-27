@@ -3,6 +3,8 @@ Domain objects for code elements like Functions and Classes.
 """
 from __future__ import annotations
 from typing import Union, TYPE_CHECKING
+
+from app.models.properties import TypeKeyValuesProperties
 from .base import DomainObject
 from .package import Package
 
@@ -16,16 +18,6 @@ if TYPE_CHECKING:
 class Function(DomainObject[node.FunctionNode]):
     """A domain object representing a function."""
     @property
-    def inputs(self) -> list[dict]:
-        """Returns the list of input parameters."""
-        return self.model.properties.inputs
-    
-    @property
-    def outputs(self) -> list[dict]:
-        """Returns the list of output parameters."""
-        return self.model.properties.outputs
-    
-    @property
     def name(self) -> str:
         """Returns the name of the function."""
         return self.model.name
@@ -34,6 +26,21 @@ class Function(DomainObject[node.FunctionNode]):
     def qname(self) -> str:
         """Returns the qualified name of the function."""
         return self.model.qname
+    
+    @property
+    def position(self) -> node.NodePosition:
+        """Returns the position of the function."""
+        return self.model.properties.position
+    
+    @property
+    def inputs(self) -> list[TypeKeyValuesProperties]:
+        """Returns the list of input parameters."""
+        return self.model.properties.inputs
+    
+    @property
+    def outputs(self) -> list[TypeKeyValuesProperties]:
+        """Returns the list of output parameters."""
+        return self.model.properties.outputs
     
     def add_call(
         self, target: Union['Function', 'Class'], position: node.NodePosition
@@ -97,7 +104,9 @@ class Function(DomainObject[node.FunctionNode]):
     ):
         """Creates a 'uses_import' edge from this element to its dependency."""
         if not isinstance(target, (Function, Class, Package)):
-            raise TypeError("Import target must be a Function, Class, or Package.")
+            raise TypeError(
+                "Import target must be a Function, Class, or Package."
+            )
 
         import_edge = edges.UsesImportEdge(
             _from=self.id,
@@ -112,19 +121,25 @@ class Function(DomainObject[node.FunctionNode]):
 
     def add_input(self, name: str, position: node.NodePosition, **kwargs):
         """Adds an input parameter to the function's properties."""
-        self.model.properties.inputs.append({
-            "name": name, "position": position, **kwargs
-        })
+        input_prop = TypeKeyValuesProperties(
+            varname=name,
+            varType=kwargs.get('varType', 'unknown'),
+            position=position,
+        )
+        self.model.properties.inputs.append(input_prop)
         db.nodes.update(self.model)
 
     def add_output(self, name: str, position: node.NodePosition, **kwargs):
         """Adds an output/return value to the function's properties."""
-        self.model.properties.outputs.append({
-            "name": name, "position": position, **kwargs
-        })
+        output_prop = TypeKeyValuesProperties(
+            varname=name,
+            varType=kwargs.get('varType', 'unknown'),
+            position=position,
+        )
+        self.model.properties.outputs.append(output_prop)
         db.nodes.update(self.model)
 
-    
+
 class Class(DomainObject[node.ClassNode]):
     """A domain object representing a class."""
     @property
@@ -136,6 +151,26 @@ class Class(DomainObject[node.ClassNode]):
     def qname(self) -> str:
         """Returns the qualified name of the class."""
         return self.model.qname
+    
+    @property
+    def fields(self) -> list[TypeKeyValuesProperties]:
+        """Returns the list of fields."""
+        return self.model.properties.fields
+    
+    @property
+    def position(self) -> node.NodePosition:
+        """Returns the position of the class."""
+        return self.model.properties.position
+    
+    @property
+    def methods(self) -> list[Function]:
+        """Returns the list of methods."""
+        return [Function(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.implements_edges,
+            direction="outbound",
+            filter_by_type="function"
+        )]
     
     def get_parent_file(self) -> 'File':
         """Returns the parent file of the class by finding contains edge."""
@@ -169,31 +204,29 @@ class Class(DomainObject[node.ClassNode]):
                     result.append(Class(node))
         return result
     
-    def add_method(self, name: str, position: node.NodePosition, **kwargs) -> Function:
+    def add_method(self, function_id: str) -> Function:
         """
         Adds a new method (Function) to this class and links them with an
         'implements' edge.
         """
-        qname = f"{self.model.qname}::{name}"
-        func_props = node.FunctionProperties(position=position, **kwargs)
-        func_node_model = node.FunctionNode(
-            name=name,
-            qname=qname,
-            node_type="function",
-            properties=func_props
-        )
-        created_func_node = db.nodes.create(func_node_model)
+
         implements_edge = edges.ImplementsEdge(
             _from=self.id,
-            _to=created_func_node.id
+            _to=function_id
         )
         db.implements_edges.create(implements_edge)
-        return Function(created_func_node)
+        return Function(db.nodes.get(function_id))
 
-    def add_call(self, target: Union['Function', 'Class'], position: node.NodePosition):
+    def add_call(
+        self, 
+        target: Union['Function', 'Class'], 
+        position: node.NodePosition
+    ):
         """Creates a 'calls' edge from this class to a target element."""
         if not isinstance(target, (Function, Class)):
-            raise TypeError("Call target must be a Function or Class domain object.")
+            raise TypeError(
+                "Call target must be a Function or Class domain object."
+            )
         call_edge_model = edges.CallEdge(
             _from=self.id,
             _to=target.id,
@@ -211,7 +244,9 @@ class Class(DomainObject[node.ClassNode]):
     ):
         """Creates a 'uses_import' edge from this element to its dependency."""
         if not isinstance(target, (Function, Class, Package)):
-            raise TypeError("Import target must be a Function, Class, or Package.")
+            raise TypeError(
+                "Import target must be a Function, Class, or Package."
+            )
             
         import_edge = edges.UsesImportEdge(
             _from=self.id,
@@ -224,7 +259,13 @@ class Class(DomainObject[node.ClassNode]):
         )
         db.uses_import_edges.create(import_edge)
 
-    def add_field(self, name: str, position: node.NodePosition, **kwargs):
+    def add_field(self, filed: TypeKeyValuesProperties,
+                  position: node.NodePosition):
         """Adds a field to the class's properties."""
-        self.model.properties.fields.append({"name": name, "position": position, **kwargs})
+        field_prop = TypeKeyValuesProperties(
+            varname=filed.varname,
+            varType=filed.varType,
+            position=position,
+        )
+        self.model.properties.fields.append(field_prop)
         db.nodes.update(self.model)
