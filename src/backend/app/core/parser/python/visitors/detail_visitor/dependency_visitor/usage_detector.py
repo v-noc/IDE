@@ -98,20 +98,36 @@ class UsageDetector:
         )
         
         if resolved_qname:
-            # Construct the full target qname
+            # For attribute access, we need to distinguish between:
+            # 1. Module-level access (numpy.array) - separate symbol
+            # 2. Class-level access (UserType.ADMIN) - field/method
+            
             if len(name_chain) > 1:
+                # First try the full qname (for module-level access)
                 full_target_qname = (
                     f"{resolved_qname}.{'.'.join(name_chain[1:])}"
                 )
+                
+                # Check if this full qname exists in the symbol table
+                if self.context.symbol_table.get_symbol_id(full_target_qname):
+                    # It exists - this is module-level attribute access
+                    target_qname = full_target_qname
+                    target_symbol = node.attr
+                else:
+                    # It doesn't exist - this is likely class attribute access
+                    # Create edge to the base class/object instead
+                    target_qname = resolved_qname
+                    target_symbol = base_name
             else:
-                full_target_qname = resolved_qname
+                target_qname = resolved_qname
+                target_symbol = base_name
                 
             create_usage_edge(
                 context=self.context,
                 current_consumer_id=current_consumer_id,
                 processed_imports=self.get_processed_imports(),
-                target_qname=full_target_qname,
-                target_symbol=node.attr,
+                target_qname=target_qname,
+                target_symbol=target_symbol,
                 alias=base_name,
                 usage_position=NodePosition(
                     line_no=node.lineno,

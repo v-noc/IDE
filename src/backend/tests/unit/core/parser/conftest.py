@@ -25,3 +25,8 @@ def clear_db():
 def sample_project_path() -> str:
     """Provides the path to the sample project directory."""
     return os.path.join(os.path.dirname(__file__), "sample_project")
+
+@pytest.fixture
+def complex_project_path():
+    """Returns the path to the complex test project."""
+    return Path(__file__).parent / "complex_project"

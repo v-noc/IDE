@@ -9,6 +9,7 @@ dependencies = [
   "pydantic-settings",
   "pytest-mock>=3.14.1",
   "pathspec>=0.12.1",
+  "astpretty>=3.0.0",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,8 @@
+[project]
+name = "complex_project"
+version = "1.0.0"
+description = "Complex test project for comprehensive scanner testing"
+
+[scanner]
+ignore_patterns = ["*.pyc", "__pycache__", ".git"]
+include_patterns = ["*.py"]

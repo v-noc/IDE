@@ -127,7 +127,7 @@ class ProjectScanner:
         
         # Check if base package already exists
         if base_package in self.created_packages:
-            print(f"Package {base_package} already created")
+      
             existing_package_id = self.package_ids.get(base_package)
             if existing_package_id:
                 # Update the existing package with new imported path
@@ -187,11 +187,13 @@ class ProjectScanner:
             if is_local:
                 # It's a local module - find the existing node ID
                 target_id = self.symbol_table.get_symbol_id(target_qname)
+                # for key, value in self.symbol_table._qname_to_id.items():
+                #     print(f"{key} -> {value}")
                 if target_id:
                     edge.to_id = target_id
                     collections.uses_import_edges.create(edge)
                 else:
-                    print(f"Warning: Local module {target_qname} not found")
+                    print(f"Warning: Local module {target_qname} not found {self.symbol_table}" )
             else:
                 # It's an external package - create package node if needed
                 package_id = self._create_package_node(target_qname)
@@ -306,7 +308,7 @@ class ProjectScanner:
             "total_symbols": len(self.symbol_table._qname_to_id),
             "created_packages": list(self.created_packages),
             "cached_files": (
-                len(self.ast_cache._cache) 
-                if hasattr(self.ast_cache, '_cache') else 0
+                len(self.file_parser.ast_cache._cache) 
+                if hasattr(self.file_parser.ast_cache, '_cache') else 0
             )
         }

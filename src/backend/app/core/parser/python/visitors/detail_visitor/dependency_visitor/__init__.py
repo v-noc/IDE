@@ -7,6 +7,8 @@ and context management.
 """
 
 import ast
+import astpretty
+
 from ..visitor_context import VisitorContext
 from .import_processor import ImportProcessor
 from .context_manager import DependencyContextManager
@@ -96,6 +98,7 @@ class DependencyVisitor(ast.NodeVisitor):
         Args:
             node: The ast.Name node to visit
         """
+       
         self.usage_detector.detect_name_usage(node)
     
     def visit_Attribute(self, node: ast.Attribute) -> None:
@@ -106,6 +109,7 @@ class DependencyVisitor(ast.NodeVisitor):
         Args:
             node: The ast.Attribute node to visit
         """
+        
         self.usage_detector.detect_attribute_usage(
             node=node,
             visit_callback=self.generic_visit

@@ -1,6 +1,6 @@
 # src/backend/app/db/node_orm.py
 
-from typing import Type, TypeVar, Generic, Union, get_origin, Optional
+from typing import Type, TypeVar, Generic, Union, get_origin
 from pydantic import TypeAdapter
 from arango.collection import StandardCollection
 from arango.exceptions import DocumentGetError
@@ -111,16 +111,39 @@ class ArangoNodeCollection(Generic[T]):
         cursor = self.db.aql.execute(query, bind_vars=bind_vars)
         return [self._validate(doc) for doc in cursor]
 
+    def find_like(
+        self, field: str, pattern: str, limit: int | None = None
+    ) -> list[T]:
+        """
+        Finds documents where a field matches a LIKE pattern.
+        
+        Args:
+            field: The field name to match against (e.g., "qname")
+            pattern: The LIKE pattern (e.g., "%utils%")
+            limit: Optional limit on number of results
+            
+        Returns:
+            List of validated model instances
+        """
+        query = f"""
+        FOR doc IN {self.collection_name}
+            FILTER LIKE(doc.{field}, @pattern)
+        """
+        
+        if limit:
+            query += " LIMIT @limit"
+            
+        query += " RETURN doc"
+        
+        bind_vars = {"pattern": pattern}
+        if limit:
+            bind_vars["limit"] = limit
+            
+        return self.aql(query, bind_vars)
+
     def truncate(self):
         """Deletes all documents in the collection."""
         self.collection.truncate()
-
-    def find(self, filters: dict, limit: Optional[int] = None) -> list[T]:
-        """
-        Finds documents using a filter dictionary.
-        """
-        cursor = self.collection.find(filters, limit=limit)
-        return [self._validate(doc) for doc in cursor]
     
     def find_related(
         self,

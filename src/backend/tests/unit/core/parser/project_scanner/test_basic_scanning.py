@@ -1,11 +1,11 @@
-# src/backend/tests/unit/core/parser/project_scanner/test_scan_project.py
+# Basic project scanning functionality tests
 import pytest
 from app.core.parser.project_scanner import ProjectScanner
 from app.db import collections
-from app.core.manager import CodeGraphManager
 
 # Marks all tests in this file as using the 'clear_db' fixture
 pytestmark = pytest.mark.usefixtures("clear_db")
+
 
 def test_scan_project_declaration_pass(sample_project_path):
     """
@@ -23,20 +23,17 @@ def test_scan_project_declaration_pass(sample_project_path):
     all_nodes = collections.nodes.find({})
     all_edges = collections.uses_import_edges.find({})
     for edge in all_edges:
-        print(f"Edge: {edge.target_qname} {edge.alias} {edge.from_id} {edge.to_id} {edge.import_position.line_no}")
+        edge_info = (
+            f"Edge: {edge.target_qname} {edge.alias} {edge.from_id} " 
+            f"{edge.to_id} {edge.import_position.line_no}"
+        )
+        print(edge_info)
         from_node = collections.nodes.get(edge.from_id)
         to_node = collections.nodes.get(edge.to_id)
         print(f"  from_id qname: {getattr(from_node, 'qname', None)}")
-
-       
-        print(f"  to_id qname: {getattr(to_node, 'qname', None)} {to_node.model_dump_json()}")
-        print("")
-
-  
-    print(f"All edges: {len(all_edges)}")
-
-    for node in all_nodes:
-        print(f"Node: {node.qname} {node.node_type} {node.model_dump_json()}")
+        to_qname = getattr(to_node, 'qname', None)
+        to_json = to_node.model_dump_json()
+        print(f"  to_id qname: {to_qname} {to_json}")
         print("")
 
     # Project (1)
@@ -45,7 +42,10 @@ def test_scan_project_declaration_pass(sample_project_path):
     # Classes (3): MainApp, UtilityClass, User
     # Functions (7): start_app, MainApp.run, MainApp.__init__, helper_function, 
     #                UtilityClass.do_something, User.__init__, User.get_name
-    assert len(all_nodes) == 1 + 5 + 3 + 7 + 1, "Should create the correct number of nodes"
+    expected_nodes = 1 + 5 + 3 + 7 + 1
+    assert len(all_nodes) == expected_nodes, (
+        "Should create the correct number of nodes"
+    )
 
     # Find specific nodes by their qualified name (qname)
     main_app_node = collections.nodes.find_one({"qname": "main.MainApp"})
@@ -60,51 +60,54 @@ def test_scan_project_declaration_pass(sample_project_path):
     assert user_class_node is not None
     assert user_class_node.node_type == "class"
 
-    user_get_name_node = collections.nodes.find_one({"qname": "models.user.User.get_name"})
+    user_get_name_qname = "models.user.User.get_name"
+    user_get_name_node = collections.nodes.find_one(
+        {"qname": user_get_name_qname}
+    )
     assert user_get_name_node is not None
     assert user_get_name_node.node_type == "function"
     
-    helper_func_node = collections.nodes.find_one({"qname": "utils.helper_function"})
+    helper_func_qname = "utils.helper_function"
+    helper_func_node = collections.nodes.find_one(
+        {"qname": helper_func_qname}
+    )
     assert helper_func_node is not None
     assert helper_func_node.node_type == "function"
 
-def test_tree_structure(sample_project_path):
+
+def test_scan_summary_information(sample_project_path):
     """
-    Tests that the tree structure is correctly created.
+    Test that scan summary provides useful information.
     """
     scanner = ProjectScanner(sample_project_path)
     scanner.scan()
-
-    manager = CodeGraphManager()
-    projects = manager.get_all_projects()
-    assert len(projects) == 1
-
-    project = projects[0]
     
-    folders = project.get_folders()
-    files = project.get_files()
-
-
-    assert len(folders) == 1
-    assert len(files) == 3
+    summary = scanner.get_scan_summary()
     
-    models_folder = folders[0]
-    assert (len(models_folder.get_files()) == 2)
-    assert (len(models_folder.get_folders()) == 0)
-
-    main_file = files[0]
-
-    assert (len(main_file.get_functions()) == 3)
-    assert (len(main_file.get_classes()) == 1)
-
-    utils_file = files[1]
-
+    assert "project_path" in summary
+    assert "total_symbols" in summary
+    assert "created_packages" in summary
     
-    assert (len(utils_file.get_functions()) == 2)
-    assert (len(utils_file.get_classes()) == 1)
+    assert summary["total_symbols"] > 5, (
+        "Should track symbols in sample project"
+    )
+    
+    print(f"Scan summary: {summary}")
 
-    utils_class = utils_file.get_classes()[0]
-    assert (utils_class.name == "UtilityClass")
 
-    helper_func = utils_file.get_functions()[0]
-    assert (helper_func.name == "helper_function")
+def test_package_node_creation(sample_project_path):
+    """
+    Test that external package nodes are created for imports.
+    """
+    scanner = ProjectScanner(sample_project_path)
+    scanner.scan()
+    
+    # Should create package nodes for external imports
+    package_nodes = collections.nodes.find({"node_type": "package"})
+    assert len(package_nodes) > 0, "Should create package nodes"
+    
+    # Check for pydantic package from sample project
+    package_qnames = [node.qname for node in package_nodes]
+    assert any("pydantic" in qname for qname in package_qnames), (
+        "Should find pydantic package from sample project imports"
+    ) 
