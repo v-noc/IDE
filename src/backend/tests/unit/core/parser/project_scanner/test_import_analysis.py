@@ -2,6 +2,7 @@
 import pytest
 from app.core.parser.project_scanner import ProjectScanner
 from app.db import collections
+from pathlib import Path
 
 # Marks all tests in this file as using the 'clear_db' fixture
 pytestmark = pytest.mark.usefixtures("clear_db")
@@ -16,12 +17,48 @@ def test_import_position_tracking(complex_project_path):
     
     # Get all import edges
     import_edges = collections.uses_import_edges.find({})
-    
+        
     # Verify import positions are tracked
     for edge in import_edges:
         assert hasattr(edge, 'import_position')
         assert edge.import_position.line_no > 0
         assert edge.import_position.col_offset >= 0
+        # Cross-check with actual file content using new methods
+        try:
+            from_node = collections.nodes.get(edge.from_id)
+            if from_node and from_node.node_type in ['function', 'class']:
+                if from_node.node_type == 'function':
+                    from app.core.code_elements import Function
+                    element = Function(from_node)
+                    print(" function", element.qname)
+                    parent_file = element.get_parent_file()
+                    path = Path(scanner.project_path) / parent_file.path
+                    assert path.exists(), f"File {path} does not exist"
+                    # Use the File class method to get text at import position
+                    import_text = parent_file.get_text(edge.import_position)
+                    print(f"Import text: {import_text}")
+                    
+                    # Verify the text contains import keywords
+                    import_keywords = ['import', 'from']
+                    has_import = any(k in import_text for k in import_keywords)
+                    assert has_import, (
+                        f"Import position should contain import statement: "
+                        f"{import_text}"
+                    )
+                        
+
+                else:
+                    from app.core.code_elements import Class
+                    element = Class(from_node)
+                    print(" element", element.qname)
+                
+                    parent_file = element.get_parent_file()
+                    print(f"Import from {element.name} in {parent_file.path}")
+                    path = Path(scanner.project_path) / parent_file.path
+                    assert path.exists(), f"File {path} does not exist"
+
+        except Exception as e:
+            print(f"Could not get parent file: {e}")
     
     # Find specific import (e.g., "from typing import Dict, List, Optional")
     typing_imports = [

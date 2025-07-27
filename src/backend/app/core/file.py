@@ -1,11 +1,14 @@
 """
 The File domain object.
 """
-from typing import List
+from typing import List, TYPE_CHECKING
 from .base import DomainObject
 from .code_elements import Function, Class
 from ..models import node, edges, properties
 from ..db import collections as db
+
+if TYPE_CHECKING:
+    from .project import Project
 
 
 class File(DomainObject[node.FileNode]):
@@ -24,6 +27,24 @@ class File(DomainObject[node.FileNode]):
     @property
     def absolute_path(self) -> str:
         return self.path + self.name
+    
+    def get_project(self) -> 'Project':
+        """Returns the project this file belongs to by following belongs_to edge."""
+        from .project import Project
+        
+        # Find the belongs_to edge where this file is the source
+        belongs_edge = db.belongs_to_edges.find_one({'from_id': self.id})
+        if not belongs_edge:
+            raise ValueError(f"No project found for file {self.id}")
+        
+        # Get the project node
+        project_node = db.nodes.get(belongs_edge.to_id)
+        if not project_node:
+            raise ValueError(
+                f"Project node {belongs_edge.to_id} not found"
+            )
+        
+        return Project(project_node)
 
     def add_function(
         self, name: str, position: node.NodePosition, **kwargs
@@ -102,3 +123,30 @@ class File(DomainObject[node.FileNode]):
             filter_by_type="class"
         )
         return [Class(node_model) for node_model in class_nodes]
+    
+    def get_text(self, position: node.NodePosition) -> str:
+        """Retrieves the text at a specific position in the file."""
+        # Get the project to build the full path
+        project = self.get_project()
+        full_path = f"{project.path}/{self.path}"
+        
+        with open(full_path, 'r') as f:
+            lines = f.readlines()
+            line_no = position.line_no
+            col_offset = position.col_offset
+            
+            if line_no > len(lines):
+                raise ValueError(
+                    f"Line number {line_no} exceeds file length {len(lines)}"
+                )
+            
+            line_content = lines[line_no - 1]
+            
+            # If we have end position, extract the specific range
+            if hasattr(position, 'end_col_offset') and position.end_col_offset:
+                start = col_offset
+                end = min(position.end_col_offset, len(line_content))
+                return line_content[start:end]
+            else:
+                # Return the entire line
+                return line_content.strip()

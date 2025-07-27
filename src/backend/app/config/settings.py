@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     ARANGO_DB: str
     ARANGO_ROOT_PASSWORD: str
     PORT: int
-    GEMINI_API_KEY: str
+
 
     model_config = SettingsConfigDict(
         # Pydantic-Settings will automatically use the ENV_FILE env var if it exists.
@@ -44,5 +44,5 @@ def get_settings() -> Settings:
         # Assumes the script is run from the project root.
         project_root = Path(__file__).parent.parent.parent
         env_file = project_root / "tests" / ".env.test"
-    
+
     return Settings(_env_file=env_file)

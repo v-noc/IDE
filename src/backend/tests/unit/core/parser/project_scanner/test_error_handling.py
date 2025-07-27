@@ -132,9 +132,9 @@ def test_large_file_handling(complex_project_path):
     # Count nodes per file by checking contains edges
     for node in all_nodes:
         if node.node_type != "file":
-            contains_edges = collections.contains_edges.find({"_to": node.id})
+            contains_edges = collections.contains_edges.find({"to_id": node.id})
             for edge in contains_edges:
-                file_id = edge._from
+                file_id = edge.from_id
                 if file_id not in file_node_counts:
                     file_node_counts[file_id] = 0
                 file_node_counts[file_id] += 1

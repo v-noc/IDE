@@ -1,13 +1,13 @@
 # src/backend/app/db/edge_orm.py
 
 from typing import Type, TypeVar, Generic, List, Dict, Any
-from pydantic import BaseModel
 from arango.collection import StandardCollection
 from arango.database import StandardDatabase
 from .client import get_db
 from ..models.base import BaseEdge
 
 T = TypeVar('T', bound=BaseEdge)
+
 
 class ArangoEdgeCollection(Generic[T]):
     """
@@ -47,6 +47,26 @@ class ArangoEdgeCollection(Generic[T]):
         
         return self.db.create_collection(self.collection_name, edge=True)
 
+    def find_one(self, filters: dict) -> T | None:
+        """
+        Finds a single edge using a filter dictionary.
+        Maps Python field names to ArangoDB field names.
+        """
+        # Map Python field names to ArangoDB field names
+        arango_filters = {}
+        for key, value in filters.items():
+            if key == 'to_id':
+                arango_filters['_to'] = value
+            elif key == 'from_id':
+                arango_filters['_from'] = value
+            else:
+                arango_filters[key] = value
+        
+        cursor = self.collection.find(arango_filters, limit=1)
+        doc = next(cursor, None)  # Get first result or None
+        
+        return self._validate(doc) if doc else None
+
     def get(self, key: str) -> T | None:
         """
         Retrieves an edge by its key and validates it with the Pydantic model.
@@ -75,8 +95,19 @@ class ArangoEdgeCollection(Generic[T]):
     def find(self, filters: dict, limit: int | None = None) -> list[T]:
         """
         Finds edges using a filter dictionary.
+        Maps Python field names to ArangoDB field names.
         """
-        cursor = self.collection.find(filters, limit=limit)
+        # Map Python field names to ArangoDB field names
+        arango_filters = {}
+        for key, value in filters.items():
+            if key == 'to_id':
+                arango_filters['_to'] = value
+            elif key == 'from_id':
+                arango_filters['_from'] = value
+            else:
+                arango_filters[key] = value
+        
+        cursor = self.collection.find(arango_filters, limit=limit)
         return [self._validate(doc) for doc in cursor]
 
     def truncate(self):
