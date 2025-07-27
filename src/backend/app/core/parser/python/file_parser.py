@@ -7,6 +7,7 @@ from .visitors.declaration_visitor import DeclarationVisitor
 from .visitors.detail_visitor.dependency_visitor import (
     DependencyVisitor
 )
+from .visitors.detail_visitor.call_visitor import CallVisitor
 from .visitors.detail_visitor.visitor_context import (
     VisitorContext
 )
@@ -36,17 +37,19 @@ class PythonFileParser:
         module_path = relative_path.replace(".py", "").replace("/", ".")
         return f"{module_path}.{'.'.join(parts)}"
 
-    def run_declaration_pass(self, file_path: str, file_content: str) -> List[ArangoBase]:
+    def run_declaration_pass(
+        self, file_path: str, file_content: str
+    ) -> List[ArangoBase]:
         """
-        Runs the first pass of the analysis to find all high-level declarations.
-        Returns a list of nodes and a dictionary mapping methods to their 
-        parent classes.
+        Runs the first pass of the analysis to find all high-level 
+        declarations. Returns a list of nodes and a dictionary 
+        mapping methods to their parent classes.
         """
         try:
             tree = ast.parse(file_content, filename=file_path)
             self.ast_cache.set(file_path, tree)
         except SyntaxError as e:
-            # In Phase 5, this will create an AnalysisIssue. For now, we just log.
+            # In Phase 5, this will create an AnalysisIssue. For now, log.
             print(f"Syntax error in {file_path}: {e}")
             return []
 
@@ -109,19 +112,23 @@ class PythonFileParser:
         
         return nodes
     
-    def run_detail_pass(self, file_path: str, file_id: str) -> List[ArangoBase]:
+    def run_detail_pass(
+        self, file_path: str, file_id: str
+    ) -> List[ArangoBase]:
         """
         Runs the second pass to analyze dependencies and control flow.
         
         This method processes imports and their usage, creating UsesImportEdge
         models that link functions/classes to the symbols they import.
+        It also processes function calls, creating CallEdge models that
+        link callers to their targets.
         
         Args:
             file_path: The path to the Python file being analyzed
             file_id: The database ID of the file node
             
         Returns:
-            List of edge models representing dependencies
+            List of edge models representing dependencies and calls
         """
         # Get the cached AST for this file
         tree = self.ast_cache.get(file_path)
@@ -149,6 +156,10 @@ class PythonFileParser:
         # Phase 2: Dependency Resolution
         dependency_visitor = DependencyVisitor(context)
         dependency_visitor.visit(tree)
+        
+        # Phase 2: Call Resolution
+        call_visitor = CallVisitor(context)
+        call_visitor.visit(tree)
         
         # Future phases will add:
         # Phase 3: Control Flow Analysis

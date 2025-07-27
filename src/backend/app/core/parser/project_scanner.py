@@ -3,7 +3,9 @@ import os
 from typing import Dict, Any
 
 from app.db import collections
-from app.models.edges import BelongsToEdge, ContainsEdge, UsesImportEdge
+from app.models.edges import (
+    BelongsToEdge, ContainsEdge, UsesImportEdge, CallEdge
+)
 from app.models import edges
 from app.models.node import PackageNode
 from app.models.properties import PackageProperties
@@ -14,7 +16,6 @@ from .python.symbol_table import SymbolTable
 from .python.file_parser import PythonFileParser
 from ..manager import CodeGraphManager
 from ..tree_builder import build_tree_from_paths
-from ..code_elements import Class
 
 
 class ProjectScanner:
@@ -167,43 +168,70 @@ class ProjectScanner:
         
         return created_package.id
 
-    def _process_dependency_edges(self, edges: list) -> None:
+    def _process_detail_pass_edges(self, edges: list) -> None:
         """
-        Processes the dependency edges from the detail pass, creating 
-        package nodes as needed and linking them properly.
+        Processes the edges from the detail pass, including dependency edges
+        and call edges, creating package nodes as needed and linking them 
+        properly.
         
         Args:
-            edges: List of UsesImportEdge models with target_qname metadata
+            edges: List of edge models (UsesImportEdge, CallEdge, etc.)
         """
         for edge in edges:
-            if not isinstance(edge, UsesImportEdge):
-                continue
-                
-            target_qname = edge.target_qname
-            if not target_qname:
-                continue
-            
-            # Check if it's a local module or external package
-            is_local = self.symbol_table.is_local_module(target_qname)
-            
-            if is_local:
-                # It's a local module - find the existing node ID
-                target_id = self.symbol_table.get_symbol_id(target_qname)
-                # for key, value in self.symbol_table._qname_to_id.items():
-                #     print(f"{key} -> {value}")
-                if target_id:
-                    edge.to_id = target_id
-                    collections.uses_import_edges.create(edge)
-                else:
-                    print(f"Warning: Local module {target_qname} not found "
-                          f"{self.symbol_table}")
-            else:
-                
-                # It's an external package - create package node if needed
-                package_id = self._create_package_node(target_qname)
-                edge.to_id = package_id
-                collections.uses_import_edges.create(edge)
+            if isinstance(edge, UsesImportEdge):
+                self._process_import_edge(edge)
+            elif isinstance(edge, CallEdge):
+                self._process_call_edge(edge)
 
+    def _process_import_edge(self, edge: UsesImportEdge) -> None:
+        """
+        Processes a single UsesImportEdge, creating package nodes as needed.
+        
+        Args:
+            edge: The UsesImportEdge to process
+        """
+        target_qname = edge.target_qname
+        if not target_qname:
+            return
+        
+        # Check if it's a local module or external package
+        is_local = self.symbol_table.is_local_module(target_qname)
+        
+        if is_local:
+            # It's a local module - find the existing node ID
+            target_id = self.symbol_table.get_symbol_id(target_qname)
+            if target_id:
+                edge.to_id = target_id
+                collections.uses_import_edges.create(edge)
+            else:
+                print(f"Warning: Local module {target_qname} not found")
+        else:
+            # It's an external package - create package node if needed
+            package_id = self._create_package_node(target_qname)
+            edge.to_id = package_id
+            collections.uses_import_edges.create(edge)
+
+    def _process_call_edge(self, edge: CallEdge) -> None:
+        """
+        Processes a single CallEdge, ensuring both from_id and to_id 
+        reference existing nodes.
+        
+        Args:
+            edge: The CallEdge to process
+        """
+        # Verify that both nodes exist in the database
+        from_node = collections.nodes.get(edge.from_id)
+        to_node = collections.nodes.get(edge.to_id)
+        
+        if from_node and to_node:
+            # Both nodes exist, create the edge
+            collections.calls_edges.create(edge)
+        else:
+            # Log missing nodes for debugging
+            if not from_node:
+                print(f"Warning: Caller node {edge.from_id} not found")
+            if not to_node:
+                print(f"Warning: Target node {edge.to_id} not found")                
 
     def scan(self) -> None:
         """
@@ -301,7 +329,6 @@ class ProjectScanner:
                 collections.implements_edges.create(implements_edge)
                 
                 
-
         # Third Pass: Phase 2 - Process dependencies and imports
         
         for file_path in py_files:
@@ -312,13 +339,13 @@ class ProjectScanner:
             if not file_node_id:
                 continue
                 
-            # Run the detail pass to get dependency edges
-            dependency_edges = self.file_parser.run_detail_pass(
+            # Run the detail pass to get dependency and call edges
+            detail_edges = self.file_parser.run_detail_pass(
                 file_path, file_node_id
             )
             
             # Process the edges, creating package nodes as needed
-            self._process_dependency_edges(dependency_edges)
+            self._process_detail_pass_edges(detail_edges)
 
         print(
             f"Project scan complete. "
