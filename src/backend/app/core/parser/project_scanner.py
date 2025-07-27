@@ -299,11 +299,8 @@ class ProjectScanner:
                     _to=method_id
                 )
                 collections.implements_edges.create(implements_edge)
-                method_node = collections.nodes.get(method_id)
-                class_node = collections.nodes.get(class_id)
-                if method_node and class_node:
-                    print(f"Linked method {method_node.name} to "
-                          f"class {class_node.name}")
+                
+                
 
         # Third Pass: Phase 2 - Process dependencies and imports
         

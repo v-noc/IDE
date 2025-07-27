@@ -119,24 +119,14 @@ class Function(DomainObject[node.FunctionNode]):
         )
         db.uses_import_edges.create(import_edge)
 
-    def add_input(self, name: str, position: node.NodePosition, **kwargs):
+    def add_input(self, input: TypeKeyValuesProperties):
         """Adds an input parameter to the function's properties."""
-        input_prop = TypeKeyValuesProperties(
-            varname=name,
-            varType=kwargs.get('varType', 'unknown'),
-            position=position,
-        )
-        self.model.properties.inputs.append(input_prop)
+        self.model.properties.inputs.append(input)
         db.nodes.update(self.model)
 
-    def add_output(self, name: str, position: node.NodePosition, **kwargs):
+    def add_output(self, output: TypeKeyValuesProperties):
         """Adds an output/return value to the function's properties."""
-        output_prop = TypeKeyValuesProperties(
-            varname=name,
-            varType=kwargs.get('varType', 'unknown'),
-            position=position,
-        )
-        self.model.properties.outputs.append(output_prop)
+        self.model.properties.outputs.append(output)
         db.nodes.update(self.model)
 
 
@@ -259,13 +249,7 @@ class Class(DomainObject[node.ClassNode]):
         )
         db.uses_import_edges.create(import_edge)
 
-    def add_field(self, filed: TypeKeyValuesProperties,
-                  position: node.NodePosition):
+    def add_field(self, filed: TypeKeyValuesProperties):
         """Adds a field to the class's properties."""
-        field_prop = TypeKeyValuesProperties(
-            varname=filed.varname,
-            varType=filed.varType,
-            position=position,
-        )
-        self.model.properties.fields.append(field_prop)
+        self.model.properties.fields.append(filed)
         db.nodes.update(self.model)
