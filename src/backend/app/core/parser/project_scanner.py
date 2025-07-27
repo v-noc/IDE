@@ -115,8 +115,7 @@ class ProjectScanner:
 
     def _create_package_node(self, package_qname: str) -> str:
         """
-        Creates a package node for an external package if it doesn't exist.
-        Only creates one node per base package and tracks imported paths.
+        Creates a PackageNode for an external package.
         
         Args:
             package_qname: The fully qualified name of the package
@@ -124,41 +123,49 @@ class ProjectScanner:
         Returns:
             The database ID of the created package node
         """
-        # Extract base package name (e.g., "pydantic" from 
-        # "pydantic.BaseModel")
+        # Check if we've already created this package
+        if package_qname in self.package_ids:
+            return self.package_ids[package_qname]
+        
+        # Determine the base package name (first part of qname)
         base_package = package_qname.split('.')[0]
         
-        # Check if base package already exists
+        # Check if the base package has already been created
         if base_package in self.created_packages:
-      
-            existing_package_id = self.package_ids.get(base_package)
-            if existing_package_id:
-                # Update the existing package with new imported path
-                existing_node = collections.nodes.get(existing_package_id)
-                if (existing_node and package_qname not in 
-                        existing_node.properties.imported_paths):
-                    existing_node.properties.imported_paths.append(
-                        package_qname
+            # Find the existing package node
+            existing_package = collections.nodes.find_one({
+                "qname": base_package,
+                "node_type": "package"
+            })
+            if existing_package:
+                # Register in symbol table if not already there
+                if package_qname not in self.symbol_table._qname_to_id:
+                    self.symbol_table.add_symbol(
+                        package_qname, existing_package.id
                     )
-                    collections.nodes.update(existing_node)
-                return existing_package_id
+                return existing_package.id
         
         # Create the package node
-        package_node = PackageNode(
-            name=base_package,  # Use base package as name
-            qname=base_package,  # Use base package as qname
-            properties=PackageProperties(imported_paths=[package_qname])
+        package_properties = PackageProperties(
+            name=base_package,
+            version="unknown"
+        )
+        
+        created_package = PackageNode(
+            name=base_package,
+            qname=base_package,
+            properties=package_properties
         )
         
         # Save to database
-        created_package = collections.nodes.create(package_node)
+        saved_package = collections.nodes.create(created_package)
         
-        # Track the package ID for future lookups
-        self.package_ids[base_package] = created_package.id
+        # Store in our local mapping
+        self.package_ids[package_qname] = saved_package.id
         
-        # Link package to project with BelongsToEdge
+        # Create belongs_to edge linking package to project
         belongs_to_edge = BelongsToEdge(
-            _from=created_package.id,
+            _from=saved_package.id,
             _to=self.project.id
         )
         collections.belongs_to_edges.create(belongs_to_edge)
@@ -166,7 +173,13 @@ class ProjectScanner:
         # Mark base package as created
         self.created_packages.add(base_package)
         
-        return created_package.id
+        # IMPORTANT: Register the package in the symbol table
+        self.symbol_table.add_symbol(base_package, saved_package.id)
+        # Also register the full qname if different from base
+        if package_qname != base_package:
+            self.symbol_table.add_symbol(package_qname, saved_package.id)
+        
+        return saved_package.id
 
     def _process_detail_pass_edges(self, edges: list) -> None:
         """

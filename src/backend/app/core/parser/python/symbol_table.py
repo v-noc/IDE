@@ -11,6 +11,7 @@ class SymbolTable:
     def __init__(self):
         self._qname_to_id: Dict[str, str] = {}
         self._file_id_to_imports: Dict[str, Dict[str, str]] = {}
+        self._package_table: Dict[str, str] = {}
         self._scope_stack: List[str] = []
 
     def add_symbol(self, qname: str, db_id: str) -> None:
@@ -73,8 +74,8 @@ class SymbolTable:
         # 3. 'myproject' (parent module)
         
         # First check exact match
-        if qname in self._qname_to_id:
-            return True
+        # if qname in self._qname_to_id:
+        #     return True
         
         # Then check prefixes (for cases like myproject.utils.function_name)
         parts = qname.split('.')
@@ -187,3 +188,34 @@ class SymbolTable:
             List of all local module qualified names
         """
         return list(self._qname_to_id.keys())
+
+    def get_all_packages(self) -> Dict[str, str]:
+        """
+        Gets all known package qnames and their IDs for debugging.
+        
+        Returns:
+            Dictionary mapping package qnames to their database IDs
+        """
+        packages = {}
+        for qname, node_id in self._qname_to_id.items():
+            # Simple heuristic: if it's not a file path, it might be a package
+            if '/' not in qname and not qname.startswith('nodes/'):
+                packages[qname] = node_id
+        return packages
+
+    def debug_symbol_table(self) -> None:
+        """
+        Prints the current state of the symbol table for debugging.
+        """
+        print("=== Symbol Table Debug ===")
+        print(f"Total symbols: {len(self._qname_to_id)}")
+        
+        packages = self.get_all_packages()
+        print(f"Packages ({len(packages)}):")
+        for qname, node_id in packages.items():
+            print(f"  {qname} -> {node_id}")
+        
+        print(f"File imports: {len(self._file_id_to_imports)}")
+        for file_id, imports in self._file_id_to_imports.items():
+            print(f"  {file_id}: {imports}")
+        print("=========================")

@@ -58,6 +58,7 @@ class Function(DomainObject[node.FunctionNode]):
         call_edge_model = edges.CallEdge(
             _from=self.id,
             _to=target.id,
+            order=0,
             position=position
         )
         db.calls_edges.create(call_edge_model)
@@ -88,7 +89,7 @@ class Function(DomainObject[node.FunctionNode]):
         """Returns all import edges from this function."""
         return db.uses_import_edges.find({'from_id': self.id})
     
-    def get_nodes_that_import_this(self) -> list['Function']:
+    def get_nodes_that_import_this(self) -> list[Union['Function', 'Class']]:
         """Returns all nodes that import this function."""
         import_edges = db.uses_import_edges.find({'to_id': self.id})
         result = []
@@ -96,6 +97,8 @@ class Function(DomainObject[node.FunctionNode]):
             node = db.nodes.get(edge.from_id)
             if node and node.node_type == 'function':
                 result.append(Function(node))
+            elif node and node.node_type == 'class':
+                result.append(Class(node))
         return result
     
     def uses_import(
@@ -133,7 +136,52 @@ class Function(DomainObject[node.FunctionNode]):
         self.model.properties.outputs.append(output)
         db.nodes.update(self.model)
 
+    def get_class_calls(self) -> list[Class]:
+        """Returns all class calls from this function."""
+        return [Class(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="outbound",
+            filter_by_type="class"
+        )]
+    
+    def get_function_calls(self) -> list[Function]:
+        """Returns all function calls from this class."""
+        return [Function(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="outbound",
+            filter_by_type="function"
+        )]
+    
+    def get_package_calls(self) -> list[Package]:
+        """Returns all package calls from this function."""
+        return [Package(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="outbound",
+            filter_by_type="package"
+        )]
 
+    def get_node_caller_functions(self) -> list[Function]:
+        """Returns all nodes that call this function."""
+        return [Function(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="inbound",
+            filter_by_type="function"
+        )]
+    
+    def get_node_caller_classes(self) -> list[Class]:
+        """Returns all nodes that call this function."""
+        return [Class(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="inbound",
+            filter_by_type="class"
+        )]
+    
+   
 class Class(DomainObject[node.ClassNode]):
     """A domain object representing a class."""
 
@@ -169,6 +217,41 @@ class Class(DomainObject[node.ClassNode]):
             edge_collection=db.implements_edges,
             direction="outbound",
             filter_by_type="function"
+        )]
+    
+    def get_function_calls(self) -> list[Function]:
+        """Returns all function calls from this class."""
+        return [Function(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="outbound",
+            filter_by_type="function"
+        )]
+    
+    def get_class_calls(self) -> list[Class]:
+        """Returns all class calls from this class."""
+        return [Class(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="outbound",
+            filter_by_type="class"
+        )]
+    def get_node_caller_functions(self) -> list[Function]:
+        """Returns all nodes that call this function."""
+        return [Function(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="inbound",
+            filter_by_type="function"
+        )]
+    
+    def get_node_caller_classes(self) -> list[Class]:
+        """Returns all nodes that call this function."""
+        return [Class(node) for node in db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.calls_edges,
+            direction="inbound",
+            filter_by_type="class"
         )]
     
     def get_parent_file(self) -> 'File':

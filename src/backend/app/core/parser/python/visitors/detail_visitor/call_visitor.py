@@ -1,5 +1,6 @@
 import ast
 from typing import Optional, Dict
+import astpretty as asp
 from app.models.edges import CallEdge
 from app.models.node import NodePosition
 from .visitor_context import VisitorContext
@@ -191,17 +192,28 @@ class CallVisitor(ast.NodeVisitor):
             # Handle self.method() calls
             if base_name == "self":
                 return self._resolve_self_method_call(method_name)
-            
+            print(asp.pprint(attr_node))
             # Check if base_name is an import
             file_imports = self.context.symbol_table.get_file_imports(
                 self.context.file_id
             )
-            
+            for file_import in file_imports:
+                print(f"file_import: {file_import}")
             if base_name in file_imports:
                 # It's a module import, resolve to module.function
                 module_qname = file_imports[base_name]
                 target_qname = f"{module_qname}.{method_name}"
-                return self.context.symbol_table.get_symbol_id(target_qname)
+                print(f"target_qname: {target_qname}")
+                id = self.context.symbol_table.get_symbol_id(target_qname)
+                for qname, node_id in self.context.symbol_table._qname_to_id.items():
+                    if "time" in qname:
+                        print(f"qname: {qname}")
+                        print(f"node_id: {node_id}")
+                # Todo : check if the target_qname is a function or a class
+                if id:
+                    return id
+                else:
+                    return self.context.symbol_table.get_symbol_id(module_qname)
         
         # For more complex attribute calls (obj.method), we would need
         # type inference to resolve the type of 'obj' first
