@@ -17,6 +17,7 @@ def test_get_project(create_project):
     project = create_project
 
     manager = CodeGraphManager()
+
     loaded_project = manager.load_project(project_key=project.key)
     assert loaded_project is not None
     assert loaded_project.name == "test"

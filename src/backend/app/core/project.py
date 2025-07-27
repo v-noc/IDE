@@ -23,6 +23,10 @@ class Project(DomainObject[node.ProjectNode]):
         return self.model.properties.path
     
     @property
+    def key(self) -> str:
+        return self.model.key
+    
+    @property
     def absolute_path(self) -> str:
         return self.path + self.name
 
