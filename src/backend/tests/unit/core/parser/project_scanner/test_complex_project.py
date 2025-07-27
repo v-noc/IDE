@@ -62,7 +62,7 @@ def test_complex_project_comprehensive_analysis(
         ),
     }
     
-    print(f"Node counts: {node_counts}")
+   
     
     # Complex project should have substantial content
     assert node_counts['file'] > 8, "Should have many files"

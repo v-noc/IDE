@@ -21,20 +21,20 @@ def test_scan_project_declaration_pass(sample_project_path):
     # 3. Assertions
     # Check that the correct nodes were created
     all_nodes = collections.nodes.find({})
-    all_edges = collections.uses_import_edges.find({})
-    for edge in all_edges:
-        edge_info = (
-            f"Edge: {edge.target_qname} {edge.alias} {edge.from_id} " 
-            f"{edge.to_id} {edge.import_position.line_no}"
-        )
-        print(edge_info)
-        from_node = collections.nodes.get(edge.from_id)
-        to_node = collections.nodes.get(edge.to_id)
-        print(f"  from_id qname: {getattr(from_node, 'qname', None)}")
-        to_qname = getattr(to_node, 'qname', None)
-        to_json = to_node.model_dump_json()
-        print(f"  to_id qname: {to_qname} {to_json}")
-        print("")
+    # all_edges = collections.uses_import_edges.find({})
+    # for edge in all_edges:
+    #     edge_info = (
+    #         f"Edge: {edge.target_qname} {edge.alias} {edge.from_id} " 
+    #         f"{edge.to_id} {edge.import_position.line_no}"
+    #     )
+    #     print(edge_info)
+    #     from_node = collections.nodes.get(edge.from_id)
+    #     to_node = collections.nodes.get(edge.to_id)
+    #     print(f"  from_id qname: {getattr(from_node, 'qname', None)}")
+    #     to_qname = getattr(to_node, 'qname', None)
+    #     to_json = to_node.model_dump_json()
+    #     print(f"  to_id qname: {to_qname} {to_json}")
+    #     print("")
 
     # Project (1)
     # Folders (1): models
@@ -110,4 +110,4 @@ def test_package_node_creation(sample_project_path):
     package_qnames = [node.qname for node in package_nodes]
     assert any("pydantic" in qname for qname in package_qnames), (
         "Should find pydantic package from sample project imports"
-    ) 
+    )

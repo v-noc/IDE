@@ -1,6 +1,7 @@
 # src/backend/app/core/parser/python/symbol_table.py
 from typing import Dict, List, Optional
 
+
 class SymbolTable:
     """
     The central component for resolving names, types, and dependencies.
@@ -156,10 +157,12 @@ class SymbolTable:
             return self._scope_stack.pop()
         return None
 
-    def resolve_call_target_to_id(self, call_node, scope_id: str) -> Optional[str]:
+    def resolve_call_target_to_id(
+        self, call_node, scope_id: str
+    ) -> Optional[str]:
         """
         Resolves a function call to its target function's database ID.
-        To be implemented in Phase 4 for call resolution with type 
+        To be implemented in Phase 4 for call resolution with type
         inference.
         """
         # To be implemented in Phase 4

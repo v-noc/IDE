@@ -195,6 +195,7 @@ class ProjectScanner:
                 else:
                     print(f"Warning: Local module {target_qname} not found {self.symbol_table}" )
             else:
+                
                 # It's an external package - create package node if needed
                 package_id = self._create_package_node(target_qname)
                 edge.to_id = package_id
@@ -246,6 +247,7 @@ class ProjectScanner:
             declared_nodes = self.file_parser.run_declaration_pass(
                 file_path, content
             )
+            
             for node in declared_nodes:
                 created_node = collections.nodes.create(node)
                 self.symbol_table.add_symbol(
@@ -269,7 +271,7 @@ class ProjectScanner:
                 collections.belongs_to_edges.create(belongs_to_edge)
 
         # Third Pass: Phase 2 - Process dependencies and imports
-        print("Processing dependencies and imports...")
+        
         for file_path in py_files:
             # Get the file qname and find the corresponding file node
             file_qname = self.get_file_qname_from_path(file_path)

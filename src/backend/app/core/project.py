@@ -28,8 +28,8 @@ class Project(DomainObject[node.ProjectNode]):
 
     def add_file(self, file_name: str, file_path: str) -> File:
         """Adds a new file directly to the project's root."""
-        # Generate qname following the dot notation pattern
-        file_qname = file_path.replace(self.path, "").lstrip("/").replace(".py", "").replace("/", ".")
+        # Generate qname using the shared utility method
+        file_qname = self._generate_child_qname(file_name, is_file=True)
         
         # 1. Create the FileNode model
         file_node_model = node.FileNode(
@@ -44,7 +44,9 @@ class Project(DomainObject[node.ProjectNode]):
         contains_edge_model = edges.ContainsEdge(
             _from=self.id,
             _to=created_file_node.id,
-            position=node.NodePosition(line_no=0, col_offset=0, end_line_no=0, end_col_offset=0)
+            position=node.NodePosition(
+                line_no=0, col_offset=0, end_line_no=0, end_col_offset=0
+            )
         )
         db.contains_edges.create(contains_edge_model)
 
@@ -53,8 +55,8 @@ class Project(DomainObject[node.ProjectNode]):
 
     def add_folder(self, folder_name: str, folder_path: str) -> Folder:
         """Adds a new folder directly to the project's root."""
-        # Generate qname following the dot notation pattern
-        folder_qname = folder_path.replace(self.path, "").lstrip("/").replace("/", ".")
+        # Generate qname using the shared utility method
+        folder_qname = self._generate_child_qname(folder_name)
         
         # 1. Create the FolderNode model
         folder_node_model = node.FolderNode(
@@ -69,7 +71,9 @@ class Project(DomainObject[node.ProjectNode]):
         contains_edge_model = edges.ContainsEdge(
             _from=self.id,
             _to=created_folder_node.id,
-            position=node.NodePosition(line_no=0, col_offset=0, end_line_no=0, end_col_offset=0)
+            position=node.NodePosition(
+                line_no=0, col_offset=0, end_line_no=0, end_col_offset=0
+            )
         )
         db.contains_edges.create(contains_edge_model)
 
@@ -117,7 +121,10 @@ class Project(DomainObject[node.ProjectNode]):
             node_info = node_map[node_id]
             return {
                 **node_info["node"],
-                "children": [build_tree(child["node"]["_id"]) for child in node_info["children"]]
+                "children": [
+                    build_tree(child["node"]["_id"]) 
+                    for child in node_info["children"]
+                ]
             }
 
         return build_tree(self.id)

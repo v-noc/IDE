@@ -55,10 +55,22 @@ class ImportProcessor:
         """
         self.processed_imports.append(node)
         
-        if node.module is None:
-            # Handle relative imports like 'from . import something'
-            base_module = get_relative_import_base(self.context, node.level)
+        # Handle relative imports based on the level (number of dots)
+        
+        if node.level > 0:
+            # This is a relative import (from .module or from ..module)
+            parent_module = get_relative_import_base(self.context, node.level)
+            if node.module:
+                # from .base import something -> parent_module + ".base"
+                base_module = (
+                    f"{parent_module}.{node.module}" 
+                    if parent_module else node.module
+                )
+            else:
+                # from . import something -> just parent_module
+                base_module = parent_module
         else:
+            # Absolute import
             base_module = node.module
             
         for alias in node.names:
