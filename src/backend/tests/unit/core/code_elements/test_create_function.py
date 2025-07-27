@@ -1,5 +1,6 @@
 from app.core.manager import CodeGraphManager
 from app.models.shared import NodePosition
+from app.models.properties import TypeKeyValuesProperties
 
 
 def test_create_function():
@@ -31,47 +32,54 @@ def test_create_function_with_inputs_and_outputs(created_function):
     assert function.inputs == []
     assert function.outputs == []
 
-    function.add_input(
-        name="input1", 
+    input = TypeKeyValuesProperties(
+        varname="input1",
+        varType="int",
         position=NodePosition(
             line_no=1, 
             col_offset=23, 
             end_line_no=1, 
             end_col_offset=23
-        ), 
-        type="int"
-    )  
-    function.add_output(
-        name="output1", 
-        position=NodePosition(
-            line_no=1, 
-            col_offset=23, 
-            end_line_no=1, 
-            end_col_offset=23
-        ), 
-        type="int"
+        )
     )
+    function.add_input(input)
+
+    output = TypeKeyValuesProperties(
+        varname="output1",
+        varType="int",
+        position=NodePosition(
+            line_no=1, 
+            col_offset=23, 
+            end_line_no=1,
+            end_col_offset=23
+        )
+    )
+    function.add_output(output)
 
     expected_input = {
-        "name": "input1", 
+        "varname": "input1", 
         "position": NodePosition(
             line_no=1, 
             col_offset=23, 
             end_line_no=1, 
             end_col_offset=23
         ), 
-        "type": "int"
+        "varType": "int"
     }
     expected_output = {
-        "name": "output1", 
+        "varname": "output1", 
         "position": NodePosition(
             line_no=1, 
             col_offset=23, 
             end_line_no=1, 
             end_col_offset=23
         ), 
-        "type": "int"
+        "varType": "int"
     }
-    assert function.inputs == [expected_input]
-    assert function.outputs == [expected_output]
+    assert function.inputs[0].varname == expected_input["varname"]
+    assert function.inputs[0].varType == expected_input["varType"]
+    assert function.inputs[0].position == expected_input["position"]
+    assert function.outputs[0].varname == expected_output["varname"]
+    assert function.outputs[0].varType == expected_output["varType"]
+    assert function.outputs[0].position == expected_output["position"]
     
