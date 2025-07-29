@@ -1,50 +1,26 @@
-# V-NOC Monorepo
 
-This project is a monorepo containing a frontend and a backend application.
 
-## Prerequisites
+# V-NOC(Place holder name): A Visual IDE for Thinking in Code
 
-- [Node.js and Yarn](https://yarnpkg.com/getting-started/install)
-- [Python and uv](https://github.com/astral-sh/uv)
-- [Docker and Docker Compose](https://docs.docker.com/get-docker/)
+`V-NOC` is a revolutionary, canvas-based IDE that lets you build, document, and understand software by visually connecting nodes, just like you'd sketch an idea on a whiteboard.
 
-## Setup
+Tired of jumping between Notion for planning, Confluence for docs, and VS Code for implementation? This constant context-switching creates mental overhead and breaks your flow state. `V-NOC` unifies these workflows into a single, visual environment where your code's architecture is no longer hidden in a rigid folder structure.
 
-1.  **Install all dependencies:**
+![Project Demo GIF](https://your-link-to-a-demo-image-or-gif.com/demo.gif)
+*(A demo GIF showing the canvas, node connections, and drilling down would be perfect here)*
 
-    ```bash
-    make install
-    ```
+## Core Philosophy: Write Code As You Think
 
-## Running the Application
+Instead of forcing your mental model of a feature into a rigid folder structure, this IDE adapts to you. The goal is to eliminate the friction between idea and implementation, allowing you to stay in a state of creative flow. Business logic becomes transparent, and system architecture is something you see, not just imagine.
 
-To run the application for development, you'll need to run the backend and frontend servers in separate terminals.
+## Key Features
 
-1.  **Start the ArangoDB database:**
-
-    ```bash
-    make start-db
-    ```
-
-2.  **Run the backend server:**
-
-    ```bash
-    make run-backend
-    ```
-
-    The backend will be available at `http://localhost:8000`.
-
-3.  **Run the frontend server:**
-
-    ```bash
-    make run-frontend
-    ```
-
-    The frontend will be available at `http://localhost:5173`.
-
-## API Documentation
-
-The API documentation is automatically generated using FastAPI's OpenAPI integration. Once the backend server is running, you can access the documentation at the following URLs:
-
--   **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
--   **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+*   **Visual Canvas Interface**: Inspired by tools like React Flow and LangChain, your codebase is an infinite canvas of interconnected nodes.
+*   **Hierarchical Canvases**: Start with a high-level view (e.g., "Authentication," "Post Management") and double-click to drill down into more detailed canvases, all the way to a single function.
+*   **Living Documentation**: Documentation isn't in a separate file—it lives *inside* each node. No more context switching or outdated docs.
+*   **Complete Creative Freedom**: Draw, add notes, and arrange nodes anywhere on the canvas. Organize your project based on features, data flow, or any other model that makes sense to you.
+*   **Focused Workflows**:
+    *   Open a single function node to focus on its implementation.
+    *   Open a function and all its dependencies in a sandboxed "editor mode" to work on a complete feature in isolation.
+*   **Business Logic Visibility**: The visual relationships between nodes make the system's flow understandable to anyone, even without reading a single line of code.
+*   **Data Journey Tracking**: Visualize how data flows through your application for different scenarios (e.g., a successful vs. failed registration), making debugging and analysis intuitive.
