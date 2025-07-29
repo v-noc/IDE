@@ -9,3 +9,15 @@ wheels/
 # Virtual environments
 .venv
 .env
+# Frontend
+src/frontend/node_modules
+src/frontend/dist
+src/frontend/.env
+src/frontend/.yarn
+src/frontend/.env.local
+src/frontend/.env.*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.yarn/
+.pnp.*
