@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ARANGO_DB: str
     ARANGO_ROOT_PASSWORD: str
     PORT: int
+    LOG_LEVEL: str = "INFO"
 
 
     model_config = SettingsConfigDict(

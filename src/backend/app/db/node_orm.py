@@ -78,6 +78,15 @@ class ArangoNodeCollection(Generic[T]):
         new_doc = self.collection.get(meta["_key"])
         return self._validate(new_doc)
     
+    def delete(self, key: str) -> bool:
+        """
+        Deletes a document by its key.
+        """
+        try:
+            return self.collection.delete(key)
+        except DocumentGetError:
+            return False
+
     def update(self, doc_data: T) -> T:
         """
         Updates an existing document from a Pydantic model.

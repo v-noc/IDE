@@ -1,10 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 from .api import root, health
+from .api.core.projects import crud as projects_crud
 from .db.client import get_db
-
-
-from contextlib import asynccontextmanager
+from .utils.logging import setup_logging
+from .utils.exceptions import generic_exception_handler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -13,6 +13,7 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events.
     """
     # Startup
+    setup_logging()
     db = get_db()
     try:
         db.properties()
@@ -33,10 +34,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Add exception handlers
+app.add_exception_handler(Exception, generic_exception_handler)
+
 # Include routers
 app.include_router(root.router)
 app.include_router(health.router, tags=["health"])
-# app.include_router(users.router, prefix="/users", tags=["users"])
-# app.include_router(projects.router, prefix="/projects", tags=["projects"])
+app.include_router(projects_crud.router, prefix="/api/core", tags=["projects"])
 
 

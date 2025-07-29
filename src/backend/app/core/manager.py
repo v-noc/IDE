@@ -12,64 +12,50 @@ class CodeGraphManager:
     Provides high-level methods to create and load projects, serving as the
     entry point for all domain-centric graph operations.
     """
-    def create_project(self, name: str, path: str) -> Project:
+    def create_project(self, name: str, path: str) -> node.ProjectNode:
         """
-        Creates a new project node, saves it to the database, and returns a
-        hydrated Project domain object.
+        Creates a new project node, saves it to the database, and returns the
+        node model.
         """
-        # 1. Create the ProjectNode model
         project_node_model = node.ProjectNode(
             name=name,
-            qname=name,  # The qualified name for a project is just its name
+            qname=name,
             node_type="project",
             properties=properties.ProjectProperties(path=path)
         )
+        return db.nodes.create(project_node_model)
 
-        # 2. Save to the 'nodes' collection
-        created_node = db.nodes.create(project_node_model)
-
-        # 3. Return the hydrated domain object
-        return Project(created_node)
-
-    def create_project_with_scan(self, name: str, path: str) -> Project:
+    def get_project(self, project_key: str) -> node.ProjectNode | None:
         """
-        Creates a new project and performs a full scan to build the complete
-        folder/file hierarchy with declarations.
+        Loads an existing project from the database by its key.
         """
-        from .parser.project_scanner import ProjectScanner
-        
-        # Create scanner and run full scan
-        scanner = ProjectScanner(path)
-        scanner.scan()
-        
-        # Return the created project
-        return scanner.project
-
-    def load_project(self, project_key: str) -> Project:
-        """
-        Loads an existing project from the database by its key and returns a
-        hydrated Project domain object.
-        """
-        # 1. Load the project node from the 'nodes' collection
         project_node = db.nodes.get(project_key)
-        if not project_node:
-            raise ValueError(f"Project with key '{project_key}' not found.")
-        
-        if not isinstance(project_node, node.ProjectNode):
-            raise TypeError(
-                f"Document with key '{project_key}' is not a ProjectNode."
-            )
+        if not project_node or not isinstance(project_node, node.ProjectNode):
+            return None
+        return project_node
 
-        # 2. Return the hydrated domain object
-        return Project(project_node)
-
-    def get_all_projects(self) -> List[Project]:
+    def get_all_projects(self) -> List[node.ProjectNode]:
         """
         Retrieves all projects from the database.
         """
-        project_nodes = db.nodes.find({"node_type": "project"})
-        return [Project(node) for node in project_nodes]
+        return db.nodes.find({"node_type": "project"})
 
+    def delete_project(self, project_key: str) -> bool:
+        """
+        Deletes a project from the database.
+        """
+        return db.nodes.delete(project_key)
 
-# A default instance for use in API endpoints
-code_graph_manager = CodeGraphManager()
+    def update_project(self, project_key: str, name: str, path: str) -> node.ProjectNode | None:
+        """
+        Updates a project in the database.
+        """
+        project_node = self.get_project(project_key)
+        if not project_node:
+            return None
+        
+        project_node.name = name
+        project_node.properties.path = path
+        
+        db.nodes.update(project_node)
+        return project_node

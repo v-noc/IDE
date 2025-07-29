@@ -10,6 +10,7 @@ dependencies = [
   "pytest-mock>=3.14.1",
   "pathspec>=0.12.1",
   "astpretty>=3.0.0",
+  "loguru>=0.7.3",
 ]
 
 [project.optional-dependencies]

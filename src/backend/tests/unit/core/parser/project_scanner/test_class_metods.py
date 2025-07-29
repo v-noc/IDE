@@ -27,12 +27,23 @@ def test_complex_project_structure_and_imports(complex_project_path):
     #     for importer in importers:
     #         print(f"importer: {importer.qname} from {package_obj.qname}")
 
-    for function in functions:
-        function_obj = Function(function)
-        print(f"function: {function_obj.qname}")
-        print(f"function.qname: {function_obj.inputs}")
-        print(f"function.qname: {function_obj.outputs}")
-        print("--------------------------------")
+    for node in all_nodes:
+        class_obj = Class(node)
+        
+        if class_obj.name == "UserManager":
+            for methods in class_obj.methods:
+                print(f"method: {methods.name}")
+                print(f"method.qname: {methods.qname}")
+                print(f"method.qname: {methods.inputs}")
+                print(f"method.qname: {methods.outputs}")
+                print("--------------------------------")
+
+    # for function in functions:
+    #     function_obj = Function(function)
+    #     print(f"function: {function_obj.qname}")
+    #     print(f"function.qname: {function_obj.inputs}")
+    #     print(f"function.qname: {function_obj.outputs}")
+    #     print("--------------------------------")
 
     # for node in all_nodes:
     #     class_obj = Class(node)
