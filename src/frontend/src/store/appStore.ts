@@ -1,12 +1,17 @@
 import { create } from 'zustand';
 
+type ViewFormat = 'grid' | 'list';
+
 interface AppState {
-  // Example state
-  count: number;
-  increment: () => void;
+  viewFormat: ViewFormat;
+  setViewFormat: (format: ViewFormat) => void;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  count: 0,
-  increment: () => set((state) => ({ count: state.count + 1 })),
+  viewFormat: 'grid',
+  setViewFormat: (format) => set({ viewFormat: format }),
+  searchTerm: '',
+  setSearchTerm: (term) => set({ searchTerm: term }),
 }));
