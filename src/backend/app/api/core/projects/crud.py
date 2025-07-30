@@ -28,7 +28,7 @@ def get_manager() -> CodeGraphManager:
 
 router = APIRouter()
 
-@router.post("/projects/", response_model=ProjectResponse, status_code=201)
+@router.post("/project/", response_model=ProjectResponse, status_code=201)
 def create_project(project: ProjectCreate, manager: CodeGraphManager = Depends(get_manager)):
     """
     Create a new project.
@@ -40,7 +40,7 @@ def create_project(project: ProjectCreate, manager: CodeGraphManager = Depends(g
         path=new_project_node.properties.path
     )
 
-@router.get("/projects/{project_key}", response_model=ProjectResponse)
+@router.get("/project/{project_key}", response_model=ProjectResponse)
 def get_project(project_key: str, manager: CodeGraphManager = Depends(get_manager)):
     """
     Retrieve a single project by its key.
@@ -54,7 +54,7 @@ def get_project(project_key: str, manager: CodeGraphManager = Depends(get_manage
         path=project_node.properties.path
     )
 
-@router.get("/projects/", response_model=List[ProjectResponse])
+@router.get("/projects", response_model=List[ProjectResponse])
 def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):
     """
     Retrieve all projects.

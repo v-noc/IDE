@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
+
 from .api import root, health
 from .api.core.projects import crud as projects_crud
 from .db.client import get_db
@@ -31,15 +33,20 @@ app = FastAPI(
     title="V-NOC API",
     version="1.0.0",
     description="API for the V-NOC project",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Add exception handlers
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # Include routers
 app.include_router(root.router)
 app.include_router(health.router, tags=["health"])
-app.include_router(projects_crud.router, prefix="/api/core", tags=["projects"])
-
-
+app.include_router(projects_crud.router, prefix="/v1/api", tags=["projects"])
