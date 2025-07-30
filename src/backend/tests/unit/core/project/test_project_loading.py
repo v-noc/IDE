@@ -18,7 +18,7 @@ def test_get_project(create_project):
 
     manager = CodeGraphManager()
 
-    loaded_project = manager.load_project(project_key=project.key)
+    loaded_project = manager.get_project(project_key=project.key)
     assert loaded_project is not None
     assert loaded_project.name == "test"
     assert loaded_project.path == "/path/to/project"

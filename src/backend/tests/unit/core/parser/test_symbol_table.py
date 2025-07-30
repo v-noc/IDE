@@ -1,4 +1,4 @@
-from src.backend.app.core.parser.python.symbol_table import SymbolTable
+from app.core.parser.python.symbol_table import SymbolTable
 
 
 class TestSymbolTable:

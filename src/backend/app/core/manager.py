@@ -34,11 +34,11 @@ class CodeGraphManager:
             return None
         return Project(project_node)
 
-    def get_all_projects(self) -> List[node.ProjectNode]:
+    def get_all_projects(self) -> List[Project]:
         """
         Retrieves all projects from the database.
         """
-        return db.nodes.find({"node_type": "project"})
+        return [Project(project_node) for project_node in db.nodes.find({"node_type": "project"})]
 
     def delete_project(self, project_key: str) -> bool:
         """

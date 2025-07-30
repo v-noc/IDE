@@ -41,7 +41,7 @@ const CreateProjectDialog = ({
   title,
   description,
 }: CreateProjectDialogProps) => {
-  const { mutate: createProject, isSuccess } = useCreateProject();
+  const { mutate: createProject, isSuccess, isPending } = useCreateProject();
   const navigate = useNavigate();
   const { register, handleSubmit, setValue, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -175,7 +175,9 @@ const CreateProjectDialog = ({
             >
               Cancel
             </Button>
-            <Button type="submit">Create Project</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Creating..." : "Create Project"}
+            </Button>
           </div>
         </form>
       </DialogContent>

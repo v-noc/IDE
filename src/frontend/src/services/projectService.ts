@@ -13,7 +13,7 @@ const fetchProjects = (): Promise<Project[]> => {
 };
 
 const createProject = (newProject: { name: string; path: string }): Promise<Project> => {
-  return apiClient('/projects/', { body: newProject });
+  return apiClient('/project/', { body: newProject });
 };
 
 // React Query hooks (no changes needed here)
