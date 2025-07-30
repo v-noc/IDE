@@ -7,7 +7,7 @@ from app.models.edges import (
     BelongsToEdge, ContainsEdge, UsesImportEdge, CallEdge
 )
 from app.models import edges
-from app.models.node import PackageNode
+from app.models.node import PackageNode, ProjectNode
 from app.models.properties import PackageProperties
 
 from .file_navigator import FileNavigator
@@ -36,6 +36,11 @@ class ProjectScanner:
         self.created_packages: set = set()
         # Track package name -> ID mapping
         self.package_ids: Dict[str, str] = {}
+        self.project = None
+    
+   
+    def get_project(self) -> ProjectNode:
+        return self.project
 
     def create_nodes_and_edges_from_tree(
         self, 
@@ -257,7 +262,7 @@ class ProjectScanner:
             name=project_name,
             path=self.project_path
         )
-        
+    
         # Add project to symbol table
         self.symbol_table.add_symbol(self.project.name, self.project.id)
 

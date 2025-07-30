@@ -4,6 +4,8 @@ from app.core.manager import CodeGraphManager
 
 from pydantic import BaseModel
 
+from app.core.parser.project_scanner import ProjectScanner
+
 # Pydantic models for request and response
 class ProjectCreate(BaseModel):
     name: str
@@ -28,17 +30,22 @@ def get_manager() -> CodeGraphManager:
 
 router = APIRouter()
 
-@router.post("/project/", response_model=ProjectResponse, status_code=201)
+@router.post("/project", response_model=ProjectResponse, status_code=201)
 def create_project(project: ProjectCreate, manager: CodeGraphManager = Depends(get_manager)):
     """
     Create a new project.
     """
-    new_project_node = manager.create_project(name=project.name, path=project.path)
-    return ProjectResponse(
+    
+    scanner = ProjectScanner(project.path)
+    scanner.scan()
+    new_project_node = scanner.get_project()
+    project_response = ProjectResponse(
         key=new_project_node.key,
         name=new_project_node.name,
         path=new_project_node.properties.path
     )
+    
+    return project_response
 
 @router.get("/project/{project_key}", response_model=ProjectResponse)
 def get_project(project_key: str, manager: CodeGraphManager = Depends(get_manager)):

@@ -12,7 +12,7 @@ class CodeGraphManager:
     Provides high-level methods to create and load projects, serving as the
     entry point for all domain-centric graph operations.
     """
-    def create_project(self, name: str, path: str) -> node.ProjectNode:
+    def create_project(self, name: str, path: str) -> Project:
         """
         Creates a new project node, saves it to the database, and returns the
         node model.
@@ -23,16 +23,16 @@ class CodeGraphManager:
             node_type="project",
             properties=properties.ProjectProperties(path=path)
         )
-        return db.nodes.create(project_node_model)
+        return Project(db.nodes.create(project_node_model))
 
-    def get_project(self, project_key: str) -> node.ProjectNode | None:
+    def get_project(self, project_key: str) -> Project | None:
         """
         Loads an existing project from the database by its key.
         """
         project_node = db.nodes.get(project_key)
         if not project_node or not isinstance(project_node, node.ProjectNode):
             return None
-        return project_node
+        return Project(project_node)
 
     def get_all_projects(self) -> List[node.ProjectNode]:
         """
@@ -46,7 +46,7 @@ class CodeGraphManager:
         """
         return db.nodes.delete(project_key)
 
-    def update_project(self, project_key: str, name: str, path: str) -> node.ProjectNode | None:
+    def update_project(self, project_key: str, name: str, path: str) -> Project | None:
         """
         Updates a project in the database.
         """
@@ -58,4 +58,4 @@ class CodeGraphManager:
         project_node.properties.path = path
         
         db.nodes.update(project_node)
-        return project_node
+        return Project(project_node)
