@@ -31,7 +31,7 @@ def test_create_project(client: TestClient, manager: CodeGraphManager):
     project_path = "/tmp/test_project"
     
     response = client.post(
-        "/api/core/projects/",
+        "/api/core/project",
         json={"name": project_name, "path": project_path}
     )
     
@@ -56,7 +56,7 @@ def test_get_project(client: TestClient, manager: CodeGraphManager):
     # First, create a project to retrieve
     project = manager.create_project(name="Test Get Project", path="/tmp/get_project")
     
-    response = client.get(f"/api/core/projects/{project.key}")
+    response = client.get(f"/api/core/project/{project.key}")
     
     assert response.status_code == 200
     data = response.json()
@@ -71,7 +71,7 @@ def test_get_project_not_found(client: TestClient):
     """
     Test retrieving a non-existent project.
     """
-    response = client.get("/api/core/projects/non_existent_key")
+    response = client.get("/api/core/project/non_existent_key")
     assert response.status_code == 404
 
 def test_get_all_projects(client: TestClient, manager: CodeGraphManager):
@@ -82,7 +82,7 @@ def test_get_all_projects(client: TestClient, manager: CodeGraphManager):
     p1 = manager.create_project(name="Project 1", path="/tmp/p1")
     p2 = manager.create_project(name="Project 2", path="/tmp/p2")
     
-    response = client.get("/api/core/projects/")
+    response = client.get("/api/core/projects")
     
     assert response.status_code == 200
     data = response.json()
@@ -105,7 +105,7 @@ def test_update_project(client: TestClient, manager: CodeGraphManager):
     
     update_data = {"name": "Updated Name", "path": "/tmp/updated_path"}
     response = client.put(
-        f"/api/core/projects/{project.key}",
+        f"/api/core/project/{project.key}",
         json=update_data
     )
     
@@ -129,7 +129,7 @@ def test_delete_project(client: TestClient, manager: CodeGraphManager):
     # Create a project to delete
     project = manager.create_project(name="To Be Deleted", path="/tmp/to_be_deleted")
     
-    response = client.delete(f"/api/core/projects/{project.key}")
+    response = client.delete(f"/api/core/project/{project.key}")
     
     assert response.status_code == 204
     

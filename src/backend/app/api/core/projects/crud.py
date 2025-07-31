@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Dict, Any
 from app.core.manager import CodeGraphManager
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.parser.project_scanner import ProjectScanner
 
@@ -20,8 +20,15 @@ class ProjectResponse(BaseModel):
     name: str
     path: str
     
+class ProjectTreeResponse(BaseModel):
+   
+    key: str = Field(alias="_key")
+    name: str
+    node_type: str
+    qname: str
+    properties: dict
+    children: List["ProjectTreeResponse"]
 
-  
 
 def get_manager() -> CodeGraphManager:
     """Dependency to get the CodeGraphManager."""
@@ -59,8 +66,19 @@ def get_project(project_key: str, manager: CodeGraphManager = Depends(get_manage
     return ProjectResponse(
         key=project_node.key,
         name=project_node.name,
-        path=project_node.properties.path
+        path=project_node.path
     )
+
+@router.get("/project/{project_key}/tree", response_model=Dict[str, Any])
+def get_project_tree(project_key: str, manager: CodeGraphManager = Depends(get_manager)):
+    """
+    Retrieve a single project by its key.
+    """
+    project_node = manager.get_project(project_key)
+    if not project_node:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    return project_node.get_descendant_tree()
 
 @router.get("/projects", response_model=List[ProjectResponse])
 def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):

@@ -30,9 +30,9 @@ const ProjectList = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
           <Card
-            key={project.id}
+            key={project.key}
             className="hover:shadow-md transition-shadow p-4 cursor-pointer"
-            onClick={() => navigate(`/project/${project.id}`)}
+            onClick={() => navigate(`/project/${project.key}`)}
           >
             <CardHeader className="p-0 ">
               <div className="flex items-start justify-between">
@@ -86,9 +86,9 @@ const ProjectList = ({
     <div className="space-y-4">
       {projects.map((project) => (
         <Card
-          key={project.id}
+          key={project.key}
           className="hover:shadow-md transition-shadow p-4 cursor-pointer"
-          onClick={() => navigate(`/project/${project.id}`)}
+          onClick={() => navigate(`/project/${project.key}`)}
         >
           <CardContent className="p-2">
             <div className="flex items-start justify-between">

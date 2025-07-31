@@ -118,7 +118,7 @@ class Project(DomainObject[node.ProjectNode]):
         """
         cursor = db.contains_edges.get_descendant_tree_query(self.id)
         
-        node_map = {self.id: {"node": self.model.model_dump(), "children": []}}
+        node_map = {self.id: {"node": self.model.model_dump(by_alias=True), "children": []}}
         
         for item in cursor:
             node_data = item['vertex']

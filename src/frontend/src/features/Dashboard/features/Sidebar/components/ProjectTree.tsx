@@ -1,4 +1,3 @@
-import React from "react";
 import { TreeNode } from "./TreeNode";
 import type { ProjectNode } from "@/types/project";
 
