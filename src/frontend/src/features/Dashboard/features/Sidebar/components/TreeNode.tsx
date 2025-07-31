@@ -94,7 +94,7 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
           "rounded-lg p-1 transition-all duration-200 border",
           "mx-1 my-0.5",
           nestingLevel > 0 && "ml-2",
-          nestingLevel === 0 && "shadow-md",
+          nestingLevel === 0 && "shadow-sm",
           nestingLevel === 1 && "shadow-sm",
           isSelected && "ring-1 ring-blue-500/80",
           isActive && "ring-2 ring-blue-600"
