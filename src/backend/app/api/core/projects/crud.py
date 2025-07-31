@@ -42,7 +42,7 @@ def create_project(project: ProjectCreate, manager: CodeGraphManager = Depends(g
     project_response = ProjectResponse(
         key=new_project_node.key,
         name=new_project_node.name,
-        path=new_project_node.properties.path
+        path=new_project_node.path
     )
     
     return project_response
