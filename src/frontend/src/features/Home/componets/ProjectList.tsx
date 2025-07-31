@@ -62,16 +62,16 @@ const ProjectList = ({
                 {truncatePath(project.path, 40)}
               </p>
               <CardDescription className="mb-4 line-clamp-2">
-                {project.description}
+                {/* {project.description} */}
               </CardDescription>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  Created: {formatDate(project.createdDate, "MM/dd/yyyy")}
+                  {/* Created: {formatDate(project.createdDate, "MM/dd/yyyy")} */}
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  Modified: {formatDate(project.lastModified, "MM/dd/yyyy")}
+                  {/* Modified: {formatDate(project.lastModified, "MM/dd/yyyy")} */}
                 </div>
               </div>
             </CardContent>
@@ -100,16 +100,16 @@ const ProjectList = ({
                   {truncatePath(project.path)}
                 </p>
                 <p className="text-sm text-muted-foreground mb-3">
-                  {project.description}
+                  {/* {project.description} */}
                 </p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Created: {formatDate(project.createdDate, "MM/dd/yyyy")}
+                    {/* Created: {formatDate(project.createdDate, "MM/dd/yyyy")} */}
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    Modified: {formatDate(project.lastModified, "MM/dd/yyyy")}
+                    {/* Modified: {formatDate(project.lastModified, "MM/dd/yyyy")} */}
                   </div>
                 </div>
               </div>

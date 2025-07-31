@@ -3,8 +3,11 @@ import SearchAndViewController from "@/features/Home/componets/SearchAndViewCont
 import ProjectList from "@/features/Home/componets/ProjectList";
 import { useState } from "react";
 import type { Project } from "@/types/project";
+import { useProjects } from "@/services/projectService";
 
 const HomePage = () => {
+  const { data: projectss, error, isLoading } = useProjects();
+  console.log(projectss);
   const [projects, setProjects] = useState<Project[]>([
     {
       id: "1",
@@ -42,7 +45,7 @@ const HomePage = () => {
           viewMode={viewMode}
           setViewMode={setViewMode}
         />
-        <ProjectList viewMode={viewMode} projects={projects} />
+        <ProjectList viewMode={viewMode} projects={projectss} />
       </div>
     </div>
   );
