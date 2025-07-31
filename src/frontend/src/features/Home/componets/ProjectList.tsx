@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Calendar, Clock, Edit, Folder, MoreHorizontal } from "lucide-react";
-import { formatDate } from "date-fns";
+import { useNavigate } from "react-router";
 import { truncatePath } from "@/utils";
 import type { Project } from "@/types/project";
 
@@ -24,15 +24,17 @@ const ProjectList = ({
   viewMode: "list" | "grid";
   projects: Project[];
 }) => {
+  const navigate = useNavigate();
   if (viewMode === "grid") {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
           <Card
             key={project.id}
-            className="hover:shadow-md transition-shadow p-4"
+            className="hover:shadow-md transition-shadow p-4 cursor-pointer"
+            onClick={() => navigate(`/project/${project.id}`)}
           >
-            <CardHeader className="pb-3">
+            <CardHeader className="p-0 ">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <Folder className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -86,6 +88,7 @@ const ProjectList = ({
         <Card
           key={project.id}
           className="hover:shadow-md transition-shadow p-4 cursor-pointer"
+          onClick={() => navigate(`/project/${project.id}`)}
         >
           <CardContent className="p-2">
             <div className="flex items-start justify-between">

@@ -26,7 +26,7 @@ const ProjectItemGrid = ({
 }) => {
   return (
     <Card key={project.id} className="hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
+      <CardHeader className="p-0 pb-3 ">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Folder className="h-5 w-5 text-muted-foreground flex-shrink-0" />
