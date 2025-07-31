@@ -19,6 +19,7 @@ class ProjectResponse(BaseModel):
     key: str
     name: str
     path: str
+    
 
   
 
@@ -71,7 +72,7 @@ def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):
         ProjectResponse(
             key=p.key,
             name=p.name,
-            path=p.properties.path
+            path=p.path
         ) for p in project_nodes
     ]
 
@@ -86,7 +87,7 @@ def update_project(project_key: str, project: ProjectUpdate, manager: CodeGraphM
     return ProjectResponse(
         key=updated_project_node.key,
         name=updated_project_node.name,
-        path=updated_project_node.properties.path
+        path=updated_project_node.path
     )
 
 @router.delete("/projects/{project_key}", status_code=204)

@@ -7,7 +7,8 @@ from app.models.edges import (
     BelongsToEdge, ContainsEdge, UsesImportEdge, CallEdge
 )
 from app.models import edges
-from app.models.node import PackageNode, ProjectNode
+from app.models.node import PackageNode
+from app.core.project import Project
 from app.models.properties import PackageProperties
 
 from .file_navigator import FileNavigator
@@ -39,7 +40,7 @@ class ProjectScanner:
         self.project = None
     
    
-    def get_project(self) -> ProjectNode:
+    def get_project(self) -> Project:
         return self.project
 
     def create_nodes_and_edges_from_tree(
