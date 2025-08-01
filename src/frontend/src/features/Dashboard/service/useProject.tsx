@@ -1,7 +1,7 @@
 import apiClient from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 
-type NodeType =
+export type NodeType =
   | "folder"
   | "file"
   | "project"
@@ -63,11 +63,11 @@ type NodeProperties =
   | { type: "class"; properties: ClassProperties }
   | { type: "package"; properties: PackageProperties };
 
-interface ProjectTreeResponse {
+export interface ProjectTreeResponse {
   name: string;
   qname: string;
   key: string;
-  type: NodeType;
+  node_type: NodeType;
   properties: NodeProperties["properties"];
   children: ProjectTreeResponse[];
 }

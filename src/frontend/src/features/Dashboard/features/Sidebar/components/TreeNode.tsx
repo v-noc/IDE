@@ -1,5 +1,5 @@
 import React from "react";
-import type { ProjectNode } from "@/types/project";
+
 import useProjectStore from "@/stores/useProjectStore";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -9,9 +9,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
+import getIcons from "@/features/Dashboard/utils/getIcons";
+import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
 
 interface TreeNodeProps {
-  node: ProjectNode;
+  node: ProjectTreeResponse;
   nestingLevel?: number;
 }
 
@@ -24,15 +26,16 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
     toggleNodeExpansion,
   } = useProjectStore();
 
-  const isOpen = expandedNodeIds.has(node.id);
+  const isOpen = expandedNodeIds.has(node.key);
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleNodeExpansion(node.id);
+
+    toggleNodeExpansion(node.key);
   };
 
-  const isSelected = selectedNode?.id === node.id;
-  const isActive = activeNodeId === node.id;
+  const isSelected = selectedNode?.key === node.key;
+  const isActive = activeNodeId === node.key;
   const hasChildren = node.children && node.children.length > 0;
 
   const handleSelectNode = () => {
@@ -122,7 +125,7 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
             </CollapsibleTrigger>
           )}
           <DynamicIcon
-            iconName={node.icon}
+            iconName={getIcons(node.node_type)}
             className={cn("h-4 w-4 flex-shrink-0")}
             color={node.iconColor || currentStyle.color}
           />
@@ -140,7 +143,7 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
             <ul className="pl-2 pt-1 space-y-1">
               {node.children?.map((child) => (
                 <TreeNode
-                  key={child.id}
+                  key={child.key}
                   node={child}
                   nestingLevel={nestingLevel + 1}
                 />

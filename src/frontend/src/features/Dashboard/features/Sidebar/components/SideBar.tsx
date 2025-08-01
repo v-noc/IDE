@@ -4,7 +4,7 @@ import ProjectTree from "./ProjectTree";
 
 const SideBar = () => {
   const { projectId } = useParams();
-  console.log(projectId);
+
   const { data } = useGetProjectTreeWithKeyProject({
     key: projectId || "",
   });
@@ -18,7 +18,7 @@ const SideBar = () => {
       </Link>
 
       <div className="p-2">
-        <ProjectTree />
+        <ProjectTree projectTree={data || {}} />
       </div>
     </div>
   );

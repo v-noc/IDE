@@ -7,6 +7,9 @@ import {
   FileText,
   Package,
   ChevronRight,
+  FolderRoot,
+  Parentheses as Function,
+  Table,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +31,9 @@ const iconMap: Record<
   FileText,
   Package,
   ChevronRight,
+  FolderRoot,
+  Function,
+  Table,
 };
 
 export const DynamicIcon: React.FC<DynamicIconProps> = ({
@@ -36,7 +42,7 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
   color,
 }) => {
   const IconComponent = iconMap[iconName] || File;
-
+  console.log(iconName);
   return (
     <IconComponent
       className={cn(className)}

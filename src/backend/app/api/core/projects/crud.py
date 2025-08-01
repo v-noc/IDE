@@ -6,28 +6,51 @@ from pydantic import BaseModel, Field
 
 from app.core.parser.project_scanner import ProjectScanner
 
+
 # Pydantic models for request and response
 class ProjectCreate(BaseModel):
     name: str
     path: str
 
+
 class ProjectUpdate(BaseModel):
     name: str
     path: str
+
 
 class ProjectResponse(BaseModel):
     key: str
     name: str
     path: str
-    
+
+
 class ProjectTreeResponse(BaseModel):
-   
-    key: str = Field(alias="_key")
+    key: str 
     name: str
     node_type: str
     qname: str
     properties: dict
     children: List["ProjectTreeResponse"]
+
+
+def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
+    """
+    Recursively maps tree data to ProjectTreeResponse.
+    """
+    children = []
+    if "children" in tree_data:
+        children = [
+            map_tree_to_response(child) for child in tree_data["children"]
+        ]
+    
+    return ProjectTreeResponse(
+        key=tree_data.get("_key", tree_data.get("key", "")),
+        name=tree_data.get("name", ""),
+        node_type=tree_data.get("node_type", ""),
+        qname=tree_data.get("qname", ""),
+        properties=tree_data.get("properties", {}),
+        children=children
+    )
 
 
 def get_manager() -> CodeGraphManager:
@@ -36,10 +59,15 @@ def get_manager() -> CodeGraphManager:
     # e.g., creating a new manager instance per request or using a singleton.
     return CodeGraphManager()
 
+
 router = APIRouter()
 
+
 @router.post("/project", response_model=ProjectResponse, status_code=201)
-def create_project(project: ProjectCreate, manager: CodeGraphManager = Depends(get_manager)):
+def create_project(
+    project: ProjectCreate, 
+    manager: CodeGraphManager = Depends(get_manager)
+):
     """
     Create a new project.
     """
@@ -55,8 +83,12 @@ def create_project(project: ProjectCreate, manager: CodeGraphManager = Depends(g
     
     return project_response
 
+
 @router.get("/project/{project_key}", response_model=ProjectResponse)
-def get_project(project_key: str, manager: CodeGraphManager = Depends(get_manager)):
+def get_project(
+    project_key: str, 
+    manager: CodeGraphManager = Depends(get_manager)
+):
     """
     Retrieve a single project by its key.
     """
@@ -69,16 +101,22 @@ def get_project(project_key: str, manager: CodeGraphManager = Depends(get_manage
         path=project_node.path
     )
 
-@router.get("/project/{project_key}/tree", response_model=Dict[str, Any])
-def get_project_tree(project_key: str, manager: CodeGraphManager = Depends(get_manager)):
+
+@router.get("/project/{project_key}/tree", response_model=ProjectTreeResponse)
+def get_project_tree(
+    project_key: str, 
+    manager: CodeGraphManager = Depends(get_manager)
+):
     """
-    Retrieve a single project by its key.
+    Retrieve project tree structure.
     """
     project_node = manager.get_project(project_key)
     if not project_node:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    return project_node.get_descendant_tree()
+    tree_data = project_node.get_descendant_tree()
+    return map_tree_to_response(tree_data)
+
 
 @router.get("/projects", response_model=List[ProjectResponse])
 def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):
@@ -94,12 +132,19 @@ def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):
         ) for p in project_nodes
     ]
 
+
 @router.put("/projects/{project_key}", response_model=ProjectResponse)
-def update_project(project_key: str, project: ProjectUpdate, manager: CodeGraphManager = Depends(get_manager)):
+def update_project(
+    project_key: str, 
+    project: ProjectUpdate, 
+    manager: CodeGraphManager = Depends(get_manager)
+):
     """
     Update a project's details.
     """
-    updated_project_node = manager.update_project(project_key, project.name, project.path)
+    updated_project_node = manager.update_project(
+        project_key, project.name, project.path
+    )
     if not updated_project_node:
         raise HTTPException(status_code=404, detail="Project not found")
     return ProjectResponse(
@@ -108,8 +153,12 @@ def update_project(project_key: str, project: ProjectUpdate, manager: CodeGraphM
         path=updated_project_node.path
     )
 
+
 @router.delete("/projects/{project_key}", status_code=204)
-def delete_project(project_key: str, manager: CodeGraphManager = Depends(get_manager)):
+def delete_project(
+    project_key: str, 
+    manager: CodeGraphManager = Depends(get_manager)
+):
     """
     Delete a project by its key.
     """

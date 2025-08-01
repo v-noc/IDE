@@ -1,0 +1,1 @@
+const getNodeStyle = (node: ProjectTreeResponse) => {

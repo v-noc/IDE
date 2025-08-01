@@ -1,5 +1,5 @@
 export interface Project {
-    id: string
+    key: string
     name: string
     path: string
     description: string
@@ -8,7 +8,7 @@ export interface Project {
 }
 
 export interface ProjectNode {
-    id: string;
+    key: string;
     name: string;
     icon?: string;
     iconColor?: string;

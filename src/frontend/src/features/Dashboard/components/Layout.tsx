@@ -15,7 +15,7 @@ const Layout = ({
       {/* <aside className="w-64 max-h-screen overflow-y-auto  p-4 hidden md:block"> */}
       <ResizablePanel defaultSize={20}>{leftSidebar}</ResizablePanel>
       {/* </aside> */}
-      <ResizableHandle />
+      <ResizableHandle withHandle />
       {/* Main Content Area */}
       <ResizablePanel defaultSize={80} className="flex-1 flex flex-col w-full">
         {/* Navbar */}
