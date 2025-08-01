@@ -2,7 +2,7 @@ import { Link, useParams } from "react-router";
 import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/useProject";
 import ProjectTree from "./ProjectTree";
 
-import CreateFolderStructure from "./CreateFolderStructure";
+import CreateFolderStructure from "./CustomFolders/CreateFolderStructure";
 import { Separator } from "@/components/ui/separator";
 
 const SideBar = () => {
@@ -11,7 +11,7 @@ const SideBar = () => {
   const { data } = useGetProjectTreeWithKeyProject({
     key: projectId || "",
   });
-  console.log(data);
+
   return (
     <div className=" h-full w-full flex flex-col gap-2">
       <Link to="/">
