@@ -11,6 +11,7 @@ import {
 import { DynamicIcon } from "@/components/ui/DynamicIcon";
 import getIcons from "@/features/Dashboard/utils/getIcons";
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import getNodeStyle from "@/features/Dashboard/utils/getNodeStyle";
 
 interface TreeNodeProps {
   node: ProjectTreeResponse;
@@ -27,7 +28,7 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
   } = useProjectStore();
 
   const isOpen = expandedNodeIds.has(node.key);
-
+  const nodeStyle = getNodeStyle(node);
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
 
@@ -42,46 +43,22 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
     setSelectedNode(node);
   };
 
-  const defaultBackgroundColor = "rgba(241, 245, 249, 0.5)"; // slate-100 with 50% opacity
-  const defaultTextColor = "#475569"; // slate-600
-  const defaultBorderColor = "rgba(226, 232, 240, 0.8)"; // slate-200 with 80% opacity
-
-  const hoverBackgroundColor = "rgba(241, 245, 249, 1)"; // slate-100
-
-  const cardColorWithOpacity = (color: string, opacity: number) => {
-    const hex = color.replace("#", "");
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-  };
-
   const baseStyle = {
-    backgroundColor: node.cardColor
-      ? cardColorWithOpacity(node.cardColor, 0.2)
-      : defaultBackgroundColor,
-    color: node.textColor || defaultTextColor,
-    borderColor: node.cardColor
-      ? cardColorWithOpacity(node.cardColor, 0.5)
-      : defaultBorderColor,
+    backgroundColor: nodeStyle.backgroundColor,
+    color: nodeStyle.color,
+    borderColor: nodeStyle.borderColor,
   };
 
   const selectedStyle = {
-    backgroundColor: node.cardColor
-      ? cardColorWithOpacity(node.cardColor, 0.4)
-      : hoverBackgroundColor,
-    color: node.textColor || defaultTextColor,
-    borderColor: node.cardColor || "#3b82f6",
+    backgroundColor: nodeStyle.backgroundColor,
+    color: nodeStyle.color,
+    borderColor: nodeStyle.borderColor,
   };
 
   const activeStyle = {
-    backgroundColor: node.cardColor
-      ? cardColorWithOpacity(node.cardColor, 0.5)
-      : hoverBackgroundColor,
-    color: node.textColor || defaultTextColor,
-    borderColor: node.cardColor
-      ? cardColorWithOpacity(node.cardColor, 0.9)
-      : "#2563eb",
+    backgroundColor: nodeStyle.backgroundColor,
+    color: nodeStyle.color,
+    borderColor: nodeStyle.borderColor,
   };
 
   const currentStyle = isActive
@@ -127,7 +104,7 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
           <DynamicIcon
             iconName={getIcons(node.node_type)}
             className={cn("h-4 w-4 flex-shrink-0")}
-            color={node.iconColor || currentStyle.color}
+            color={nodeStyle.iconColor}
           />
           <span
             className={cn(

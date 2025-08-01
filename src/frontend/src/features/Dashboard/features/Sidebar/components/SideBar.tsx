@@ -17,9 +17,7 @@ const SideBar = () => {
         </div>
       </Link>
 
-      <div className="p-2">
-        <ProjectTree projectTree={data || {}} />
-      </div>
+      <div className="p-2">{data && <ProjectTree projectTree={data} />}</div>
     </div>
   );
 };
