@@ -33,12 +33,16 @@ def test_tree_structure(sample_project_path):
 
     main_file = files[0]
 
-    assert (len(main_file.get_functions()) == 3)
+    assert (len(main_file.get_functions()) == 1)
     assert (len(main_file.get_classes()) == 1)
+    methods = main_file.get_classes()[0].methods
+   
+    assert len(methods) == 2
+    
 
     utils_file = files[1]
 
-    assert (len(utils_file.get_functions()) == 2)
+    assert (len(utils_file.get_functions()) == 1)
     assert (len(utils_file.get_classes()) == 1)
 
     utils_class = utils_file.get_classes()[0]
