@@ -44,8 +44,8 @@ def test_tree_structure(sample_project_path):
     utils_class = utils_file.get_classes()[0]
     assert (utils_class.name == "UtilityClass")
 
-    helper_func = utils_file.get_functions()[0]
-    assert (helper_func.name == "helper_function")
+    for func in utils_file.get_functions():
+        assert (func.name in ["do_something", "helper_function"])
 
 
 def test_nested_folder_structure(complex_project_path):

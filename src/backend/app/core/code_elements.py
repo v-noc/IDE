@@ -214,7 +214,7 @@ class Class(DomainObject[node.ClassNode]):
         """Returns the list of methods."""
         return [Function(node) for node in db.nodes.find_related(
             start_node_id=self.id,
-            edge_collection=db.implements_edges,
+            edge_collection=db.contains_edges,
             direction="outbound",
             filter_by_type="function"
         )]
@@ -292,11 +292,17 @@ class Class(DomainObject[node.ClassNode]):
         'implements' edge.
         """
 
-        implements_edge = edges.ImplementsEdge(
+        contains_edge = edges.ContainsEdge(
             _from=self.id,
-            _to=function_id
+            _to=function_id,
+            position=node.NodePosition(
+                line_no=0,
+                col_offset=0,
+                end_line_no=0,
+                end_col_offset=0
+            )
         )
-        db.implements_edges.create(implements_edge)
+        db.contains_edges.create(contains_edge)
         return Function(db.nodes.get(function_id))
 
     def add_call(

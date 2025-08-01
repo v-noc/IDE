@@ -112,6 +112,7 @@ def test_method_call_detection(simple_call_project):
     scanner = ProjectScanner(simple_call_project)
     scanner.scan()
     
+    
     # Find the method_two node
     method_two_node = collections.nodes.find_one({
         "qname": "main.MyClass.method_two"
