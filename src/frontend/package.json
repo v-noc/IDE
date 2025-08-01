@@ -42,6 +42,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "immer": "^10.1.1",
     "lucide-react": "^0.532.0",
     "next-themes": "^0.4.6",
     "postcss": "^8.5.6",
@@ -56,6 +57,7 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.11",
     "toml": "^3.0.0",
+    "uuid": "^11.1.0",
     "vaul": "^1.1.2",
     "zod": "^4.0.14",
     "zustand": "^5.0.6"

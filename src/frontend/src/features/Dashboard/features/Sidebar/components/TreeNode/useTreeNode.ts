@@ -1,5 +1,6 @@
 import useProjectStore from "@/stores/useProjectStore";
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import { useState } from "react";
 
 export const useTreeNode = (node: ProjectTreeResponse) => {
   const {
@@ -8,9 +9,15 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     activeNodeId,
     expandedNodeIds,
     toggleNodeExpansion,
+    addVirtualNode,
   } = useProjectStore();
 
-  const isOpen = expandedNodeIds.has(node.key);
+  const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
+  const [nodeTypeToCreate, setNodeTypeToCreate] = useState<"file" | "folder">(
+    "file"
+  );
+
+  const isOpen = expandedNodeIds.includes(node.key);
   const isSelected = selectedNode?.key === node.key;
   const isActive = activeNodeId === node.key;
   const hasChildren = node.children && node.children.length > 0;
@@ -39,15 +46,35 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     console.log("Remove:", node.name);
   };
 
+  const handleCreateFile = () => {
+    setNodeTypeToCreate("file");
+    setCreateDialogOpen(true);
+  };
+
+  const handleCreateFolder = () => {
+    setNodeTypeToCreate("folder");
+    setCreateDialogOpen(true);
+  };
+
+  const closeCreateDialog = () => {
+    setCreateDialogOpen(false);
+  };
+
   return {
     isOpen,
     isSelected,
     isActive,
     hasChildren,
+    isCreateDialogOpen,
+    nodeTypeToCreate,
     handleToggle,
     handleSelectNode,
     handleFocus,
     handleExpand,
     handleRemove,
+    handleCreateFile,
+    handleCreateFolder,
+    closeCreateDialog,
+    addVirtualNode,
   };
 };

@@ -1,13 +1,11 @@
-import { Link, useParams } from "react-router";
+import { Link, useParams } from "react-router-dom";
 import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/useProject";
 import ProjectTree from "./ProjectTree";
-
-import CreateFolderStructure from "./CustomFolders/CreateFolderStructure";
 import { Separator } from "@/components/ui/separator";
+import CustomFolders from "./CustomFolders/CustomFolders";
 
 const SideBar = () => {
   const { projectId } = useParams();
-
   const { data } = useGetProjectTreeWithKeyProject({
     key: projectId || "",
   });
@@ -25,10 +23,7 @@ const SideBar = () => {
         </div>
         <div>{data && <ProjectTree projectTree={data} />}</div>
         <Separator className="my-2" />
-        <div className="text-xs font-medium text-gray-600 px-2 flex items-center justify-between">
-          Custom Folders & Files
-          <CreateFolderStructure />
-        </div>
+        <CustomFolders />
       </div>
     </div>
   );

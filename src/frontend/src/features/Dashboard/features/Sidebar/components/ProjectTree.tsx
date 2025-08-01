@@ -1,15 +1,11 @@
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
-import { TreeNode } from "./TreeNode/index";
-
-// Sample project data for placeholder
+import { TreeNode } from "./TreeNode";
 
 const ProjectTree = ({ projectTree }: { projectTree: ProjectTreeResponse }) => {
   return (
-    <div>
-      <ul className="space-y-1">
-        <TreeNode node={projectTree} />
-      </ul>
-    </div>
+    <ul className="space-y-1">
+      <TreeNode node={projectTree} />
+    </ul>
   );
 };
 

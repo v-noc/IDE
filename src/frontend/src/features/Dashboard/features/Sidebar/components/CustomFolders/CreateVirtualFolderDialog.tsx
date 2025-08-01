@@ -19,30 +19,33 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
-import { Textarea } from "@/components/ui/textarea";
+import useProjectStore from "@/stores/useProjectStore";
+import { useState } from "react";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-const CreateFolderStructureDialog = () => {
+const CreateVirtualFolderDialog = () => {
+  const [isOpen, setOpen] = useState(false);
+  const { createVirtualFolder } = useProjectStore();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      description: "",
     },
   });
 
   const onSubmit = (data: FormValues) => {
-    console.log(data);
+    createVirtualFolder(data.name);
+    setOpen(false);
+    form.reset();
   };
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="cursor-pointer ">
           <PlusIcon className="w-4 h-4" />
@@ -50,7 +53,7 @@ const CreateFolderStructureDialog = () => {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create New Folder Structure</DialogTitle>
+          <DialogTitle>Create New Virtual Folder</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -67,19 +70,6 @@ const CreateFolderStructureDialog = () => {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <Button type="submit">Create</Button>
           </form>
         </Form>
@@ -88,4 +78,4 @@ const CreateFolderStructureDialog = () => {
   );
 };
 
-export default CreateFolderStructureDialog;
+export default CreateVirtualFolderDialog;
