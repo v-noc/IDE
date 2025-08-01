@@ -45,6 +45,7 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
   console.log(iconName);
   return (
     <IconComponent
+      strokeWidth={2.5}
       className={cn(className)}
       style={color ? { color } : undefined}
     />

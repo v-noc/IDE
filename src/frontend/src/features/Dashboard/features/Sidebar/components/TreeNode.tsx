@@ -8,7 +8,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { DynamicIcon } from "@/components/ui/DynamicIcon";
+import { DynamicIcon } from "@/components/DynamicIcon";
 import getIcons from "@/features/Dashboard/utils/getIcons";
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
 import getNodeStyle from "@/features/Dashboard/utils/getNodeStyle";
