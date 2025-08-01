@@ -1,5 +1,5 @@
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
-import { TreeNode } from "./TreeNode";
+import { TreeNode } from "./TreeNode/index";
 
 // Sample project data for placeholder
 
