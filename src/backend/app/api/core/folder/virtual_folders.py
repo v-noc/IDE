@@ -74,6 +74,7 @@ def create_virtual_folder(
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Assumes a 'create_virtual_folder' method on the manager.
+    
     new_folder = manager.create_virtual_folder(
         project_id=folder.project_id,
         name=folder.name,

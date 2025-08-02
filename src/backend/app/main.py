@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api import root, health
 from .api.core.projects import crud as projects_crud
 from .api.core.files import virtual_files
-from .api.core.files import virtual_folders
+from .api.core.folder import virtual_folders
 from .db.client import get_db
 from .utils.logging import setup_logging
 from .utils.exceptions import generic_exception_handler
