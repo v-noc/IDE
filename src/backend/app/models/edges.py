@@ -17,6 +17,12 @@ class ContainsEdge(BaseEdge):
         ..., description="The position of the contained node."
     )
 
+class VirtualContainsEdge(BaseEdge):
+    """Represents that a virtual folder is contained within another 
+    (e.g., file in a folder).
+    """
+    edge_type: str = "virtual_contains"
+
 
 class CallEdge(BaseEdge):
     """Represents a call from one node to another (e.g., function call)."""

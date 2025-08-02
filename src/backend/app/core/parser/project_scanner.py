@@ -38,8 +38,7 @@ class ProjectScanner:
         # Track package name -> ID mapping
         self.package_ids: Dict[str, str] = {}
         self.project = None
-    
-   
+
     def get_project(self) -> Project:
         return self.project
 

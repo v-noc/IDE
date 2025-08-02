@@ -10,6 +10,8 @@ from .properties import (
     FunctionProperties,
     ClassProperties,
     PackageProperties,
+    VirtualFolderProperties,
+    VirtualFileProperties,
 )
 from .shared import NodePosition
 
@@ -63,6 +65,20 @@ class PackageNode(BaseNode):
     description: Optional[str] = None
     properties: PackageProperties
 
+class VirtualFolderNode(BaseNode):
+    node_type: Literal["virtual_folder"] = "virtual_folder"
+    name: str
+    qname: str
+    description: Optional[str] = None
+    # properties: VirtualFolderProperties
+
+class VirtualFileNode(BaseNode):
+    node_type: Literal["virtual_file"] = "virtual_file"
+    name: str
+    qname: str
+    description: Optional[str] = None
+    # properties: VirtualFileProperties
+
 # ==============================================================================
 # A Discriminated Union of all specific Node models.
 # ==============================================================================
@@ -77,6 +93,8 @@ Node = Annotated[
         FunctionNode,
         ClassNode,
         PackageNode,
+        VirtualFolderNode,
+        VirtualFileNode,
     ],
     Field(discriminator="node_type"),
 ]

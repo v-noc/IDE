@@ -1,10 +1,11 @@
 """
 The Project domain object, representing the root of a code graph.
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from .base import DomainObject
 from .file import File
 from .folder import Folder
+from .virtual_folder import VirtualFolder
 from ..models import node, edges, properties
 from ..db import collections as db
 
@@ -83,6 +84,30 @@ class Project(DomainObject[node.ProjectNode]):
 
         # 3. Return the hydrated Folder domain object
         return Folder(created_folder_node)
+
+    def add_virtual_folder(self, folder_name: str, description: Optional[str] = None) -> VirtualFolder:
+        """Adds a new virtual folder directly to the project's root."""
+        virtual_folder = node.VirtualFolderNode(
+            name=folder_name,
+            qname=f"{self.qname}.{folder_name}",
+            description=description
+        )
+        created_virtual_folder = db.nodes.create(virtual_folder)
+        contains_edge_model = edges.VirtualContainsEdge(
+            _from=self.id,
+            _to=created_virtual_folder.id,
+        )
+        db.virtual_contains_edges.create(contains_edge_model)
+        return VirtualFolder(created_virtual_folder)
+    
+    def get_virtual_folders(self) -> list[VirtualFolder]:
+        """Retrieves all virtual folders directly contained within the project."""
+        virtual_folder_nodes = db.nodes.find_related(
+            start_node_id=self.id,
+            edge_collection=db.virtual_contains_edges,
+            filter_by_type="virtual_folder"
+        )
+        return [VirtualFolder(node) for node in virtual_folder_nodes]
 
     def get_files(self) -> list[File]:
         """Retrieves all files directly contained within the project."""

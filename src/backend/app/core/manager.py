@@ -5,7 +5,7 @@ from typing import List
 from .project import Project
 from ..models import node, properties
 from ..db import collections as db
-
+from .virtual_folder import VirtualFolder
 
 class CodeGraphManager:
     """
@@ -59,3 +59,12 @@ class CodeGraphManager:
         
         db.nodes.update(project_node)
         return Project(project_node)
+
+    def get_virtual_folder(self, folder_key: str) -> VirtualFolder | None:
+        """
+        Loads an existing virtual folder from the database by its key.
+        """
+        virtual_folder_node = db.nodes.get(folder_key)
+        if not virtual_folder_node or not isinstance(virtual_folder_node, node.VirtualFolderNode):
+            return None
+        return VirtualFolder(virtual_folder_node)

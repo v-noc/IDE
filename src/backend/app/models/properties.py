@@ -67,3 +67,10 @@ class PackageProperties(BaseProperties):
         description="List of specific imports from this package "
                     "(e.g., ['BaseModel', 'Field'])"
     )
+
+class VirtualFolderProperties(BaseProperties):
+    pass
+
+
+class VirtualFileProperties(BaseProperties):
+    pass

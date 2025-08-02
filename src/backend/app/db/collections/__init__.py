@@ -30,6 +30,12 @@ contains_edges = ArangoEdgeCollection[edges.ContainsEdge](
     model=edges.ContainsEdge
 )
 
+# Edge collection for representing virtual containment (e.g., file in a virtual folder).
+virtual_contains_edges = ArangoEdgeCollection[edges.VirtualContainsEdge](
+    collection_name="virtual_contains",
+    model=edges.VirtualContainsEdge
+)
+
 # Edge collection for representing function/method calls.
 calls_edges = ArangoEdgeCollection[edges.CallEdge](
     collection_name="calls",
