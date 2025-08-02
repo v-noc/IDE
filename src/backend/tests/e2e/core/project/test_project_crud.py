@@ -1,7 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 from app.core.manager import CodeGraphManager
+
 
 @pytest.fixture(scope="module")
 def client():
@@ -11,17 +13,6 @@ def client():
     with TestClient(app) as c:
         yield c
 
-@pytest.fixture(scope="function")
-def manager():
-    """
-    Provides a CodeGraphManager instance for each test function,
-    ensuring a clean state.
-    """
-    m = CodeGraphManager()
-    # Clean up any projects that might be left over from previous runs
-    for p in m.get_all_projects():
-        m.delete_project(p.key)
-    return m
 
 def test_create_project(client: TestClient, manager: CodeGraphManager):
     """
@@ -31,10 +22,10 @@ def test_create_project(client: TestClient, manager: CodeGraphManager):
     project_path = "/tmp/test_project"
     
     response = client.post(
-        "/api/core/project",
+        "v1/api/project",
         json={"name": project_name, "path": project_path}
     )
-    
+    print(response.json())
     assert response.status_code == 201
     data = response.json()
   
@@ -49,14 +40,17 @@ def test_create_project(client: TestClient, manager: CodeGraphManager):
     # Clean up
     manager.delete_project(project_key)
 
+
 def test_get_project(client: TestClient, manager: CodeGraphManager):
     """
     Test retrieving a single project.
     """
     # First, create a project to retrieve
-    project = manager.create_project(name="Test Get Project", path="/tmp/get_project")
+    project = manager.create_project(
+        name="Test Get Project", path="/tmp/get_project"
+    )
     
-    response = client.get(f"/api/core/project/{project.key}")
+    response = client.get(f"v1/api/project/{project.key}")
     
     assert response.status_code == 200
     data = response.json()
@@ -67,12 +61,14 @@ def test_get_project(client: TestClient, manager: CodeGraphManager):
     # Clean up
     manager.delete_project(project.key)
 
+
 def test_get_project_not_found(client: TestClient):
     """
     Test retrieving a non-existent project.
     """
-    response = client.get("/api/core/project/non_existent_key")
+    response = client.get("v1/api/project/non_existent_key")
     assert response.status_code == 404
+
 
 def test_get_all_projects(client: TestClient, manager: CodeGraphManager):
     """
@@ -82,7 +78,7 @@ def test_get_all_projects(client: TestClient, manager: CodeGraphManager):
     p1 = manager.create_project(name="Project 1", path="/tmp/p1")
     p2 = manager.create_project(name="Project 2", path="/tmp/p2")
     
-    response = client.get("/api/core/projects")
+    response = client.get("v1/api/projects")
     
     assert response.status_code == 200
     data = response.json()
@@ -96,19 +92,22 @@ def test_get_all_projects(client: TestClient, manager: CodeGraphManager):
     manager.delete_project(p1.key)
     manager.delete_project(p2.key)
 
+
 def test_update_project(client: TestClient, manager: CodeGraphManager):
     """
     Test updating a project.
     """
     # Create a project to update
-    project = manager.create_project(name="Original Name", path="/tmp/original_path")
+    project = manager.create_project(
+        name="Original Name", path="/tmp/original_path"
+    )
     
     update_data = {"name": "Updated Name", "path": "/tmp/updated_path"}
     response = client.put(
-        f"/api/core/project/{project.key}",
+        f"v1/api/project/{project.key}",
         json=update_data
     )
-    
+    print(response.json())
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Updated Name"
@@ -117,19 +116,22 @@ def test_update_project(client: TestClient, manager: CodeGraphManager):
     # Verify the update in the manager
     updated_project = manager.get_project(project.key)
     assert updated_project.name == "Updated Name"
-    assert updated_project.properties.path == "/tmp/updated_path"
+    assert updated_project.path == "/tmp/updated_path"
     
     # Clean up
     manager.delete_project(project.key)
+
 
 def test_delete_project(client: TestClient, manager: CodeGraphManager):
     """
     Test deleting a project.
     """
     # Create a project to delete
-    project = manager.create_project(name="To Be Deleted", path="/tmp/to_be_deleted")
+    project = manager.create_project(
+        name="To Be Deleted", path="/tmp/to_be_deleted"
+    )
     
-    response = client.delete(f"/api/core/project/{project.key}")
+    response = client.delete(f"v1/api/project/{project.key}")
     
     assert response.status_code == 204
     

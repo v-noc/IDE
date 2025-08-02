@@ -72,7 +72,7 @@ def create_project(
     Create a new project.
     """
     
-    scanner = ProjectScanner(project.path)
+    scanner = ProjectScanner(project.path, project.name)
     scanner.scan()
     new_project_node = scanner.get_project()
     project_response = ProjectResponse(
@@ -133,7 +133,7 @@ def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):
     ]
 
 
-@router.put("/projects/{project_key}", response_model=ProjectResponse)
+@router.put("/project/{project_key}", response_model=ProjectResponse)
 def update_project(
     project_key: str, 
     project: ProjectUpdate, 
@@ -142,11 +142,10 @@ def update_project(
     """
     Update a project's details.
     """
-    updated_project_node = manager.update_project(
-        project_key, project.name, project.path
-    )
+    updated_project_node = manager.get_project(project_key)
     if not updated_project_node:
         raise HTTPException(status_code=404, detail="Project not found")
+    updated_project_node.update(name=project.name, path=project.path)
     return ProjectResponse(
         key=updated_project_node.key,
         name=updated_project_node.name,
@@ -154,7 +153,7 @@ def update_project(
     )
 
 
-@router.delete("/projects/{project_key}", status_code=204)
+@router.delete("/project/{project_key}", status_code=204)
 def delete_project(
     project_key: str, 
     manager: CodeGraphManager = Depends(get_manager)

@@ -74,12 +74,13 @@ def create_virtual_folder(
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Assumes a 'create_virtual_folder' method on the manager.
-    
+
     new_folder = manager.create_virtual_folder(
         project_id=folder.project_id,
         name=folder.name,
-        parent_id=folder.parent_id,
+       
         description=folder.description,
+        parent_id=folder.parent_id,
     )
 
     if not new_folder:
@@ -113,11 +114,10 @@ def update_virtual_folder(
     Updates a virtual folder's details.
     """
     # Assumes an 'update_virtual_folder' method on the manager.
-    updated_folder = manager.update_virtual_folder(
-        folder_key, folder_update.model_dump(exclude_unset=True)
-    )
-    if not updated_folder:
+    virtual_folder = manager.get_virtual_folder(folder_key)
+    if not virtual_folder:
         raise HTTPException(status_code=404, detail="Virtual folder not found")
+    updated_folder = virtual_folder.update(folder_update.model_dump(exclude_unset=True))
     return updated_folder.model
 
 
@@ -129,7 +129,10 @@ def delete_virtual_folder(
     Deletes a virtual folder.
     """
     # Assumes a 'delete_virtual_folder' method on the manager.
-    success = manager.delete_virtual_folder(folder_key)
+    virtual_folder = manager.get_virtual_folder(folder_key)
+    if not virtual_folder:
+        raise HTTPException(status_code=404, detail="Virtual folder not found")
+    success = virtual_folder.delete()
     if not success:
         raise HTTPException(status_code=404, detail="Virtual folder not found")
     return None

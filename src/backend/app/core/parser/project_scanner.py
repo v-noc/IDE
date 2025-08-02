@@ -24,7 +24,7 @@ class ProjectScanner:
     The main entry point and orchestrator for parsing a whole project using
     the advanced two-pass analysis system.
     """
-    def __init__(self, project_path: str):
+    def __init__(self, project_path: str, project_name: str):
         self.project_path = project_path
         self.file_navigator = FileNavigator(project_path)
         self.code_graph_manager = CodeGraphManager()
@@ -36,6 +36,7 @@ class ProjectScanner:
         self.symbol_table = self.file_parser.symbol_table
         self.created_packages: set = set()
         # Track package name -> ID mapping
+        self.project_name = project_name
         self.package_ids: Dict[str, str] = {}
         self.project = None
 
@@ -258,9 +259,10 @@ class ProjectScanner:
         This now includes Phase 2: Dependency and Import Resolution.
         """
         # Create the main project using CodeGraphManager
-        project_name = os.path.basename(self.project_path)
+        if not self.project_name:
+            self.project_name = os.path.basename(self.project_path)
         self.project = self.code_graph_manager.create_project(
-            name=project_name,
+            name=self.project_name,
             path=self.project_path
         )
     

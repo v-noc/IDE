@@ -31,6 +31,13 @@ class Project(DomainObject[node.ProjectNode]):
     def absolute_path(self) -> str:
         return self.path + self.name
 
+    def update(self, name: str, path: str) -> None:
+        """Updates the project's name and path."""
+        self.model.name = name
+        
+        self.model.properties.path = path
+        db.nodes.update(self.model)
+
     def add_file(self, file_name: str, file_path: str) -> File:
         """Adds a new file directly to the project's root."""
         # Generate qname using the shared utility method
