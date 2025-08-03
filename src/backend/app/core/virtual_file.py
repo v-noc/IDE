@@ -1,5 +1,4 @@
 from .base import DomainObject
-from .file import File
 from ..models import node
 from ..db import collections as db
 from typing import Dict, Any
@@ -10,6 +9,10 @@ class VirtualFile(DomainObject[node.VirtualFileNode]):
     """
     A domain object representing a virtual file.
     """
+    @property
+    def key(self) -> str:
+        return self.model.key
+
     @property
     def name(self) -> str:
         return self.model.name
@@ -22,6 +25,27 @@ class VirtualFile(DomainObject[node.VirtualFileNode]):
     def description(self) -> str | None:
         return self.model.description
 
+    @property
+    def node_type(self) -> str:
+        return self.model.node_type
+
+    @staticmethod
+    def get_by_key(key: str) -> 'VirtualFile':
+        return VirtualFile(db.nodes.get(key))
+
+    @staticmethod
+    def get_by_qname(qname: str) -> 'VirtualFile':
+        return VirtualFile(db.nodes.find_one(
+            {"qname": qname, "node_type": "virtual_file"}
+        ))
+    
+    def delete(self) -> None:
+        db.nodes.delete(self.model.key)
+
+    def update(self, update_data: dict) -> 'VirtualFile':
+        updated_model = self.model.model_copy(update=update_data)
+        db.nodes.update(updated_model)
+        return self.get_by_key(self.key)
 
     def get_functions(self) -> list[Function]:
         return [Function(function) for function in db.nodes.find_related(
