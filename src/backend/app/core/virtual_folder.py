@@ -28,6 +28,18 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
     @property
     def node_type(self) -> str:
         return self.model.node_type
+    
+    @staticmethod
+    def get_by_key(key: str) -> 'VirtualFolder':
+        return VirtualFolder(db.nodes.get(key))
+
+    def delete(self) -> None:
+        db.nodes.delete(self.model.key)
+
+    def update(self, update_data: dict) -> 'VirtualFolder':
+        updated_model = self.model.model_copy(update=update_data)
+        db.nodes.update(updated_model)
+        return self.get_by_key(self.key)
 
     def add_virtual_file(
         self, file_name: str,  description: Optional[str] = None

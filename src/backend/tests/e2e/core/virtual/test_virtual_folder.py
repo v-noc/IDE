@@ -60,3 +60,21 @@ def test_get_virtual_folder(client: TestClient, manager: CodeGraphManager):
         assert folder["name"] in ["Test Virtual Folder", "Test Virtual Folder 2"]
 
 
+def test_update_virtual_folder(client: TestClient, manager: CodeGraphManager):
+    project = manager.create_project(
+        name="Test Update Project", path="/tmp/update_project"
+    )
+
+    folder = project.add_virtual_folder(folder_name="Test Virtual Folder")
+    folder.add_virtual_file(file_name="Test Virtual File", description="Test Description")
+    
+    response = client.put(
+        f"v1/api/virtual-folder/{folder.key}",
+        json={
+            "name": "Test Virtual Folder Updated",
+            "description": "Test Description Updated"
+        }
+    )
+    data = response.json()
+    assert response.status_code == 200
+    assert data["name"] == "Test Virtual Folder Updated"

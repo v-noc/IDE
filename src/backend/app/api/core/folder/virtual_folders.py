@@ -121,7 +121,7 @@ def get_virtual_folder(
     return virtual_folder.model
 
 
-@router.put("/virtual-folder/{folder_key}", response_model=FolderNode)
+@router.put("/virtual-folder/{folder_key}", response_model=VirtualFolderResponse)
 def update_virtual_folder(
     folder_key: str,
     folder_update: VirtualFolderUpdate,
@@ -137,7 +137,7 @@ def update_virtual_folder(
     updated_folder = virtual_folder.update(
         folder_update.model_dump(exclude_unset=True)
     )
-    return updated_folder.model
+    return updated_folder
 
 
 @router.delete("/virtual-folder/{folder_key}", status_code=204)
