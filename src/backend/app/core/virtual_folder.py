@@ -10,6 +10,10 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
     A domain object representing a virtual folder.
     """
     @property
+    def key(self) -> str:
+        return self.model.key
+
+    @property
     def name(self) -> str:
         return self.model.name
 
@@ -20,6 +24,10 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
     @property
     def description(self) -> str | None:
         return self.model.description
+    
+    @property
+    def node_type(self) -> str:
+        return self.model.node_type
 
     def add_virtual_file(
         self, file_name: str,  description: Optional[str] = None

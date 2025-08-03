@@ -1,17 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
 from app.core.manager import CodeGraphManager
-
-
-@pytest.fixture(scope="module")
-def client():
-    """
-    Yield a TestClient instance for the API.
-    """
-    with TestClient(app) as c:
-        yield c
 
 
 def test_create_project(client: TestClient, manager: CodeGraphManager):

@@ -5,6 +5,7 @@ from app.core.manager import CodeGraphManager
 from pydantic import BaseModel, Field
 
 from app.core.parser.project_scanner import ProjectScanner
+from app.api.core.folder.virtual_folders import VirtualFolderResponse
 
 
 # Pydantic models for request and response
@@ -101,6 +102,18 @@ def get_project(
         path=project_node.path
     )
 
+@router.get("/project/{project_key}/virtual-folders", response_model=List[VirtualFolderResponse])
+def get_project_virtual_folders(
+    project_key: str, 
+    manager: CodeGraphManager = Depends(get_manager)
+):
+    """
+    Retrieve all virtual folders for a project.
+    """
+    project_node = manager.get_project(project_key)
+    if not project_node:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project_node.get_virtual_folders()
 
 @router.get("/project/{project_key}/tree", response_model=ProjectTreeResponse)
 def get_project_tree(

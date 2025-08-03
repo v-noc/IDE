@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.core.manager import CodeGraphManager
-from app.models.node import FolderNode
+from app.models.node import FolderNode, VirtualFolderNode
 from typing import List, Dict, Any, Optional
 
 
@@ -11,7 +11,13 @@ class VirtualFolderCreate(BaseModel):
     description: str | None = None
     parent_id: str | None = None
     project_id: str
-
+class VirtualFolderResponse(BaseModel):
+    key: str
+    name: str
+    node_type: str
+    qname: str
+    description: str | None = None
+    # children: List["VirtualFolderResponse"]
 
 class VirtualFolderUpdate(BaseModel):
     name: Optional[str] = None
@@ -61,7 +67,11 @@ def map_tree_to_response(
 router = APIRouter()
 
 
-@router.post("/virtual-folder", response_model=FolderNode, status_code=201)
+@router.post(
+    "/virtual-folder",
+    response_model=VirtualFolderResponse,
+    status_code=201
+)
 def create_virtual_folder(
     folder: VirtualFolderCreate,
     manager: CodeGraphManager = Depends(get_manager)
@@ -77,8 +87,7 @@ def create_virtual_folder(
 
     new_folder = manager.create_virtual_folder(
         project_id=folder.project_id,
-        name=folder.name,
-       
+        folder_name=folder.name,
         description=folder.description,
         parent_id=folder.parent_id,
     )
@@ -87,7 +96,15 @@ def create_virtual_folder(
         raise HTTPException(
             status_code=500, detail="Failed to create virtual folder"
         )
-    return new_folder.model
+
+    return VirtualFolderResponse(
+        key=new_folder.key,
+        name=new_folder.name,
+        node_type=new_folder.model.node_type,
+        qname=new_folder.qname,
+        description=new_folder.description,
+        #   children=[]
+    )
 
 
 @router.get("/virtual-folder/{folder_key}", response_model=FolderNode)
@@ -117,7 +134,9 @@ def update_virtual_folder(
     virtual_folder = manager.get_virtual_folder(folder_key)
     if not virtual_folder:
         raise HTTPException(status_code=404, detail="Virtual folder not found")
-    updated_folder = virtual_folder.update(folder_update.model_dump(exclude_unset=True))
+    updated_folder = virtual_folder.update(
+        folder_update.model_dump(exclude_unset=True)
+    )
     return updated_folder.model
 
 
