@@ -172,7 +172,9 @@ class CallVisitor(ast.NodeVisitor):
         
         return None
 
-    def _resolve_attribute_call(self, attr_node: ast.Attribute) -> Optional[str]:
+    def _resolve_attribute_call(
+        self, attr_node: ast.Attribute
+    ) -> Optional[str]:
         """
         Resolves an attribute call (method or module function call).
         
@@ -192,6 +194,14 @@ class CallVisitor(ast.NodeVisitor):
             # Handle self.method() calls
             if base_name == "self":
                 return self._resolve_self_method_call(method_name)
+            
+            # Check if base_name is a local variable with known type
+            if base_name in self.context.local_variable_types:
+                var_type = self.context.local_variable_types[base_name]
+                return self._resolve_instance_method_call(
+                    var_type, method_name
+                )
+            
             print(asp.pprint(attr_node))
             # Check if base_name is an import
             file_imports = self.context.symbol_table.get_file_imports(
@@ -205,7 +215,9 @@ class CallVisitor(ast.NodeVisitor):
                 target_qname = f"{module_qname}.{method_name}"
                 print(f"target_qname: {target_qname}")
                 id = self.context.symbol_table.get_symbol_id(target_qname)
-                for qname, node_id in self.context.symbol_table._qname_to_id.items():
+                for qname, node_id in (
+                    self.context.symbol_table._qname_to_id.items()
+                ):
                     if "time" in qname:
                         print(f"qname: {qname}")
                         print(f"node_id: {node_id}")
@@ -213,11 +225,45 @@ class CallVisitor(ast.NodeVisitor):
                 if id:
                     return id
                 else:
-                    return self.context.symbol_table.get_symbol_id(module_qname)
+                    return self.context.symbol_table.get_symbol_id(
+                        module_qname
+                    )
         
         # For more complex attribute calls (obj.method), we would need
         # type inference to resolve the type of 'obj' first
         # This will be implemented in Phase 4
+        
+        return None
+
+    def _resolve_instance_method_call(
+        self, class_type: str, method_name: str
+    ) -> Optional[str]:
+        """
+        Resolves an instance method call using the known type of the instance.
+        
+        Args:
+            class_type: The type/class name of the instance
+            method_name: The name of the method being called
+            
+        Returns:
+            Database ID of the target method or None if not found
+        """
+        # First, try to find the class in the symbol table
+        class_id = self.context.symbol_table.get_symbol_id(class_type)
+        if not class_id:
+            # Try with file prefix if it's a local class
+            file_qname = self._get_file_qname_from_context()
+            full_class_qname = f"{file_qname}.{class_type}"
+            class_id = self.context.symbol_table.get_symbol_id(
+                full_class_qname
+            )
+            if class_id:
+                class_type = full_class_qname
+        
+        if class_id:
+            # Build the method qname: class_qname.method_name
+            method_qname = f"{class_type}.{method_name}"
+            return self.context.symbol_table.get_symbol_id(method_qname)
         
         return None
 

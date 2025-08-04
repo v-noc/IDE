@@ -89,7 +89,7 @@ const useProjectStore = create<ProjectState>()(
                 },
             })),
             {
-                name: "project-store-v2",
+                name: "project-store-v3",
             }
         )
     )

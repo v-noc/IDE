@@ -46,6 +46,18 @@ class Function(DomainObject[node.FunctionNode]):
         """Returns the list of output parameters."""
         return self.model.properties.outputs
     
+    def to_dict(self) -> dict:
+        return {
+            "key": self.key,
+            "id": self.id,
+            "name": self.name,
+            "qname": self.qname,
+            "node_type": self.model.node_type,
+            "position": self.position,
+            "inputs": self.inputs,
+            "outputs": self.outputs
+        }
+    
     def add_call(
         self, target: Union['Function', 'Class'], position: node.NodePosition
     ):
@@ -142,7 +154,8 @@ class Function(DomainObject[node.FunctionNode]):
             start_node_id=self.id,
             edge_collection=db.calls_edges,
             direction="outbound",
-            filter_by_type="class"
+            filter_by_type="class",
+            limit=100
         )]
     
     def get_function_calls(self) -> list[Function]:
@@ -151,7 +164,8 @@ class Function(DomainObject[node.FunctionNode]):
             start_node_id=self.id,
             edge_collection=db.calls_edges,
             direction="outbound",
-            filter_by_type="function"
+            filter_by_type="function",
+            limit=100
         )]
     
     def get_package_calls(self) -> list[Package]:
@@ -160,7 +174,8 @@ class Function(DomainObject[node.FunctionNode]):
             start_node_id=self.id,
             edge_collection=db.calls_edges,
             direction="outbound",
-            filter_by_type="package"
+            filter_by_type="package",
+            limit=100
         )]
 
     def get_node_caller_functions(self) -> list[Function]:
@@ -216,8 +231,21 @@ class Class(DomainObject[node.ClassNode]):
             start_node_id=self.id,
             edge_collection=db.contains_edges,
             direction="outbound",
-            filter_by_type="function"
+            filter_by_type="function",
+            limit=100
         )]
+    
+    def to_dict(self) -> dict:
+        return {
+            "key": self.key,
+            "id": self.id,
+            "name": self.name,
+            "qname": self.qname,
+            "node_type": self.model.node_type,
+            "position": self.position,
+            "fields": self.fields,
+            "methods": [method.to_dict() for method in self.methods()]
+        }
     
     def get_function_calls(self) -> list[Function]:
         """Returns all function calls from this class."""
@@ -225,7 +253,8 @@ class Class(DomainObject[node.ClassNode]):
             start_node_id=self.id,
             edge_collection=db.calls_edges,
             direction="outbound",
-            filter_by_type="function"
+            filter_by_type="function",
+            limit=100
         )]
     
     def get_class_calls(self) -> list[Class]:
@@ -234,15 +263,18 @@ class Class(DomainObject[node.ClassNode]):
             start_node_id=self.id,
             edge_collection=db.calls_edges,
             direction="outbound",
-            filter_by_type="class"
+            filter_by_type="class",
+            limit=100
         )]
+
     def get_node_caller_functions(self) -> list[Function]:
         """Returns all nodes that call this function."""
         return [Function(node) for node in db.nodes.find_related(
             start_node_id=self.id,
             edge_collection=db.calls_edges,
             direction="inbound",
-            filter_by_type="function"
+            filter_by_type="function",
+            limit=100
         )]
     
     def get_node_caller_classes(self) -> list[Class]:
@@ -251,7 +283,8 @@ class Class(DomainObject[node.ClassNode]):
             start_node_id=self.id,
             edge_collection=db.calls_edges,
             direction="inbound",
-            filter_by_type="class"
+            filter_by_type="class",
+            limit=100
         )]
     
     def get_parent_file(self) -> 'File':

@@ -55,7 +55,14 @@ class ArangoEdgeCollection(Generic[T]):
         # Check for and apply unique index from model config
         unique_field = self.model.model_config.get("unique_on")
         if unique_field:
-            collection.add_hash_index(fields=[unique_field], unique=True)
+            # Note: add_hash_index is deprecated in favor of add_index
+            collection.add_index(
+                {
+                    "type": "hash",
+                    "fields": [unique_field],
+                    "unique": True
+                }
+            )
 
         return collection
 

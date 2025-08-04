@@ -169,13 +169,13 @@ class PythonFileParser:
         dependency_visitor = DependencyVisitor(context)
         dependency_visitor.visit(tree)
         
-        # Phase 2: Call Resolution
-        call_visitor = CallVisitor(context)
-        call_visitor.visit(tree)
-        
-        # Phase 4: Type Inference (enabled now)
+        # Phase 4: Type Inference (must run before Call Resolution)
         type_inference_visitor = TypeInferenceVisitor(context)
         type_inference_visitor.visit(tree)
+        
+        # Phase 2: Call Resolution (runs after type inference)
+        call_visitor = CallVisitor(context)
+        call_visitor.visit(tree)
         
         # Future phases will add:
         # Phase 3: Control Flow Analysis

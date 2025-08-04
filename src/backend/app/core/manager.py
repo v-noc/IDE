@@ -86,3 +86,12 @@ class CodeGraphManager:
             return parent_folder.add_virtual_file(file_name, description)
         else:
             raise ValueError("Parent folder ID is required for virtual file creation")
+        
+    def get_node(self, node_id: str) -> node.Node | None:
+        """
+        Loads an existing node from the database by its ID.
+        """
+        node_model = db.nodes.get(node_id)
+        if not node_model:
+            return None
+        return node.Node(node_model)

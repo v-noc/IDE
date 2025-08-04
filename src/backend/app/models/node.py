@@ -74,6 +74,7 @@ class VirtualFolderNode(BaseNode):
     name: str
     qname: str
     description: Optional[str] = None
+    call_order: Optional[int] = None
     # properties: VirtualFolderProperties
 
 
