@@ -152,7 +152,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         """
         link_edge = db.links_to_edges.find_one({"from_id": self.id})
         linked_element_data = None
-        imports_data = None
+        imports_data = []  # Changed to a list to hold detailed import objects
         
         if link_edge:
             linked_node = db.nodes.get(link_edge.to_id)
@@ -167,10 +167,23 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
                 # Get imports using UsesImportEdge
                 import_edges = db.uses_import_edges.find({"from_id": linked_node.id})
                 if import_edges:
-                    imports_data = {}
                     for import_edge in import_edges:
-                        alias = import_edge.alias or import_edge.target_symbol
-                        imports_data[alias] = import_edge.target_qname
+                        from_node = db.nodes.get(import_edge.from_id)
+                        to_node = db.nodes.get(import_edge.to_id)
+                        
+                        from_virtual_folder = self.get_folder_linked_to_element(from_node.id)
+                        to_virtual_folder = self.get_folder_linked_to_element(to_node.id)
+
+                        imports_data.append({
+                            "_key": import_edge.key,
+                            "id": import_edge.id,
+                            "from_id": import_edge.from_id,
+                            "to_id": import_edge.to_id,
+                            "from_parent_virtual_folder_id": from_virtual_folder.id if from_virtual_folder else None,
+                            "to_parent_virtual_folder_id": to_virtual_folder.id if to_virtual_folder else None,
+                            "alias": import_edge.alias or import_edge.target_symbol,
+                            "qname": import_edge.target_qname,
+                        })
 
         result = {
             "id": self.id,
@@ -183,7 +196,6 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             "call_order": getattr(self.model, 'call_order', None),
         }
         
-        # Add imports if we found any
         if imports_data:
             result["imports"] = imports_data
             
