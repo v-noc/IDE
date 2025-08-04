@@ -30,6 +30,7 @@ def test_link_to_code_element(sample_project_path):
    
    new_folder = folder.create_folder_for_element(Function(function[3]))
 
+   # Get imports from UsesImportEdge in the database
    data = folder.get_descendant_tree()
    print("Data: ")
    pprint(data)

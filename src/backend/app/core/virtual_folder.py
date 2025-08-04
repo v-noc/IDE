@@ -54,6 +54,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         """
         link_edge = db.links_to_edges.find_one({"from_id": self.id})
         linked_element_data = None
+        
         if link_edge:
             linked_node = db.nodes.get(link_edge.to_id)
             if linked_node:
@@ -113,13 +114,14 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
     def get_descendant_tree(self) -> Dict[str, Any]:
         """
         Builds a recursive JSON tree of the virtual folder and its descendants.
+        Includes import information from UsesImportEdge edges.
         """
         cursor = db.virtual_contains_edges.get_descendant_tree_query(self.id)
         
         node_map: Dict[str, Dict[str, Any]] = {}
         
         # Process the root node first
-        root_data = self.to_dict()
+        root_data = self._to_dict_with_imports()
         root_data["children"] = []
         node_map[self.id] = root_data
 
@@ -134,7 +136,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
                     node_data
                 )
                 vf = VirtualFolder(vf_node_model)
-                serialized_node = vf.to_dict()
+                serialized_node = vf._to_dict_with_imports()
                 serialized_node["children"] = []
                 node_map[node_id] = serialized_node
 
@@ -143,6 +145,49 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
                 node_map[parent_id]["children"].append(node_map[node_id])
 
         return node_map.get(self.id, {})
+
+    def _to_dict_with_imports(self) -> dict:
+        """
+        Helper method to serialize virtual folder with import information from UsesImportEdge.
+        """
+        link_edge = db.links_to_edges.find_one({"from_id": self.id})
+        linked_element_data = None
+        imports_data = None
+        
+        if link_edge:
+            linked_node = db.nodes.get(link_edge.to_id)
+            if linked_node:
+                linked_element_data = {
+                    "id": linked_node.id,
+                    "name": linked_node.name,
+                    "qname": linked_node.qname,
+                    "node_type": linked_node.node_type,
+                }
+                
+                # Get imports using UsesImportEdge
+                import_edges = db.uses_import_edges.find({"from_id": linked_node.id})
+                if import_edges:
+                    imports_data = {}
+                    for import_edge in import_edges:
+                        alias = import_edge.alias or import_edge.target_symbol
+                        imports_data[alias] = import_edge.target_qname
+
+        result = {
+            "id": self.id,
+            "key": self.key,
+            "name": self.name,
+            "qname": self.qname,
+            "description": self.description,
+            "node_type": self.node_type,
+            "link_to": linked_element_data,
+            "call_order": getattr(self.model, 'call_order', None),
+        }
+        
+        # Add imports if we found any
+        if imports_data:
+            result["imports"] = imports_data
+            
+        return result
 
     def link_to_code_element(self, code_element_id: str):
         if not db.nodes.get(code_element_id):
