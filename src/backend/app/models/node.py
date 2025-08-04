@@ -1,7 +1,7 @@
 from typing import Optional, Union, Literal
-from pydantic import Field, BaseModel
+from pydantic import Field
 from typing_extensions import Annotated
-
+from .shared import NodePosition
 from .base import BaseNode
 from .properties import (
     ProjectProperties,
@@ -10,10 +10,7 @@ from .properties import (
     FunctionProperties,
     ClassProperties,
     PackageProperties,
-    VirtualFolderProperties,
-    VirtualFileProperties,
 )
-from .shared import NodePosition
 
 # ==============================================================================
 # Define Node Models with Specific 'node_type' Literals
@@ -23,12 +20,14 @@ from .shared import NodePosition
 # when parsing data, eliminating the need for manual validation.
 # ==============================================================================
 
+
 class ProjectNode(BaseNode):
     node_type: Literal["project"] = "project"
     name: str
     qname: str
     description: Optional[str] = None
     properties: ProjectProperties
+
 
 class FolderNode(BaseNode):
     node_type: Literal["folder"] = "folder"
@@ -37,12 +36,14 @@ class FolderNode(BaseNode):
     description: Optional[str] = None
     properties: FolderProperties
 
+
 class FileNode(BaseNode):
     node_type: Literal["file"] = "file"
     name: str
     qname: str
     description: Optional[str] = None
     properties: FileProperties
+
 
 class FunctionNode(BaseNode):
     node_type: Literal["function"] = "function"
@@ -51,12 +52,14 @@ class FunctionNode(BaseNode):
     description: Optional[str] = None
     properties: FunctionProperties
 
+
 class ClassNode(BaseNode):
     node_type: Literal["class"] = "class"
     name: str
     qname: str
     description: Optional[str] = None
     properties: ClassProperties
+
 
 class PackageNode(BaseNode):
     node_type: Literal["package"] = "package"
@@ -65,6 +68,7 @@ class PackageNode(BaseNode):
     description: Optional[str] = None
     properties: PackageProperties
 
+
 class VirtualFolderNode(BaseNode):
     node_type: Literal["virtual_folder"] = "virtual_folder"
     name: str
@@ -72,12 +76,14 @@ class VirtualFolderNode(BaseNode):
     description: Optional[str] = None
     # properties: VirtualFolderProperties
 
+
 class VirtualFileNode(BaseNode):
     node_type: Literal["virtual_file"] = "virtual_file"
     name: str
     qname: str
     description: Optional[str] = None
     # properties: VirtualFileProperties
+
 
 # ==============================================================================
 # A Discriminated Union of all specific Node models.

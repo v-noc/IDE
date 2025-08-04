@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 
+
 class ArangoBase(BaseModel):
     """
     The base model for all ArangoDB documents. It defines the system
@@ -17,6 +18,7 @@ class ArangoBase(BaseModel):
         },
     )
 
+
 class BaseNode(ArangoBase):
     """
     A base model for all node documents, ensuring a 'node_type' field
@@ -24,6 +26,7 @@ class BaseNode(ArangoBase):
     in the 'nodes' collection.
     """
     node_type: str
+
 
 class BaseEdge(ArangoBase):
     """
@@ -33,3 +36,9 @@ class BaseEdge(ArangoBase):
     from_id: str = Field(..., alias='_from')
     to_id: str = Field(..., alias='_to')
     edge_type: str
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        # Custom setting for unique index on a field (e.g., '_from' or '_to')
+        unique_on=None,
+    )

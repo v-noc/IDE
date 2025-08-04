@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from app.core.manager import CodeGraphManager
 from app.core.virtual_folder import VirtualFolder
 from app.core.virtual_file import VirtualFile
+from app.core.code_elements import Function, Class
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class VirtualFileUpdate(BaseModel):
@@ -23,13 +24,21 @@ class VirtualFileResponse(BaseModel):
     qname: str
     description: str | None = None
 
+class AddCodeElementRequest(BaseModel):
+    element_id: str
+    include_dependencies: bool = True
+
+class CodeElementSummaryResponse(BaseModel):
+    functions: list[Dict[str, str]]
+    classes: list[Dict[str, str]]
+    packages: list[Dict[str, str]]
+    total_count: int
+
 def get_manager() -> CodeGraphManager:
     return CodeGraphManager()
 
 
 router = APIRouter()
-
-
 
 
 @router.post("/virtual-file", response_model=VirtualFileResponse, status_code=201)
@@ -102,3 +111,84 @@ def delete_virtual_file(
         raise HTTPException(status_code=404, detail="Virtual file not found")
     virtual_file.delete()
     return Response(status_code=204)
+
+@router.post(
+    "/virtual-file/{file_key}/add-code-element", 
+    response_model=CodeElementSummaryResponse,
+    status_code=201
+)
+def add_code_element_to_virtual_file(
+    file_key: str,
+    request: AddCodeElementRequest,
+    manager: CodeGraphManager = Depends(get_manager)
+):
+    """
+    Adds a code element (function or class) to a virtual file with its 
+    dependencies.
+    """
+    virtual_file = VirtualFile.get_by_key(file_key)
+    if not virtual_file:
+        raise HTTPException(status_code=404, detail="Virtual file not found")
+    
+    # Get the code element
+    element_node = manager.get_node(request.element_id)
+    if not element_node:
+        raise HTTPException(status_code=404, detail="Code element not found")
+    
+    # Create appropriate domain object
+    if element_node.node_type == 'function':
+        element = Function(element_node)
+    elif element_node.node_type == 'class':
+        element = Class(element_node)
+    else:
+        raise HTTPException(
+            status_code=400, 
+            detail="Only functions and classes can be added to virtual files"
+        )
+    
+    # Add the element with its dependencies
+    result = virtual_file.add_code_element_with_dependencies(
+        element=element,
+        include_dependencies=request.include_dependencies
+    )
+    
+    return CodeElementSummaryResponse(**result)
+
+@router.delete(
+    "/virtual-file/{file_key}/code-element/{element_id}", 
+    status_code=204
+)
+def remove_code_element_from_virtual_file(
+    file_key: str,
+    element_id: str
+):
+    """
+    Removes a code element from a virtual file.
+    """
+    virtual_file = VirtualFile.get_by_key(file_key)
+    if not virtual_file:
+        raise HTTPException(status_code=404, detail="Virtual file not found")
+    
+    success = virtual_file.remove_code_element(element_id)
+    if not success:
+        raise HTTPException(
+            status_code=404, 
+            detail="Code element not found in virtual file"
+        )
+    
+    return Response(status_code=204)
+
+@router.get(
+    "/virtual-file/{file_key}/code-elements", 
+    response_model=CodeElementSummaryResponse
+)
+def get_virtual_file_code_elements(file_key: str):
+    """
+    Gets all code elements contained in a virtual file.
+    """
+    virtual_file = VirtualFile.get_by_key(file_key)
+    if not virtual_file:
+        raise HTTPException(status_code=404, detail="Virtual file not found")
+    
+    summary = virtual_file.get_code_elements_summary()
+    return CodeElementSummaryResponse(**summary)

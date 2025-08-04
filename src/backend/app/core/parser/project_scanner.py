@@ -1,6 +1,6 @@
 # src/backend/app/core/parser/project_scanner.py
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import ast
 
 from app.db import collections
@@ -24,7 +24,7 @@ class ProjectScanner:
     The main entry point and orchestrator for parsing a whole project using
     the advanced two-pass analysis system.
     """
-    def __init__(self, project_path: str, project_name: str):
+    def __init__(self, project_path: str, project_name: Optional[str] = None):
         self.project_path = project_path
         self.file_navigator = FileNavigator(project_path)
         self.code_graph_manager = CodeGraphManager()
