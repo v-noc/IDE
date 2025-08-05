@@ -2,7 +2,7 @@
 Domain objects for code elements like Functions and Classes.
 """
 from __future__ import annotations
-from typing import Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING, Optional
 
 from app.models.properties import TypeKeyValuesProperties
 from .base import DomainObject
@@ -13,6 +13,8 @@ from ..db import collections as db
 
 if TYPE_CHECKING:
     from .file import File
+
+CodeElement = Union["Function", "Class"]
 
 
 class Function(DomainObject[node.FunctionNode]):
@@ -244,7 +246,7 @@ class Class(DomainObject[node.ClassNode]):
             "node_type": self.model.node_type,
             "position": self.position,
             "fields": self.fields,
-            "methods": [method.to_dict() for method in self.methods()]
+            "methods": [method.to_dict() for method in self.methods]
         }
     
     def get_function_calls(self) -> list[Function]:
@@ -384,3 +386,14 @@ class Class(DomainObject[node.ClassNode]):
         """Adds a field to the class's properties."""
         self.model.properties.fields.append(field)
         db.nodes.update(self.model)
+
+
+def to_domain_element(
+    element_doc: node.CodeNode,
+) -> Optional[CodeElement]:
+    """Converts a code node document to a domain element."""
+    if element_doc.node_type == "function":
+        return Function(element_doc)
+    if element_doc.node_type == "class":
+        return Class(element_doc)
+    return None

@@ -1,9 +1,12 @@
-from .base import DomainObject
-from ..models import node, edges
-from ..db import collections as db
-from typing import Dict, Any, Optional, List, Union
-from .code_elements import Function, Class
+
 from arango.exceptions import DocumentInsertError
+from typing import Union, Optional
+
+from app.db import collections as db
+from app.models import edges, node
+from app.models.edges import LinksToEdge
+from .base import DomainObject
+from .code_elements import Class, Function, to_domain_element
 
 
 class VirtualFolder(DomainObject[node.VirtualFolderNode]):
@@ -11,6 +14,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
     A domain object representing a virtual folder that can contain other
     virtual folders, each linked to a single code element.
     """
+
     @property
     def key(self) -> str:
         return self.model.key
@@ -24,9 +28,9 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         return self.model.qname
 
     @property
-    def description(self) -> str | None:
+    def description(self) -> Optional[str]:
         return self.model.description
-    
+
     @property
     def node_type(self) -> str:
         return self.model.node_type
@@ -54,16 +58,13 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         """
         link_edge = db.links_to_edges.find_one({"from_id": self.id})
         linked_element_data = None
-        
+
         if link_edge:
             linked_node = db.nodes.get(link_edge.to_id)
             if linked_node:
-                linked_element_data = {
-                    "id": linked_node.id,
-                    "name": linked_node.name,
-                    "qname": linked_node.qname,
-                    "node_type": linked_node.node_type,
-                }
+                domain_element = to_domain_element(linked_node)
+                if domain_element:
+                    linked_element_data = domain_element.to_dict()
 
         children = [child.to_dict() for child in self.get_virtual_folders()]
 
@@ -88,7 +89,8 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         return self.get_by_key(self.key)
 
     def add_virtual_folder(
-        self, folder_name: str, description: Optional[str] = None, call_order: Optional[int] = None
+        self, folder_name: str, description: Optional[str] = None,
+        call_order: Optional[int] = None
     ) -> 'VirtualFolder':
         virtual_folder = node.VirtualFolderNode(
             qname=f"{self.qname}.{folder_name}", name=folder_name,
@@ -101,7 +103,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         db.virtual_contains_edges.create(edge)
         return VirtualFolder(created_node)
 
-    def get_virtual_folders(self) -> List['VirtualFolder']:
+    def get_virtual_folders(self) -> list['VirtualFolder']:
         return [
             VirtualFolder(f) for f in db.nodes.find_related(
                 start_node_id=self.id,
@@ -111,15 +113,15 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             )
         ]
 
-    def get_descendant_tree(self) -> Dict[str, Any]:
+    def get_descendant_tree(self) -> dict[str, any]:
         """
         Builds a recursive JSON tree of the virtual folder and its descendants.
         Includes import information from UsesImportEdge edges.
         """
         cursor = db.virtual_contains_edges.get_descendant_tree_query(self.id)
-        
-        node_map: Dict[str, Dict[str, Any]] = {}
-        
+
+        node_map: dict[str, dict[str, any]] = {}
+
         # Process the root node first
         root_data = self._to_dict_with_imports()
         root_data["children"] = []
@@ -148,42 +150,39 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
 
     def _to_dict_with_imports(self) -> dict:
         """
-        Helper method to serialize virtual folder with import information from UsesImportEdge.
+        Helper method to serialize virtual folder with import information.
         """
-        link_edge = db.links_to_edges.find_one({"from_id": self.id})
+        link_edge = self.get_linked_element_edge()
         linked_element_data = None
-        imports_data = []  # Changed to a list to hold detailed import objects
-        
         if link_edge:
             linked_node = db.nodes.get(link_edge.to_id)
             if linked_node:
-                linked_element_data = {
-                    "id": linked_node.id,
-                    "name": linked_node.name,
-                    "qname": linked_node.qname,
-                    "node_type": linked_node.node_type,
-                }
-                
-                # Get imports using UsesImportEdge
-                import_edges = db.uses_import_edges.find({"from_id": linked_node.id})
-                if import_edges:
-                    for import_edge in import_edges:
-                        from_node = db.nodes.get(import_edge.from_id)
-                        to_node = db.nodes.get(import_edge.to_id)
-                        
-                        from_virtual_folder = self.get_folder_linked_to_element(from_node.id)
-                        to_virtual_folder = self.get_folder_linked_to_element(to_node.id)
+                domain_element = to_domain_element(linked_node)
+                if domain_element:
+                    linked_element_data = domain_element.to_dict()
 
-                        imports_data.append({
-                            "_key": import_edge.key,
-                            "id": import_edge.id,
-                            "from_id": import_edge.from_id,
-                            "to_id": import_edge.to_id,
-                            "from_parent_virtual_folder_id": from_virtual_folder.id if from_virtual_folder else None,
-                            "to_parent_virtual_folder_id": to_virtual_folder.id if to_virtual_folder else None,
-                            "alias": import_edge.alias or import_edge.target_symbol,
-                            "qname": import_edge.target_qname,
-                        })
+        imports_data = []
+        import_edges = self.get_imports()
+        if import_edges:
+            for import_edge in import_edges:
+                from_node = db.nodes.get(import_edge.from_id)
+                to_node = db.nodes.get(import_edge.to_id)
+
+                from_vf = self.get_folder_linked_to_element(from_node.id)
+                to_vf = self.get_folder_linked_to_element(to_node.id)
+
+                imports_data.append({
+                    "_key": import_edge.key,
+                    "id": import_edge.id,
+                    "from_id": import_edge.from_id,
+                    "to_id": import_edge.to_id,
+                    "from_parent_virtual_folder_id":
+                        from_vf.id if from_vf else None,
+                    "to_parent_virtual_folder_id":
+                        to_vf.id if to_vf else None,
+                    "alias": import_edge.alias or import_edge.target_symbol,
+                    "qname": import_edge.target_qname,
+                })
 
         result = {
             "id": self.id,
@@ -195,16 +194,29 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             "link_to": linked_element_data,
             "call_order": getattr(self.model, 'call_order', None),
         }
-        
+
         if imports_data:
             result["imports"] = imports_data
-            
+
         return result
+
+    def get_linked_element_edge(self) -> Optional[LinksToEdge]:
+        """Returns the 'links_to' edge if it exists."""
+        return db.links_to_edges.find_one({"from_id": self.id})
+
+    def get_imports(self) -> list[edges.UsesImportEdge]:
+        """
+        Returns all import edges from the linked code element of this folder.
+        """
+        link_edge = self.get_linked_element_edge()
+        if not link_edge:
+            return []
+        return db.uses_import_edges.find({"from_id": link_edge.to_id})
 
     def link_to_code_element(self, code_element_id: str):
         if not db.nodes.get(code_element_id):
             raise ValueError(f"Code element '{code_element_id}' not found.")
-        
+
         edge = edges.LinksToEdge(from_id=self.id, to_id=code_element_id)
         try:
             db.links_to_edges.create(edge)
@@ -223,7 +235,9 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         """
         created_folders = {}  # element_id -> VirtualFolder
         current_path = []  # (caller_id, callee_id) pairs
-        return self._create_folder_recursively(element, current_path, created_folders)
+        return self._create_folder_recursively(
+            element, current_path, created_folders
+        )
 
     def _create_folder_recursively(
         self,
@@ -246,87 +260,83 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             created_folders[element.id] = new_folder
         else:
             new_folder = created_folders[element.id]
-        
+
         # Get all CallEdges from this element, sorted by order
-        if isinstance(element, Class):
-            # For classes, only process __init__ method calls
-            init_method_id = None
-            
-            # Find the __init__ method
-            for method in element.methods:
-                if method.name == "__init__":
-                    init_method_id = method.id
-                    break
-            
-            if init_method_id:
-                call_edges = db.calls_edges.find({"from_id": init_method_id})
-                print(f"Processing {element.name}.__init__ - found {len(call_edges)} call edges:")
-            else:
-                call_edges = []
-                print(f"Processing {element.name} - no __init__ method found, skipping")
-        else:
-            # For functions, process their direct calls
-            call_edges = db.calls_edges.find({"from_id": element.id})
-            print(f"Processing {element.name} - found {len(call_edges)} call edges:")
-        
-        # Sort by order to maintain source code call sequence
-        call_edges = sorted(call_edges, key=lambda edge: edge.order)
-        
-        for edge in call_edges:
-            called_node = db.nodes.get(edge.to_id)
-            if called_node:
-                print(f"  Order {edge.order}: calls {called_node.name} ({called_node.qname})")
-        
+        call_edges = self._get_call_edges_for_element(element)
+
         # Create folders for called elements in order
         for call_edge in call_edges:
             called_node = db.nodes.get(call_edge.to_id)
-            if called_node and called_node.node_type in ['function', 'class']:
-                if called_node.node_type == 'function':
-                    called_element = Function(called_node)
-                else:
-                    called_element = Class(called_node)
-                
-                # Check for infinite recursion using caller-callee pairs
-                call_pair = (element.id, called_element.id)
-                if call_pair in current_path:
-                    print(f"  Skipping {called_element.name} - would create infinite loop")
-                    continue
-                
-                # Add call pair to path for recursion detection
-                new_path = current_path + [call_pair]
-                
-                if called_element.id in created_folders:
-                    # Folder already exists, create edge reference
-                    existing_child_folder = created_folders[called_element.id]
-                    edge = edges.VirtualContainsEdge(
-                        _from=new_folder.id, _to=existing_child_folder.id
-                    )
-                    db.virtual_contains_edges.create(edge)
-                    print(f"  Created edge to existing {called_element.name}")
-                else:
-                    # Create new folder and recurse
-                    child_folder_node = node.VirtualFolderNode(
-                        qname=f"{new_folder.qname}.{called_element.name}",
-                        name=called_element.name,
-                        description=called_element.model.description,
-                        call_order=call_edge.order
-                    )
-                    created_child_node = db.nodes.create(child_folder_node)
-                    edge = edges.VirtualContainsEdge(
-                        _from=new_folder.id, _to=created_child_node.id
-                    )
-                    db.virtual_contains_edges.create(edge)
-                    child_folder = VirtualFolder(created_child_node)
-                    child_folder.link_to_code_element(called_element.id)
-                    created_folders[called_element.id] = child_folder
-                    
-                    print(f"  Created new folder for {called_element.name}")
-                
-                # Always recurse to process dependencies, but only if not in path
-                if called_element.id in created_folders:
-                    created_folders[called_element.id]._create_folder_recursively(
-                        called_element, new_path, created_folders
-                    )
-        
+            if not (called_node and called_node.node_type in ['function', 'class']):
+                continue
+
+            called_element = to_domain_element(called_node)
+            if not called_element:
+                continue
+
+            # Check for infinite recursion using caller-callee pairs
+            call_pair = (element.id, called_element.id)
+            if call_pair in current_path:
+                continue
+
+            new_path = current_path + [call_pair]
+
+            if called_element.id in created_folders:
+                # Folder already exists, create edge reference
+                existing_child_folder = created_folders[called_element.id]
+                edge = edges.VirtualContainsEdge(
+                    _from=new_folder.id, _to=existing_child_folder.id
+                )
+                db.virtual_contains_edges.create(edge)
+            else:
+                child_folder = self._create_child_folder(
+                    new_folder, called_element, call_edge.order
+                )
+                created_folders[called_element.id] = child_folder
+
+            # Always recurse to process dependencies
+            if called_element.id in created_folders:
+                created_folders[called_element.id]._create_folder_recursively(
+                    called_element, new_path, created_folders
+                )
+
         return new_folder
+
+    def _get_call_edges_for_element(
+        self, element: Union[Function, Class]
+    ) -> list[edges.CallEdge]:
+        """
+        Returns a sorted list of CallEdges for a given code element.
+        For classes, it considers calls from the `__init__` method.
+        """
+        if isinstance(element, Class):
+            for method in element.methods:
+                if method.name == "__init__":
+                    call_edges = db.calls_edges.find({"from_id": method.id})
+                    return sorted(call_edges, key=lambda edge: edge.order)
+            return []
+        else:
+            call_edges = db.calls_edges.find({"from_id": element.id})
+            return sorted(call_edges, key=lambda edge: edge.order)
+
+    def _create_child_folder(
+        self, parent_folder: 'VirtualFolder', element: Union[Function, Class],
+        call_order: int) -> 'VirtualFolder':
+        """
+        Creates, links, and returns a new child virtual folder.
+        """
+        child_folder_node = node.VirtualFolderNode(
+            qname=f"{parent_folder.qname}.{element.name}",
+            name=element.name,
+            description=element.model.description,
+            call_order=call_order
+        )
+        created_child_node = db.nodes.create(child_folder_node)
+        edge = edges.VirtualContainsEdge(
+            _from=parent_folder.id, _to=created_child_node.id
+        )
+        db.virtual_contains_edges.create(edge)
+        child_folder = VirtualFolder(created_child_node)
+        child_folder.link_to_code_element(element.id)
+        return child_folder
 
