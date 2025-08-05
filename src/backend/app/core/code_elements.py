@@ -55,9 +55,10 @@ class Function(DomainObject[node.FunctionNode]):
             "name": self.name,
             "qname": self.qname,
             "node_type": self.model.node_type,
-            "position": self.position,
-            "inputs": self.inputs,
-            "outputs": self.outputs
+            "position": self.position.model_dump(),
+            "inputs": [input.model_dump() for input in self.inputs],
+            "outputs": [output.model_dump() for output in self.outputs],
+            "parent_file": self.get_parent_file().to_dict()
         }
     
     def add_call(
@@ -78,27 +79,38 @@ class Function(DomainObject[node.FunctionNode]):
         db.calls_edges.create(call_edge_model)
 
     def get_parent_file(self) -> 'File':
-        """Returns the parent file of the function by finding contains edge."""
+        """
+        Returns the parent file of the function.
+        If the function is a method in a class, it recursively finds the class's
+        parent file.
+        """
         from .file import File
-        # Find the contains edge where this function is the target
-        contains_edge = db.contains_edges.find_one({'to_id': self.id})
-        
-        # Debug: Save all contains edges to file
-        # all_contains_edges = db.contains_edges.find({})
-        # with open('contains_edges.json', 'w') as f:
-        #     edge_data = [edge.model_dump() for edge in all_contains_edges]
-        #     json.dump(edge_data, f, indent=2)
 
+        contains_edge = db.contains_edges.find_one({'to_id': self.id})
         if not contains_edge:
-            raise ValueError(f"No parent file found for function {self.id}")
+            raise ValueError(f"No parent container found for function {self.id}")
+
+        parent_node_doc = db.nodes.get(contains_edge.from_id)
+        if not parent_node_doc:
+            raise ValueError(
+                f"Parent node {contains_edge.from_id} not found for "
+                f"function {self.id}"
+            )
+
+        if parent_node_doc.node_type == 'file':
+            return File(parent_node_doc)
         
-        # Get the file node that contains this function
-        file_node = db.nodes.get(contains_edge.from_id)
-        if not file_node:
-            raise ValueError(f"File node {contains_edge.from_id} not found")
+        elif parent_node_doc.node_type == 'class':
+            # It's a method, so we get the parent file of the class.
+            containing_class = Class(parent_node_doc)
+            return containing_class.get_parent_file()
         
-        return File(file_node)
-    
+        else:
+            raise TypeError(
+                f"Unexpected parent node type '{parent_node_doc.node_type}' for "
+                f"function {self.id}"
+            )
+
     def get_imports(self) -> list[edges.UsesImportEdge]:
         """Returns all import edges from this function."""
         return db.uses_import_edges.find({'from_id': self.id})
@@ -244,9 +256,10 @@ class Class(DomainObject[node.ClassNode]):
             "name": self.name,
             "qname": self.qname,
             "node_type": self.model.node_type,
-            "position": self.position,
-            "fields": self.fields,
-            "methods": [method.to_dict() for method in self.methods]
+            "position": self.position.model_dump(),
+            "fields": [field.model_dump() for field in self.fields],
+            "methods": [method.to_dict() for method in self.methods],
+            "parent_file": self.get_parent_file().to_dict()
         }
     
     def get_function_calls(self) -> list[Function]:
@@ -298,7 +311,7 @@ class Class(DomainObject[node.ClassNode]):
             raise ValueError(f"No parent file found for class {self.id}")
         
         # Get the file node that contains this class
-        file_node = db.file_nodes.get(contains_edge.from_id)
+        file_node = db.nodes.get(contains_edge.from_id)
         if not file_node:
             raise ValueError(f"File node {contains_edge.from_id} not found")
         

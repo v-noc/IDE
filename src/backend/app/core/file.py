@@ -32,6 +32,18 @@ class File(DomainObject[node.FileNode]):
     def key(self) -> str:
         return self.model.key
     
+   
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "key": self.key,
+            "name": self.name,
+            "qname": self.model.qname,
+            "path": self.path,
+        }
+
+
     def get_project(self) -> 'Project':
         """Returns the project this file belongs to by following belongs_to edge."""
         from .project import Project
