@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { TreeNode } from "../TreeNode";
-import useProjectStore from "@/stores/useProjectStore";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
 
 const CustomFolders = () => {

@@ -1,4 +1,4 @@
-import useProjectStore from "@/stores/useProjectStore";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
 import { useState } from "react";
 

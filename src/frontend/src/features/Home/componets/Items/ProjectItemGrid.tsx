@@ -25,7 +25,7 @@ const ProjectItemGrid = ({
   setEditingProject: (project: Project) => void;
 }) => {
   return (
-    <Card key={project.id} className="hover:shadow-md transition-shadow">
+    <Card key={project.key} className="hover:shadow-md transition-shadow">
       <CardHeader className="p-0 pb-3 ">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
