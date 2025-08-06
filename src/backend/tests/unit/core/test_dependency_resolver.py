@@ -2,7 +2,7 @@
 Tests for the DependencyResolver utility class.
 """
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, PropertyMock
 from app.core.dependency_resolver import DependencyResolver
 from app.core.code_elements import Function, Class
 from app.core.package import Package
@@ -96,10 +96,13 @@ class TestDependencyResolver:
         user_class.get_function_calls = Mock(return_value=[])
         user_class.get_class_calls = Mock(return_value=[])
         user_class.get_imports = Mock(return_value=[])
-        user_class.methods = []
-        
-        # Resolve dependencies
-        dependencies = self.resolver.resolve_dependencies(function)
+
+        with patch.object(
+            Class, 'methods', new_callable=PropertyMock
+        ) as mock_methods:
+            mock_methods.return_value = []
+            # Resolve dependencies
+            dependencies = self.resolver.resolve_dependencies(function)
         
         # Should contain function and class
         assert len(dependencies) == 2
@@ -204,7 +207,6 @@ class TestDependencyResolver:
         
         user_class.get_function_calls = Mock(return_value=[])
         user_class.get_class_calls = Mock(return_value=[])
-        user_class.methods = []
         
         # Mock import edge
         import_edge = Mock(spec=edges.UsesImportEdge)
@@ -212,9 +214,13 @@ class TestDependencyResolver:
         user_class.get_imports = Mock(return_value=[import_edge])
         
         mock_db.nodes.get.return_value = package_node
-        
-        # Get summary
-        summary = self.resolver.get_dependency_summary(function)
+
+        with patch.object(
+            Class, 'methods', new_callable=PropertyMock
+        ) as mock_methods:
+            mock_methods.return_value = []
+            # Get summary
+            summary = self.resolver.get_dependency_summary(function)
         
         # Verify summary structure
         assert 'functions' in summary

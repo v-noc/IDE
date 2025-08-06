@@ -126,6 +126,7 @@ def get_project_tree(
     """
     Retrieve project tree structure.
     """
+    
     project_node = manager.get_project(project_key)
     if not project_node:
         raise HTTPException(status_code=404, detail="Project not found")
