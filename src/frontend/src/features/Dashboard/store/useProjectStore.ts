@@ -12,7 +12,6 @@ interface ProjectState {
     expandedNodeIds: string[];
     toggleNodeExpansion: (nodeId: string) => void;
     virtualFolderStructures: ProjectTreeResponse[];
-    createVirtualFolder: (name: string) => void;
     addVirtualNode: (parentId: string, name: string, type: "file" | "folder") => void;
     projectData: ProjectTreeResponse | null;
     setProjectData: (data: ProjectTreeResponse) => void;
@@ -57,21 +56,6 @@ const useProjectStore = create<ProjectState>()(
                 projectData: null,
                 setProjectData: (data) => set({ projectData: data }),
                 virtualFolderStructures: [],
-                createVirtualFolder: (name) => {
-                    const newFolder: ProjectTreeResponse = {
-                        key: uuidv4(),
-                        name,
-                        path: `/${name}`,
-                        node_type: "folder",
-                        label: name,
-                        children: [],
-                        isVirtual: true,
-                        parentId: null,
-                    };
-                    set((state) => {
-                        state.virtualFolderStructures.push(newFolder);
-                    });
-                },
                 addVirtualNode: (parentId, name, type) => {
                     const newNode: ProjectTreeResponse = {
                         key: uuidv4(),

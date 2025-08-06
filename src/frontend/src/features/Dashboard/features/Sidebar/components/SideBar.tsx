@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/useProject";
 import ProjectTree from "./ProjectTree";
-import CustomFolders from "./CustomFolders/CustomFolders";
+import VirtualFolders from "./VirtualFolders/VirtualFolders";
 import {
   ResizableHandle,
   ResizablePanelGroup,
@@ -11,20 +11,32 @@ import {
   type ImperativePanelHandle,
 } from "react-resizable-panels";
 import { ChevronDownIcon } from "lucide-react";
-import { useState, useRef } from "react";
-import CreateVirtualFolderDialog from "./CustomFolders/CreateVirtualFolderDialog";
+import { useState, useRef, useEffect } from "react";
+import CreateVirtualFolderDialog from "./VirtualFolders/CreateVirtualFolderDialog";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const SideBar = () => {
   const { projectId } = useParams();
-  const { data } = useGetProjectTreeWithKeyProject({
+  const { data, isLoading } = useGetProjectTreeWithKeyProject({
     key: projectId || "",
   });
 
+  const { setProjectData } = useProjectStore();
+
+  // Update project data in store when data changes
+  useEffect(() => {
+    if (data) {
+      setProjectData(data);
+    }
+  }, [data, setProjectData]);
+
   const [isProjectFilesCollapsed, setProjectFilesCollapsed] = useState(false);
-  const [isCustomFoldersCollapsed, setCustomFoldersCollapsed] = useState(false);
+  const [isVirtualFoldersCollapsed, setVirtualFoldersCollapsed] =
+    useState(false);
 
   const projectFilePanelRef = useRef<ImperativePanelHandle>(null);
-  const customFoldersPanelRef = useRef<ImperativePanelHandle>(null);
+  const virtualFoldersPanelRef = useRef<ImperativePanelHandle>(null);
 
   const toggleProjectFiles = () => {
     const panel = projectFilePanelRef.current;
@@ -32,16 +44,16 @@ const SideBar = () => {
       if (panel.isCollapsed()) {
         panel.expand();
       } else {
-        if (isCustomFoldersCollapsed) {
-          customFoldersPanelRef.current?.expand();
+        if (isVirtualFoldersCollapsed) {
+          virtualFoldersPanelRef.current?.expand();
         }
         panel.collapse();
       }
     }
   };
 
-  const toggleCustomFolders = () => {
-    const panel = customFoldersPanelRef.current;
+  const toggleVirtualFolders = () => {
+    const panel = virtualFoldersPanelRef.current;
     if (panel) {
       if (panel.isCollapsed()) {
         panel.expand();
@@ -68,8 +80,8 @@ const SideBar = () => {
           collapsedSize={4}
           minSize={10}
           onCollapse={() => {
-            if (isCustomFoldersCollapsed) {
-              customFoldersPanelRef.current?.expand();
+            if (isVirtualFoldersCollapsed) {
+              virtualFoldersPanelRef.current?.expand();
             }
             setProjectFilesCollapsed(true);
           }}
@@ -90,48 +102,59 @@ const SideBar = () => {
             </div>
             {!isProjectFilesCollapsed && (
               <div className="py-2 flex-grow overflow-y-auto">
-                {data && <ProjectTree projectTree={data} />}
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : (
+                  data && <ProjectTree projectTree={data} />
+                )}
               </div>
             )}
           </div>
         </ResizablePanel>
-        <ResizableHandle
-          withHandle
-          disabled={isProjectFilesCollapsed || isCustomFoldersCollapsed}
-        />
+        <ResizableHandle withHandle />
         <ResizablePanel
-          ref={customFoldersPanelRef}
+          ref={virtualFoldersPanelRef}
           collapsible
           collapsedSize={4}
-          className={isCustomFoldersCollapsed ? "pb-4" : ""}
+          className={isVirtualFoldersCollapsed ? "pb-4" : ""}
           minSize={10}
           onCollapse={() => {
             if (isProjectFilesCollapsed) {
               projectFilePanelRef.current?.expand();
             }
-            setCustomFoldersCollapsed(true);
+            setVirtualFoldersCollapsed(true);
           }}
-          onExpand={() => setCustomFoldersCollapsed(false)}
+          onExpand={() => setVirtualFoldersCollapsed(false)}
         >
           <div className={`h-full flex flex-col`}>
             <div className="text-xs font-medium text-gray-600 px-2 flex items-center justify-between hover:no-underline py-1">
               <div
                 className="flex items-center gap-4 cursor-pointer flex-1"
-                onClick={toggleCustomFolders}
+                onClick={toggleVirtualFolders}
               >
                 <ChevronDownIcon
                   className={`text-muted-foreground transition-transform duration-200 ${
-                    !isCustomFoldersCollapsed && "rotate-180"
+                    !isVirtualFoldersCollapsed && "rotate-180"
                   }`}
                   size={16}
                 />
-                <span>Custom Folders</span>
+                <span>Virtual Folders</span>
               </div>
               <CreateVirtualFolderDialog />
             </div>
-            {!isCustomFoldersCollapsed && (
+            {!isVirtualFoldersCollapsed && (
               <div className="flex-grow overflow-y-auto h-full">
-                <CustomFolders />
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                ) : (
+                  <VirtualFolders />
+                )}
               </div>
             )}
           </div>

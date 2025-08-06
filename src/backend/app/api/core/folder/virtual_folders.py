@@ -105,12 +105,16 @@ def create_virtual_folder(
     if request.parent_id:
         parent_folder = VirtualFolder.get_by_key(request.parent_id)
         if not parent_folder:
-            raise HTTPException(status_code=404, detail="Parent folder not found")
+            raise HTTPException(
+                status_code=404, detail="Parent folder not found"
+            )
         new_folder = parent_folder.add_virtual_folder(
             request.name, request.description
         )
     else:
-        new_folder = project.add_virtual_folder(request.name, request.description)
+        new_folder = project.add_virtual_folder(
+            request.name, request.description
+        )
 
     return new_folder.to_dict()
 
@@ -139,6 +143,25 @@ def update_virtual_folder(
 
     updated_folder = folder.update(update_data)
     return updated_folder.to_dict()
+
+
+@router.get(
+    "/{project_key}/virtual-folders",
+    response_model=List[VirtualFolderResponse],
+)
+def get_all_virtual_folders(
+    project_key: str,
+    manager: CodeGraphManager = Depends(get_manager),
+):
+    """
+    Gets all virtual folders for a project.
+    """
+    project = manager.get_project(project_key)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    virtual_folders = project.get_all_virtual_folders()
+    return [folder.to_dict() for folder in virtual_folders]
 
 
 @router.get(

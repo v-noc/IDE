@@ -2,7 +2,8 @@ import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProjec
 import { useTreeNode } from "./useTreeNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeContent } from "./NodeContent";
-import CreateVirtualNodeDialog from "../CustomFolders/CreateVirtualNodeDialog";
+import CreateVirtualNodeDialog from "../VirtualFolders/CreateVirtualNodeDialog";
+import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
 
 interface TreeNodeProps {
   node: ProjectTreeResponse;
@@ -16,15 +17,18 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
     isActive,
     hasChildren,
     isCreateDialogOpen,
+    isEditDialogOpen,
     nodeTypeToCreate,
     handleToggle,
     handleSelectNode,
     handleFocus,
     handleExpand,
     handleRemove,
+    handleEdit,
     handleCreateFile,
     handleCreateFolder,
     closeCreateDialog,
+    closeEditDialog,
   } = useTreeNode(node);
 
   return (
@@ -34,6 +38,7 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
         onFocus={handleFocus}
         onExpand={handleExpand}
         onRemove={handleRemove}
+        onEdit={node.isVirtual ? handleEdit : undefined}
         onCreateFile={handleCreateFile}
         onCreateFolder={handleCreateFolder}
       >
@@ -53,6 +58,11 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
         onClose={closeCreateDialog}
         parentId={node.key}
         nodeType={nodeTypeToCreate}
+      />
+      <EditVirtualFolderDialog
+        isOpen={isEditDialogOpen && !!node.isVirtual}
+        onClose={closeEditDialog}
+        node={node}
       />
     </>
   );

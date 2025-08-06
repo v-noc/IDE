@@ -13,6 +13,7 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   } = useProjectStore();
 
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [nodeTypeToCreate, setNodeTypeToCreate] = useState<"file" | "folder">(
     "file"
   );
@@ -46,6 +47,10 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     console.log("Remove:", node.name);
   };
 
+  const handleEdit = () => {
+    setEditDialogOpen(true);
+  };
+
   const handleCreateFile = () => {
     setNodeTypeToCreate("file");
     setCreateDialogOpen(true);
@@ -60,21 +65,28 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     setCreateDialogOpen(false);
   };
 
+  const closeEditDialog = () => {
+    setEditDialogOpen(false);
+  };
+
   return {
     isOpen,
     isSelected,
     isActive,
     hasChildren,
     isCreateDialogOpen,
+    isEditDialogOpen,
     nodeTypeToCreate,
     handleToggle,
     handleSelectNode,
     handleFocus,
     handleExpand,
     handleRemove,
+    handleEdit,
     handleCreateFile,
     handleCreateFolder,
     closeCreateDialog,
+    closeEditDialog,
     addVirtualNode,
   };
 };

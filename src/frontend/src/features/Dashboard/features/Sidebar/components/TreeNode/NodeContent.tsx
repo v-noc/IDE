@@ -6,6 +6,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import getIcons from "@/features/Dashboard/utils/getIcons";
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
@@ -41,6 +47,53 @@ export const NodeContent = ({
     borderColor: nodeStyle.borderColor,
   };
 
+  // Check if this node has a description (for virtual folders)
+  const hasDescription = node.isVirtual && node.description;
+
+  const nodeContent = (
+    <li
+      onClick={handleSelectNode}
+      className={cn(
+        "flex items-center space-x-1 rounded-md p-1.5 transition-all duration-200 cursor-pointer ",
+        "hover:bg-black/5"
+      )}
+    >
+      {hasChildren && (
+        <CollapsibleTrigger
+          onClick={handleToggle}
+          className="p-0.5 rounded-md hover:bg-black/10 "
+        >
+          <ChevronRight
+            className={cn(
+              "h-4 w-4 transition-transform duration-200",
+              isOpen && "rotate-90"
+            )}
+          />
+        </CollapsibleTrigger>
+      )}
+      <DynamicIcon
+        iconName={getIcons(node.node_type)}
+        className={cn("h-4 w-4 flex-shrink-0")}
+        color={nodeStyle.iconColor}
+      />
+      <div className="flex-1 min-w-0">
+        <span
+          className={cn(
+            "text-sm truncate block",
+            isSelected ? "font-semibold" : "font-medium"
+          )}
+        >
+          {node.name}
+        </span>
+        {hasDescription && (
+          <span className="text-xs text-muted-foreground truncate block">
+            {node.description}
+          </span>
+        )}
+      </div>
+    </li>
+  );
+
   return (
     <Collapsible open={isOpen}>
       <div
@@ -55,40 +108,16 @@ export const NodeContent = ({
         )}
         style={currentStyle}
       >
-        <li
-          onClick={handleSelectNode}
-          className={cn(
-            "flex items-center space-x-1 rounded-md p-1.5 transition-all duration-200 cursor-pointer ",
-            "hover:bg-black/5"
-          )}
-        >
-          {hasChildren && (
-            <CollapsibleTrigger
-              onClick={handleToggle}
-              className="p-0.5 rounded-md hover:bg-black/10 "
-            >
-              <ChevronRight
-                className={cn(
-                  "h-4 w-4 transition-transform duration-200",
-                  isOpen && "rotate-90"
-                )}
-              />
-            </CollapsibleTrigger>
-          )}
-          <DynamicIcon
-            iconName={getIcons(node.node_type)}
-            className={cn("h-4 w-4 flex-shrink-0")}
-            color={nodeStyle.iconColor}
-          />
-          <span
-            className={cn(
-              "flex-1 text-sm truncate",
-              isSelected ? "font-semibold" : "font-medium"
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>{nodeContent}</TooltipTrigger>
+            {hasDescription && (
+              <TooltipContent>
+                <p className="max-w-xs">{node.description}</p>
+              </TooltipContent>
             )}
-          >
-            {node.name}
-          </span>
-        </li>
+          </Tooltip>
+        </TooltipProvider>
         {hasChildren && (
           <CollapsibleContent>
             <ul className="pl-2 pt-1 space-y-1">

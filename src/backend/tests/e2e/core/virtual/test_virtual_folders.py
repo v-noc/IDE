@@ -65,7 +65,9 @@ def test_update_virtual_folder(client: TestClient, manager: CodeGraphManager):
     assert data['description'] == 'Updated description.'
 
 
-def test_get_virtual_folder_tree(client: TestClient, manager: CodeGraphManager):
+def test_get_virtual_folder_tree(
+    client: TestClient, manager: CodeGraphManager
+):
     """
     Tests retrieving a virtual folder and its descendant tree.
     """
@@ -94,7 +96,9 @@ def test_get_virtual_folder_tree(client: TestClient, manager: CodeGraphManager):
             assert child['children'][0]['name'] == 'grandchild'
 
 
-def test_add_code_element(client: TestClient, manager: CodeGraphManager, sample_project_path):
+def test_add_code_element(
+    client: TestClient, manager: CodeGraphManager, sample_project_path
+):
     """
     Tests adding a code element to a virtual folder and then removing it.
     """
@@ -122,7 +126,9 @@ def test_add_code_element(client: TestClient, manager: CodeGraphManager, sample_
     assert add_response.status_code == 201
     
     # Verify it was added
-    get_response = client.get(f"/api/v1/{project.key}/virtual-folder/{folder.key}")
+    get_response = client.get(
+        f"/api/v1/{project.key}/virtual-folder/{folder.key}"
+    )
     data = get_response.json()
     assert len(data['children']) == 1
     assert data['children'][0]['link_to']['qname'] == 'main.start_app'
