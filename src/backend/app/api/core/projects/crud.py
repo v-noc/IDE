@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any
 from app.core.manager import CodeGraphManager
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.parser.project_scanner import ProjectScanner
 from app.api.core.folder.virtual_folders import VirtualFolderResponse
@@ -26,7 +26,7 @@ class ProjectResponse(BaseModel):
 
 
 class ProjectTreeResponse(BaseModel):
-    key: str 
+    key: str
     name: str
     node_type: str
     qname: str
@@ -43,7 +43,7 @@ def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
         children = [
             map_tree_to_response(child) for child in tree_data["children"]
         ]
-    
+
     return ProjectTreeResponse(
         key=tree_data.get("_key", tree_data.get("key", "")),
         name=tree_data.get("name", ""),
@@ -64,15 +64,15 @@ def get_manager() -> CodeGraphManager:
 router = APIRouter()
 
 
-@router.post("/project", response_model=ProjectResponse, status_code=201)
+@router.post("/", response_model=ProjectResponse, status_code=201)
 def create_project(
-    project: ProjectCreate, 
+    project: ProjectCreate,
     manager: CodeGraphManager = Depends(get_manager)
 ):
     """
     Create a new project.
     """
-    
+
     scanner = ProjectScanner(project.path, project.name)
     scanner.scan()
     new_project_node = scanner.get_project()
@@ -81,13 +81,13 @@ def create_project(
         name=new_project_node.name,
         path=new_project_node.path
     )
-    
+
     return project_response
 
 
-@router.get("/project/{project_key}", response_model=ProjectResponse)
+@router.get("/{project_key}", response_model=ProjectResponse)
 def get_project(
-    project_key: str, 
+    project_key: str,
     manager: CodeGraphManager = Depends(get_manager)
 ):
     """
@@ -102,9 +102,11 @@ def get_project(
         path=project_node.path
     )
 
-@router.get("/project/{project_key}/virtual-folders", response_model=List[VirtualFolderResponse])
+
+@router.get("/{project_key}/virtual-folders",
+            response_model=List[VirtualFolderResponse])
 def get_project_virtual_folders(
-    project_key: str, 
+    project_key: str,
     manager: CodeGraphManager = Depends(get_manager)
 ):
     """
@@ -115,9 +117,10 @@ def get_project_virtual_folders(
         raise HTTPException(status_code=404, detail="Project not found")
     return project_node.get_virtual_folders()
 
-@router.get("/project/{project_key}/tree", response_model=ProjectTreeResponse)
+
+@router.get("/{project_key}/tree", response_model=ProjectTreeResponse)
 def get_project_tree(
-    project_key: str, 
+    project_key: str,
     manager: CodeGraphManager = Depends(get_manager)
 ):
     """
@@ -126,12 +129,12 @@ def get_project_tree(
     project_node = manager.get_project(project_key)
     if not project_node:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     tree_data = project_node.get_descendant_tree()
     return map_tree_to_response(tree_data)
 
 
-@router.get("/projects", response_model=List[ProjectResponse])
+@router.get("/", response_model=List[ProjectResponse])
 def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):
     """
     Retrieve all projects.
@@ -146,10 +149,10 @@ def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):
     ]
 
 
-@router.put("/project/{project_key}", response_model=ProjectResponse)
+@router.put("/{project_key}", response_model=ProjectResponse)
 def update_project(
-    project_key: str, 
-    project: ProjectUpdate, 
+    project_key: str,
+    project: ProjectUpdate,
     manager: CodeGraphManager = Depends(get_manager)
 ):
     """
@@ -166,9 +169,9 @@ def update_project(
     )
 
 
-@router.delete("/project/{project_key}", status_code=204)
+@router.delete("/{project_key}", status_code=204)
 def delete_project(
-    project_key: str, 
+    project_key: str,
     manager: CodeGraphManager = Depends(get_manager)
 ):
     """
