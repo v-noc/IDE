@@ -91,7 +91,10 @@ class CodeGraphManager:
         """
         Loads an existing node from the database by its ID.
         """
-        node_model = db.nodes.get(node_id)
-        if not node_model:
-            return None
-        return node.Node(node_model)
+        return db.nodes.get(node_id)
+
+    def get_node_by_qname(self, qname: str) -> node.Node | None:
+        """
+        Loads an existing node from the database by its fully qualified name.
+        """
+        return self.symbol_table.get_symbol_by_qname(qname)

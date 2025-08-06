@@ -31,9 +31,7 @@ class File(DomainObject[node.FileNode]):
     @property
     def key(self) -> str:
         return self.model.key
-    
-   
-    
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -43,9 +41,8 @@ class File(DomainObject[node.FileNode]):
             "path": self.path,
         }
 
-
     def get_project(self) -> 'Project':
-        """Returns the project this file belongs to by following belongs_to edge."""
+        """Returns the project this file belongs to."""
         from .project import Project
         
         # Find the belongs_to edge where this file is the source

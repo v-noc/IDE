@@ -200,6 +200,24 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
 
         return result
 
+    def remove_element_by_id(self, element_id: str) -> bool:
+        """
+        Removes an element from this virtual folder by its ID.
+        This could be a subfolder or a linked code element.
+        """
+        # Check for subfolders first
+        edge = db.virtual_contains_edges.find_one({
+            'from_id': self.id,
+            'to_id': element_id
+        })
+        if edge:
+            db.virtual_contains_edges.delete(edge.key)
+            # Optionally, delete the subfolder if it's not referenced elsewhere
+            # For now, just removing the link
+            return True
+
+        return False
+
     def get_linked_element_edge(self) -> Optional[LinksToEdge]:
         """Returns the 'links_to' edge if it exists."""
         return db.links_to_edges.find_one({"from_id": self.id})
