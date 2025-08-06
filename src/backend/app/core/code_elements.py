@@ -81,14 +81,13 @@ class Function(DomainObject[node.FunctionNode]):
     def get_parent_file(self) -> 'File':
         """
         Returns the parent file of the function.
-        If the function is a method in a class, it recursively finds the class's
-        parent file.
+        If a method, recursively finds the class's parent file.
         """
         from .file import File
 
         contains_edge = db.contains_edges.find_one({'to_id': self.id})
         if not contains_edge:
-            raise ValueError(f"No parent container found for function {self.id}")
+            raise ValueError(f"No parent container for function {self.id}")
 
         parent_node_doc = db.nodes.get(contains_edge.from_id)
         if not parent_node_doc:
@@ -99,15 +98,15 @@ class Function(DomainObject[node.FunctionNode]):
 
         if parent_node_doc.node_type == 'file':
             return File(parent_node_doc)
-        
+
         elif parent_node_doc.node_type == 'class':
             # It's a method, so we get the parent file of the class.
             containing_class = Class(parent_node_doc)
             return containing_class.get_parent_file()
-        
+
         else:
             raise TypeError(
-                f"Unexpected parent node type '{parent_node_doc.node_type}' for "
+                f"Unexpected parent type '{parent_node_doc.node_type}' for "
                 f"function {self.id}"
             )
 
@@ -396,7 +395,11 @@ class Class(DomainObject[node.ClassNode]):
         db.uses_import_edges.create(import_edge)
 
     def add_field(self, field: TypeKeyValuesProperties):
-        """Adds a field to the class's properties."""
+        """Adds a field to the class's properties, avoiding duplicates."""
+        # Check if a field with the same name already exists
+        if any(f.varname == field.varname  for f in self.model.properties.fields):
+            return
+
         self.model.properties.fields.append(field)
         db.nodes.update(self.model)
 

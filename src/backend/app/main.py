@@ -50,13 +50,5 @@ app.add_middleware(
 # Add exception handlers
 app.add_exception_handler(Exception, generic_exception_handler)
 
-# Include routers
-app.include_router(root.router)
-app.include_router(health.router, tags=["health"])
-app.include_router(projects_crud.router, prefix="/v1/api", tags=["projects"])
-app.include_router(
-    virtual_files.router, prefix="/v1/api", tags=["virtual_files"]
-)
-app.include_router(
-    virtual_folders.router, prefix="/v1/api", tags=["virtual_folders"]
-)
+# Include the main router
+app.include_router(root.router, prefix="/api/v1")
