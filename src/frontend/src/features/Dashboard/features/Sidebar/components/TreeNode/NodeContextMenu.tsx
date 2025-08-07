@@ -14,6 +14,7 @@ interface NodeContextMenuProps {
   onRemove: () => void;
   onCreateFile: () => void;
   onCreateFolder: () => void;
+  onCreatePath: () => void;
   onEdit?: () => void;
 }
 
@@ -25,6 +26,7 @@ export const NodeContextMenu = ({
   onRemove,
   onCreateFile,
   onCreateFolder,
+  onCreatePath,
   onEdit,
 }: NodeContextMenuProps) => {
   return (
@@ -35,6 +37,9 @@ export const NodeContextMenu = ({
         <ContextMenuItem onClick={onExpand}>Expand</ContextMenuItem>
         {node.isVirtual && onEdit && (
           <ContextMenuItem onClick={onEdit}>Edit</ContextMenuItem>
+        )}
+        {(node.node_type == "function" || node.node_type == "class") && (
+          <ContextMenuItem onClick={onCreatePath}>Create Path</ContextMenuItem>
         )}
         <ContextMenuItem onClick={onRemove}>Remove</ContextMenuItem>
         {node.isVirtual && node.node_type === "folder" && (

@@ -14,9 +14,10 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
 
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
-  const [nodeTypeToCreate, setNodeTypeToCreate] = useState<"file" | "folder">(
-    "file"
-  );
+  const [isCreatePathDialogOpen, setCreatePathDialogOpen] = useState(false);
+  const [nodeTypeToCreate, setNodeTypeToCreate] = useState<
+    "file" | "folder" | "path"
+  >("file");
 
   const isOpen = expandedNodeIds.includes(node.key);
   const isSelected = selectedNode?.key === node.key;
@@ -61,8 +62,16 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     setCreateDialogOpen(true);
   };
 
+  const handleCreatePath = () => {
+    setCreatePathDialogOpen(true);
+  };
+
   const closeCreateDialog = () => {
     setCreateDialogOpen(false);
+  };
+
+  const closeCreatePathDialog = () => {
+    setCreatePathDialogOpen(false);
   };
 
   const closeEditDialog = () => {
@@ -76,6 +85,7 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     hasChildren,
     isCreateDialogOpen,
     isEditDialogOpen,
+    isCreatePathDialogOpen,
     nodeTypeToCreate,
     handleToggle,
     handleSelectNode,
@@ -85,8 +95,10 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     handleEdit,
     handleCreateFile,
     handleCreateFolder,
+    handleCreatePath,
     closeCreateDialog,
     closeEditDialog,
+    closeCreatePathDialog,
     addVirtualNode,
   };
 };

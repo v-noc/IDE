@@ -145,21 +145,54 @@ class File(DomainObject[node.FileNode]):
         
         with open(full_path, 'r') as f:
             lines = f.readlines()
-            line_no = position.line_no
+            start_line = position.line_no
             col_offset = position.col_offset
             
-            if line_no > len(lines):
+            if start_line > len(lines):
                 raise ValueError(
-                    f"Line number {line_no} exceeds file length {len(lines)}"
+                    f"Line number {start_line} exceeds file length "
+                    f"{len(lines)}"
                 )
             
-            line_content = lines[line_no - 1]
+            # Handle multi-line elements
+            has_end_line = (hasattr(position, 'end_line_no') and 
+                           position.end_line_no and 
+                           position.end_line_no > start_line)
             
-            # If we have end position, extract the specific range
-            if hasattr(position, 'end_col_offset') and position.end_col_offset:
-                start = col_offset
-                end = min(position.end_col_offset, len(line_content))
-                return line_content[start:end]
+            if has_end_line:
+                # Extract multi-line content
+                result_lines = []
+                
+                # First line (from col_offset to end)
+                first_line = lines[start_line - 1]
+                result_lines.append(first_line[col_offset:])
+                
+                # Middle lines (complete lines)
+                for line_idx in range(start_line, position.end_line_no - 1):
+                    result_lines.append(lines[line_idx])
+                
+                # Last line (from start to end_col_offset)
+                if position.end_line_no <= len(lines):
+                    last_line = lines[position.end_line_no - 1]
+                    end_col = getattr(
+                        position, 'end_col_offset', len(last_line)
+                    )
+                    result_lines.append(last_line[:end_col])
+                
+                return ''.join(result_lines)
+            
             else:
-                # Return the entire line
-                return line_content.strip()
+                # Single line element
+                line_content = lines[start_line - 1]
+                
+                # If we have end position on same line, extract the range
+                has_end_col = (hasattr(position, 'end_col_offset') and 
+                              position.end_col_offset)
+                
+                if has_end_col:
+                    start = col_offset
+                    end = min(position.end_col_offset, len(line_content))
+                    return line_content[start:end]
+                else:
+                    # Return from col_offset to end of line
+                    return line_content[col_offset:].rstrip()

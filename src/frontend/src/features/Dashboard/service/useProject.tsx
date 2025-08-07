@@ -203,6 +203,31 @@ const getProjectTreeWithKey = async (
   return response as ProjectTreeResponse;
 };
 
+export const useCreatePathForElement = (
+  projectKey: string,
+  elementKey: string
+) => {
+  return useMutation({
+    mutationFn: (data: { name: string; description: string }) =>
+      createPathForElement(projectKey, elementKey, data),
+  });
+};
+
+const createPathForElement = async (
+  projectKey: string,
+  elementKey: string,
+  data: { name: string; description: string }
+): Promise<VirtualFolderResponse> => {
+  const response = await api(
+    `${API_ROUTES.VIRTUAL_FOLDER}${projectKey}/virtual-folder/create-path/${elementKey}`,
+    {
+      method: "POST",
+      body: data as unknown as BodyInit,
+    }
+  );
+  return response as VirtualFolderResponse;
+};
+
 export const useGetVirtualFolders = (projectKey: string) => {
   return useQuery<VirtualFolderResponse[]>({
     queryKey: ["virtualFolders", projectKey],

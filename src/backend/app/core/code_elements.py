@@ -397,7 +397,10 @@ class Class(DomainObject[node.ClassNode]):
     def add_field(self, field: TypeKeyValuesProperties):
         """Adds a field to the class's properties, avoiding duplicates."""
         # Check if a field with the same name already exists
-        if any(f.varname == field.varname  for f in self.model.properties.fields):
+        if any(
+            f.varname == field.varname 
+            for f in self.model.properties.fields
+        ):
             return
 
         self.model.properties.fields.append(field)

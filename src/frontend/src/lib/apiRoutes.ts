@@ -1,6 +1,7 @@
 const API_ROUTES = {
-    PROJECT: "/api/v1/project/",
-    VIRTUAL_FOLDER: "/api/v1/",
+    PROJECT: '/projects/',
+    VIRTUAL_FOLDER: '/virtual-folders/',
+    CODE_ELEMENTS: '/code-elements/',
 };
 
 export default API_ROUTES; 
