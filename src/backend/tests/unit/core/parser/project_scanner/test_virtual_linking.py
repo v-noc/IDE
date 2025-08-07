@@ -54,8 +54,8 @@ def test_virtual_folder_structure_from_code_element(sample_project_path):
 
     folder.create_folder_for_element(function)
     folder2.create_folder_for_element(class_)
-    data2 = folder2.get_descendant_tree()
-    pprint(data2)
+    # data2 = folder2.get_descendant_tree()
+    # pprint(data2)
     data = folder.get_descendant_tree()
     
     _assert_folder_structure(data, 'register', 'sample_project', 1)
@@ -120,7 +120,7 @@ def test_virtual_folder_structure_from_code_element_link_directly(
 
     folder.create_folder_for_element(function, link_directly=True)
     data = folder.get_descendant_tree()
-
+    pprint(data)
     # When link_directly=True, the folder itself is linked to the element
     # and has the dependencies as direct children
     _assert_folder_structure(data, 'register', 'sample_project', 3)

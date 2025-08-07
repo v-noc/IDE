@@ -19,7 +19,7 @@ router.include_router(
     project_crud.router, prefix="/projects", tags=["projects"]
 )
 router.include_router(
-    virtual_folders.router, prefix="/virtual-folders", tags=["virtual-folders"]
+    virtual_folders.router, prefix="/project/{project_key}/virtual-folders", tags=["virtual-folders"]
 )
 router.include_router(
     code_elements.router, prefix="/code-elements", tags=["code-elements"]

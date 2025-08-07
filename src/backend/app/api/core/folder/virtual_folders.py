@@ -86,7 +86,7 @@ def add_element_as_virtual_folder(
 
 
 @router.post(
-    "/{project_key}/virtual-folder",
+    "/virtual-folder",
     response_model=VirtualFolderResponse,
     status_code=201
 )
@@ -120,7 +120,7 @@ def create_virtual_folder(
 
 
 @router.put(
-    "/{project_key}/virtual-folder/{folder_key}",
+    "/virtual-folder/{folder_key}",
     response_model=VirtualFolderResponse
 )
 def update_virtual_folder(
@@ -146,7 +146,7 @@ def update_virtual_folder(
 
 
 @router.get(
-    "/{project_key}/virtual-folders",
+    "/virtual-folders",
     response_model=List[VirtualFolderResponse],
 )
 def get_all_virtual_folders(
@@ -165,7 +165,7 @@ def get_all_virtual_folders(
 
 
 @router.get(
-    "/{project_key}/virtual-folder/{folder_key}",
+    "/virtual-folder/{folder_key}",
     response_model=VirtualFolderResponse
 )
 def get_virtual_folder(
@@ -188,7 +188,7 @@ def get_virtual_folder(
 
 
 @router.post(
-    "/{project_key}/virtual-folder/{folder_key}/add-code-element",
+    "/virtual-folder/{folder_key}/add-code-element",
     response_model=VirtualFolderResponse,
     status_code=201
 )
@@ -228,7 +228,7 @@ def add_code_element_to_virtual_folder(
 
 
 @router.delete(
-    "/{project_key}/virtual-folder/{folder_key}/code-element/{element_key}",
+    "/virtual-folder/{folder_key}/code-element/{element_key}",
     status_code=204
 )
 def remove_code_element_from_virtual_folder(
@@ -271,8 +271,8 @@ def remove_code_element_from_virtual_folder(
 
 
 @router.post(
-    "/{project_key}/virtual-folder/create-path/{element_key}",
-    
+    "/virtual-folder/create-path/{element_key}",
+    status_code=201,
 )
 def create_path_for_element(
     project_key: str,
