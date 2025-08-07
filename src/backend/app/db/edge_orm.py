@@ -103,6 +103,24 @@ class ArangoEdgeCollection(Generic[T]):
         meta = self.collection.insert(dump, overwrite=True)
         new_doc = self.collection.get(meta["_key"])
         return self._validate(new_doc)
+
+    def delete(self, filters: Dict[str, Any]) -> int:
+        """
+        Deletes edges matching the provided filters and returns the count of
+        deleted documents.
+        """
+        # Map Python field names to ArangoDB field names
+        arango_filters = {}
+        for key, value in filters.items():
+            if key == 'to_id':
+                arango_filters['_to'] = value
+            elif key == 'from_id':
+                arango_filters['_from'] = value
+            else:
+                arango_filters[key] = value
+
+        result = self.collection.delete_match(arango_filters, sync=True)
+        return result
     
     def update(self, edge_data: T) -> T:
         """

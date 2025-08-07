@@ -81,7 +81,48 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         }
 
     def delete(self) -> None:
-        db.nodes.delete(self.model.key)
+        """
+        Deletes a virtual folder and all its descendants using a bottom-up
+        approach. This method is non-recursive and ensures that child folders
+        and their associated edges are removed before their parents to maintain
+        data integrity.
+        """
+        # _collect_all_descendants performs a post-order traversal, so children
+        # appear before parents. The folder itself will be the last element.
+        all_folders_to_delete = self._collect_all_descendants()
+
+        for folder in all_folders_to_delete:
+            # Delete edges associated with the folder.
+            db.links_to_edges.delete({"from_id": folder.id})
+            db.virtual_contains_edges.delete({"from_id": folder.id})
+            db.virtual_contains_edges.delete({"to_id": folder.id})
+
+            # Delete the folder node itself.
+            db.nodes.delete(folder.model.key)
+
+    def _collect_all_descendants(self) -> list['VirtualFolder']:
+        """
+        Collects all descendants of this folder in a way that ensures children
+        come before their parents in the list (post-order traversal).
+        """
+        descendants_post_order = []
+        # Stack stores tuples of (folder, children_iterator)
+        stack = [(self, iter(self.get_virtual_folders()))]
+        visited = {self.id}
+        
+        while stack:
+            parent, children_iter = stack[-1]
+            try:
+                child = next(children_iter)
+                if child.id not in visited:
+                    visited.add(child.id)
+                    stack.append((child, iter(child.get_virtual_folders())))
+            except StopIteration:
+                # All children visited, process the parent
+                folder, _ = stack.pop()
+                descendants_post_order.append(folder)
+
+        return descendants_post_order
 
     def update(self, update_data: dict) -> 'VirtualFolder':
         updated_model = self.model.model_copy(update=update_data)
@@ -351,7 +392,9 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         # Create folders for called elements in order
         for call_edge in call_edges:
             called_node = db.nodes.get(call_edge.to_id)
-            if not (called_node and called_node.node_type in ['function', 'class']):
+            if not (
+                called_node and called_node.node_type in ['function', 'class']
+            ):
                 continue
 
             called_element = to_domain_element(called_node)

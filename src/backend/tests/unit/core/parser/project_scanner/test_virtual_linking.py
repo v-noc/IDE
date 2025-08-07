@@ -4,6 +4,7 @@ from app.core.code_elements import Class, Function
 from app.core.manager import CodeGraphManager
 from app.core.parser.project_scanner import ProjectScanner
 from app.db import collections
+from app.core.virtual_folder import VirtualFolder
 
 pytestmark = pytest.mark.usefixtures("clear_db")
 
@@ -220,7 +221,57 @@ def test_main_app_virtual_folder(sample_project_path):
     assert field_names == {'name', 'age'}
     assert len(user_class_data['methods']) == 1
     assert user_class_data['methods'][0]['name'] == 'get_name'
-   
 
+
+def test_delete_virtual_folder_cascade(sample_project_path):
+    """
+    Tests that deleting a virtual folder also deletes all its descendants
+    and associated edges.
+    """
+    project, function, _ = _setup_test_project(sample_project_path)
+
+    # Create a virtual folder and a nested structure within it
+    folder = project.add_virtual_folder(folder_name="register")
+    folder.create_folder_for_element(function)
+
+    # Verify that folders and edges were created
+    # Project root + 'register' + 4 descendants = 6
+    initial_vf_count = len(
+        list(collections.nodes.find({"node_type": "virtual_folder"}))
+    )
+    assert initial_vf_count == 6
+    # 1 edge from root, 5 in the structure
+    initial_edge_count = len(list(collections.virtual_contains_edges.find({})))
+    assert initial_edge_count == 7
+    
+    # Get the descendant tree to find a folder to delete
+    data = folder.get_descendant_tree()
+    start_app_folder_id = data['children'][0]['id']
+    start_app_folder_doc = collections.nodes.get(
+        start_app_folder_id
+    )
+    start_app_vf = VirtualFolder(start_app_folder_doc)
+
+    # Count `links_to` edges before deletion
+    initial_links_to_count = len(list(collections.links_to_edges.find({})))
+
+    # Delete the 'start_app' virtual folder
+    start_app_vf.delete()
+
+    # After deletion:
+    # Remaining VFs:  'register' folder = 1
+    final_vf_count = len(
+        list(collections.nodes.find({"node_type": "virtual_folder"}))
+    )
+    assert final_vf_count == 1
+    
+    # Remaining edges: project_root -> register (1 edge)
+    final_edge_count = len(list(collections.virtual_contains_edges.find({})))
+    assert final_edge_count == 1
+
+    # Check that links_to edges were also deleted. 4 folders deleted, each has one link.
+    final_links_to_count = len(list(collections.links_to_edges.find({})))
+    assert final_links_to_count == initial_links_to_count - 4
+   
    
   

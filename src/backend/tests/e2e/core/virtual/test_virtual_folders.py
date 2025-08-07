@@ -168,6 +168,41 @@ def test_create_path_for_element(
     child_names = {child['name'] for child in data['children']}
     assert 'MainApp' in child_names
     assert 'helper_function' in child_names
+
+
+def test_delete_virtual_folder_recursive(
+    client: TestClient, manager: CodeGraphManager
+):
+    """
+    Tests that deleting a virtual folder recursively deletes all its children
+    and associated database edges.
+    """
+    from app.db import collections
+
+    project = manager.create_project(
+        name="Test Project", path="/tmp/test_project"
+    )
+    root = project.add_virtual_folder("root")
+    child1 = root.add_virtual_folder("child1")
+    grandchild = child1.add_virtual_folder("grandchild")
+
+    # Delete the root folder
+    response = client.delete(
+        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/{root.key}"
+    )
+    assert response.status_code == 204
+
+    # Verify all folders are deleted
+    assert not collections.nodes.get(root.key)
+    assert not collections.nodes.get(child1.key)
+    assert not collections.nodes.get(grandchild.key)
+
+    # Verify all edges are deleted
+    assert not collections.virtual_contains_edges.find_one({"_from": root.id})
+    assert not collections.virtual_contains_edges.find_one({"_from": child1.id})
+    assert not collections.links_to_edges.find_one({"_from": root.id})
+    assert not collections.links_to_edges.find_one({"_from": child1.id})
+    assert not collections.links_to_edges.find_one({"_from": grandchild.id})
     
     
     

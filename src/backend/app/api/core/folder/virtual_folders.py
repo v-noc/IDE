@@ -187,6 +187,27 @@ def get_virtual_folder(
     return folder.get_descendant_tree()
 
 
+@router.delete("/virtual-folder/{folder_key}", status_code=204)
+def delete_virtual_folder(
+    project_key: str,
+    folder_key: str,
+    manager: CodeGraphManager = Depends(get_manager),
+):
+    """
+    Deletes a virtual folder and all its children recursively.
+    """
+    project = manager.get_project(project_key)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    folder = VirtualFolder.get_by_key(folder_key)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Virtual folder not found")
+
+    folder.delete()
+    return Response(status_code=204)
+
+
 @router.post(
     "/virtual-folder/{folder_key}/add-code-element",
     response_model=VirtualFolderResponse,
@@ -313,4 +334,3 @@ def create_path_for_element(
         return new_folder.to_dict()
     except Exception as e:
         raise HTTPException(status_code=409, detail=str(e))
-
