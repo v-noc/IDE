@@ -240,6 +240,10 @@ def remove_code_element_from_virtual_folder(
     """
     Removes a code element from a virtual folder.
     """
+    project = manager.get_project(project_key)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
     folder = VirtualFolder.get_by_key(folder_key)
     if not folder:
         raise HTTPException(status_code=404, detail="Virtual folder not found")
