@@ -20,37 +20,42 @@ def _assert_linked_element(data, expected_qname):
     assert data['link_to']['qname'] == expected_qname
 
 
-def test_virtual_folder_structure_from_code_element(sample_project_path):
-    """
-    Test that a virtual folder structure can be generated from a code element,
-    and that the resulting JSON from get_descendant_tree is correct.
-    """
+def _setup_test_project(sample_project_path):
+    """Common setup for virtual folder tests."""
     scanner = ProjectScanner(sample_project_path)
     scanner.scan()
 
     manager = CodeGraphManager()
-
     projects = manager.get_all_projects()
     assert len(projects) == 1
     project = projects[0]
 
-    folder = project.add_virtual_folder(folder_name="register")
-    folder2 = project.add_virtual_folder(folder_name="main")
-    assert len(project.get_virtual_folders()) == 2, "VF not created"
-
     function_doc = collections.nodes.find_one({"qname": "main.start_app"})
+    assert function_doc, "Could not find function 'main.start_app'"
+    function = Function(function_doc)
 
     class_doc = collections.nodes.find_one({"qname": "main.MainApp"})
     assert class_doc, "Could not find class 'main.MainApp'"
     class_ = Class(class_doc)
 
-    assert function_doc, "Could not find function 'main.start_app'"
-    function = Function(function_doc)
+    return project, function, class_
+
+
+def test_virtual_folder_structure_from_code_element(sample_project_path):
+    """
+    Test that a virtual folder structure can be generated from a code element,
+    and that the resulting JSON from get_descendant_tree is correct.
+    """
+    project, function, class_ = _setup_test_project(sample_project_path)
+
+    folder = project.add_virtual_folder(folder_name="register")
+    folder2 = project.add_virtual_folder(folder_name="main")
+    assert len(project.get_virtual_folders()) == 2, "VF not created"
 
     folder.create_folder_for_element(function)
     folder2.create_folder_for_element(class_)
-    # data2 = folder2.get_descendant_tree()
-    # pprint(data2)
+    data2 = folder2.get_descendant_tree()
+    pprint(data2)
     data = folder.get_descendant_tree()
     
     _assert_folder_structure(data, 'register', 'sample_project', 1)
@@ -100,19 +105,69 @@ def test_virtual_folder_structure_from_code_element(sample_project_path):
     assert 'utils' in import_qnames
 
 
+def test_virtual_folder_structure_from_code_element_link_directly(
+    sample_project_path
+):
+    """
+    Test that a virtual folder structure can be generated from a code element
+    with link_directly=True, where the element is linked directly to the folder
+    and its dependencies are added as children.
+    """
+    project, function, class_ = _setup_test_project(sample_project_path)
+
+    folder = project.add_virtual_folder(folder_name="register")
+    assert len(project.get_virtual_folders()) == 1, "VF not created"
+
+    folder.create_folder_for_element(function, link_directly=True)
+    data = folder.get_descendant_tree()
+
+    # When link_directly=True, the folder itself is linked to the element
+    # and has the dependencies as direct children
+    _assert_folder_structure(data, 'register', 'sample_project', 3)
+    _assert_linked_element(data, 'main.start_app')
+
+    # The dependencies should be direct children of the register folder
+    child_names = {child['name'] for child in data['children']}
+    assert child_names == {'run', 'MainApp', 'helper_function'}
+
+    for child in data['children']:
+        if child['name'] == 'run':
+            _assert_folder_structure(
+                child, 'run', 'sample_project.register', 1
+            )
+            _assert_linked_element(child, 'main.MainApp.run')
+            assert child['children'][0]['name'] == 'helper_function'
+            _assert_linked_element(
+                child['children'][0], 'utils.helper_function'
+            )
+        elif child['name'] == 'MainApp':
+            _assert_folder_structure(
+                child, 'MainApp', 'sample_project.register', 1
+            )
+            _assert_linked_element(child, 'main.MainApp')
+            assert child['children'][0]['name'] == 'User'
+            _assert_linked_element(
+                child['children'][0], 'models.user.User'
+            )
+        elif child['name'] == 'helper_function':
+            _assert_folder_structure(
+                child, 'helper_function', 'sample_project.register', 0
+            )
+            _assert_linked_element(child, 'utils.helper_function')
+
+    # Check imports on the main folder since it's linked directly
+    imports = data.get('imports', [])
+    assert len(imports) > 0
+    import_qnames = {imp['qname'] for imp in imports}
+    assert 'utils.helper_function' in import_qnames
+    assert 'utils' in import_qnames
+
+
 def test_link_directly_to_virtual_folder(sample_project_path):
     """
     Tests that a code element can be linked directly to a virtual folder.
     """
-    scanner = ProjectScanner(sample_project_path)
-    scanner.scan()
-
-    manager = CodeGraphManager()
-    project = manager.get_all_projects()[0]
-
-    function_doc = collections.nodes.find_one({"qname": "main.start_app"})
-    assert function_doc, "Could not find function 'main.start_app'"
-    function = Function(function_doc)
+    project, function, class_ = _setup_test_project(sample_project_path)
 
     folder = project.add_virtual_folder(folder_name="direct_link_test")
     folder.create_folder_for_element(function, link_directly=True)
@@ -126,15 +181,7 @@ def test_main_app_virtual_folder(sample_project_path):
     """
     Tests the structure of the virtual folder generated for the MainApp class.
     """
-    scanner = ProjectScanner(sample_project_path)
-    scanner.scan()
-
-    manager = CodeGraphManager()
-    project = manager.get_all_projects()[0]
-
-    class_doc = collections.nodes.find_one({"qname": "main.MainApp"})
-    assert class_doc, "Could not find class 'main.MainApp'"
-    class_ = Class(class_doc)
+    project, function, class_ = _setup_test_project(sample_project_path)
 
     folder = project.add_virtual_folder(folder_name="main_app_test")
     folder.create_folder_for_element(class_)

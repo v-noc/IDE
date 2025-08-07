@@ -115,7 +115,7 @@ def get_project_virtual_folders(
     project_node = manager.get_project(project_key)
     if not project_node:
         raise HTTPException(status_code=404, detail="Project not found")
-    return project_node.get_virtual_folders()
+    return [folder.get_descendant_tree() for folder in project_node.get_virtual_folders()]
 
 
 @router.get("/{project_key}/tree", response_model=ProjectTreeResponse)

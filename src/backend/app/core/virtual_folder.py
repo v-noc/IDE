@@ -259,12 +259,69 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         created_folders = {}
 
         if link_directly:
+            # Link the element directly to this folder
             self.link_to_code_element(element.id)
             created_folders[element.id] = self
+            # Process dependencies and add them as children of this folder
+            self._process_element_dependencies(
+                element, current_path, created_folders, self
+            )
+            return self
+        else:
+            # Create a new folder for the element (original behavior)
+            return self._create_folder_recursively(
+                element, current_path, created_folders
+            )
 
-        return self._create_folder_recursively(
-            element, current_path, created_folders
-        )
+    def _process_element_dependencies(
+        self,
+        element: Union[Function, Class],
+        current_path: list[tuple[str, str]],
+        created_folders: dict[str, "VirtualFolder"],
+        parent_folder: "VirtualFolder",
+    ):
+        """
+        Process dependencies of an element and create child folders.
+        """
+        call_edges = self._get_call_edges_for_element(element)
+
+        for call_edge in call_edges:
+            called_node = db.nodes.get(call_edge.to_id)
+            if not (
+                called_node and called_node.node_type in ["function", "class"]
+            ):
+                continue
+
+            called_element = to_domain_element(called_node)
+            if not called_element:
+                continue
+
+            # Check for infinite recursion using caller-callee pairs
+            call_pair = (element.id, called_element.id)
+            if call_pair in current_path:
+                continue
+
+            new_path = current_path + [call_pair]
+
+            if called_element.id in created_folders:
+                # Folder already exists, create edge reference
+                existing_child_folder = created_folders[called_element.id]
+                edge = edges.VirtualContainsEdge(
+                    _from=parent_folder.id, _to=existing_child_folder.id
+                )
+                db.virtual_contains_edges.create(edge)
+            else:
+                child_folder = self._create_child_folder(
+                    parent_folder, called_element, call_edge.order
+                )
+                created_folders[called_element.id] = child_folder
+
+            # Always recurse to process dependencies
+            if called_element.id in created_folders:
+                folder = created_folders[called_element.id]
+                folder._create_folder_recursively(
+                    called_element, new_path, created_folders
+                )
 
     def _create_folder_recursively(
         self,
@@ -323,7 +380,8 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
 
             # Always recurse to process dependencies
             if called_element.id in created_folders:
-                created_folders[called_element.id]._create_folder_recursively(
+                folder = created_folders[called_element.id]
+                folder._create_folder_recursively(
                     called_element, new_path, created_folders
                 )
 
@@ -359,7 +417,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             qname=f"{parent_folder.qname}.{element.name}",
             name=element.name,
             description=element.model.description,
-            call_order=call_order
+            call_order=call_order,
         )
         created_child_node = db.nodes.create(child_folder_node)
         edge = edges.VirtualContainsEdge(
