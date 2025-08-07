@@ -18,13 +18,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import type { NodeType } from "@/features/Dashboard/service/useProject";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
-type NodeType = "file" | "folder";
 
 interface CreateVirtualNodeDialogProps {
   parentId: string;

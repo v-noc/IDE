@@ -27,8 +27,6 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
     handleExpand,
     handleRemove,
     handleEdit,
-    handleCreateFile,
-    handleCreateFolder,
     handleCreatePath,
     closeCreateDialog,
     closeEditDialog,
@@ -43,8 +41,6 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
         onExpand={handleExpand}
         onRemove={handleRemove}
         onEdit={node.isVirtual ? handleEdit : undefined}
-        onCreateFile={handleCreateFile}
-        onCreateFolder={handleCreateFolder}
         onCreatePath={handleCreatePath}
       >
         <NodeContent

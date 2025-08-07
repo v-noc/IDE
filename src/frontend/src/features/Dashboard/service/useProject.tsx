@@ -1,11 +1,20 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
+
+export type NodeType =
+  | "folder"
+  | "file"
+  | "project"
+  | "function"
+  | "class"
+  | "package"
+  | "virtual_folder";
 export interface ProjectTreeResponse {
   key: string;
   name: string;
   path?: string;
-  node_type: string;
+  node_type: NodeType;
   label?: string;
   children: ProjectTreeResponse[];
   isVirtual?: boolean;
@@ -16,14 +25,14 @@ export interface ProjectTreeResponse {
 export interface VirtualFolderResponse {
   key: string;
   name: string;
-  node_type: string;
+  node_type: NodeType;
   qname: string;
   description?: string | null;
   link_to?: {
     id: string;
     name: string;
     qname: string;
-    node_type: string;
+    node_type: NodeType;
   } | null;
   children: VirtualFolderResponse[];
   call_order?: number | null;
@@ -121,7 +130,7 @@ const createVirtualFolder = async (
   description?: string
 ): Promise<VirtualFolderResponse> => {
   const response = await api(
-    `${API_ROUTES.VIRTUAL_FOLDER}${projectKey}/virtual-folder`,
+    `${API_ROUTES.PROJECT}${projectKey}/virtual-folder`,
     {
       method: "POST",
       headers: {
@@ -142,7 +151,7 @@ const updateVirtualFolder = async (
   data: VirtualFolderUpdateRequest
 ): Promise<VirtualFolderResponse> => {
   const response = await api(
-    `${API_ROUTES.VIRTUAL_FOLDER}${projectKey}/virtual-folder/${folderKey}`,
+    `${API_ROUTES.PROJECT}${projectKey}/virtual-folder/${folderKey}`,
     {
       method: "PUT",
       headers: {
@@ -159,7 +168,7 @@ const getVirtualFolder = async (
   folderKey: string
 ): Promise<VirtualFolderResponse> => {
   const response = await api(
-    `${API_ROUTES.VIRTUAL_FOLDER}${projectKey}/virtual-folder/${folderKey}`
+    `${API_ROUTES.PROJECT}${projectKey}/virtual-folder/${folderKey}`
   );
   return response as VirtualFolderResponse;
 };
@@ -170,7 +179,7 @@ const addCodeElementToVirtualFolder = async (
   data: AddCodeElementRequest
 ): Promise<VirtualFolderResponse> => {
   const response = await api(
-    `${API_ROUTES.VIRTUAL_FOLDER}${projectKey}/virtual-folder/${folderKey}/add-code-element`,
+    `${API_ROUTES.PROJECT}${projectKey}/virtual-folder/${folderKey}/add-code-element`,
     {
       method: "POST",
       headers: {
@@ -188,7 +197,7 @@ const removeCodeElementFromVirtualFolder = async (
   elementKey: string
 ): Promise<void> => {
   const response = await api(
-    `${API_ROUTES.VIRTUAL_FOLDER}${projectKey}/virtual-folder/${folderKey}/code-element/${elementKey}`,
+    `${API_ROUTES.PROJECT}${projectKey}/virtual-folder/${folderKey}/code-element/${elementKey}`,
     {
       method: "DELETE",
     }
@@ -219,7 +228,7 @@ const createPathForElement = async (
   data: { name: string; description: string }
 ): Promise<VirtualFolderResponse> => {
   const response = await api(
-    `${API_ROUTES.VIRTUAL_FOLDER}${projectKey}/virtual-folder/create-path/${elementKey}`,
+    `${API_ROUTES.PROJECT}${projectKey}/virtual-folder/create-path/${elementKey}`,
     {
       method: "POST",
       body: data as unknown as BodyInit,
@@ -252,10 +261,7 @@ const deleteVirtualFolder = async (
   projectKey: string,
   folderKey: string
 ): Promise<void> => {
-  await api(
-    `${API_ROUTES.VIRTUAL_FOLDER}${projectKey}/virtual-folder/${folderKey}`,
-    {
-      method: "DELETE",
-    }
-  );
+  await api(`${API_ROUTES.PROJECT}${projectKey}/virtual-folder/${folderKey}`, {
+    method: "DELETE",
+  });
 };

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import type { NodeType, ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
 
 const uuidv4 = () => new Date().getTime().toString() + Math.random().toString(36).substr(2, 9);
 
@@ -12,7 +12,7 @@ interface ProjectState {
     expandedNodeIds: string[];
     toggleNodeExpansion: (nodeId: string) => void;
     virtualFolderStructures: ProjectTreeResponse[];
-    addVirtualNode: (parentId: string, name: string, type: "file" | "folder") => void;
+    addVirtualNode: (parentId: string, name: string, type: NodeType) => void;
     projectData: ProjectTreeResponse | null;
     setProjectData: (data: ProjectTreeResponse) => void;
 }

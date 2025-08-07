@@ -1,6 +1,6 @@
-import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
 import { useState } from "react";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import type { NodeType, ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
 
 export const useTreeNode = (node: ProjectTreeResponse) => {
   const {
@@ -16,7 +16,7 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
   const [isCreatePathDialogOpen, setCreatePathDialogOpen] = useState(false);
   const [nodeTypeToCreate, setNodeTypeToCreate] = useState<
-    "file" | "folder" | "path"
+    NodeType
   >("file");
 
   const isOpen = expandedNodeIds.includes(node.key);
@@ -45,7 +45,7 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   };
 
   const handleRemove = () => {
-    console.log("Remove:", node.name);
+
   };
 
   const handleEdit = () => {
