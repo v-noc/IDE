@@ -269,9 +269,9 @@ def test_delete_virtual_folder_cascade(sample_project_path):
     final_edge_count = len(list(collections.virtual_contains_edges.find({})))
     assert final_edge_count == 1
 
-    # Check that links_to edges were also deleted. 4 folders deleted, each has one link.
+    # Check that links_to edges were also deleted. 5 folders deleted, each has one link.
     final_links_to_count = len(list(collections.links_to_edges.find({})))
-    assert final_links_to_count == initial_links_to_count - 4
+    assert final_links_to_count == initial_links_to_count - 5
    
    
   
