@@ -264,3 +264,49 @@ def remove_code_element_from_virtual_folder(
             )
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.post(
+    "/{project_key}/virtual-folder/create-path/{element_key}",
+    
+)
+def create_path_for_element(
+    project_key: str,
+    element_key: str,
+    request: VirtualFolderCreate,
+    
+    manager: CodeGraphManager = Depends(get_manager),
+):
+    """
+    Creates a path for a code element.
+    """
+    project = manager.get_project(project_key)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    element_node = manager.get_node(element_key)
+    if not element_node:
+        raise HTTPException(status_code=404, detail="Code element not found")
+    
+    if element_node.node_type not in ['function', 'class']:
+        raise HTTPException(
+            status_code=400,
+            detail="Only functions and classes can be added."
+        )
+    
+    element = (
+        Function(element_node) if element_node.node_type == 'function' 
+        else Class(element_node)
+    )
+    
+    try:
+        folder = project.add_virtual_folder(
+            request.name, request.description
+        )
+        new_folder = folder.create_folder_for_element(
+            element, link_directly=True
+        )
+        return new_folder.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=409, detail=str(e))
+

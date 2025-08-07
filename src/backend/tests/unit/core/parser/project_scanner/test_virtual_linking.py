@@ -49,8 +49,8 @@ def test_virtual_folder_structure_from_code_element(sample_project_path):
 
     folder.create_folder_for_element(function)
     folder2.create_folder_for_element(class_)
-    data2 = folder2.get_descendant_tree()
-    pprint(data2)
+    # data2 = folder2.get_descendant_tree()
+    # pprint(data2)
     data = folder.get_descendant_tree()
     
     _assert_folder_structure(data, 'register', 'sample_project', 1)
@@ -100,6 +100,28 @@ def test_virtual_folder_structure_from_code_element(sample_project_path):
     assert 'utils' in import_qnames
 
 
+def test_link_directly_to_virtual_folder(sample_project_path):
+    """
+    Tests that a code element can be linked directly to a virtual folder.
+    """
+    scanner = ProjectScanner(sample_project_path)
+    scanner.scan()
+
+    manager = CodeGraphManager()
+    project = manager.get_all_projects()[0]
+
+    function_doc = collections.nodes.find_one({"qname": "main.start_app"})
+    assert function_doc, "Could not find function 'main.start_app'"
+    function = Function(function_doc)
+
+    folder = project.add_virtual_folder(folder_name="direct_link_test")
+    folder.create_folder_for_element(function, link_directly=True)
+    data = folder.get_descendant_tree()
+
+    _assert_folder_structure(data, 'direct_link_test', 'sample_project', 3)
+    _assert_linked_element(data, 'main.start_app')
+
+
 def test_main_app_virtual_folder(sample_project_path):
     """
     Tests the structure of the virtual folder generated for the MainApp class.
@@ -129,7 +151,9 @@ def test_main_app_virtual_folder(sample_project_path):
     main_app_class_data = main_app_folder['link_to']
     assert main_app_class_data['node_type'] == 'class'
     assert len(main_app_class_data['methods']) == 2
-    method_names = {method['name'] for method in main_app_class_data['methods']}
+    method_names = {
+        method['name'] for method in main_app_class_data['methods']
+    }
     assert method_names == {'__init__', 'run'}
 
     user_folder = main_app_folder['children'][0]

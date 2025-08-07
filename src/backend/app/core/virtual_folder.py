@@ -244,15 +244,24 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             raise
 
     def create_folder_for_element(
-        self, element: Union[Function, Class]
-    ) -> 'VirtualFolder':
+        self,
+        element: Union[Function, Class],
+        link_directly: bool = False,
+    ) -> "VirtualFolder":
         """
         Creates a new virtual folder under `self`, names it after the element,
         links it to the element, and recursively creates folders for its
         dependencies using the actual call order from CallEdges.
+        If `link_directly` is True, it links the element directly to `self`
+        and adds its dependencies as children of `self`.
         """
-        created_folders = {}  # element_id -> VirtualFolder
-        current_path = []  # (caller_id, callee_id) pairs
+        current_path = []
+        created_folders = {}
+
+        if link_directly:
+            self.link_to_code_element(element.id)
+            created_folders[element.id] = self
+
         return self._create_folder_recursively(
             element, current_path, created_folders
         )
@@ -338,8 +347,11 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             return sorted(call_edges, key=lambda edge: edge.order)
 
     def _create_child_folder(
-        self, parent_folder: 'VirtualFolder', element: Union[Function, Class],
-        call_order: int) -> 'VirtualFolder':
+        self,
+        parent_folder: "VirtualFolder",
+        element: Union[Function, Class],
+        call_order: int,
+    ) -> "VirtualFolder":
         """
         Creates, links, and returns a new child virtual folder.
         """
