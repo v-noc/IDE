@@ -16,11 +16,8 @@ def test_create_virtual_folder(client: TestClient, manager: CodeGraphManager):
 
     # Create root virtual folder
     response = client.post(
-        f"/api/v1/{project.key}/virtual-folder",
-        json={
-            "name": "root_folder",
-            "description": "This is a root folder."
-        }
+        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder",
+        json={"name": "root_folder", "description": "This is a root folder."},
     )
     assert response.status_code == 201
     data = response.json()
@@ -30,7 +27,7 @@ def test_create_virtual_folder(client: TestClient, manager: CodeGraphManager):
 
     # Create child virtual folder
     response = client.post(
-        f"/api/v1/{project.key}/virtual-folder",
+        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder",
         json={
             "name": "child_folder",
             "description": "This is a child folder.",
@@ -52,12 +49,13 @@ def test_update_virtual_folder(client: TestClient, manager: CodeGraphManager):
     )
     folder = project.add_virtual_folder(folder_name="original_name")
 
+    url = (
+        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"{folder.key}"
+    )
     response = client.put(
-        f"/api/v1/{project.key}/virtual-folder/{folder.key}",
-        json={
-            "name": "updated_name",
-            "description": "Updated description."
-        }
+        url,
+        json={"name": "updated_name", "description": "Updated description."},
     )
     assert response.status_code == 200
     data = response.json()
@@ -79,7 +77,10 @@ def test_get_virtual_folder_tree(
     root_folder.add_virtual_folder(folder_name="child2")
     child1.add_virtual_folder(folder_name="grandchild")
 
-    url = f"/api/v1/{project.key}/virtual-folder/{root_folder.key}"
+    url = (
+        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"{root_folder.key}"
+    )
     response = client.get(url)
     assert response.status_code == 200
     data = response.json()
@@ -116,21 +117,57 @@ def test_add_code_element(
     assert function_doc, "Function 'main.start_app' not found"
     
     # Add code element
+    url = (
+        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"{folder.key}/add-code-element"
+    )
     add_response = client.post(
-        f"/api/v1/{project.key}/virtual-folder/{folder.key}/add-code-element",
-        json={
-            "element_id": function_doc.id,
-            "parent_folder_key": folder.key
-        }
+        url,
+        json={"element_id": function_doc.id, "parent_folder_key": folder.key},
     )
     assert add_response.status_code == 201
     
     # Verify it was added
-    get_response = client.get(
-        f"/api/v1/{project.key}/virtual-folder/{folder.key}"
+    url = (
+        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"{folder.key}"
     )
+    get_response = client.get(url)
     data = get_response.json()
     assert len(data['children']) == 1
     assert data['children'][0]['link_to']['qname'] == 'main.start_app'
    
 
+def test_create_path_for_element(
+    client: TestClient, manager: CodeGraphManager, sample_project_path
+):
+    from app.core.parser.project_scanner import ProjectScanner
+    from app.db import collections
+    
+    scanner = ProjectScanner(sample_project_path)
+    scanner.scan()
+    project = manager.get_all_projects()[0]
+    function_doc = collections.nodes.find_one({"qname": "main.start_app"})
+    assert function_doc, "Function 'main.start_app' not found"
+
+    url = (
+        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"create-path/{function_doc.key}"
+    )
+    response = client.post(
+        url,
+        json={"name": "test_path", "description": "This is a test path."},
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+
+    assert data['name'] == 'test_path'
+    assert data['link_to']['qname'] == 'main.start_app'
+    assert len(data['children']) > 0
+
+    child_names = {child['name'] for child in data['children']}
+    assert 'MainApp' in child_names
+    assert 'helper_function' in child_names
+    
+    
+    
