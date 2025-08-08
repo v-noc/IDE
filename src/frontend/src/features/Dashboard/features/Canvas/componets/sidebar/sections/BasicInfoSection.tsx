@@ -7,10 +7,12 @@ import {
 } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import IconSelector from "@/components/IconSelector";
 
 export type BasicInfoData = {
   name: string;
   description: string;
+  icon?: string;
 };
 
 export type BasicInfoSectionProps = {
@@ -58,6 +60,15 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
               }
               placeholder="Enter description"
               rows={5}
+            />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel>Icon</FieldLabel>
+            <IconSelector
+              value={value.icon}
+              onChange={(icon) => onChange({ ...value, icon })}
+              className="w-full justify-start"
+              placeholder="Select icon..."
             />
           </div>
         </AccordionContent>

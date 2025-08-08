@@ -13,7 +13,11 @@ export type ConfigSidebarContentProps = {
   defaultTab?: "basic" | "customization";
 };
 
-const defaultBasic: BasicInfoData = { name: "", description: "" };
+const defaultBasic: BasicInfoData = {
+  name: "",
+  description: "",
+  icon: undefined,
+};
 const defaultCustom: CustomizationData = {
   iconColor: "#000000",
   nameColor: "#000000",
