@@ -2,13 +2,48 @@
 Pydantic models for the 'properties' field of a Node, based on NodeType.
 """
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from .shared import NodePosition
+
+
+class ThemeConfig(BaseModel):
+    navbarColor: str = Field(
+        ..., 
+        description="The color of the navbar."
+    )
+    leftSidebarColor: str = Field(
+        ..., 
+        description="The color of the left sidebar."
+    )
+    rightSidebarColor: str = Field(
+        ..., 
+        description="The color of the right sidebar."
+    )
+    backgroundColor: str = Field(
+        ..., 
+        description="The color of the background."
+    )
+    
+    textColor: str = Field(
+        ..., 
+        description="The color of the text."
+    )
+    iconColor: str = Field(
+        ..., 
+        description="The color of the icon."
+    )
+    cardColor: str = Field(
+        ..., 
+        description="The color of the card."
+    )
 
 
 class BaseProperties(BaseModel):
     """A base model for all properties to ensure consistency."""
-    pass
+    metaData: Optional[ThemeConfig] = Field(
+        None, 
+        description="The metadata of the layout."
+    )
 
 
 class ProjectProperties(BaseProperties):
@@ -67,6 +102,7 @@ class PackageProperties(BaseProperties):
         description="List of specific imports from this package "
                     "(e.g., ['BaseModel', 'Field'])"
     )
+
 
 class VirtualFolderProperties(BaseProperties):
     pass

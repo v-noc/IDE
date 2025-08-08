@@ -198,11 +198,62 @@ def test_delete_virtual_folder_recursive(
     assert not collections.nodes.get(grandchild.key)
 
     # Verify all edges are deleted
-    assert not collections.virtual_contains_edges.find_one({"_from": root.id})
-    assert not collections.virtual_contains_edges.find_one({"_from": child1.id})
+    assert not collections.virtual_contains_edges.find_one({
+        "_from": root.id
+    })
+    assert not collections.virtual_contains_edges.find_one({
+        "_from": child1.id
+    })
     assert not collections.links_to_edges.find_one({"_from": root.id})
     assert not collections.links_to_edges.find_one({"_from": child1.id})
     assert not collections.links_to_edges.find_one({"_from": grandchild.id})
+
+
+def test_update_virtual_folder_theme(
+    client: TestClient,
+    manager: CodeGraphManager,
+):
+    project = manager.create_project(
+        name="Theme Test",
+        path="/tmp/theme_test",
+    )
+    folder = project.add_virtual_folder(folder_name="vf")
+
+    theme = {
+        "navbarColor": "#111111",
+        "leftSidebarColor": "#222222",
+        "rightSidebarColor": "#333333",
+        "backgroundColor": "#444444",
+        "textColor": "#555555",
+        "iconColor": "#666666",
+        "cardColor": "#777777",
+    }
+
+    url = f"/api/v1/core/{folder.key}/update-node-theme"
+    response = client.post(url, json=theme)
+    assert response.status_code == 200, response.text
+
+    data = response.json()
+    assert data["properties"]["metaData"]["navbarColor"] == "#111111"
+    assert data["properties"]["metaData"]["leftSidebarColor"] == "#222222"
+
+
+def test_update_virtual_folder_icon(
+    client: TestClient,
+    manager: CodeGraphManager,
+):
+    project = manager.create_project(
+        name="Icon Test",
+        path="/tmp/icon_test",
+    )
+    folder = project.add_virtual_folder(folder_name="vf")
+
+    url = f"/api/v1/core/{folder.key}/update-icon"
+    response = client.post(url, json={"icon": "folder-star"})
+    assert response.status_code == 200, response.text
+
+    data = response.json()
+    assert data["icon"] == "folder-star"
     
     
     

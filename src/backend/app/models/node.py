@@ -10,6 +10,8 @@ from .properties import (
     FunctionProperties,
     ClassProperties,
     PackageProperties,
+    VirtualFolderProperties,
+    VirtualFileProperties,
 )
 
 # ==============================================================================
@@ -27,6 +29,7 @@ class ProjectNode(BaseNode):
     qname: str
     description: Optional[str] = None
     properties: ProjectProperties
+    icon: Optional[str] = None
 
 
 class FolderNode(BaseNode):
@@ -35,7 +38,7 @@ class FolderNode(BaseNode):
     qname: str
     description: Optional[str] = None
     properties: FolderProperties
-
+    icon: Optional[str] = None
 
 class FileNode(BaseNode):
     node_type: Literal["file"] = "file"
@@ -43,7 +46,7 @@ class FileNode(BaseNode):
     qname: str
     description: Optional[str] = None
     properties: FileProperties
-
+    icon: Optional[str] = None
 
 class FunctionNode(BaseNode):
     node_type: Literal["function"] = "function"
@@ -51,7 +54,7 @@ class FunctionNode(BaseNode):
     qname: str
     description: Optional[str] = None
     properties: FunctionProperties
-
+    icon: Optional[str] = None
 
 class ClassNode(BaseNode):
     node_type: Literal["class"] = "class"
@@ -59,7 +62,7 @@ class ClassNode(BaseNode):
     qname: str
     description: Optional[str] = None
     properties: ClassProperties
-
+    icon: Optional[str] = None
 
 class PackageNode(BaseNode):
     node_type: Literal["package"] = "package"
@@ -67,7 +70,7 @@ class PackageNode(BaseNode):
     qname: str
     description: Optional[str] = None
     properties: PackageProperties
-
+    icon: Optional[str] = None
 
 class VirtualFolderNode(BaseNode):
     node_type: Literal["virtual_folder"] = "virtual_folder"
@@ -75,15 +78,16 @@ class VirtualFolderNode(BaseNode):
     qname: str
     description: Optional[str] = None
     call_order: Optional[int] = None
-    # properties: VirtualFolderProperties
-
+    properties: Optional[VirtualFolderProperties] = None
+    icon: Optional[str] = None
 
 class VirtualFileNode(BaseNode):
     node_type: Literal["virtual_file"] = "virtual_file"
     name: str
     qname: str
     description: Optional[str] = None
-    # properties: VirtualFileProperties
+    properties: Optional[VirtualFileProperties] = None
+    icon: Optional[str] = None
 
 
 # ==============================================================================

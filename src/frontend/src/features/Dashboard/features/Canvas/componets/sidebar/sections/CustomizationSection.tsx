@@ -14,6 +14,9 @@ export type CustomizationData = {
   navbarColor?: string;
   leftSidebarColor?: string;
   rightSidebarColor?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  fontSize?: number;
 };
 
 export type CustomizationSectionProps = {
@@ -68,26 +71,9 @@ const CustomizationSection: React.FC<CustomizationSectionProps> = ({
             onChange={(v) => update({ navbarColor: v })}
           />
           <ColorRow
-            label="Left sidebar color"
-            value={value.leftSidebarColor ?? "#ffffff"}
-            onChange={(v) => update({ leftSidebarColor: v })}
-          />
-          <ColorRow
-            label="Right sidebar color"
-            value={value.rightSidebarColor ?? "#ffffff"}
-            onChange={(v) => update({ rightSidebarColor: v })}
-          />
-        </AccordionContent>
-      </AccordionItem>
-      <AccordionItem value="layout2" className="!border rounded-md">
-        <AccordionTrigger className="px-3 py-2 text-sm font-medium">
-          Layout
-        </AccordionTrigger>
-        <AccordionContent className="space-y-3 p-3 bg-muted/20">
-          <ColorRow
-            label="Navbar color"
-            value={value.navbarColor ?? "#ffffff"}
-            onChange={(v) => update({ navbarColor: v })}
+            label="Background color"
+            value={value.backgroundColor ?? "#ffffff"}
+            onChange={(v) => update({ backgroundColor: v })}
           />
           <ColorRow
             label="Left sidebar color"
