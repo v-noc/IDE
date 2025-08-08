@@ -8,6 +8,7 @@ export interface ThemeConfig {
     textColor: string;
     iconColor: string;
     cardColor: string;
+    nameColor: string;
 }
 
 interface ThemeState {

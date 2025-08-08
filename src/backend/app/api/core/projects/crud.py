@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Dict, Any
+import json
+from typing import List, Dict, Any, Optional
 from app.core.manager import CodeGraphManager
 
 from pydantic import BaseModel
@@ -28,6 +29,8 @@ class ProjectResponse(BaseModel):
 class ProjectTreeResponse(BaseModel):
     key: str
     name: str
+    icon: Optional[str]
+    description: Optional[str]
     node_type: str
     qname: str
     properties: dict
@@ -43,10 +46,13 @@ def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
         children = [
             map_tree_to_response(child) for child in tree_data["children"]
         ]
-
+    with open("tree_data.json", "w") as f:
+        json.dump(tree_data, f)
     return ProjectTreeResponse(
         key=tree_data.get("_key", tree_data.get("key", "")),
         name=tree_data.get("name", ""),
+        icon=tree_data.get("icon", ""),
+        description=tree_data.get("description", ""),
         node_type=tree_data.get("node_type", ""),
         qname=tree_data.get("qname", ""),
         properties=tree_data.get("properties", {}),

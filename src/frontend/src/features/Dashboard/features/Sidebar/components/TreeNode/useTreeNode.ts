@@ -7,8 +7,8 @@ import { toast } from "sonner";
 
 export const useTreeNode = (node: ProjectTreeResponse) => {
   const {
-    selectedNode,
-    setSelectedNode,
+    selectedNodeId,
+    setSelectedNodeId,
     activeNodeId,
     expandedNodeIds,
     toggleNodeExpansion,
@@ -27,7 +27,7 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   >("file");
 
   const isOpen = expandedNodeIds.includes(node.key);
-  const isSelected = selectedNode?.key === node.key;
+  const isSelected = selectedNodeId === node.key;
   const isActive = activeNodeId === node.key;
   const hasChildren = node.children && node.children.length > 0;
 
@@ -37,7 +37,7 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   };
 
   const handleSelectNode = () => {
-    setSelectedNode(node);
+    setSelectedNodeId(node.key);
   };
 
   const handleFocus = () => {

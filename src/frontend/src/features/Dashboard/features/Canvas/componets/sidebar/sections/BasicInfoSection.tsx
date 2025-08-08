@@ -8,12 +8,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import IconSelector from "@/components/IconSelector";
-
-export type BasicInfoData = {
-  name: string;
-  description: string;
-  icon?: string;
-};
+import type { BasicInfoData } from "../hooks/useConfigSidebarForm";
 
 export type BasicInfoSectionProps = {
   value: BasicInfoData;
