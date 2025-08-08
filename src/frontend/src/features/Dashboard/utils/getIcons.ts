@@ -3,17 +3,17 @@ import type { NodeType } from "../service/useProject";
 const getIcons = (nodeType: NodeType) => {
   switch (nodeType) {
     case "folder":
-      return "Folder";
+      return "FaFolder";
     case "file":
-      return "File";
+      return "FaFile";
     case "project":
-      return "FolderRoot";
+      return "FaThLarge";
     case "function":
-      return "Function";
+      return "TbFunction";
     case "class":
-      return "Table";
+      return "FaTable";
     case "package":
-      return "Package";
+      return "FiPackage";
   }
 };
 

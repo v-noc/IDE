@@ -1,6 +1,9 @@
 import { ResizableHandle, ResizablePanel } from "@/components/ui/resizable";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
+import { useThemeStore } from "../store/useThemeStore";
+
+import useProjectStore from "../store/useProjectStore";
 
 const Layout = ({
   main,
@@ -14,21 +17,49 @@ const Layout = ({
   rightSidebar?: React.ReactNode;
 }) => {
   const [isRightOpen, setIsRightOpen] = useState(true);
+  const { theme, setTheme } = useThemeStore();
+  const { projectData } = useProjectStore();
+
+  useEffect(() => {
+    if (projectData?.theme) {
+      setTheme(projectData.theme);
+    }
+  }, [projectData, setTheme]);
+
+  const style = theme
+    ? ({
+        "--navbar-color": theme.navbarColor,
+        "--left-sidebar-color": theme.leftSidebarColor,
+        "--right-sidebar-color": theme.rightSidebarColor,
+        "--background-color": theme.backgroundColor,
+        "--text-color": theme.textColor,
+        "--icon-color": theme.iconColor,
+        "--card-color": theme.cardColor,
+      } as React.CSSProperties)
+    : {};
 
   return (
-    <div className="relative flex min-h-screen max-h-screen bg-gray-100 w-full h-full">
+    <div
+      className="relative flex min-h-screen max-h-screen w-full h-full"
+      style={style}
+    >
       {/* Left Sidebar */}
-      {/* <aside className="w-64 max-h-screen overflow-y-auto  p-4 hidden md:block"> */}
-      <ResizablePanel defaultSize={20}>{leftSidebar}</ResizablePanel>
-      {/* </aside> */}
+      <ResizablePanel
+        defaultSize={20}
+        className="bg-[var(--left-sidebar-color)]"
+      >
+        {leftSidebar}
+      </ResizablePanel>
       <ResizableHandle withHandle />
       {/* Main Content Area */}
       <ResizablePanel
         defaultSize={rightSidebar ? 60 : 80}
-        className="flex-1 flex flex-col w-full"
+        className="flex-1 flex flex-col w-full bg-[var(--background-color)]"
       >
         {/* Navbar */}
-        <nav className="p-4 border-b shadow-sidebar">{navbar}</nav>
+        <nav className="p-4 border-b shadow-sidebar bg-[var(--navbar-color)]">
+          {navbar}
+        </nav>
 
         {/* Content */}
         <main className="flex-1 min-h-0 h-full">{main}</main>
@@ -38,7 +69,12 @@ const Layout = ({
       {rightSidebar && isRightOpen && (
         <>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={20} minSize={12} collapsible>
+          <ResizablePanel
+            defaultSize={20}
+            minSize={12}
+            collapsible
+            className="bg-[var(--right-sidebar-color)]"
+          >
             {rightSidebar}
           </ResizablePanel>
         </>

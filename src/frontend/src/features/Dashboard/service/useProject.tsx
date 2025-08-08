@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
+import type { ThemeConfig } from "../store/useThemeStore";
 
 export type NodeType =
   | "folder"
@@ -16,10 +17,12 @@ export interface ProjectTreeResponse {
   path?: string;
   node_type: NodeType;
   label?: string;
+  icon?: string;
   children: ProjectTreeResponse[];
   isVirtual?: boolean;
   parentId?: string | null;
   description?: string | null;
+  theme?: ThemeConfig;
 }
 
 export interface VirtualFolderResponse {
@@ -36,6 +39,8 @@ export interface VirtualFolderResponse {
   } | null;
   children: VirtualFolderResponse[];
   call_order?: number | null;
+  icon?: string;
+  theme?: ThemeConfig;
   imports?: Array<{
     _key: string;
     id: string;
