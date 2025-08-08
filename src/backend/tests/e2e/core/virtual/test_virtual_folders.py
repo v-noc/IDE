@@ -247,7 +247,7 @@ def test_update_virtual_folder_icon(
         path="/tmp/icon_test",
     )
     folder = project.add_virtual_folder(folder_name="vf")
-
+    
     url = f"/api/v1/core/{folder.key}/update-icon"
     response = client.post(url, json={"icon": "folder-star"})
     assert response.status_code == 200, response.text
