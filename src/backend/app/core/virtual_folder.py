@@ -68,6 +68,14 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
 
         children = [child.to_dict() for child in self.get_virtual_folders()]
 
+        theme = None
+        if self.model.properties:
+            theme = (
+                self.model.properties.metaData.model_dump()
+                if self.model.properties.metaData
+                else None
+            )
+
         return {
             "id": self.id,
             "key": self.key,
@@ -78,6 +86,8 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             "link_to": linked_element_data,
             "children": children,
             "call_order": getattr(self.model, 'call_order', None),
+            "theme": theme,
+            "icon": self.model.icon,
         }
 
     def delete(self) -> None:
@@ -217,13 +227,24 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
                     "id": import_edge.id,
                     "from_id": import_edge.from_id,
                     "to_id": import_edge.to_id,
-                    "from_parent_virtual_folder_id":
-                        from_vf.id if from_vf else None,
-                    "to_parent_virtual_folder_id":
-                        to_vf.id if to_vf else None,
-                    "alias": import_edge.alias or import_edge.target_symbol,
+                    "from_parent_virtual_folder_id": (
+                        from_vf.id if from_vf else None
+                    ),
+                    "to_parent_virtual_folder_id": (
+                        to_vf.id if to_vf else None
+                    ),
+                    "alias": (
+                        import_edge.alias or import_edge.target_symbol
+                    ),
                     "qname": import_edge.target_qname,
                 })
+        theme = None
+        if self.model.properties:
+            theme = (
+                self.model.properties.metaData.model_dump()
+                if self.model.properties.metaData
+                else None
+            )
 
         result = {
             "id": self.id,
@@ -234,6 +255,9 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             "node_type": self.node_type,
             "link_to": linked_element_data,
             "call_order": getattr(self.model, 'call_order', None),
+            
+            "icon": self.model.icon,
+            "theme": theme,
         }
 
         if imports_data:

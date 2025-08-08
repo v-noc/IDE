@@ -3,6 +3,7 @@ The Folder domain object.
 """
 from .base import DomainObject
 from .file import File
+from .code_elements import to_domain_element
 from ..models import node, edges, properties
 from ..db import collections as db
 from typing import Dict, Any
@@ -29,8 +30,22 @@ class Folder(DomainObject[node.FolderNode]):
     def key(self) -> str:
         return self.model.key
     
-
-
+    def to_dict(self) -> dict:
+        return {
+            "id": self.model.id,
+            "key": self.key,
+            "name": self.name,
+            "qname": self.model.qname,
+            "node_type": self.model.node_type,
+            "path": self.path,
+            "description": self.model.description,
+            "icon": self.model.icon,
+            "theme": (
+                self.model.properties.metaData.model_dump()
+                if self.model.properties.metaData
+                else None
+            ),
+        }
 
     def add_file(self, file_name: str, file_path: str) -> File:
         """Adds a new file to this folder."""
@@ -107,10 +122,40 @@ class Folder(DomainObject[node.FolderNode]):
     def get_descendant_tree(self) -> Dict[str, Any]:
         """
         Retrieves all descendants of this folder and formats them as a tree.
+        Ensures each node is serialized via its domain object's to_dict().
         """
         cursor = db.contains_edges.get_descendant_tree_query(self.id)
         
-        node_map = {self.id: {"node": self.model.model_dump(), "children": []}}
+        # Root node via domain serialization
+        node_map: Dict[str, Dict[str, Any]] = {
+            self.id: {"node": self.to_dict(), "children": []}
+        }
+
+        def serialize_node(node_data: dict) -> dict:
+            node_type = node_data.get("node_type")
+            if node_type == "folder":
+                model = node.FolderNode.model_validate(node_data)
+                return Folder(model).to_dict()
+            if node_type == "file":
+                model = node.FileNode.model_validate(node_data)
+                return File(model).to_dict()
+            if node_type in {"function", "class"}:
+                # Convert to corresponding domain element (Function/Class)
+                # and use its to_dict()
+                model_cls = (
+                    node.FunctionNode
+                    if node_type == "function"
+                    else node.ClassNode
+                )
+                model = model_cls.model_validate(node_data)
+                domain_element = to_domain_element(model)
+                return (
+                    domain_element.to_dict()
+                    if domain_element
+                    else node_data
+                )
+            # Fallback: return raw data if unknown
+            return node_data
         
         for item in cursor:
             node_data = item['vertex']
@@ -118,17 +163,20 @@ class Folder(DomainObject[node.FolderNode]):
             
             node_id = node_data['_id']
             if node_id not in node_map:
-                node_map[node_id] = {"node": node_data, "children": []}
-            
+                serialized = serialize_node(node_data)
+                # Children are built here, not nested calls
+                serialized["children"] = []
+                node_map[node_id] = {"node": serialized, "children": []}
+        
             if parent_id in node_map:
                 node_map[parent_id]["children"].append(node_map[node_id])
 
-        def build_tree(node_id):
+        def build_tree(node_id: str) -> Dict[str, Any]:
             node_info = node_map[node_id]
             return {
                 **node_info["node"],
                 "children": [
-                    build_tree(child["node"]["_id"]) 
+                    build_tree(child["node"]["id"])
                     for child in node_info["children"]
                 ]
             }

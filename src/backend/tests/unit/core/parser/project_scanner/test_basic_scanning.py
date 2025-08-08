@@ -41,8 +41,10 @@ def test_scan_project_declaration_pass(sample_project_path):
     # Files (4): main.py, utils.py, models/user.py, models/__init__, 
     # Classes (3): MainApp, UtilityClass, User
     # Functions (7): start_app, MainApp.run, MainApp.__init__, helper_function, 
-    #                UtilityClass.do_something, User.__init__, User.get_name
-    expected_nodes = 1 + 5 + 3 + 7 + 1
+    #                UtilityClass.do_something, User.__init__, User.get_name,
+    # Packages (1): pydantic
+    expected_nodes = 1 + 5 + 3 + 7 + 1 + 1
+    
     assert len(all_nodes) == expected_nodes, (
         "Should create the correct number of nodes"
     )

@@ -6,6 +6,7 @@ from .base import DomainObject
 from .file import File
 from .folder import Folder
 from .virtual_folder import VirtualFolder
+from .code_elements import to_domain_element
 from ..models import node, edges, properties
 from ..db import collections as db
 
@@ -30,6 +31,21 @@ class Project(DomainObject[node.ProjectNode]):
     @property
     def absolute_path(self) -> str:
         return self.path + self.name
+
+    def to_dict(self) -> dict:
+        return {
+            "key": self.key,
+            "name": self.name,
+            "node_type": self.model.node_type,
+            "icon": self.model.icon,
+            "theme": (
+                self.model.properties.metaData.model_dump()
+                if self.model.properties.metaData
+                else None
+            ),
+            "path": self.path,
+            "description": self.model.description,
+        }
 
     def update(self, name: str, path: str) -> None:
         """Updates the project's name and path."""
@@ -146,11 +162,38 @@ class Project(DomainObject[node.ProjectNode]):
     
     def get_descendant_tree(self) -> Dict[str, Any]:
         """
-        Retrieves all descendants of this folder and formats them as a tree.
+        Retrieves all descendants of this project and formats them as a tree.
+        Ensures each node is serialized via its domain object's to_dict().
         """
         cursor = db.contains_edges.get_descendant_tree_query(self.id)
         
-        node_map = {self.id: {"node": self.model.model_dump(by_alias=True), "children": []}}
+        def serialize_node(node_data: dict) -> dict:
+            node_type = node_data.get("node_type")
+            if node_type == "folder":
+                model = node.FolderNode.model_validate(node_data)
+                return Folder(model).to_dict()
+            if node_type == "file":
+                model = node.FileNode.model_validate(node_data)
+                return File(model).to_dict()
+            if node_type in {"function", "class"}:
+                model_cls = (
+                    node.FunctionNode
+                    if node_type == "function"
+                    else node.ClassNode
+                )
+                model = model_cls.model_validate(node_data)
+                domain_element = to_domain_element(model)
+                return (
+                    domain_element.to_dict()
+                    if domain_element
+                    else node_data
+                )
+            # Fallback
+            return node_data
+        
+        node_map = {
+            self.id: {"node": {**self.to_dict(), "id": self.id}, "children": []}
+        }
         
         for item in cursor:
             node_data = item['vertex']
@@ -158,19 +201,24 @@ class Project(DomainObject[node.ProjectNode]):
             
             node_id = node_data['_id']
             if node_id not in node_map:
-                node_map[node_id] = {"node": node_data, "children": []}
+                serialized = serialize_node(node_data)
+                # Guarantee children are built here
+                serialized["children"] = []
+                # Ensure id is present for build traversal
+                if "id" not in serialized:
+                    serialized["id"] = node_id
+                node_map[node_id] = {"node": serialized, "children": []}
             
             if parent_id in node_map:
                 node_map[parent_id]["children"].append(node_map[node_id])
             
-        def build_tree(node_id):
+        def build_tree(node_id: str) -> Dict[str, Any]:
             node_info = node_map[node_id]
             return {
                 **node_info["node"],
                 "children": [
-                    build_tree(child["node"]["_id"]) 
-                    for child in node_info["children"]
-                ]
+                    build_tree(child["node"]["id"]) for child in node_info["children"]
+                ],
             }
 
         return build_tree(self.id)

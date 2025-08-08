@@ -190,6 +190,7 @@ class TestDependencyResolver:
         class_node = Mock(spec=node.ClassNode)
         class_node.id = "user_class"
         class_node.name = "User"
+        class_node.qname = "User"
         
         package_node = Mock(spec=node.PackageNode)
         package_node.id = "requests_pkg"

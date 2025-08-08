@@ -53,11 +53,17 @@ class Function(DomainObject[node.FunctionNode]):
             "key": self.key,
             "id": self.id,
             "name": self.name,
+            "icon": self.model.icon,
             "qname": self.qname,
             "node_type": self.model.node_type,
             "position": self.position.model_dump(),
             "inputs": [input.model_dump() for input in self.inputs],
             "outputs": [output.model_dump() for output in self.outputs],
+            "theme": (
+                self.model.properties.metaData.model_dump()
+                if self.model.properties.metaData
+                else None
+            ),
             "parent_file": self.get_parent_file().to_dict()
         }
     
@@ -256,6 +262,12 @@ class Class(DomainObject[node.ClassNode]):
             "qname": self.qname,
             "node_type": self.model.node_type,
             "position": self.position.model_dump(),
+            "icon": self.model.icon,
+            "theme": (
+                self.model.properties.metaData.model_dump()
+                if self.model.properties.metaData
+                else None
+            ),
             "fields": [field.model_dump() for field in self.fields],
             "methods": [method.to_dict() for method in self.methods],
             "parent_file": self.get_parent_file().to_dict()

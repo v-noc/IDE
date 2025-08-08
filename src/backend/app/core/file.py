@@ -37,8 +37,16 @@ class File(DomainObject[node.FileNode]):
             "id": self.id,
             "key": self.key,
             "name": self.name,
+            "node_type": self.model.node_type,
+            "description": self.model.description,
             "qname": self.model.qname,
             "path": self.path,
+            "icon": self.model.icon,
+            "theme": (
+                self.model.properties.metaData.model_dump()
+                if self.model.properties.metaData
+                else None
+            ),
         }
 
     def get_project(self) -> 'Project':
@@ -155,9 +163,11 @@ class File(DomainObject[node.FileNode]):
                 )
             
             # Handle multi-line elements
-            has_end_line = (hasattr(position, 'end_line_no') and 
-                           position.end_line_no and 
-                           position.end_line_no > start_line)
+            has_end_line = (
+                hasattr(position, 'end_line_no') and
+                position.end_line_no and
+                position.end_line_no > start_line
+            )
             
             if has_end_line:
                 # Extract multi-line content
@@ -186,8 +196,11 @@ class File(DomainObject[node.FileNode]):
                 line_content = lines[start_line - 1]
                 
                 # If we have end position on same line, extract the range
-                has_end_col = (hasattr(position, 'end_col_offset') and 
-                              position.end_col_offset)
+                has_end_col = (
+                    hasattr(position, 'end_col_offset') and
+                    position.end_line_no == start_line and
+                    position.end_col_offset
+                )
                 
                 if has_end_col:
                     start = col_offset
