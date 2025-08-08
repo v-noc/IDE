@@ -45,7 +45,7 @@ def get_manager() -> CodeGraphManager:
 
 
 @router.post(
-    "/virtual-folder/add-element",
+    "/add-element",
     response_model=VirtualFolderResponse,
     status_code=201,
 )
@@ -86,7 +86,7 @@ def add_element_as_virtual_folder(
 
 
 @router.post(
-    "/virtual-folder",
+    "/",
     response_model=VirtualFolderResponse,
     status_code=201
 )
@@ -120,7 +120,7 @@ def create_virtual_folder(
 
 
 @router.put(
-    "/virtual-folder/{folder_key}",
+    "/{folder_key}",
     response_model=VirtualFolderResponse
 )
 def update_virtual_folder(
@@ -146,7 +146,7 @@ def update_virtual_folder(
 
 
 @router.get(
-    "/virtual-folders",
+    "/",
     response_model=List[VirtualFolderResponse],
 )
 def get_all_virtual_folders(
@@ -165,7 +165,7 @@ def get_all_virtual_folders(
 
 
 @router.get(
-    "/virtual-folder/{folder_key}",
+    "/{folder_key}",
     response_model=VirtualFolderResponse
 )
 def get_virtual_folder(
@@ -187,7 +187,7 @@ def get_virtual_folder(
     return folder.get_descendant_tree()
 
 
-@router.delete("/virtual-folder/{folder_key}", status_code=204)
+@router.delete("/{folder_key}", status_code=204)
 def delete_virtual_folder(
     project_key: str,
     folder_key: str,
@@ -209,7 +209,7 @@ def delete_virtual_folder(
 
 
 @router.post(
-    "/virtual-folder/{folder_key}/add-code-element",
+    "/{folder_key}/add-code-element",
     response_model=VirtualFolderResponse,
     status_code=201
 )
@@ -249,7 +249,7 @@ def add_code_element_to_virtual_folder(
 
 
 @router.delete(
-    "/virtual-folder/{folder_key}/code-element/{element_key}",
+    "/{folder_key}/code-element/{element_key}",
     status_code=204
 )
 def remove_code_element_from_virtual_folder(
@@ -292,7 +292,7 @@ def remove_code_element_from_virtual_folder(
 
 
 @router.post(
-    "/virtual-folder/create-path/{element_key}",
+    "/create-path/{element_key}",
     status_code=201,
 )
 def create_path_for_element(

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { NodeType, ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 export const useTreeNode = (node: ProjectTreeResponse) => {
   const {
@@ -10,7 +13,11 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     expandedNodeIds,
     toggleNodeExpansion,
     addVirtualNode,
+    projectData,
   } = useProjectStore();
+
+  const queryClient = useQueryClient();
+  const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.key || "");
 
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
@@ -44,8 +51,23 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     }
   };
 
-  const handleRemove = () => {
-
+  const handleRemove = async () => {
+    if (node.node_type !== "virtual_folder") return;
+    if (!projectData?.key) {
+      toast.error("No project selected");
+      return;
+    }
+    try {
+      await deleteVirtualFolderMutation.mutateAsync(node.key);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["projectTree", projectData.key] }),
+        queryClient.invalidateQueries({ queryKey: ["virtualFolders", projectData.key] }),
+      ]);
+      toast.success("Virtual folder removed");
+    } catch (error) {
+      console.error("Failed to remove virtual folder:", error);
+      toast.error("Failed to remove virtual folder");
+    }
   };
 
   const handleEdit = () => {

@@ -16,7 +16,7 @@ def test_create_virtual_folder(client: TestClient, manager: CodeGraphManager):
 
     # Create root virtual folder
     response = client.post(
-        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder",
+        f"/api/v1/project/{project.key}/virtual-folders",
         json={"name": "root_folder", "description": "This is a root folder."},
     )
     assert response.status_code == 201
@@ -27,7 +27,7 @@ def test_create_virtual_folder(client: TestClient, manager: CodeGraphManager):
 
     # Create child virtual folder
     response = client.post(
-        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder",
+        f"/api/v1/project/{project.key}/virtual-folders",
         json={
             "name": "child_folder",
             "description": "This is a child folder.",
@@ -50,7 +50,7 @@ def test_update_virtual_folder(client: TestClient, manager: CodeGraphManager):
     folder = project.add_virtual_folder(folder_name="original_name")
 
     url = (
-        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"/api/v1/project/{project.key}/virtual-folders/"
         f"{folder.key}"
     )
     response = client.put(
@@ -78,7 +78,7 @@ def test_get_virtual_folder_tree(
     child1.add_virtual_folder(folder_name="grandchild")
 
     url = (
-        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"/api/v1/project/{project.key}/virtual-folders/"
         f"{root_folder.key}"
     )
     response = client.get(url)
@@ -118,7 +118,7 @@ def test_add_code_element(
     
     # Add code element
     url = (
-        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"/api/v1/project/{project.key}/virtual-folders/"
         f"{folder.key}/add-code-element"
     )
     add_response = client.post(
@@ -129,7 +129,7 @@ def test_add_code_element(
     
     # Verify it was added
     url = (
-        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"/api/v1/project/{project.key}/virtual-folders/"
         f"{folder.key}"
     )
     get_response = client.get(url)
@@ -151,7 +151,7 @@ def test_create_path_for_element(
     assert function_doc, "Function 'main.start_app' not found"
 
     url = (
-        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/"
+        f"/api/v1/project/{project.key}/virtual-folders/"
         f"create-path/{function_doc.key}"
     )
     response = client.post(
@@ -188,7 +188,7 @@ def test_delete_virtual_folder_recursive(
 
     # Delete the root folder
     response = client.delete(
-        f"/api/v1/project/{project.key}/virtual-folders/virtual-folder/{root.key}"
+        f"/api/v1/project/{project.key}/virtual-folders/{root.key}"
     )
     assert response.status_code == 204
 
