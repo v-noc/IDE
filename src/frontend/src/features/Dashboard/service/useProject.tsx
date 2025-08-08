@@ -261,7 +261,7 @@ const deleteVirtualFolder = async (
   projectKey: string,
   folderKey: string
 ): Promise<void> => {
-  await api(`${API_ROUTES.PROJECT}${projectKey}/virtual-folder/${folderKey}`, {
+  await api(`/project/${projectKey}/virtual-folders/${folderKey}`, {
     method: "DELETE",
   });
 };
