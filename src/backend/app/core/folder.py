@@ -21,7 +21,7 @@ class Folder(DomainObject[node.FolderNode]):
     @property
     def path(self) -> str:
         return self.model.properties.path
-    
+
     @property
     def absolute_path(self) -> str:
         return self.path + self.name
@@ -29,9 +29,9 @@ class Folder(DomainObject[node.FolderNode]):
     @property
     def key(self) -> str:
         return self.model.key
-    
-    def to_dict(self) -> dict:
-        return {
+
+    def to_dict(self, with_dependency_tree: bool = False) -> dict:
+        data: dict[str, Any] = {
             "id": self.model.id,
             "key": self.key,
             "name": self.name,
@@ -47,11 +47,33 @@ class Folder(DomainObject[node.FolderNode]):
             ),
         }
 
+        if not with_dependency_tree:
+            return data
+
+        # Include direct children (subfolders and files). Recurse to build
+        # the nested structure when requested.
+        children_dicts: list[dict] = []
+
+        # Subfolders first (sorted by name for stability)
+        for subfolder in sorted(
+            self.get_folders(), key=lambda f: f.name.lower()
+        ):
+            children_dicts.append(subfolder.to_dict(with_dependency_tree=True))
+
+        # Files next (sorted by name for stability)
+        for file in sorted(
+            self.get_files(), key=lambda f: f.name.lower()
+        ):
+            children_dicts.append(file.to_dict(with_dependency_tree=True))
+
+        data["children"] = children_dicts
+        return data
+
     def add_file(self, file_name: str, file_path: str) -> File:
         """Adds a new file to this folder."""
         # Generate qname using the shared utility method
         file_qname = self._generate_child_qname(file_name, is_file=True)
-        
+
         # 1. Create the FileNode model
         file_node_model = node.FileNode(
             name=file_name,
@@ -78,7 +100,7 @@ class Folder(DomainObject[node.FolderNode]):
         """Adds a new sub-folder to this folder."""
         # Generate qname using the shared utility method
         folder_qname = self._generate_child_qname(folder_name)
-        
+
         # 1. Create the FolderNode model
         folder_node_model = node.FolderNode(
             name=folder_name,
@@ -125,7 +147,7 @@ class Folder(DomainObject[node.FolderNode]):
         Ensures each node is serialized via its domain object's to_dict().
         """
         cursor = db.contains_edges.get_descendant_tree_query(self.id)
-        
+
         # Root node via domain serialization
         node_map: Dict[str, Dict[str, Any]] = {
             self.id: {"node": self.to_dict(), "children": []}
@@ -156,11 +178,11 @@ class Folder(DomainObject[node.FolderNode]):
                 )
             # Fallback: return raw data if unknown
             return node_data
-        
+
         for item in cursor:
             node_data = item['vertex']
             parent_id = item['parent_id']
-            
+
             node_id = node_data['_id']
             if node_id not in node_map:
                 serialized = serialize_node(node_data)
@@ -176,9 +198,11 @@ class Folder(DomainObject[node.FolderNode]):
             return {
                 **node_info["node"],
                 "children": [
-                    build_tree(child["node"]["id"])
+                    build_tree(
+                        child["node"]["id"]
+                    )
                     for child in node_info["children"]
-                ]
+                ],
             }
 
         return build_tree(self.id)

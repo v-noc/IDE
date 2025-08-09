@@ -12,7 +12,7 @@ from ..models import node, edges
 from ..db import collections as db
 
 if TYPE_CHECKING:
-    from .file import File
+    from .file import File  # only for type hints
 
 CodeElement = Union["Function", "Class"]
 

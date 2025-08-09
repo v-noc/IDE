@@ -23,11 +23,11 @@ class Project(DomainObject[node.ProjectNode]):
     @property
     def path(self) -> str:
         return self.model.properties.path
-    
+
     @property
     def key(self) -> str:
         return self.model.key
-    
+
     @property
     def absolute_path(self) -> str:
         return self.path + self.name
@@ -50,7 +50,7 @@ class Project(DomainObject[node.ProjectNode]):
     def update(self, name: str, path: str) -> None:
         """Updates the project's name and path."""
         self.model.name = name
-        
+
         self.model.properties.path = path
         db.nodes.update(self.model)
 
@@ -58,7 +58,7 @@ class Project(DomainObject[node.ProjectNode]):
         """Adds a new file directly to the project's root."""
         # Generate qname using the shared utility method
         file_qname = self._generate_child_qname(file_name, is_file=True)
-        
+
         # 1. Create the FileNode model
         file_node_model = node.FileNode(
             name=file_name,
@@ -85,7 +85,7 @@ class Project(DomainObject[node.ProjectNode]):
         """Adds a new folder directly to the project's root."""
         # Generate qname using the shared utility method
         folder_qname = self._generate_child_qname(folder_name)
-        
+
         # 1. Create the FolderNode model
         folder_node_model = node.FolderNode(
             name=folder_name,
@@ -108,7 +108,9 @@ class Project(DomainObject[node.ProjectNode]):
         # 3. Return the hydrated Folder domain object
         return Folder(created_folder_node)
 
-    def add_virtual_folder(self, folder_name: str, description: Optional[str] = None) -> VirtualFolder:
+    def add_virtual_folder(
+        self, folder_name: str, description: Optional[str] = None
+    ) -> VirtualFolder:
         """Adds a new virtual folder directly to the project's root."""
         virtual_folder = node.VirtualFolderNode(
             name=folder_name,
@@ -122,13 +124,15 @@ class Project(DomainObject[node.ProjectNode]):
         )
         db.virtual_contains_edges.create(contains_edge_model)
         return VirtualFolder(created_virtual_folder)
-    
+
     def get_virtual_folders(self) -> list[VirtualFolder]:
-        """Retrieves all virtual folders directly contained within the project."""
+        """
+        Retrieves all virtual folders contained within the project.
+        """
         virtual_folder_nodes = db.nodes.find_related(
             start_node_id=self.id,
             edge_collection=db.virtual_contains_edges,
-            filter_by_type="virtual_folder"
+            filter_by_type="virtual_folder",
         )
         return [VirtualFolder(node) for node in virtual_folder_nodes]
 
@@ -150,7 +154,7 @@ class Project(DomainObject[node.ProjectNode]):
             limit=100,
         )
         return [Folder(node) for node in folder_nodes]
-    
+
     def get_folders(self) -> list[Folder]:
         """Retrieves all folders directly contained within the project."""
         folder_nodes = db.nodes.find_related(
@@ -159,14 +163,16 @@ class Project(DomainObject[node.ProjectNode]):
             filter_by_type="folder"
         )
         return [Folder(node) for node in folder_nodes]
-    
-    def get_descendant_tree(self) -> Dict[str, Any]:
+
+    def get_descendant_tree(
+        self, with_dependency_tree: bool = False
+    ) -> Dict[str, Any]:
         """
         Retrieves all descendants of this project and formats them as a tree.
         Ensures each node is serialized via its domain object's to_dict().
         """
         cursor = db.contains_edges.get_descendant_tree_query(self.id)
-        
+
         def serialize_node(node_data: dict) -> dict:
             node_type = node_data.get("node_type")
             if node_type == "folder":
@@ -184,40 +190,60 @@ class Project(DomainObject[node.ProjectNode]):
                 model = model_cls.model_validate(node_data)
                 domain_element = to_domain_element(model)
                 return (
-                    domain_element.to_dict()
+                    domain_element.to_dict(with_dependency_tree=True)
                     if domain_element
                     else node_data
                 )
             # Fallback
             return node_data
-        
+
         node_map = {
-            self.id: {"node": {**self.to_dict(), "id": self.id}, "children": []}
+            self.id: {
+                "node": {**self.to_dict(), "id": self.id},
+                "children": [],
+            }
         }
-        
+
         for item in cursor:
             node_data = item['vertex']
             parent_id = item['parent_id']
-            
+
             node_id = node_data['_id']
             if node_id not in node_map:
                 serialized = serialize_node(node_data)
                 # Guarantee children are built here
-                serialized["children"] = []
+                if not serialize_node(node_data).get("children"):
+                    serialized["children"] = []
                 # Ensure id is present for build traversal
                 if "id" not in serialized:
                     serialized["id"] = node_id
                 node_map[node_id] = {"node": serialized, "children": []}
-            
+
             if parent_id in node_map:
                 node_map[parent_id]["children"].append(node_map[node_id])
-            
+
         def build_tree(node_id: str) -> Dict[str, Any]:
             node_info = node_map[node_id]
+            node_payload = node_info["node"]
+
+            # If the node (typically function/class) already carries a
+            # dependency-tree children list from its domain serialization,
+            # preserve it as-is.
+            provided_children = node_payload.get("children")
+            if provided_children:
+                return {
+                    **node_payload,
+                    "children": provided_children,
+                }
+
+            # Otherwise, build children from the structural contains traversal
             return {
-                **node_info["node"],
+                **node_payload,
                 "children": [
-                    build_tree(child["node"]["id"]) for child in node_info["children"]
+                    build_tree(
+                        child["node"]["id"]
+                    )
+                    for child in node_info["children"]
                 ],
             }
 

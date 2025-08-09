@@ -23,17 +23,17 @@ class File(DomainObject[node.FileNode]):
     @property
     def path(self) -> str:
         return self.model.properties.path
-    
+
     @property
     def absolute_path(self) -> str:
         return self.path + self.name
-    
+
     @property
     def key(self) -> str:
         return self.model.key
 
-    def to_dict(self):
-        return {
+    def to_dict(self, with_dependency_tree: bool = False) -> dict:
+        data = {
             "id": self.id,
             "key": self.key,
             "name": self.name,
@@ -48,6 +48,22 @@ class File(DomainObject[node.FileNode]):
                 else None
             ),
         }
+
+        if not with_dependency_tree:
+            return data
+
+        # Include code elements contained in this file (classes and functions)
+        # preserving a consistent, stable order.
+        children: list[dict] = []
+
+        # Classes first, then functions, both alpha-sorted
+        for cls in sorted(self.get_classes(), key=lambda c: c.name.lower()):
+            children.append(cls.to_dict(with_dependency_tree=True))
+        for func in sorted(self.get_functions(), key=lambda f: f.name.lower()):
+            children.append(func.to_dict(with_dependency_tree=True))
+
+        data["children"] = children
+        return data
 
     def get_project(self) -> 'Project':
         """Returns the project this file belongs to."""
@@ -131,7 +147,7 @@ class File(DomainObject[node.FileNode]):
             start_node_id=self.id,
             edge_collection=db.contains_edges,
             direction="outbound",
-            filter_by_type="function"
+            filter_by_type="function",
         )
         return [Function(node_model) for node_model in function_nodes]
 
@@ -141,16 +157,16 @@ class File(DomainObject[node.FileNode]):
             start_node_id=self.id,
             edge_collection=db.contains_edges,
             direction="outbound",
-            filter_by_type="class"
+            filter_by_type="class",
         )
         return [Class(node_model) for node_model in class_nodes]
-    
+
     def get_text(self, position: node.NodePosition) -> str:
         """Retrieves the text at a specific position in the file."""
         # Get the project to build the full path
         project = self.get_project()
         full_path = f"{project.path}/{self.path}"
-        
+
         with open(full_path, 'r') as f:
             lines = f.readlines()
             start_line = position.line_no
@@ -168,11 +184,11 @@ class File(DomainObject[node.FileNode]):
                 position.end_line_no and
                 position.end_line_no > start_line
             )
-            
+
             if has_end_line:
                 # Extract multi-line content
                 result_lines = []
-                
+
                 # First line (from col_offset to end)
                 first_line = lines[start_line - 1]
                 result_lines.append(first_line[col_offset:])

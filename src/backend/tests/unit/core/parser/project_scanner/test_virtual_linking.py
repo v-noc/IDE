@@ -2,10 +2,12 @@ import json
 from pprint import pprint
 import pytest
 from app.core.code_elements import Class, Function
+from app.core.file import File
 from app.core.manager import CodeGraphManager
 from app.core.parser.project_scanner import ProjectScanner
 from app.db import collections
 from app.core.virtual_folder import VirtualFolder
+from app.core.folder import Folder
 
 pytestmark = pytest.mark.usefixtures("clear_db")
 
@@ -59,6 +61,9 @@ def test_virtual_folder_structure_from_code_element(sample_project_path):
     # data2 = folder2.get_descendant_tree()
     # pprint(data2)
     data = folder.get_descendant_tree()
+
+    with open('data.json', 'w') as f:
+        json.dump(data, f)
     
     _assert_folder_structure(data, 'register', 'sample_project', 1)
     assert data['link_to'] is None
@@ -211,6 +216,7 @@ def test_main_app_virtual_folder(sample_project_path):
     _assert_folder_structure(data, 'main_app_test', 'sample_project', 1)
 
     main_app_folder = data['children'][0]
+
     # MainApp class has 2 methods: __init__ and run
     _assert_folder_structure(
         main_app_folder, 'MainApp', 'sample_project.main_app_test', 2
@@ -314,10 +320,114 @@ def test_delete_virtual_folder_cascade(sample_project_path):
     # Remaining edges: project_root -> register (1 edge)
     final_edge_count = len(list(collections.virtual_contains_edges.find({})))
     assert final_edge_count == 1
-
-    # Check that links_to edges were also deleted. 8 folders deleted, each has one link.
+    # Check that links_to edges were also deleted.
     final_links_to_count = len(list(collections.links_to_edges.find({})))
     assert final_links_to_count == initial_links_to_count - 10
+
    
-   
-  
+def test_class_virtual_folder(sample_project_path):
+    """
+    Tests the structure of the virtual folder generated for a class.
+    """
+    project, function, class_ = _setup_test_project(sample_project_path)
+
+    folder = project.add_virtual_folder(folder_name="class_test")
+    folder.create_folder_for_element(class_)
+    data = folder.get_descendant_tree()
+
+    # The root should contain one child: the class folder
+    _assert_folder_structure(data, 'class_test', 'sample_project', 1)
+    class_folder = data['children'][0]
+
+    # The class folder should have 2 methods as children
+    _assert_folder_structure(
+        class_folder, 'MainApp', 'sample_project.class_test', 2
+    )
+    _assert_linked_element(class_folder, 'main.MainApp')
+
+    method_names = {child['name'] for child in class_folder['children']}
+    assert method_names == {'__init__', 'run'}
+
+    # The 'run' method should have one child: 'helper_function'
+    run_folder = next(
+        child for child in class_folder['children'] if child['name'] == 'run'
+    )
+    _assert_folder_structure(
+        run_folder, 'run', 'sample_project.class_test.MainApp', 1
+    )
+    _assert_linked_element(run_folder, 'main.MainApp.run')
+    assert run_folder['children'][0]['name'] == 'helper_function'
+
+ 
+def test_virtual_folder_structure_from_file(sample_project_path):
+    """
+    Tests the structure of the virtual folder generated for a File.
+    The file's dependency tree should include its classes and functions.
+    """
+    project, _, _ = _setup_test_project(sample_project_path)
+
+    # Locate the main.py file node and wrap it as a File domain object
+    file_doc = collections.nodes.find_one({
+        "node_type": "file",
+        "qname": "main",
+    })
+    assert file_doc, "Could not find file 'main.py'"
+    file = File(file_doc)
+    folder = project.add_virtual_folder(folder_name="file_test")
+    folder.create_folder_for_element(file)
+    data = folder.get_descendant_tree()
+ 
+    _assert_folder_structure(data, "file_test", "sample_project", 1)
+
+    file_folder = data["children"][0]
+    # The file folder should have two children: MainApp (class) and start_app
+    _assert_folder_structure(
+        file_folder, "main.py", "sample_project.file_test", 2
+    )
+    assert file_folder["link_to"]["node_type"] == "file"
+    assert file_folder["link_to"]["name"] == "main.py"
+
+    child_names = {child["name"] for child in file_folder["children"]}
+    assert child_names == {"MainApp", "start_app"}
+
+
+def test_virtual_folder_structure_from_folder(sample_project_path):
+    """
+    Tests the structure of the virtual folder generated for a Folder.
+    The folder's dependency tree should include its files and subfolders.
+    """
+    project, _, _ = _setup_test_project(sample_project_path)
+
+    # Get a real folder from the scanned project (e.g., 'models')
+    folder_doc = collections.nodes.find_one({
+        "node_type": "folder",
+        "qname": "models",
+    })
+    assert folder_doc, "Could not find folder 'models'"
+    physical_folder = Folder(folder_doc)
+
+    vf = project.add_virtual_folder(folder_name="folder_test")
+    vf.create_folder_for_element(physical_folder)
+    data = vf.get_descendant_tree()
+
+    _assert_folder_structure(data, "folder_test", "sample_project", 1)
+
+    models_vf = data["children"][0]
+    assert models_vf["name"] == "models"
+    assert models_vf["link_to"]["node_type"] == "folder"
+    assert models_vf["link_to"]["qname"] == "models"
+    assert len(models_vf["children"]) >= 1
+
+    # Ensure the models folder contains the 'user.py' file as a child VF
+    user_file_vf = next(
+        (
+            c for c in models_vf["children"]
+            if c.get("link_to", {}).get("node_type") == "file"
+            and c.get("link_to", {}).get("name") == "user.py"
+        ),
+        None,
+    )
+    assert user_file_vf is not None, "Expected 'user.py' under models folder"
+    # And that the file expands to include the 'User' class
+    child_names = {c["name"] for c in user_file_vf.get("children", [])}
+    assert "User" in child_names

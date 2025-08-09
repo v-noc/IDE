@@ -141,7 +141,7 @@ def get_project_tree(
     if not project_node:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    tree_data = project_node.get_descendant_tree()
+    tree_data = project_node.get_descendant_tree(with_dependency_tree=True)
     return map_tree_to_response(tree_data)
 
 

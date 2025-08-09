@@ -1,12 +1,14 @@
+from __future__ import annotations
 from arango.exceptions import DocumentInsertError
-from typing import Union, Optional
+from typing import Union, Optional, TYPE_CHECKING
 from app.db import collections as db
 from app.models import edges, node
 from app.models.edges import LinksToEdge
 from .base import DomainObject
 from .code_elements import Class, Function, to_domain_element
-from .folder import Folder
-from .file import File
+if TYPE_CHECKING:
+    from .folder import Folder
+    from .file import File
 
 
 class VirtualFolder(DomainObject[node.VirtualFolderNode]):
@@ -62,10 +64,21 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         if link_edge:
             linked_node = db.nodes.get(link_edge.to_id)
             if linked_node:
+                # Lazy resolve to domain object; fall back for file/folder
                 domain_element = to_domain_element(linked_node)
+                if (
+                    not domain_element and
+                    linked_node.node_type in {"file", "folder"}
+                ):
+                    if linked_node.node_type == "file":
+                        from .file import File  # local import
+                        domain_element = File(linked_node)
+                    else:
+                        from .folder import Folder  # local import
+                        domain_element = Folder(linked_node)
                 if domain_element:
                     linked_element_data = domain_element.to_dict(
-                        with_dependency_tree=with_dependency_tree
+                        with_dependency_tree=False
                     )
 
         children = [child.to_dict() for child in self.get_virtual_folders()]
@@ -219,10 +232,21 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         if link_edge:
             linked_node = db.nodes.get(link_edge.to_id)
             if linked_node:
+                # Lazy resolve to domain object; fall back for file/folder
                 domain_element = to_domain_element(linked_node)
+                if (
+                    not domain_element and
+                    linked_node.node_type in {"file", "folder"}
+                ):
+                    if linked_node.node_type == "file":
+                        from .file import File  # local import
+                        domain_element = File(linked_node)
+                    else:
+                        from .folder import Folder  # local import
+                        domain_element = Folder(linked_node)
                 if domain_element:
                     linked_element_data = domain_element.to_dict(
-                        with_dependency_tree=True
+                        with_dependency_tree=False
                     )
 
         imports_data = []
@@ -322,7 +346,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
 
     def create_folder_for_element(
         self,
-        element: Union[Folder, File, Function, Class],
+        element: Union["Folder", "File", Function, Class],
         link_directly: bool = False
     ) -> "VirtualFolder":
         """
@@ -337,6 +361,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         if link_directly:
             # Link this folder to the element and build the tree underneath.
             self.link_to_code_element(dependency_tree["id"])
+
             if children_data:
                 self._create_from_dict(children_data)
             return self
