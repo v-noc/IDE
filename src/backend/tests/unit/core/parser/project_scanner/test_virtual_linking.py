@@ -1,3 +1,4 @@
+import json
 from pprint import pprint
 import pytest
 from app.core.code_elements import Class, Function
@@ -82,13 +83,28 @@ def test_virtual_folder_structure_from_code_element(sample_project_path):
                 child['children'][0], 'utils.helper_function'
             )
         elif child['name'] == 'MainApp':
+            # MainApp has two methods: __init__ and run
             _assert_folder_structure(
-                child, 'MainApp', 'sample_project.register.start_app', 1
+                child, 'MainApp', 'sample_project.register.start_app', 2
             )
             _assert_linked_element(child, 'main.MainApp')
-            assert child['children'][0]['name'] == 'User'
+            # Check for methods as children
+            method_names = {c['name'] for c in child['children']}
+            assert method_names == {'__init__', 'run'}
+            # Check __init__ content
+            init_method = next(
+                c for c in child['children'] if c['name'] == '__init__'
+            )
+            _assert_folder_structure(
+                init_method,
+                '__init__',
+                'sample_project.register.start_app.MainApp',
+                1
+            )
+            _assert_linked_element(init_method, 'main.MainApp.__init__')
+            assert init_method['children'][0]['name'] == 'User'
             _assert_linked_element(
-                child['children'][0], 'models.user.User'
+                init_method['children'][0], 'models.user.User'
             )
         elif child['name'] == 'helper_function':
             _assert_folder_structure(
@@ -143,13 +159,17 @@ def test_virtual_folder_structure_from_code_element_link_directly(
             )
         elif child['name'] == 'MainApp':
             _assert_folder_structure(
-                child, 'MainApp', 'sample_project.register', 1
+                child, 'MainApp', 'sample_project.register', 2
             )
             _assert_linked_element(child, 'main.MainApp')
-            assert child['children'][0]['name'] == 'User'
-            _assert_linked_element(
-                child['children'][0], 'models.user.User'
+            method_names = {c['name'] for c in child['children']}
+            assert method_names == {'__init__', 'run'}
+            init_method = next(
+                c for c in child['children'] if c['name'] == '__init__'
             )
+            _assert_linked_element(init_method, 'main.MainApp.__init__')
+            assert init_method['children'][0]['name'] == 'User'
+
         elif child['name'] == 'helper_function':
             _assert_folder_structure(
                 child, 'helper_function', 'sample_project.register', 0
@@ -191,36 +211,54 @@ def test_main_app_virtual_folder(sample_project_path):
     _assert_folder_structure(data, 'main_app_test', 'sample_project', 1)
 
     main_app_folder = data['children'][0]
+    # MainApp class has 2 methods: __init__ and run
     _assert_folder_structure(
-        main_app_folder, 'MainApp', 'sample_project.main_app_test', 1
+        main_app_folder, 'MainApp', 'sample_project.main_app_test', 2
     )
     _assert_linked_element(main_app_folder, 'main.MainApp')
 
     main_app_class_data = main_app_folder['link_to']
     assert main_app_class_data['node_type'] == 'class'
-    assert len(main_app_class_data['methods']) == 2
+    # The 'children' now represent the methods
+    assert len(main_app_folder['children']) == 2
     method_names = {
-        method['name'] for method in main_app_class_data['methods']
+        method['name'] for method in main_app_folder['children']
     }
     assert method_names == {'__init__', 'run'}
 
-    user_folder = main_app_folder['children'][0]
+    # Check the __init__ method's children
+    init_method_folder = next(
+        c for c in main_app_folder['children'] if c['name'] == '__init__'
+    )
+    _assert_folder_structure(
+        init_method_folder,
+        '__init__',
+        'sample_project.main_app_test.MainApp',
+        1
+    )
+    _assert_linked_element(init_method_folder, 'main.MainApp.__init__')
+
+    user_folder = init_method_folder['children'][0]
+    # The User class has 1 method: get_name
     _assert_folder_structure(
         user_folder,
         'User',
-        'sample_project.main_app_test.MainApp',
-        0
+        'sample_project.main_app_test.MainApp.__init__',
+        1
     )
     _assert_linked_element(user_folder, 'models.user.User')
 
     user_class_data = user_folder['link_to']
     assert user_class_data['node_type'] == 'class'
-   
+
     assert len(user_class_data['fields']) == 2
     field_names = {field['varname'] for field in user_class_data['fields']}
     assert field_names == {'name', 'age'}
-    assert len(user_class_data['methods']) == 1
-    assert user_class_data['methods'][0]['name'] == 'get_name'
+    # The user's method is now a child folder
+    assert user_folder['children'][0]['name'] == 'get_name'
+    _assert_linked_element(
+        user_folder['children'][0], 'models.user.User.get_name'
+    )
 
 
 def test_delete_virtual_folder_cascade(sample_project_path):
@@ -239,13 +277,21 @@ def test_delete_virtual_folder_cascade(sample_project_path):
     initial_vf_count = len(
         list(collections.nodes.find({"node_type": "virtual_folder"}))
     )
-    assert initial_vf_count == 6
+
+    for node in collections.nodes.find({"node_type": "virtual_folder"}):
+        pprint(node)
+
+    assert initial_vf_count == 11, "Virtual folders not created"
     # 1 edge from root, 5 in the structure
     initial_edge_count = len(list(collections.virtual_contains_edges.find({})))
-    assert initial_edge_count == 7
+    assert initial_edge_count == 11
     
     # Get the descendant tree to find a folder to delete
     data = folder.get_descendant_tree()
+
+    with open('data.json', 'w') as f:
+        json.dump(data, f)
+
     start_app_folder_id = data['children'][0]['id']
     start_app_folder_doc = collections.nodes.get(
         start_app_folder_id
@@ -269,9 +315,9 @@ def test_delete_virtual_folder_cascade(sample_project_path):
     final_edge_count = len(list(collections.virtual_contains_edges.find({})))
     assert final_edge_count == 1
 
-    # Check that links_to edges were also deleted. 5 folders deleted, each has one link.
+    # Check that links_to edges were also deleted. 8 folders deleted, each has one link.
     final_links_to_count = len(list(collections.links_to_edges.find({})))
-    assert final_links_to_count == initial_links_to_count - 5
+    assert final_links_to_count == initial_links_to_count - 10
    
    
   

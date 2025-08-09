@@ -22,39 +22,40 @@ class Function(DomainObject[node.FunctionNode]):
     @property
     def key(self) -> str:
         return self.model.key
-    
+
     @property
     def name(self) -> str:
         """Returns the name of the function."""
         return self.model.name
-    
+
     @property
     def qname(self) -> str:
         """Returns the qualified name of the function."""
         return self.model.qname
-    
+
     @property
     def position(self) -> node.NodePosition:
         """Returns the position of the function."""
         return self.model.properties.position
-    
+
     @property
     def inputs(self) -> list[TypeKeyValuesProperties]:
         """Returns the list of input parameters."""
         return self.model.properties.inputs
-    
+
     @property
     def outputs(self) -> list[TypeKeyValuesProperties]:
         """Returns the list of output parameters."""
         return self.model.properties.outputs
-    
-    def to_dict(self) -> dict:
-        return {
+
+    def to_dict(self, with_dependency_tree: bool = False) -> dict:
+        data = {
             "key": self.key,
             "id": self.id,
             "name": self.name,
             "icon": self.model.icon,
             "qname": self.qname,
+            "description": self.model.description,
             "node_type": self.model.node_type,
             "position": self.position.model_dump(),
             "inputs": [input.model_dump() for input in self.inputs],
@@ -66,7 +67,24 @@ class Function(DomainObject[node.FunctionNode]):
             ),
             "parent_file": self.get_parent_file().to_dict()
         }
-    
+        if with_dependency_tree:
+            children = []
+            call_edges = db.calls_edges.find({"from_id": self.id})
+            sorted_edges = sorted(call_edges, key=lambda edge: edge.order)
+
+            for edge in sorted_edges:
+                node_doc = db.nodes.get(edge.to_id)
+                if node_doc:
+                    element = to_domain_element(node_doc)
+                    if element:
+                        child_dict = element.to_dict(
+                            with_dependency_tree=True
+                        )
+                        child_dict["call_order"] = edge.order
+                        children.append(child_dict)
+            data["children"] = children
+        return data
+
     def add_call(
         self, target: Union['Function', 'Class'], position: node.NodePosition
     ):
@@ -75,7 +93,7 @@ class Function(DomainObject[node.FunctionNode]):
             raise TypeError(
                 "Call target must be a Function or Class domain object."
             )
-            
+
         call_edge_model = edges.CallEdge(
             _from=self.id,
             _to=target.id,
@@ -119,7 +137,7 @@ class Function(DomainObject[node.FunctionNode]):
     def get_imports(self) -> list[edges.UsesImportEdge]:
         """Returns all import edges from this function."""
         return db.uses_import_edges.find({'from_id': self.id})
-    
+
     def get_nodes_that_import_this(self) -> list[Union['Function', 'Class']]:
         """Returns all nodes that import this function."""
         import_edges = db.uses_import_edges.find({'to_id': self.id})
@@ -131,7 +149,7 @@ class Function(DomainObject[node.FunctionNode]):
             elif node and node.node_type == 'class':
                 result.append(Class(node))
         return result
-    
+
     def uses_import(
         self,
         target: Union["Function", "Class", "Package"],
@@ -176,17 +194,19 @@ class Function(DomainObject[node.FunctionNode]):
             filter_by_type="class",
             limit=100
         )]
-    
+
     def get_function_calls(self) -> list[Function]:
         """Returns all function calls from this class."""
-        return [Function(node) for node in db.nodes.find_related(
-            start_node_id=self.id,
-            edge_collection=db.calls_edges,
-            direction="outbound",
-            filter_by_type="function",
-            limit=100
-        )]
-    
+        return [
+            Function(node) for node in db.nodes.find_related(
+                start_node_id=self.id,
+                edge_collection=db.calls_edges,
+                direction="outbound",
+                filter_by_type="function",
+                limit=100
+            )
+        ]
+
     def get_package_calls(self) -> list[Package]:
         """Returns all package calls from this function."""
         return [Package(node) for node in db.nodes.find_related(
@@ -205,7 +225,7 @@ class Function(DomainObject[node.FunctionNode]):
             direction="inbound",
             filter_by_type="function"
         )]
-    
+
     def get_node_caller_classes(self) -> list[Class]:
         """Returns all nodes that call this function."""
         return [Class(node) for node in db.nodes.find_related(
@@ -214,8 +234,8 @@ class Function(DomainObject[node.FunctionNode]):
             direction="inbound",
             filter_by_type="class"
         )]
-    
-   
+
+
 class Class(DomainObject[node.ClassNode]):
     """A domain object representing a class."""
 
@@ -227,22 +247,22 @@ class Class(DomainObject[node.ClassNode]):
     def name(self) -> str:
         """Returns the name of the class."""
         return self.model.name
-    
+
     @property
     def qname(self) -> str:
         """Returns the qualified name of the class."""
         return self.model.qname
-    
+
     @property
     def fields(self) -> list[TypeKeyValuesProperties]:
         """Returns the list of fields."""
         return self.model.properties.fields
-    
+
     @property
     def position(self) -> node.NodePosition:
         """Returns the position of the class."""
         return self.model.properties.position
-    
+
     @property
     def methods(self) -> list[Function]:
         """Returns the list of methods."""
@@ -253,13 +273,14 @@ class Class(DomainObject[node.ClassNode]):
             filter_by_type="function",
             limit=100
         )]
-    
-    def to_dict(self) -> dict:
-        return {
+
+    def to_dict(self, with_dependency_tree: bool = False) -> dict:
+        data = {
             "key": self.key,
             "id": self.id,
             "name": self.name,
             "qname": self.qname,
+            "description": self.model.description,
             "node_type": self.model.node_type,
             "position": self.position.model_dump(),
             "icon": self.model.icon,
@@ -269,10 +290,19 @@ class Class(DomainObject[node.ClassNode]):
                 else None
             ),
             "fields": [field.model_dump() for field in self.fields],
-            "methods": [method.to_dict() for method in self.methods],
             "parent_file": self.get_parent_file().to_dict()
         }
-    
+
+        if with_dependency_tree:
+            children = []
+            for i, method in enumerate(self.methods):
+                child_dict = method.to_dict(with_dependency_tree=True)
+                child_dict["call_order"] = i
+                children.append(child_dict)
+            data["children"] = children
+
+        return data
+
     def get_function_calls(self) -> list[Function]:
         """Returns all function calls from this class."""
         return [Function(node) for node in db.nodes.find_related(
@@ -282,16 +312,17 @@ class Class(DomainObject[node.ClassNode]):
             filter_by_type="function",
             limit=100
         )]
-    
+
     def get_class_calls(self) -> list[Class]:
         """Returns all class calls from this class."""
-        return [Class(node) for node in db.nodes.find_related(
+        nodes = db.nodes.find_related(
             start_node_id=self.id,
             edge_collection=db.calls_edges,
             direction="outbound",
             filter_by_type="class",
-            limit=100
-        )]
+            limit=100,
+        )
+        return [Class(node) for node in nodes]
 
     def get_node_caller_functions(self) -> list[Function]:
         """Returns all nodes that call this function."""
@@ -302,7 +333,7 @@ class Class(DomainObject[node.ClassNode]):
             filter_by_type="function",
             limit=100
         )]
-    
+
     def get_node_caller_classes(self) -> list[Class]:
         """Returns all nodes that call this function."""
         return [Class(node) for node in db.nodes.find_related(
@@ -312,7 +343,7 @@ class Class(DomainObject[node.ClassNode]):
             filter_by_type="class",
             limit=100
         )]
-    
+
     def get_parent_file(self) -> 'File':
         """Returns the parent file of the class by finding contains edge."""
         from .file import File
@@ -320,18 +351,18 @@ class Class(DomainObject[node.ClassNode]):
         contains_edge = db.contains_edges.find_one({'to_id': self.id})
         if not contains_edge:
             raise ValueError(f"No parent file found for class {self.id}")
-        
+
         # Get the file node that contains this class
         file_node = db.nodes.get(contains_edge.from_id)
         if not file_node:
             raise ValueError(f"File node {contains_edge.from_id} not found")
-        
+
         return File(file_node)
-    
+
     def get_imports(self) -> list[edges.UsesImportEdge]:
         """Returns all import edges from this class."""
         return db.uses_import_edges.find({'from_id': self.id})
-    
+
     def get_nodes_that_import_this(self) -> list[Union['Function', 'Class']]:
         """Returns all nodes that import this class."""
         import_edges = db.uses_import_edges.find({'to_id': self.id})
@@ -344,7 +375,7 @@ class Class(DomainObject[node.ClassNode]):
                 elif node.node_type == 'class':
                     result.append(Class(node))
         return result
-    
+
     def add_method(self, function_id: str) -> Function:
         """
         Adds a new method (Function) to this class and links them with an
@@ -365,8 +396,8 @@ class Class(DomainObject[node.ClassNode]):
         return Function(db.nodes.get(function_id))
 
     def add_call(
-        self, 
-        target: Union['Function', 'Class'], 
+        self,
+        target: Union['Function', 'Class'],
         position: node.NodePosition
     ):
         """Creates a 'calls' edge from this class to a target element."""
@@ -394,7 +425,7 @@ class Class(DomainObject[node.ClassNode]):
             raise TypeError(
                 "Import target must be a Function, Class, or Package."
             )
-            
+
         import_edge = edges.UsesImportEdge(
             _from=self.id,
             _to=target.id,
@@ -410,7 +441,7 @@ class Class(DomainObject[node.ClassNode]):
         """Adds a field to the class's properties, avoiding duplicates."""
         # Check if a field with the same name already exists
         if any(
-            f.varname == field.varname 
+            f.varname == field.varname
             for f in self.model.properties.fields
         ):
             return
