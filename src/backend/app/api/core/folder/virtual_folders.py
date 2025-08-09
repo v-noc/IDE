@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from app.core.manager import CodeGraphManager
 from app.core.code_elements import Function, Class
+from app.core.file import File
+from app.core.folder import Folder
 from app.core.virtual_folder import VirtualFolder
 from typing import Dict, Any, Optional, List
 from app.models.properties import ThemeConfig
@@ -314,15 +316,18 @@ def create_path_for_element(
     if not element_node:
         raise HTTPException(status_code=404, detail="Code element not found")
     
-    if element_node.node_type not in ['function', 'class']:
+    if element_node.node_type not in ['function', 'class', 'file', 'folder']:
         raise HTTPException(
             status_code=400,
-            detail="Only functions and classes can be added."
+            detail="Only functions, classes, files, and folders can be added."
         )
     
     element = (
         Function(element_node) if element_node.node_type == 'function' 
-        else Class(element_node)
+        else Class(element_node) if element_node.node_type == 'class'
+        else File(element_node) if element_node.node_type == 'file'
+        else Folder(element_node) if element_node.node_type == 'folder'
+        else None
     )
     
     try:

@@ -35,7 +35,10 @@ export const NodeContextMenu = ({
         {node.isVirtual && onEdit && (
           <ContextMenuItem onClick={onEdit}>Edit</ContextMenuItem>
         )}
-        {(node.node_type == "function" || node.node_type == "class") && (
+        {(node.node_type == "function" ||
+          node.node_type == "class" ||
+          node.node_type == "file" ||
+          node.node_type == "folder") && (
           <ContextMenuItem onClick={onCreatePath}>Create Path</ContextMenuItem>
         )}
 
