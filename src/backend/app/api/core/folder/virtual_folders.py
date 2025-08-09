@@ -4,7 +4,7 @@ from app.core.manager import CodeGraphManager
 from app.core.code_elements import Function, Class
 from app.core.virtual_folder import VirtualFolder
 from typing import Dict, Any, Optional, List
-
+from app.models.properties import ThemeConfig
 
 # Pydantic Models
 class VirtualFolderCreate(BaseModel):
@@ -28,6 +28,7 @@ class VirtualFolderResponse(BaseModel):
     children: List['VirtualFolderResponse'] = []
     call_order: Optional[int] = None
     imports: Optional[List[Dict[str, Any]]] = None
+    theme: Optional[ThemeConfig] = None
 
 
 class AddCodeElementRequest(BaseModel):
@@ -160,7 +161,7 @@ def get_all_virtual_folders(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    virtual_folders = project.get_all_virtual_folders()
+    virtual_folders = project.get_virtual_folders()
     return [folder.to_dict() for folder in virtual_folders]
 
 

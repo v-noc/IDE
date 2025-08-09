@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCreatePathForElement } from "@/features/Dashboard/service/useProject";
 import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -37,7 +38,9 @@ interface CreatePathDialogProps {
 
 const CreatePathDialog = ({ isOpen, onClose, node }: CreatePathDialogProps) => {
   const projectKey = useProjectStore((state) => state.projectData?.key);
-  const { mutate: createPath } = useCreatePathForElement(
+  const queryClient = useQueryClient();
+
+  const { mutate: createPath, isPending } = useCreatePathForElement(
     projectKey || "",
     node.key
   );
@@ -58,8 +61,15 @@ const CreatePathDialog = ({ isOpen, onClose, node }: CreatePathDialogProps) => {
       },
       {
         onSuccess: () => {
+          // Close dialog and reset form
           onClose();
-          // TODO: Invalidate queries to refetch data
+          form.reset();
+          // Refresh virtual folders list
+          if (projectKey) {
+            queryClient.invalidateQueries({
+              queryKey: ["virtualFolders", projectKey],
+            });
+          }
         },
       }
     );
@@ -99,7 +109,9 @@ const CreatePathDialog = ({ isOpen, onClose, node }: CreatePathDialogProps) => {
                 </FormItem>
               )}
             />
-            <Button type="submit">Create Path</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Creating..." : "Create Path"}
+            </Button>
           </form>
         </Form>
       </DialogContent>

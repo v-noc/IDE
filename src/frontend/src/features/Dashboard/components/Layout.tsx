@@ -104,13 +104,20 @@ const Layout = ({
       return hasEffectiveTheme(merged) ? merged : undefined;
     }
 
+    // No node found in project tree; do not override externally set theme
+    if (selectedNodeId && selectedPath.length === 0) {
+      return undefined;
+    }
+
     // No node selected → use project theme if available and non-empty
     const projectTheme = normalizeTheme(projectData?.theme);
     return hasEffectiveTheme(projectTheme) ? projectTheme : undefined;
   }, [selectedNodeId, selectedPath, projectData?.theme]);
 
   useEffect(() => {
-    setTheme(resolvedTheme);
+    if (resolvedTheme !== undefined) {
+      setTheme(resolvedTheme);
+    }
   }, [resolvedTheme, setTheme]);
 
   const style = theme

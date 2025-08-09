@@ -155,14 +155,23 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         return VirtualFolder(created_node)
 
     def get_virtual_folders(self) -> list['VirtualFolder']:
-        return [
+        children = [
             VirtualFolder(f) for f in db.nodes.find_related(
                 start_node_id=self.id,
                 edge_collection=db.virtual_contains_edges,
                 filter_by_type="virtual_folder",
-                limit=100
+                limit=1  # depth of traversal: direct children only
             )
         ]
+        # Sort by call_order if present, then by name for stable ordering
+        children.sort(
+            key=lambda vf: (
+                vf.model.call_order is None,
+                vf.model.call_order if vf.model.call_order is not None else 0,
+                vf.name.lower(),
+            )
+        )
+        return children
 
     def get_descendant_tree(self) -> dict[str, any]:
         """

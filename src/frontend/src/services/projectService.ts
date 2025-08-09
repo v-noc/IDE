@@ -10,11 +10,11 @@ interface Project {
 
 // API functions using the new client
 const fetchProjects = (): Promise<Project[]> => {
-  return apiClient(API_ROUTES.PROJECT);
+  return apiClient(API_ROUTES.PROJECTS);
 };
 
 const createProject = (newProject: { name: string; path: string }): Promise<Project> => {
-  return apiClient(API_ROUTES.PROJECT, { body: newProject });
+  return apiClient(API_ROUTES.PROJECTS, { body: newProject });
 };
 
 // React Query hooks (no changes needed here)
