@@ -2,7 +2,6 @@ import Layout from "@/features/Dashboard/components/Layout";
 import SideBar from "@/features/Dashboard/features/Sidebar/components/SideBar";
 import Navbar from "@/features/Dashboard/features/Navbar/componets/Navbar";
 import MainCanvas from "@/features/Dashboard/features/Canvas";
-import { useParams } from "react-router";
 
 import { ResizablePanelGroup } from "@/components/ui/resizable";
 import MainWithRightSidebar from "@/features/Dashboard/features/Canvas/MainWithRightSidebar";
@@ -12,6 +11,7 @@ import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import getIcons from "@/features/Dashboard/utils/getIcons";
 import {
   useUpdateNodeIcon,
+  useUpdateNodeTheme,
   useUpdateNodeBasicInfo,
 } from "@/features/Dashboard/service/useNode";
 import { useMemo, useCallback } from "react";
@@ -19,7 +19,9 @@ import type {
   ProjectTreeResponse,
   NodeType,
 } from "@/features/Dashboard/service/useProject";
-import type { BasicInfoData } from "@/features/Dashboard/features/Canvas/componets/sidebar/sections/BasicInfoSection";
+import type { BasicInfoData } from "@/features/Dashboard/features/Canvas/componets/sidebar/hooks/useConfigSidebarForm";
+import type { ThemeConfig } from "@/features/Dashboard/store/useThemeStore";
+import type { CustomizationData } from "@/features/Dashboard/features/Canvas/componets/sidebar/hooks/useConfigSidebarForm";
 
 function findNodeByKey(
   root: ProjectTreeResponse | null,
@@ -50,6 +52,27 @@ const Dashboard = () => {
 
   const updateIconMutation = useUpdateNodeIcon(projectData?.key);
   const updateNodeBasicInfoMutation = useUpdateNodeBasicInfo(projectData?.key);
+  const updateNodeThemeMutation = useUpdateNodeTheme(projectData?.key);
+
+  const onChangeTheme = useCallback(
+    (data: CustomizationData) => {
+      if (!selectedNode) return;
+      const theme: ThemeConfig = {
+        iconColor: data.iconColor,
+        cardColor: data.cardColor,
+        navbarColor: data.navbarColor,
+        leftSidebarColor: data.leftSidebarColor,
+        rightSidebarColor: data.rightSidebarColor,
+        backgroundColor: data.backgroundColor,
+        textColor: data.textColor,
+      };
+      updateNodeThemeMutation.mutate({
+        elementKey: selectedNode.key,
+        theme,
+      });
+    },
+    [selectedNode, updateNodeThemeMutation]
+  );
 
   const onChangeBasicInfo = useCallback(
     (data: BasicInfoData) => {
@@ -98,12 +121,18 @@ const Dashboard = () => {
       },
       initialCustomization: {
         iconColor: selectedNode?.theme?.iconColor,
-        nameColor: selectedNode?.theme?.nameColor,
+
         cardColor: selectedNode?.theme?.cardColor,
+        navbarColor: selectedNode?.theme?.navbarColor,
+        backgroundColor: selectedNode?.theme?.backgroundColor,
+        leftSidebarColor: selectedNode?.theme?.leftSidebarColor,
+        rightSidebarColor: selectedNode?.theme?.rightSidebarColor,
+        textColor: selectedNode?.theme?.textColor,
       },
       onChangeBasicInfo,
+      onChangeCustomization: onChangeTheme,
     };
-  }, [selectedNode, onChangeBasicInfo]);
+  }, [selectedNode, onChangeBasicInfo, onChangeTheme]);
 
   return (
     <ResizablePanelGroup direction="horizontal">

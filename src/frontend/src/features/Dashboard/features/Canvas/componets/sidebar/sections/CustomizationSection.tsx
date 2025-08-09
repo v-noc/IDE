@@ -6,18 +6,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import ColorRow from "../shared/ColorRow";
-
-export type CustomizationData = {
-  iconColor: string;
-  nameColor: string;
-  cardColor: string;
-  navbarColor?: string;
-  leftSidebarColor?: string;
-  rightSidebarColor?: string;
-  backgroundColor?: string;
-  textColor?: string;
-  fontSize?: number;
-};
+import type { CustomizationData } from "../hooks/useConfigSidebarForm";
 
 export type CustomizationSectionProps = {
   value: CustomizationData;
@@ -47,10 +36,11 @@ const CustomizationSection: React.FC<CustomizationSectionProps> = ({
             value={value.iconColor}
             onChange={(v) => update({ iconColor: v })}
           />
+
           <ColorRow
-            label="Name color"
-            value={value.nameColor}
-            onChange={(v) => update({ nameColor: v })}
+            label="Text color"
+            value={value.textColor ?? "#000000"}
+            onChange={(v) => update({ textColor: v })}
           />
           <ColorRow
             label="Card color"
@@ -74,28 +64,6 @@ const CustomizationSection: React.FC<CustomizationSectionProps> = ({
             label="Background color"
             value={value.backgroundColor ?? "#ffffff"}
             onChange={(v) => update({ backgroundColor: v })}
-          />
-          <ColorRow
-            label="Left sidebar color"
-            value={value.leftSidebarColor ?? "#ffffff"}
-            onChange={(v) => update({ leftSidebarColor: v })}
-          />
-          <ColorRow
-            label="Right sidebar color"
-            value={value.rightSidebarColor ?? "#ffffff"}
-            onChange={(v) => update({ rightSidebarColor: v })}
-          />
-        </AccordionContent>
-      </AccordionItem>
-      <AccordionItem value="layout3" className="!border  rounded-md">
-        <AccordionTrigger className="px-3 py-2 text-sm font-medium">
-          Layout
-        </AccordionTrigger>
-        <AccordionContent className="space-y-3 p-3 bg-muted/20">
-          <ColorRow
-            label="Navbar color"
-            value={value.navbarColor ?? "#ffffff"}
-            onChange={(v) => update({ navbarColor: v })}
           />
           <ColorRow
             label="Left sidebar color"

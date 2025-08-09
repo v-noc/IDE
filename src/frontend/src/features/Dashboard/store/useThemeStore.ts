@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 
 export interface ThemeConfig {
-    navbarColor: string;
-    leftSidebarColor: string;
-    rightSidebarColor: string;
-    backgroundColor: string;
-    textColor: string;
-    iconColor: string;
-    cardColor: string;
-    nameColor: string;
+    navbarColor?: string;
+    leftSidebarColor?: string;
+    rightSidebarColor?: string;
+    backgroundColor?: string;
+    textColor?: string;
+    iconColor?: string;
+    cardColor?: string;
+
 }
 
 interface ThemeState {

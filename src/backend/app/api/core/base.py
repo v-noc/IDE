@@ -5,16 +5,27 @@ from app.models import properties as node_props
 from pydantic import BaseModel, Field
 from typing import Optional
 
+
 router = APIRouter()
 
+
 class BasicInfo(BaseModel):
-    name: str = Field(..., description="The name of the node" ,min_length=1, max_length=100)
-    description: Optional[str] = Field(None, description="The description of the node")
+    name: str = Field(
+        ...,
+        description="The name of the node",
+        min_length=1,
+        max_length=100,
+    )
+    description: Optional[str] = Field(
+        None,
+        description="The description of the node",
+    )
+
 
 @router.post("/{element_key}/update-node-theme")
-def update_layout_metadata(
+def update_node_theme(
     element_key: str,
-    layout_metadata: ThemeConfig,
+    theme: ThemeConfig,
 ):
     db_node = nodes.get(element_key)
     if not db_node:
@@ -29,12 +40,26 @@ def update_layout_metadata(
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Properties are missing for this node type and cannot be "
-                    "auto-initialized."
+                    "Properties are missing for this node type and "
+                    "cannot be auto-initialized."
                 ),
             )
 
-    db_node.properties.metaData = layout_metadata
+    # Only apply values provided by client; do not set defaults
+    existing = db_node.properties.metaData
+    updates = theme.model_dump(exclude_unset=True)
+
+    if existing is None:
+        if not updates:
+            return nodes.get(element_key)
+        # Create a new ThemeConfig with only provided fields, others remain None
+        merged = ThemeConfig(**updates)
+    else:
+        base_dict = existing.model_dump()
+        base_dict.update({k: v for k, v in updates.items() if v is not None})
+        merged = ThemeConfig(**base_dict)
+
+    db_node.properties.metaData = merged
     nodes.update(db_node)
 
     return nodes.get(element_key)

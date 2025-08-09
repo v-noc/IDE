@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-import json
 from typing import List, Dict, Any, Optional
 from app.core.manager import CodeGraphManager
 
@@ -7,6 +6,7 @@ from pydantic import BaseModel
 
 from app.core.parser.project_scanner import ProjectScanner
 from app.api.core.folder.virtual_folders import VirtualFolderResponse
+from app.models.properties import ThemeConfig
 
 
 # Pydantic models for request and response
@@ -34,6 +34,7 @@ class ProjectTreeResponse(BaseModel):
     node_type: str
     qname: str
     properties: dict
+    theme: Optional[ThemeConfig] = None
     children: List["ProjectTreeResponse"]
 
 
@@ -46,8 +47,7 @@ def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
         children = [
             map_tree_to_response(child) for child in tree_data["children"]
         ]
-    with open("tree_data.json", "w") as f:
-        json.dump(tree_data, f)
+   
     return ProjectTreeResponse(
         key=tree_data.get("_key", tree_data.get("key", "")),
         name=tree_data.get("name", ""),
@@ -56,6 +56,7 @@ def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
         node_type=tree_data.get("node_type", ""),
         qname=tree_data.get("qname", ""),
         properties=tree_data.get("properties", {}),
+        theme=tree_data.get("theme", {}),
         children=children
     )
 
@@ -121,7 +122,10 @@ def get_project_virtual_folders(
     project_node = manager.get_project(project_key)
     if not project_node:
         raise HTTPException(status_code=404, detail="Project not found")
-    return [folder.get_descendant_tree() for folder in project_node.get_virtual_folders()]
+    return [
+        folder.get_descendant_tree()
+        for folder in project_node.get_virtual_folders()
+    ]
 
 
 @router.get("/{project_key}/tree", response_model=ProjectTreeResponse)

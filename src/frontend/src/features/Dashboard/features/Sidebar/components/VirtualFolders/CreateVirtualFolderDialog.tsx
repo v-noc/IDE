@@ -79,9 +79,9 @@ const CreateVirtualFolderDialog = () => {
       });
     },
     onSuccess: () => {
-      // Invalidate and refetch project tree
+      // Refresh virtual folders only to avoid selection reset
       queryClient.invalidateQueries({
-        queryKey: ["projectTree", projectData?.key],
+        queryKey: ["virtualFolders", projectData?.key],
       });
       toast.success("Virtual folder created successfully");
       setOpen(false);

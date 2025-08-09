@@ -10,7 +10,6 @@ export type BasicInfoData = z.infer<typeof basicInfoSchema>;
 
 export const customizationSchema = z.object({
     iconColor: z.string(),
-    nameColor: z.string(),
     cardColor: z.string(),
     navbarColor: z.string().optional(),
     leftSidebarColor: z.string().optional(),
@@ -28,7 +27,7 @@ const defaultBasic: BasicInfoData = {
 };
 const defaultCustom: Omit<CustomizationData, "navbarColor" | "leftSidebarColor" | "rightSidebarColor" | "backgroundColor" | "textColor" | "fontSize"> = {
     iconColor: "#000000",
-    nameColor: "#000000",
+
     cardColor: "#ffffff",
 };
 
@@ -54,8 +53,8 @@ export const useConfigSidebarForm = ({
         ...initialCustomization,
     });
 
-    const basicTimeoutRef = useRef<number>();
-    const customTimeoutRef = useRef<number>();
+    const basicTimeoutRef = useRef<number>(undefined);
+    const customTimeoutRef = useRef<number>(undefined);
 
     useEffect(() => {
         setBasicInfo({ ...defaultBasic, ...initialBasicInfo });

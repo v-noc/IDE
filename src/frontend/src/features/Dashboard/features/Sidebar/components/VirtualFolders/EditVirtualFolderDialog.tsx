@@ -84,9 +84,9 @@ const EditVirtualFolderDialog = ({
 
       await updateVirtualFolderMutation.mutateAsync(updateData);
 
-      // Invalidate and refetch project tree
+      // Refresh virtual folders only to avoid selection reset
       await queryClient.invalidateQueries({
-        queryKey: ["projectTree", projectData.key],
+        queryKey: ["virtualFolders", projectData.key],
       });
 
       toast.success("Virtual folder updated successfully");

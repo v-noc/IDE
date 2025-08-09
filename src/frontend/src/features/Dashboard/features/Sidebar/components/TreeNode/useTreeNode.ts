@@ -4,6 +4,7 @@ import type { NodeType, ProjectTreeResponse } from "@/features/Dashboard/service
 import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useThemeStore } from "@/features/Dashboard/store/useThemeStore";
 
 export const useTreeNode = (node: ProjectTreeResponse) => {
   const {
@@ -15,6 +16,8 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     addVirtualNode,
     projectData,
   } = useProjectStore();
+
+  const { setTheme } = useThemeStore();
 
   const queryClient = useQueryClient();
   const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.key || "");
@@ -37,7 +40,10 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   };
 
   const handleSelectNode = () => {
+    if (selectedNodeId === node.key) return;
     setSelectedNodeId(node.key);
+    // Update global theme from the selected node if provided
+    setTheme(node.theme);
   };
 
   const handleFocus = () => {
@@ -60,7 +66,8 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     try {
       await deleteVirtualFolderMutation.mutateAsync(node.key);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["projectTree", projectData.key] }),
+        // Avoid invalidating projectTree to preserve selection
+        // queryClient.invalidateQueries({ queryKey: ["projectTree", projectData.key] }),
         queryClient.invalidateQueries({ queryKey: ["virtualFolders", projectData.key] }),
       ]);
       toast.success("Virtual folder removed");

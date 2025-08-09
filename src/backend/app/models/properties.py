@@ -7,33 +7,33 @@ from .shared import NodePosition
 
 
 class ThemeConfig(BaseModel):
-    navbarColor: str = Field(
-        ..., 
+    navbarColor: Optional[str] = Field(
+        default=None,
         description="The color of the navbar."
     )
-    leftSidebarColor: str = Field(
-        ..., 
+    leftSidebarColor: Optional[str] = Field(
+        default=None,
         description="The color of the left sidebar."
     )
-    rightSidebarColor: str = Field(
-        ..., 
+    rightSidebarColor: Optional[str] = Field(
+        default=None,
         description="The color of the right sidebar."
     )
-    backgroundColor: str = Field(
-        ..., 
+    backgroundColor: Optional[str] = Field(
+        default=None,
         description="The color of the background."
     )
     
-    textColor: str = Field(
-        ..., 
+    textColor: Optional[str] = Field(
+        default=None,
         description="The color of the text."
     )
-    iconColor: str = Field(
-        ..., 
+    iconColor: Optional[str] = Field(
+        default=None,
         description="The color of the icon."
     )
-    cardColor: str = Field(
-        ..., 
+    cardColor: Optional[str] = Field(
+        default=None,
         description="The color of the card."
     )
 
@@ -41,14 +41,14 @@ class ThemeConfig(BaseModel):
 class BaseProperties(BaseModel):
     """A base model for all properties to ensure consistency."""
     metaData: Optional[ThemeConfig] = Field(
-        None, 
+        None,
         description="The metadata of the layout."
     )
 
 
 class ProjectProperties(BaseProperties):
     path: str = Field(
-        ..., 
+        ...,
         description="The absolute path to the project directory."
     )
 
@@ -63,12 +63,12 @@ class FileProperties(BaseProperties):
 
 class TypeKeyValuesProperties(BaseProperties):
     varname: str = Field(
-        ..., 
+        ...,
         description="The key of the type key-value pair."
     )
     varType: str = Field(..., description="The type of the variable.")
     position: NodePosition = Field(
-        ..., 
+        ...,
         description="The position of the variable."
     )
 
@@ -76,11 +76,11 @@ class TypeKeyValuesProperties(BaseProperties):
 class FunctionProperties(BaseProperties):
     position: NodePosition
     inputs: List[TypeKeyValuesProperties] = Field(
-        default_factory=list, 
+        default_factory=list,
         description="Function parameters."
     )
     outputs: List[TypeKeyValuesProperties] = Field(
-        default_factory=list, 
+        default_factory=list,
         description="Function return types."
     )
 
@@ -88,7 +88,7 @@ class FunctionProperties(BaseProperties):
 class ClassProperties(BaseProperties):
     position: NodePosition
     fields: List[TypeKeyValuesProperties] = Field(
-        default_factory=list, 
+        default_factory=list,
         description="Class attributes or fields."
     )
 
@@ -98,7 +98,7 @@ class PackageProperties(BaseProperties):
     version: str | None = None
     source: str | None = None  # e.g., "pypi"
     imported_paths: List[str] = Field(
-        default_factory=list, 
+        default_factory=list,
         description="List of specific imports from this package "
                     "(e.g., ['BaseModel', 'Field'])"
     )

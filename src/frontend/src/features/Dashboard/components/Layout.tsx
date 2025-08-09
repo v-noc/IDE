@@ -1,9 +1,58 @@
 import { ResizableHandle, ResizablePanel } from "@/components/ui/resizable";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft } from "lucide-react";
-import { useThemeStore } from "../store/useThemeStore";
+import { useThemeStore, type ThemeConfig } from "../store/useThemeStore";
 
 import useProjectStore from "../store/useProjectStore";
+import type { ProjectTreeResponse } from "../service/useProject";
+
+const hasEffectiveTheme = (t: ThemeConfig | undefined): boolean => {
+  if (!t) return false;
+  const values = [
+    t.navbarColor,
+    t.leftSidebarColor,
+    t.rightSidebarColor,
+    t.backgroundColor,
+    t.textColor,
+    t.iconColor,
+    t.cardColor,
+  ];
+  return values.some((v) => Boolean(v));
+};
+
+const THEME_KEYS: (keyof ThemeConfig)[] = [
+  "navbarColor",
+  "leftSidebarColor",
+  "rightSidebarColor",
+  "backgroundColor",
+  "textColor",
+  "iconColor",
+  "cardColor",
+];
+
+const normalizeTheme = (
+  t: ThemeConfig | undefined | null
+): ThemeConfig | undefined => {
+  if (!t) return undefined;
+  const normalized: ThemeConfig = {};
+  for (const key of THEME_KEYS) {
+    const value = t[key] as unknown as string | undefined | null;
+    if (value) normalized[key] = value;
+  }
+  return hasEffectiveTheme(normalized) ? normalized : undefined;
+};
+
+const mergeThemes = (
+  baseTheme: ThemeConfig | undefined,
+  overrideTheme: ThemeConfig | undefined
+): ThemeConfig => {
+  const result: ThemeConfig = { ...(baseTheme ?? {}) };
+  for (const key of THEME_KEYS) {
+    const value = overrideTheme?.[key];
+    if (value) result[key] = value;
+  }
+  return result;
+};
 
 const Layout = ({
   main,
@@ -18,13 +67,51 @@ const Layout = ({
 }) => {
   const [isRightOpen, setIsRightOpen] = useState(true);
   const { theme, setTheme } = useThemeStore();
-  const { projectData } = useProjectStore();
+  const { projectData, selectedNodeId } = useProjectStore();
+
+  const selectedPath = useMemo(() => {
+    // Returns path from root to selected node (inclusive)
+    const path: ProjectTreeResponse[] = [];
+    if (!projectData || !selectedNodeId) return path;
+
+    const dfs = (
+      node: ProjectTreeResponse,
+      acc: ProjectTreeResponse[]
+    ): boolean => {
+      acc.push(node);
+      if (node.key === selectedNodeId) return true;
+      if (node.children) {
+        for (const child of node.children) {
+          if (dfs(child, acc)) return true;
+        }
+      }
+      acc.pop();
+      return false;
+    };
+
+    const tmp: ProjectTreeResponse[] = [];
+    if (dfs(projectData, tmp)) return tmp;
+    return [];
+  }, [projectData, selectedNodeId]);
+
+  const resolvedTheme = useMemo(() => {
+    // Merge themes along the path from root to selected node, allowing child to override
+    if (selectedNodeId && selectedPath.length > 0) {
+      let merged: ThemeConfig | undefined = undefined;
+      for (const node of selectedPath) {
+        merged = mergeThemes(merged, normalizeTheme(node.theme));
+      }
+      return hasEffectiveTheme(merged) ? merged : undefined;
+    }
+
+    // No node selected → use project theme if available and non-empty
+    const projectTheme = normalizeTheme(projectData?.theme);
+    return hasEffectiveTheme(projectTheme) ? projectTheme : undefined;
+  }, [selectedNodeId, selectedPath, projectData?.theme]);
 
   useEffect(() => {
-    if (projectData?.theme) {
-      setTheme(projectData.theme);
-    }
-  }, [projectData, setTheme]);
+    setTheme(resolvedTheme);
+  }, [resolvedTheme, setTheme]);
 
   const style = theme
     ? ({
