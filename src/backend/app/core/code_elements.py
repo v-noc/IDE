@@ -68,6 +68,48 @@ class Function(DomainObject[node.FunctionNode]):
             "parent_file": self.get_parent_file().to_dict()
         }
         if with_dependency_tree:
+            # Include imports similar to VirtualFolder._to_dict_with_imports
+            imports_data = []
+            import_edges = self.get_imports()
+            if import_edges:
+                # Local import to avoid circular dependency at module level
+                from .virtual_folder import VirtualFolder  # type: ignore
+                for import_edge in import_edges:
+                    from_node = db.nodes.get(import_edge.from_id)
+                    to_node = db.nodes.get(import_edge.to_id)
+                    from_vf = (
+                        VirtualFolder.get_folder_linked_to_element(
+                            from_node.id
+                        )
+                        if from_node else None
+                    )
+                    to_vf = (
+                        VirtualFolder.get_folder_linked_to_element(
+                            to_node.id
+                        )
+                        if to_node else None
+                    )
+                    imports_data.append({
+                        "_key": import_edge.key,
+                        "id": import_edge.id,
+                        "from_id": import_edge.from_id,
+                        "to_id": import_edge.to_id,
+                        "to_type": (
+                            to_node.node_type if to_node else None
+                        ),
+                        "from_parent_virtual_folder_id": (
+                            from_vf.id if from_vf else None
+                        ),
+                        "to_parent_virtual_folder_id": (
+                            to_vf.id if to_vf else None
+                        ),
+                        "alias": (
+                            import_edge.alias or import_edge.target_symbol
+                        ),
+                        "qname": import_edge.target_qname,
+                    })
+            if imports_data:
+                data["imports"] = imports_data
             children = []
             call_edges = db.calls_edges.find({"from_id": self.id})
             sorted_edges = sorted(call_edges, key=lambda edge: edge.order)
@@ -294,6 +336,48 @@ class Class(DomainObject[node.ClassNode]):
         }
 
         if with_dependency_tree:
+            # Include imports similar to VirtualFolder._to_dict_with_imports
+            imports_data = []
+            import_edges = self.get_imports()
+            if import_edges:
+                # Local import to avoid circular dependency at module level
+                from .virtual_folder import VirtualFolder  # type: ignore
+                for import_edge in import_edges:
+                    from_node = db.nodes.get(import_edge.from_id)
+                    to_node = db.nodes.get(import_edge.to_id)
+                    from_vf = (
+                        VirtualFolder.get_folder_linked_to_element(
+                            from_node.id
+                        )
+                        if from_node else None
+                    )
+                    to_vf = (
+                        VirtualFolder.get_folder_linked_to_element(
+                            to_node.id
+                        )
+                        if to_node else None
+                    )
+                    imports_data.append({
+                        "_key": import_edge.key,
+                        "id": import_edge.id,
+                        "from_id": import_edge.from_id,
+                        "to_id": import_edge.to_id,
+                        "to_type": (
+                            to_node.node_type if to_node else None
+                        ),
+                        "from_parent_virtual_folder_id": (
+                            from_vf.id if from_vf else None
+                        ),
+                        "to_parent_virtual_folder_id": (
+                            to_vf.id if to_vf else None
+                        ),
+                        "alias": (
+                            import_edge.alias or import_edge.target_symbol
+                        ),
+                        "qname": import_edge.target_qname,
+                    })
+            if imports_data:
+                data["imports"] = imports_data
             children = []
             for i, method in enumerate(self.methods):
                 child_dict = method.to_dict(with_dependency_tree=True)

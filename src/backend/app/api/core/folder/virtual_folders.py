@@ -29,7 +29,6 @@ class VirtualFolderResponse(BaseModel):
     link_to: Optional[Dict[str, Any]] = None
     children: List['VirtualFolderResponse'] = []
     call_order: Optional[int] = None
-    imports: Optional[List[Dict[str, Any]]] = None
     theme: Optional[ThemeConfig] = None
 
 

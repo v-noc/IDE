@@ -7,6 +7,7 @@ import {
   useEdgesState,
   useNodesState,
   BackgroundVariant,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -14,23 +15,29 @@ import { useCanvasGraph } from "../hooks/useCanvasGraph";
 import { nodeTypes } from "../wiring/nodeTypes";
 import { edgeTypes } from "../wiring/edgeTypes";
 
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+
 interface CanvasViewProps {
   projectId?: string;
 }
 
 const CanvasView: React.FC<CanvasViewProps> = ({ projectId }) => {
-  const {
-    initialNodes,
-    initialEdges,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-  } = useCanvasGraph(projectId);
+  const { setSelectedNodeId, toggleNodeExpansion } = useProjectStore();
 
-  const [nodes, setNodes, handleNodesChange] = useNodesState(initialNodes);
+  const { initialNodes, initialEdges, onConnect } = useCanvasGraph(projectId);
+
+  const [nodes, , handleNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, handleEdgesChange] = useEdgesState(initialEdges);
 
   const handleConnect = onConnect(setEdges);
+
+  const onNodeClick: NodeMouseHandler = (_event, node) => {
+    setSelectedNodeId(node.id);
+  };
+
+  const onNodeDoubleClick: NodeMouseHandler = (_event, node) => {
+    toggleNodeExpansion(node.id);
+  };
 
   return (
     <div className="h-[calc(100vh-140px)] w-full">
@@ -40,6 +47,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId }) => {
         onNodesChange={(changes) => handleNodesChange(changes)}
         onEdgesChange={(changes) => handleEdgesChange(changes)}
         onConnect={handleConnect}
+        onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView

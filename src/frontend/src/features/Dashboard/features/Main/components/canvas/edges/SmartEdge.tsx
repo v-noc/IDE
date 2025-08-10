@@ -1,17 +1,28 @@
 import React from "react";
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from "@xyflow/react";
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  type EdgeProps,
+} from "@xyflow/react";
 
-type SmartEdgeProps = React.ComponentProps<typeof BaseEdge> & {
+interface SmartEdgeProps extends EdgeProps {
   label?: string;
-};
+}
 
 const SmartEdge: React.FC<SmartEdgeProps> = (props) => {
+  const { id, markerEnd, markerStart, label } = props;
   const [edgePath, labelX, labelY] = getBezierPath(props);
 
   return (
     <>
-      <BaseEdge path={edgePath} {...props} />
-      {props.label ? (
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerEnd={markerEnd}
+        markerStart={markerStart}
+      />
+      {label ? (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -21,7 +32,7 @@ const SmartEdge: React.FC<SmartEdgeProps> = (props) => {
             }}
             className="rounded bg-background px-1 py-0.5 text-xs shadow"
           >
-            {props.label}
+            {label}
           </div>
         </EdgeLabelRenderer>
       ) : null}

@@ -12,6 +12,33 @@ export type NodeType =
   | "class"
   | "package"
   | "virtual_folder";
+
+export type NodePosition = {
+  line_no: number;
+  col_offset: number;
+  end_line_no: number | null;
+  end_col_offset: number | null;
+};
+
+export interface ImportResponse {
+  _key: string;
+  id: string;
+  from_id: string;
+  to_type: NodeType;
+  to_id: string;
+  from_parent_virtual_folder_id?: string | null;
+  to_parent_virtual_folder_id?: string | null;
+  alias: string;
+  qname: string;
+  position: NodePosition;
+}
+
+export interface FieldResponse {
+  varType: string;
+  varName: string;
+  position: NodePosition;
+}
+
 export interface ProjectTreeResponse {
   key: string;
   name: string;
@@ -20,8 +47,11 @@ export interface ProjectTreeResponse {
   label?: string;
   icon?: string;
   children: ProjectTreeResponse[];
-  isVirtual?: boolean;
-  parentId?: string | null;
+  call_order?: number | null;
+  imports?: ImportResponse[];
+  fields?: FieldResponse[];
+  inputs?: FieldResponse[];
+  outputs?: FieldResponse[];
   description?: string | null;
   theme?: ThemeConfig;
 }
@@ -35,25 +65,20 @@ export interface VirtualFolderResponse {
   link_to?: {
     id: string;
     name: string;
+    description?: string | null;
     qname: string;
     node_type: NodeType;
     icon?: string;
     theme?: ThemeConfig;
+    imports?: ImportResponse[];
+    fields?: FieldResponse[];
+    inputs?: FieldResponse[];
+    outputs?: FieldResponse[];
   } | null;
   children: VirtualFolderResponse[];
   call_order?: number | null;
   icon?: string;
   theme?: ThemeConfig;
-  imports?: Array<{
-    _key: string;
-    id: string;
-    from_id: string;
-    to_id: string;
-    from_parent_virtual_folder_id?: string | null;
-    to_parent_virtual_folder_id?: string | null;
-    alias: string;
-    qname: string;
-  }> | null;
 }
 
 export interface VirtualFolderCreateRequest {

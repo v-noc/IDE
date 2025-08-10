@@ -3,9 +3,9 @@ import api from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 
 export interface CodeElementResponse {
-  element_id: string;
-  element_name: string;
-  element_type: string;
+  id: string;
+  name: string;
+  node_type: string;
   qname: string;
   code: string;
   file_path: string;
