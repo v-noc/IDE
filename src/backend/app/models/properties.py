@@ -2,18 +2,53 @@
 Pydantic models for the 'properties' field of a Node, based on NodeType.
 """
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from .shared import NodePosition
+
+
+class ThemeConfig(BaseModel):
+    navbarColor: Optional[str] = Field(
+        default=None,
+        description="The color of the navbar."
+    )
+    leftSidebarColor: Optional[str] = Field(
+        default=None,
+        description="The color of the left sidebar."
+    )
+    rightSidebarColor: Optional[str] = Field(
+        default=None,
+        description="The color of the right sidebar."
+    )
+    backgroundColor: Optional[str] = Field(
+        default=None,
+        description="The color of the background."
+    )
+    
+    textColor: Optional[str] = Field(
+        default=None,
+        description="The color of the text."
+    )
+    iconColor: Optional[str] = Field(
+        default=None,
+        description="The color of the icon."
+    )
+    cardColor: Optional[str] = Field(
+        default=None,
+        description="The color of the card."
+    )
 
 
 class BaseProperties(BaseModel):
     """A base model for all properties to ensure consistency."""
-    pass
+    metaData: Optional[ThemeConfig] = Field(
+        None,
+        description="The metadata of the layout."
+    )
 
 
 class ProjectProperties(BaseProperties):
     path: str = Field(
-        ..., 
+        ...,
         description="The absolute path to the project directory."
     )
 
@@ -28,12 +63,12 @@ class FileProperties(BaseProperties):
 
 class TypeKeyValuesProperties(BaseProperties):
     varname: str = Field(
-        ..., 
+        ...,
         description="The key of the type key-value pair."
     )
     varType: str = Field(..., description="The type of the variable.")
     position: NodePosition = Field(
-        ..., 
+        ...,
         description="The position of the variable."
     )
 
@@ -41,11 +76,11 @@ class TypeKeyValuesProperties(BaseProperties):
 class FunctionProperties(BaseProperties):
     position: NodePosition
     inputs: List[TypeKeyValuesProperties] = Field(
-        default_factory=list, 
+        default_factory=list,
         description="Function parameters."
     )
     outputs: List[TypeKeyValuesProperties] = Field(
-        default_factory=list, 
+        default_factory=list,
         description="Function return types."
     )
 
@@ -53,7 +88,7 @@ class FunctionProperties(BaseProperties):
 class ClassProperties(BaseProperties):
     position: NodePosition
     fields: List[TypeKeyValuesProperties] = Field(
-        default_factory=list, 
+        default_factory=list,
         description="Class attributes or fields."
     )
 
@@ -63,7 +98,15 @@ class PackageProperties(BaseProperties):
     version: str | None = None
     source: str | None = None  # e.g., "pypi"
     imported_paths: List[str] = Field(
-        default_factory=list, 
+        default_factory=list,
         description="List of specific imports from this package "
                     "(e.g., ['BaseModel', 'Field'])"
     )
+
+
+class VirtualFolderProperties(BaseProperties):
+    pass
+
+
+class VirtualFileProperties(BaseProperties):
+    pass

@@ -5,11 +5,12 @@ from app.models.node import NodePosition
 from app.core.code_elements import Function, Class
 from app.db import collections as db
 from .visitor_context import VisitorContext
-import astpretty as asp
+
 
 class TypeInferenceVisitor(ast.NodeVisitor):
     """
-    A visitor to perform comprehensive type inference for functions and classes.
+    A visitor to perform comprehensive type inference for functions and 
+    classes.
     
     This visitor:
     1. Extracts type hints from function signatures and return annotations
@@ -98,6 +99,17 @@ class TypeInferenceVisitor(ast.NodeVisitor):
         # Remove from class stack
         self.current_class_stack.pop()
 
+    def visit_Call(self, node: ast.Call) -> None:
+        """
+        Infers the type of the variable being assigned the result of a call.
+        This is crucial for tracking class instantiations.
+        """
+        # We need to find the assignment this call is part of.
+        # This requires navigating up the AST, which is not directly
+        # supported by NodeVisitor. A parent-tracking visitor is needed.
+        # For now, we will handle this in visit_Assign.
+        self.generic_visit(node)
+
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         """Process annotated assignments for type information."""
         if isinstance(node.target, ast.Name):
@@ -137,6 +149,16 @@ class TypeInferenceVisitor(ast.NodeVisitor):
 
     def visit_Assign(self, node: ast.Assign) -> None:
         """Process assignments to infer types when no annotation is present."""
+        if isinstance(node.value, ast.Call):
+            # This is an assignment from a call, e.g., `app = MainApp()`
+            inferred_type = self._infer_type_from_value(node.value)
+            if inferred_type:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        var_name = target.id
+                        # Store the inferred type in the context
+                        self.context.local_variable_types[var_name] = inferred_type
+
         # Try to infer type from the value
         if node.value:
             inferred_type = self._infer_type_from_value(node.value)
@@ -146,7 +168,6 @@ class TypeInferenceVisitor(ast.NodeVisitor):
                     var_name = target.id
                  
                     position = self._get_node_position(node)
-                  
                     
                     # If we're in a class (not in method), class attribute
                     if (self.current_class_stack and
@@ -158,7 +179,9 @@ class TypeInferenceVisitor(ast.NodeVisitor):
                         class_path = ".".join(self.current_class_stack)
                         class_qname = f"{file_qname}.{class_path}"
                         
-                        class_id = self.context.symbol_table.get_symbol_id(class_qname)
+                        class_id = self.context.symbol_table.get_symbol_id(
+                            class_qname
+                        )
                         if class_id:
                             class_node = db.nodes.get(class_id)
                             if class_node:
@@ -175,6 +198,10 @@ class TypeInferenceVisitor(ast.NodeVisitor):
                                 self._link_custom_type(inferred_type, field)
                                 
                                 class_obj.add_field(field)
+                    else:
+                        # Store local variable type if we're not in a class
+                        if inferred_type:
+                            self.context.local_variable_types[var_name] = inferred_type
         
         self.generic_visit(node)
 
@@ -213,11 +240,24 @@ class TypeInferenceVisitor(ast.NodeVisitor):
         
         self.generic_visit(node)
 
-    def _process_function_parameters(self, node: ast.FunctionDef, function_obj: Function) -> None:
+    def _process_function_parameters(
+        self, node: ast.FunctionDef, function_obj: Function
+    ) -> None:
         """Extract type information from function parameters."""
         for arg in node.args.args:
             # Skip 'self' parameter
             if arg.arg == 'self':
+                # In a method, 'self' refers to an instance of the class.
+                # We can use this to infer the class type.
+                if self.current_class_stack:
+                    file_qname = self._get_file_qname_from_context()
+                    class_path = ".".join(self.current_class_stack)
+                    class_qname = f"{file_qname}.{class_path}"
+                    # Here we could store that 'self' is of type 
+                    # 'class_qname'
+                    # self.context.set_local_variable_type(
+                    #     'self', class_qname
+                    # )
                 continue
                 
             param_name = arg.arg
@@ -334,7 +374,8 @@ class TypeInferenceVisitor(ast.NodeVisitor):
             return self._extract_base_type(inner)
         
         if type_str.startswith('Dict[') and type_str.endswith(']'):
-            # For Dict[K, V], we could extract both types, but for now just return None
+            # For Dict[K, V], we could extract both types, but for now 
+            # just return None
             return None
         
         if type_str.startswith('Union[') and type_str.endswith(']'):
@@ -375,15 +416,26 @@ class TypeInferenceVisitor(ast.NodeVisitor):
             # Try to infer type from constructor calls
             if isinstance(value_node.func, ast.Name):
                 func_name = value_node.func.id
-                # Check if it's a local class
-                if self.context.symbol_table.is_local_module(func_name):
+                
+                # Check if it's a local class (constructor call)
+                file_qname = self._get_file_qname_from_context()
+                local_class_qname = f"{file_qname}.{func_name}"
+                if self.context.symbol_table.get_symbol_id(local_class_qname):
+                    return local_class_qname
+                
+                # Check if it's just the class name without file prefix
+                if self.context.symbol_table.get_symbol_id(func_name):
                     return func_name
+                
                 # Check builtin types
-                elif func_name in self.builtin_types:
+                if func_name in self.builtin_types:
                     return func_name
         
         elif isinstance(value_node, ast.Name):
-            # Variable reference - could look up its type if we tracked it
+            # Variable reference - look up its type if we tracked it
+            var_name = value_node.id
+            if var_name in self.context.local_variable_types:
+                return self.context.local_variable_types[var_name]
             return None
         
         return None
@@ -408,9 +460,13 @@ class TypeInferenceVisitor(ast.NodeVisitor):
         """Extract position information from an AST node."""
         return NodePosition(
             col_offset=getattr(node, 'col_offset', 0),
-            end_line_no=getattr(node, 'end_lineno', getattr(node, 'lineno', 0)),
+            end_line_no=getattr(
+                node, 'end_lineno', getattr(node, 'lineno', 0)
+            ),
             line_no=getattr(node, 'lineno', 0),
-            end_col_offset=getattr(node, 'end_col_offset', getattr(node, 'col_offset', 0))
+            end_col_offset=getattr(
+                node, 'end_col_offset', getattr(node, 'col_offset', 0)
+            )
         )
 
     def _get_file_qname_from_context(self) -> str:

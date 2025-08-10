@@ -87,6 +87,14 @@ class ArangoNodeCollection(Generic[T]):
         except DocumentGetError:
             return False
 
+    def delete_many(self, filters: dict) -> int:
+        """
+        Deletes documents matching the provided filters and returns the count
+        of deleted documents.
+        """
+        result = self.collection.delete_match(filters, sync=True)
+        return result
+
     def update(self, doc_data: T) -> T:
         """
         Updates an existing document from a Pydantic model.
@@ -171,7 +179,8 @@ class ArangoNodeCollection(Generic[T]):
             )
 
         query = f"""
-        FOR node IN 1..{limit} {direction.upper()} @start_node_id @@edge_collection
+        FOR node IN 1..{limit} {direction.upper()} @start_node_id 
+            @@edge_collection
         """
         bind_vars = {
             "start_node_id": start_node_id,

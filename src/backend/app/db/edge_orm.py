@@ -37,15 +37,34 @@ class ArangoEdgeCollection(Generic[T]):
 
     def _get_or_create_collection(self) -> StandardCollection:
         """
-        Retrieves the edge collection or creates it if it doesn't exist.
+        Retrieves or creates the edge collection and ensures any specified
+        unique indexes from the Pydantic model's `model_config` are applied.
         """
         if self.db.has_collection(self.collection_name):
             collection = self.db.collection(self.collection_name)
-            if collection.properties()['edge']:
-                return collection
-            self.db.delete_collection(self.collection_name)
-        
-        return self.db.create_collection(self.collection_name, edge=True)
+            if not collection.properties().get('edge'):
+                self.db.delete_collection(self.collection_name)
+                collection = self.db.create_collection(
+                    self.collection_name, edge=True
+                )
+        else:
+            collection = self.db.create_collection(
+                self.collection_name, edge=True
+            )
+
+        # Check for and apply unique index from model config
+        unique_field = self.model.model_config.get("unique_on")
+        if unique_field:
+            # Note: add_hash_index is deprecated in favor of add_index
+            collection.add_index(
+                {
+                    "type": "hash",
+                    "fields": [unique_field],
+                    "unique": True
+                }
+            )
+
+        return collection
 
     def find_one(self, filters: dict) -> T | None:
         """
@@ -84,6 +103,24 @@ class ArangoEdgeCollection(Generic[T]):
         meta = self.collection.insert(dump, overwrite=True)
         new_doc = self.collection.get(meta["_key"])
         return self._validate(new_doc)
+
+    def delete(self, filters: Dict[str, Any]) -> int:
+        """
+        Deletes edges matching the provided filters and returns the count of
+        deleted documents.
+        """
+        # Map Python field names to ArangoDB field names
+        arango_filters = {}
+        for key, value in filters.items():
+            if key == 'to_id':
+                arango_filters['_to'] = value
+            elif key == 'from_id':
+                arango_filters['_from'] = value
+            else:
+                arango_filters[key] = value
+
+        result = self.collection.delete_match(arango_filters, sync=True)
+        return result
     
     def update(self, edge_data: T) -> T:
         """
@@ -114,12 +151,17 @@ class ArangoEdgeCollection(Generic[T]):
         """Deletes all edges in the collection."""
         self.collection.truncate()
 
-    def get_descendant_tree_query(self, start_node_id: str) -> List[Dict[str, Any]]:
+    def get_descendant_tree_query(
+        self, start_node_id: str
+    ) -> List[Dict[str, Any]]:
         """
         Executes a graph traversal to fetch all descendants of a start node.
         """
         aql = f"""
         FOR v, e, p IN 1..100 OUTBOUND '{start_node_id}' {self.collection_name}
-            RETURN {{ "vertex": v, "parent_id": p.vertices[-2]._id }}
+            RETURN {{
+                "vertex": v,
+                "parent_id": p.vertices[-2]._id
+            }}
         """
         return list(self.db.aql.execute(aql))

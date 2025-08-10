@@ -1,12 +1,12 @@
 # src/backend/app/core/parser/project_scanner.py
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+import ast
 
 from app.db import collections
 from app.models.edges import (
     BelongsToEdge, ContainsEdge, UsesImportEdge, CallEdge
 )
-from app.models import edges
 from app.models.node import PackageNode
 from app.core.project import Project
 from app.models.properties import PackageProperties
@@ -24,7 +24,7 @@ class ProjectScanner:
     The main entry point and orchestrator for parsing a whole project using
     the advanced two-pass analysis system.
     """
-    def __init__(self, project_path: str):
+    def __init__(self, project_path: str, project_name: Optional[str] = None):
         self.project_path = project_path
         self.file_navigator = FileNavigator(project_path)
         self.code_graph_manager = CodeGraphManager()
@@ -36,10 +36,10 @@ class ProjectScanner:
         self.symbol_table = self.file_parser.symbol_table
         self.created_packages: set = set()
         # Track package name -> ID mapping
+        self.project_name = project_name
         self.package_ids: Dict[str, str] = {}
         self.project = None
-    
-   
+
     def get_project(self) -> Project:
         return self.project
 
@@ -115,6 +115,7 @@ class ProjectScanner:
         """
         Generate the file qname from file path using the same pattern.
         """
+       
         return file_path.replace(
             self.project_path, ""
         ).lstrip("/").replace(".py", "").replace("/", ".")
@@ -258,9 +259,10 @@ class ProjectScanner:
         This now includes Phase 2: Dependency and Import Resolution.
         """
         # Create the main project using CodeGraphManager
-        project_name = os.path.basename(self.project_path)
+        if not self.project_name:
+            self.project_name = os.path.basename(self.project_path)
         self.project = self.code_graph_manager.create_project(
-            name=project_name,
+            name=self.project_name,
             path=self.project_path
         )
     
@@ -282,7 +284,7 @@ class ProjectScanner:
         for file_path in py_files:
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
+                    file_content = f.read()
             except Exception as e:
                 print(f"Error reading file {file_path}: {e}")
                 continue
@@ -295,60 +297,115 @@ class ProjectScanner:
                 print(f"Warning: Could not find file node for {file_path}")
                 continue
 
+            # Get hierarchical structure from file parser
             declared_nodes = self.file_parser.run_declaration_pass(
-                file_path, content
+                file_path, file_content
             )
             
-            # Create nodes and track class-method relationships
-            class_nodes = {}  # qname -> node_id mapping for classes
-            method_parent_mapping = {}  # method_node_id -> class_node_id
+            # Also get the hierarchical visitor for structure information
+            try:
+                tree = ast.parse(file_content, filename=file_path)
+            except SyntaxError as e:
+                print(f"Syntax error in {file_path}: {e}")
+                continue
+                
+            from app.core.parser.python.visitors.declaration_visitor import (
+                DeclarationVisitor
+            )
+            visitor = DeclarationVisitor()
+            visitor.visit(tree)
             
+            # Create all nodes first and track them by qname
+            created_nodes = {}  # qname -> created_node mapping
+            hierarchical_nodes = {}  # qname -> hierarchical_node mapping
+            
+            # Build mapping of qnames to hierarchical nodes
+            all_hierarchical_nodes = visitor.get_all_nodes_flat()
+            for h_node in all_hierarchical_nodes:
+                # Build qname based on hierarchy (same logic as in file_parser)
+                qname_parts = []
+                current = h_node
+                while current:
+                    if hasattr(current.ast_node, 'name'):
+                        qname_parts.insert(0, current.ast_node.name)
+                    current = current.parent
+                
+                file_qname_base = self.get_file_qname_from_path(file_path)
+                if file_qname_base:
+                    full_qname = f"{file_qname_base}.{'.'.join(qname_parts)}"
+                else:
+                    full_qname = '.'.join(qname_parts)
+                
+                hierarchical_nodes[full_qname] = h_node
+            
+            # Create all database nodes
             for node in declared_nodes:
                 created_node = collections.nodes.create(node)
                 self.symbol_table.add_symbol(
                     created_node.qname, created_node.id
                 )
-                
-                # Track class nodes for method linking
-                if created_node.node_type == 'class':
-                    class_nodes[created_node.qname] = created_node.id
-                elif created_node.node_type == 'function':
-                    # Check if this is a method (has parent class in qname)
-                    qname_parts = created_node.qname.split('.')
-                    if len(qname_parts) >= 2:
-                        # Try to find parent class by removing last part of qname
-                        potential_class_qname = '.'.join(qname_parts[:-1])
-                        if potential_class_qname in class_nodes:
-                            method_parent_mapping[created_node.id] = (
-                                class_nodes[potential_class_qname]
-                            )
-                
-                # Link declared nodes to their file with ContainsEdge
-                contains_edge = ContainsEdge(
-                    _from=file_node_id,
-                    _to=created_node.id,
-                    position=node.properties.position
-                )
-                collections.contains_edges.create(contains_edge)
+                created_nodes[created_node.qname] = created_node
                 
                 # Link declared nodes to project with BelongsToEdge
-                # Not Sure the usage of this edge (might be removed)
                 belongs_to_edge = BelongsToEdge(
                     _from=created_node.id,
                     _to=self.project.id
                 )
                 collections.belongs_to_edges.create(belongs_to_edge)
             
-            # Create implements edges for method-class relationships
-            for method_id, class_id in method_parent_mapping.items():
-                implements_edge = edges.ImplementsEdge(
-                    _from=class_id,
-                    _to=method_id
-                )
-                collections.implements_edges.create(implements_edge)
+            # Create ContainsEdge relationships based on actual hierarchy
+            for node in declared_nodes:
+                created_node = created_nodes[node.qname]
+                hierarchical_node = hierarchical_nodes.get(node.qname)
                 
-                
+                if hierarchical_node and hierarchical_node.parent:
+                    # This node has a parent in the hierarchy
+                    parent_h_node = hierarchical_node.parent
+                    
+                    # Build parent qname
+                    parent_qname_parts = []
+                    current = parent_h_node
+                    while current:
+                        if hasattr(current.ast_node, 'name'):
+                            parent_qname_parts.insert(0, current.ast_node.name)
+                        current = current.parent
+                    
+                    file_qname_base = self.get_file_qname_from_path(file_path)
+                    if file_qname_base:
+                        parent_qname = (
+                            f"{file_qname_base}.{'.'.join(parent_qname_parts)}"
+                        )
+                    else:
+                        parent_qname = '.'.join(parent_qname_parts)
+                    
+                    parent_created_node = created_nodes.get(parent_qname)
+                    if parent_created_node:
+                        # Create ContainsEdge from parent to child
+                        contains_edge = ContainsEdge(
+                            _from=parent_created_node.id,
+                            _to=created_node.id,
+                            position=node.properties.position
+                        )
+                        collections.contains_edges.create(contains_edge)
+                    else:
+                        # Parent not found, link to file
+                        contains_edge = ContainsEdge(
+                            _from=file_node_id,
+                            _to=created_node.id,
+                            position=node.properties.position
+                        )
+                        collections.contains_edges.create(contains_edge)
+                else:
+                    # Top-level node, link directly to file
+                    contains_edge = ContainsEdge(
+                        _from=file_node_id,
+                        _to=created_node.id,
+                        position=node.properties.position
+                    )
+                    collections.contains_edges.create(contains_edge)
+
         # Third Pass: Phase 2 - Process dependencies and imports
+        # Now that all nodes are created and in the symbol table, we can
         
         for file_path in py_files:
             # Get the file qname and find the corresponding file node

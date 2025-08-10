@@ -33,19 +33,23 @@ def test_tree_structure(sample_project_path):
 
     main_file = files[0]
 
-    assert (len(main_file.get_functions()) == 3)
+    assert (len(main_file.get_functions()) == 1)
     assert (len(main_file.get_classes()) == 1)
+    methods = main_file.get_classes()[0].methods
+   
+    assert len(methods) == 2
+    
 
     utils_file = files[1]
 
-    assert (len(utils_file.get_functions()) == 2)
+    assert (len(utils_file.get_functions()) == 1)
     assert (len(utils_file.get_classes()) == 1)
 
     utils_class = utils_file.get_classes()[0]
     assert (utils_class.name == "UtilityClass")
 
-    helper_func = utils_file.get_functions()[0]
-    assert (helper_func.name == "helper_function")
+    for func in utils_file.get_functions():
+        assert (func.name in ["do_something", "helper_function"])
 
 
 def test_nested_folder_structure(complex_project_path):

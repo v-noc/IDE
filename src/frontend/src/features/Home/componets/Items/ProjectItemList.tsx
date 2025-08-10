@@ -19,7 +19,7 @@ const ProjectItem = ({
   setEditingProject: (project: Project) => void;
 }) => {
   return (
-    <Card key={project.id} className="hover:shadow-md transition-shadow">
+    <Card key={project.key} className="hover:shadow-md transition-shadow">
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">

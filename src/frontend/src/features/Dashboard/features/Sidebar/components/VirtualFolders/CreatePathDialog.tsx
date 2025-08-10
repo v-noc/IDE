@@ -4,9 +4,9 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { PlusIcon } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import z from "zod";
 import {
   Form,
@@ -16,10 +16,12 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
 import { Textarea } from "@/components/ui/textarea";
+import { useCreatePathForElement } from "@/features/Dashboard/service/useProject";
+import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -28,7 +30,21 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const CreateFolderStructureDialog = () => {
+interface CreatePathDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  node: ProjectTreeResponse;
+}
+
+const CreatePathDialog = ({ isOpen, onClose, node }: CreatePathDialogProps) => {
+  const projectKey = useProjectStore((state) => state.projectData?.key);
+  const queryClient = useQueryClient();
+
+  const { mutate: createPath, isPending } = useCreatePathForElement(
+    projectKey || "",
+    node.key
+  );
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -38,19 +54,32 @@ const CreateFolderStructureDialog = () => {
   });
 
   const onSubmit = (data: FormValues) => {
-    console.log(data);
+    createPath(
+      {
+        name: data.name,
+        description: data.description || "",
+      },
+      {
+        onSuccess: () => {
+          // Close dialog and reset form
+          onClose();
+          form.reset();
+          // Refresh virtual folders list
+          if (projectKey) {
+            queryClient.invalidateQueries({
+              queryKey: ["virtualFolders", projectKey],
+            });
+          }
+        },
+      }
+    );
   };
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="cursor-pointer ">
-          <PlusIcon className="w-4 h-4" />
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create New Folder Structure</DialogTitle>
+          <DialogTitle>Create Path for {node.name}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -80,7 +109,9 @@ const CreateFolderStructureDialog = () => {
                 </FormItem>
               )}
             />
-            <Button type="submit">Create</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Creating..." : "Create Path"}
+            </Button>
           </form>
         </Form>
       </DialogContent>
@@ -88,4 +119,4 @@ const CreateFolderStructureDialog = () => {
   );
 };
 
-export default CreateFolderStructureDialog;
+export default CreatePathDialog;

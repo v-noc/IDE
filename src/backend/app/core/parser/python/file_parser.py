@@ -39,15 +39,16 @@ class PythonFileParser:
         """Constructs a fully qualified name."""
         relative_path = file_path.replace(self.project_root, "").lstrip("/")
         module_path = relative_path.replace(".py", "").replace("/", ".")
-        return f"{module_path}.{'.'.join(parts)}"
+        if parts:
+            return f"{module_path}.{'.'.join(parts)}"
+        return module_path
 
     def run_declaration_pass(
         self, file_path: str, file_content: str
     ) -> List[ArangoBase]:
         """
         Runs the first pass of the analysis to find all high-level 
-        declarations. Returns a list of nodes and a dictionary 
-        mapping methods to their parent classes.
+        declarations. Returns a list of nodes with hierarchical relationships.
         """
         try:
             tree = ast.parse(file_content, filename=file_path)
@@ -62,58 +63,65 @@ class PythonFileParser:
 
         nodes: List[ArangoBase] = []
         
-        # Create class nodes
-        for class_node in visitor.declared_classes:
-            class_qname = self._get_qname(file_path, [class_node.name])
-            nodes.append(ClassNode(
-                name=class_node.name,
-                qname=class_qname,
-                properties=ClassProperties(
-                    fields=[],
-                    position=NodePosition(
-                        line_no=class_node.lineno,
-                        col_offset=class_node.col_offset,
-                        end_line_no=class_node.end_lineno,
-                        end_col_offset=class_node.end_col_offset,
+        # Convert hierarchical nodes to database nodes
+        def create_node_from_hierarchical(hierarchical_node) -> ArangoBase:
+            """Recursively create nodes from hierarchical structure"""
+            ast_node = hierarchical_node.ast_node
+            node_type = hierarchical_node.node_type
+            
+            # Build qname based on hierarchy
+            qname_parts = []
+            current = hierarchical_node
+            while current:
+                if hasattr(current.ast_node, 'name'):
+                    qname_parts.insert(0, current.ast_node.name)
+                current = current.parent
+            
+            # Add file module path to qname
+            file_qname_base = self._get_qname(file_path, [])
+            qname_parts_str = '.'.join(qname_parts)
+            
+            if file_qname_base and qname_parts_str:
+                full_qname = f"{file_qname_base}.{qname_parts_str}"
+            elif file_qname_base:
+                full_qname = file_qname_base
+            else:
+                full_qname = qname_parts_str
+            
+            if node_type == 'class':
+                return ClassNode(
+                    name=ast_node.name,
+                    qname=full_qname,
+                    properties=ClassProperties(
+                        fields=[],
+                        position=NodePosition(
+                            line_no=ast_node.lineno,
+                            col_offset=ast_node.col_offset,
+                            end_line_no=ast_node.end_lineno,
+                            end_col_offset=ast_node.end_col_offset,
+                        )
                     )
                 )
-            ))
-
-        # Create method nodes (functions that belong to classes)
-        for method_node, parent_class in visitor.methods:
-            method_qname = self._get_qname(
-                file_path, 
-                [parent_class.name, method_node.name]
-            )
-            nodes.append(FunctionNode(
-                name=method_node.name,
-                qname=method_qname,
-                properties=FunctionProperties(
-                    position=NodePosition(
-                        line_no=method_node.lineno,
-                        col_offset=method_node.col_offset,
-                        end_line_no=method_node.end_lineno,
-                        end_col_offset=method_node.end_col_offset,
+            elif node_type == 'function':
+                return FunctionNode(
+                    name=ast_node.name,
+                    qname=full_qname,
+                    properties=FunctionProperties(
+                        position=NodePosition(
+                            line_no=ast_node.lineno,
+                            col_offset=ast_node.col_offset,
+                            end_line_no=ast_node.end_lineno,
+                            end_col_offset=ast_node.end_col_offset,
+                        )
                     )
                 )
-            ))
-
-        # Create standalone function nodes
-        for func_node in visitor.declared_functions:
-            func_qname = self._get_qname(file_path, [func_node.name])
-            nodes.append(FunctionNode(
-                name=func_node.name,
-                qname=func_qname,
-                properties=FunctionProperties(
-                    position=NodePosition(
-                        line_no=func_node.lineno,
-                        col_offset=func_node.col_offset,
-                        end_line_no=func_node.end_lineno,
-                        end_col_offset=func_node.end_col_offset,
-                    )
-                )
-            ))
         
+        # Process all hierarchical nodes and create database nodes
+        all_hierarchical_nodes = visitor.get_all_nodes_flat()
+        for hierarchical_node in all_hierarchical_nodes:
+            db_node = create_node_from_hierarchical(hierarchical_node)
+            nodes.append(db_node)
+            
         return nodes
     
     def run_detail_pass(
@@ -161,13 +169,13 @@ class PythonFileParser:
         dependency_visitor = DependencyVisitor(context)
         dependency_visitor.visit(tree)
         
-        # Phase 2: Call Resolution
-        call_visitor = CallVisitor(context)
-        call_visitor.visit(tree)
-        
-        # Phase 4: Type Inference (enabled now)
+        # Phase 4: Type Inference (must run before Call Resolution)
         type_inference_visitor = TypeInferenceVisitor(context)
         type_inference_visitor.visit(tree)
+        
+        # Phase 2: Call Resolution (runs after type inference)
+        call_visitor = CallVisitor(context)
+        call_visitor.visit(tree)
         
         # Future phases will add:
         # Phase 3: Control Flow Analysis

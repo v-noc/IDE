@@ -1,0 +1,11 @@
+import React from "react";
+import SplitRight from "@/features/Dashboard/features/Canvas/componets/sidebar";
+
+const MainWithRightSidebar: React.FC<{
+  left: React.ReactNode;
+  right: React.ReactNode;
+}> = ({ left, right }) => {
+  return <SplitRight left={left} right={right} />;
+};
+
+export default MainWithRightSidebar;

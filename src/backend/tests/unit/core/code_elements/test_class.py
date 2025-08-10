@@ -75,5 +75,5 @@ def test_add_method_to_class(created_class: Class):
     assert retrieved_func_node.qname == "test_project.test_module.TestClass::new_method"
 
     # Verify the 'implements' edge was created
-    implements_edge = db.implements_edges.find({"_from": created_class.id, "_to": method_func.id})
+    implements_edge = created_class.methods
     assert len(implements_edge) == 1

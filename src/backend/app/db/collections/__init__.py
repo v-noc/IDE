@@ -1,8 +1,8 @@
 # src/backend/app/db/collections/__init__.py
+from app.models import node, edges
 
 from ..node_orm import ArangoNodeCollection
 from ..edge_orm import ArangoEdgeCollection
-from ...models import node, edges
 
 # ==============================================================================
 # Node Collections
@@ -24,10 +24,22 @@ belongs_to_edges = ArangoEdgeCollection[edges.BelongsToEdge](
     model=edges.BelongsToEdge
 )
 
+# Edge collection for linking a virtual folder to a code element.
+links_to_edges = ArangoEdgeCollection[edges.LinksToEdge](
+    collection_name="links_to",
+    model=edges.LinksToEdge
+)
+
 # Edge collection for representing containment (e.g., file in a folder).
 contains_edges = ArangoEdgeCollection[edges.ContainsEdge](
     collection_name="contains",
     model=edges.ContainsEdge
+)
+
+# Edge collection for representing virtual containment (e.g., file in a virtual folder).
+virtual_contains_edges = ArangoEdgeCollection[edges.VirtualContainsEdge](
+    collection_name="virtual_contains",
+    model=edges.VirtualContainsEdge
 )
 
 # Edge collection for representing function/method calls.

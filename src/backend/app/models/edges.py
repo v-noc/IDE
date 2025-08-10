@@ -1,6 +1,6 @@
 from .base import BaseEdge
-from .node import NodePosition
-from pydantic import Field
+from .shared import NodePosition
+from pydantic import Field, ConfigDict
 
 
 class BelongsToEdge(BaseEdge):
@@ -16,6 +16,13 @@ class ContainsEdge(BaseEdge):
     position: NodePosition = Field(
         ..., description="The position of the contained node."
     )
+
+
+class VirtualContainsEdge(BaseEdge):
+    """Represents that a virtual folder is contained within another 
+    (e.g., file in a folder).
+    """
+    edge_type: str = "virtual_contains"
 
 
 class CallEdge(BaseEdge):
@@ -60,3 +67,18 @@ class UsesImportEdge(BaseEdge):
 class ImplementsEdge(BaseEdge):
     """Links a class to one of its methods (a function)."""
     edge_type: str = "implements"
+
+
+class LinksToEdge(BaseEdge):
+    """
+    Creates a logical link from a virtual container (e.g., a virtual folder)
+    to a code element.
+    """
+    edge_type: str = "links_to"
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        # A virtual folder can only be linked to one code element.
+        unique_on="_from",
+    )
+    

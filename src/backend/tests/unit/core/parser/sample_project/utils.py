@@ -1,6 +1,9 @@
 # src/backend/tests/unit/core/parser/sample_project/utils.py
 
-def helper_function():
+from typing import Optional
+
+
+def helper_function(i:int, b:Optional[bool]=False)->str:
     """A simple helper function."""
     print("This is a helper.")
 

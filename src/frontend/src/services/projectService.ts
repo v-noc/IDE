@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../lib/api';
+import apiClient from '@/lib/api';
+import API_ROUTES from '@/lib/apiRoutes';
 
 interface Project {
   key: string;
@@ -9,11 +10,11 @@ interface Project {
 
 // API functions using the new client
 const fetchProjects = (): Promise<Project[]> => {
-  return apiClient('/projects/');
+  return apiClient(API_ROUTES.PROJECTS);
 };
 
 const createProject = (newProject: { name: string; path: string }): Promise<Project> => {
-  return apiClient('/project/', { body: newProject });
+  return apiClient(API_ROUTES.PROJECTS, { body: newProject });
 };
 
 // React Query hooks (no changes needed here)
