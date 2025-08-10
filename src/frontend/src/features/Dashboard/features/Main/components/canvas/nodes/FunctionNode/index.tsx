@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { FunctionNodeProps } from "../../types/node";
+import { DynamicIcon } from "@/components/DynamicIcon";
+import { getIcons } from "@/features/Dashboard/utils";
+import { cn } from "@/lib/utils";
 
 type FunctionNodeData = Omit<FunctionNodeProps, "id" | "children">;
 
@@ -36,34 +39,40 @@ const FunctionNode: React.FC<
   return (
     <div
       {...props}
-      className={`w-[360px] rounded-xl border-2 bg-card text-card-foreground shadow ${successColor}`}
+      className={`w-[300px] rounded-xl border-2 bg-card text-card-foreground shadow ${successColor}`}
     >
       <div className="border-b px-4 py-3 text-base font-semibold flex items-center gap-2">
-        <span>🔧</span>
-        <span>{data.name}</span>
+        <DynamicIcon
+          iconName={data.icon || getIcons("function")}
+          className={cn("h-4 w-4 flex-shrink-0")}
+          color={data.theme?.iconColor}
+        />
+        <span className={cn("text-sm", data.theme?.textColor)}>
+          {data.name}
+        </span>
       </div>
-      {data.isExpanded ? (
-        <div className="px-4 py-3 text-sm space-y-3">
-          <Section title="↓ Inputs" initiallyOpen>
-            <ul className="list-disc ml-5 space-y-0.5">
-              {(data.inputs ?? []).map((i) => (
-                <li key={i.name}>
-                  <span className="font-medium">{i.name}</span>: {i.type}
-                </li>
-              ))}
-            </ul>
-          </Section>
-          <Section title="↑ Outputs" initiallyOpen>
-            <ul className="list-disc ml-5 space-y-0.5">
-              {(data.outputs ?? []).map((o) => (
-                <li key={o.name}>
-                  <span className="font-medium">{o.name}</span>: {o.type}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        </div>
-      ) : null}
+
+      <div className="px-4 py-3 text-sm space-y-3">
+        <Section title="↓ Inputs" initiallyOpen>
+          <ul className="list-disc ml-5 space-y-0.5">
+            {(data.inputs ?? []).map((i) => (
+              <li key={i.varname}>
+                <span className="font-medium">{i.varname}</span>: {i.varType}
+              </li>
+            ))}
+          </ul>
+        </Section>
+        <Section title="↑ Outputs" initiallyOpen>
+          <ul className="list-disc ml-5 space-y-0.5">
+            {(data.outputs ?? []).map((o) => (
+              <li key={o.varname}>
+                <span className="font-medium">{o.varname}</span>: {o.varType}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      </div>
+
       {data.performance ? (
         <div className="grid grid-cols-3 items-center gap-2 px-4 py-3 text-sm border-t">
           <span>⚡ {data.performance.avgTime ?? 0}ms</span>

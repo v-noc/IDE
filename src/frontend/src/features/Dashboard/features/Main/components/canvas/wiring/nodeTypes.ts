@@ -1,9 +1,10 @@
 import type { NodeTypes } from "@xyflow/react";
-import { FunctionNode, ClassNode } from "../nodes";
+import { FunctionNode, ClassNode, MethodNode } from "../nodes";
 
 export const nodeTypes: NodeTypes = {
-    functionNode: FunctionNode,
-    classNode: ClassNode,
+    function: FunctionNode,
+    class: ClassNode,
+    method: MethodNode,
 };
 
 

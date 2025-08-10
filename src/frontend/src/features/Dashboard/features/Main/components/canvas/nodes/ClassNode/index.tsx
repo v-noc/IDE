@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { ClassNodeProps } from "../../types/node";
+import { DynamicIcon } from "@/components/DynamicIcon";
+import { getIcons } from "@/features/Dashboard/utils";
+import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 type ClassNodeData = Omit<ClassNodeProps, "id">;
 
@@ -32,49 +36,60 @@ const ClassNode: React.FC<
   return (
     <div
       {...props}
-      className="w-[360px] rounded-xl border bg-card text-card-foreground shadow"
+      className="w-[300px] rounded-xl border bg-card text-card-foreground shadow"
     >
       <div className="border-b px-4 py-3 text-base font-semibold flex items-center gap-2">
-        <span>🏛️</span>
-        <span>{data.name}</span>
+        <DynamicIcon
+          iconName={data.icon || getIcons("class")}
+          className={cn("h-4 w-4 flex-shrink-0")}
+          color={data.theme?.iconColor}
+        />
+        <span className={cn("text-sm", data.theme?.textColor)}>
+          {data.name}
+        </span>
       </div>
-      {data.isExpanded ? (
-        <div className="px-4 py-3 space-y-3">
-          <Section title="📋 Fields" initiallyOpen>
-            <ul className="list-disc ml-5 space-y-0.5">
-              {(data.fields ?? []).map((f) => (
-                <li key={f.name}>
-                  <span className="font-medium">{f.name}</span>: {f.type}
-                </li>
-              ))}
-            </ul>
-          </Section>
-          <Section title="🔧 Methods" initiallyOpen>
-            <ul className="ml-1 space-y-1">
-              {(data.methods ?? []).map((m) => (
-                <li key={m.name}>
-                  <button
-                    className="w-full text-left px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Hook for future: expand method as separate flow
-                    }}
-                  >
-                    <span>🛠️</span>
-                    <span className="font-medium">{m.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {m.returnType ? ` → ${m.returnType}` : ""}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Section>
-          <div className="text-xs text-muted-foreground px-1">
-            📦 From: {data.sourceFile}
-          </div>
+
+      <div className="px-4 py-3 space-y-3">
+        <Section title="📋 Fields" initiallyOpen>
+          <Separator />
+          <ul className="list-disc ml-5 space-y-0.5">
+            {(data.fields ?? []).map((f) => (
+              <li key={f.varname}>
+                <span className="font-medium">{f.varname}</span>: {f.varType}
+              </li>
+            ))}
+          </ul>
+        </Section>
+        <Section title="🔧 Methods" initiallyOpen>
+          <Separator />
+          <ul className="ml-1 space-y-1">
+            {(data.methods ?? []).map((m) => (
+              <li key={m.name}>
+                <button
+                  className="w-full text-left px-2 py-1 rounded hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Hook for future: expand method as separate flow
+                  }}
+                >
+                  <DynamicIcon
+                    iconName={m.icon || getIcons("function")}
+                    className={cn("h-4 w-4 flex-shrink-0")}
+                    color={m.theme?.iconColor}
+                  />
+                  <span className={cn("text-sm", m.theme?.textColor)}>
+                    {m.name}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+        <div className="text-xs text-muted-foreground px-1">
+          📦 From: {data.sourceFile}
         </div>
-      ) : null}
+      </div>
+
       <Handle type="target" position={Position.Top} />
       <Handle type="source" position={Position.Bottom} />
     </div>

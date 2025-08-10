@@ -48,7 +48,7 @@ export const NodeContent = ({
   };
 
   // Check if this node has a description (for virtual folders)
-  const hasDescription = node.isVirtual && node.description;
+  const hasDescription = node.description;
 
   const nodeContent = (
     <li

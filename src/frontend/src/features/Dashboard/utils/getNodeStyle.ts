@@ -1,6 +1,7 @@
-import type { ProjectTreeResponse } from "../service/useProject";
+import type { NodeType } from "../service/useProject";
+import type { ThemeConfig } from "../store/useThemeStore";
 
-const getNodeStyle = (node: ProjectTreeResponse) => {
+const getNodeStyle = (node: { node_type: NodeType, theme?: ThemeConfig }) => {
     // If node has theme overrides, prefer them
     const themed = node.theme || {};
 

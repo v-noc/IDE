@@ -35,7 +35,7 @@ export interface ImportResponse {
 
 export interface FieldResponse {
   varType: string;
-  varName: string;
+  varname: string;
   position: NodePosition;
 }
 

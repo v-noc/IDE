@@ -1,10 +1,17 @@
+import type { FieldResponse } from "@/features/Dashboard/service/useProject";
 export interface FunctionNodeProps {
     id: string;
     name: string;
     qname: string;
-    inputs: Array<{ name: string; type: string }>;
-    outputs: Array<{ name: string; type: string }>;
+    inputs: FieldResponse[];
+    outputs: FieldResponse[];
     callOrder: number;
+    icon: string;
+    theme?: {
+        iconColor?: string;
+        cardColor?: string;
+        textColor?: string;
+    };
     performance?: {
         avgTime?: number;
         runCount?: number;
@@ -18,8 +25,15 @@ export interface ClassNodeProps {
     id: string;
     name: string;
     qname: string;
-    fields: Array<{ name: string; type: string }>;
-    methods: Array<{ name: string; returnType?: string }>;
+    icon: string;
+    theme?: {
+        iconColor?: string;
+        cardColor?: string;
+        textColor?: string;
+
+    };
+    fields: FieldResponse[];
+    methods: FunctionNodeProps[];
     sourceFile: string;
     isExpanded?: boolean;
 }
