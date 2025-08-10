@@ -7,7 +7,10 @@ const MainCanvas = () => {
 
   return (
     <div className="flex h-full w-full flex-col gap-2 p-2">
-      <Tabs defaultValue="code" className="flex h-full w-full flex-col">
+      <Tabs
+        defaultValue="code"
+        className="flex h-full w-full flex-col bg-background rounded"
+      >
         <TabsList>
           <TabsTrigger value="code">Code</TabsTrigger>
           <TabsTrigger value="docs">Docs</TabsTrigger>

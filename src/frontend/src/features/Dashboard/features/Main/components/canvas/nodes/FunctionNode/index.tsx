@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Handle, Position } from "@xyflow/react";
+import { Position } from "@xyflow/react";
+import CustomHandle from "../CustomHandle";
 import type { FunctionNodeProps } from "../../types/node";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { getIcons } from "@/features/Dashboard/utils";
@@ -32,14 +33,14 @@ const Section: React.FC<{
 const FunctionNode: React.FC<
   { data: FunctionNodeData } & React.ComponentProps<"div">
 > = ({ data, ...props }) => {
-  const successColor =
-    data.performance?.successRate && data.performance.successRate >= 0.95
-      ? "border-green-500"
-      : "border-red-500";
+  // const successColor =
+  //   data.performance?.successRate && data.performance.successRate >= 0.95
+  //     ? "border-green-500"
+  //     : "border-red-500";
   return (
     <div
       {...props}
-      className={`w-[300px] rounded-xl border-2 bg-card text-card-foreground shadow ${successColor}`}
+      className={`w-[300px] rounded-xl border-2 bg-card text-card-foreground shadow `}
     >
       <div className="border-b px-4 py-3 text-base font-semibold flex items-center gap-2">
         <DynamicIcon
@@ -82,8 +83,8 @@ const FunctionNode: React.FC<
           </span>
         </div>
       ) : null}
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom} />
+      <CustomHandle type="target" position={Position.Left} size={16} />
+      <CustomHandle type="source" position={Position.Right} size={16} />
     </div>
   );
 };

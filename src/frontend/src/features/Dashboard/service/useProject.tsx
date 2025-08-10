@@ -44,6 +44,7 @@ export interface ProjectTreeResponse {
   name: string;
   path?: string;
   node_type: NodeType;
+
   label?: string;
   icon?: string;
   children: ProjectTreeResponse[];

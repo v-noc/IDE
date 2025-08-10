@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Handle, Position } from "@xyflow/react";
+import { Position } from "@xyflow/react";
+import CustomHandle from "../CustomHandle";
 import type { ClassNodeProps } from "../../types/node";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { getIcons } from "@/features/Dashboard/utils";
@@ -90,8 +91,8 @@ const ClassNode: React.FC<
         </div>
       </div>
 
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom} />
+      <CustomHandle type="target" position={Position.Left} size={16} />
+      <CustomHandle type="source" position={Position.Right} size={16} />
     </div>
   );
 };

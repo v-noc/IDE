@@ -10,6 +10,7 @@ import type { ThemeConfig } from "@/features/Dashboard/store/useThemeStore";
 interface CommonVNode {
     key: string;
     name: string;
+    description?: string | null;
     node_type: NodeType; // final renderer type: function | class | virtual_folder | etc.
     qname?: string;
     icon?: string;
@@ -31,6 +32,7 @@ function processVirtualFolders(vf: VirtualFolderResponse): CommonVNode {
     const base: CommonVNode = {
         key: vf.key, // always use virtual folder key (do not use link_to id)
         name: vf.name || lt?.name || "",
+        call_order: vf.call_order,
         node_type: (lt?.node_type || vf.node_type) as NodeType,
         qname: vf.qname || lt?.qname,
         children: (vf.children || []).map(processVirtualFolders),
@@ -121,10 +123,24 @@ export function useCanvasGraph(
         }
 
         if (nodesToBeRender == null) return [];
+        // Sort by call_order (undefined/null treated as Infinity so they go last)
+        const ordered = [...nodesToBeRender].sort((a, b) => {
+            const ao = a.call_order ?? Number.POSITIVE_INFINITY;
+            const bo = b.call_order ?? Number.POSITIVE_INFINITY;
+            return ao - bo;
+        });
+
         const nodes: Node[] = [];
 
+        // Add START circle node
+        nodes.push({
+            type: "circle",
+            id: `__start__-${node.key}`,
+            position: { x: -160, y: 0 },
+            data: { label: "Start", kind: "start" },
+        } as unknown as Node);
 
-        nodesToBeRender.forEach((child, index) => {
+        ordered.forEach((child, index) => {
             const position = { x: index * 420, y: 0 };
             const isExpanded = expandedNodeIds.includes(child.key);
 
@@ -190,11 +206,44 @@ export function useCanvasGraph(
             }
         });
 
+        // Add END circle node
+        nodes.push({
+            type: "circle",
+            id: `__end__-${node.key}`,
+            position: { x: ordered.length * 420, y: 0 },
+            data: { label: "End", kind: "end" },
+        } as unknown as Node);
+
         return nodes;
     }, [selectedFromSources, expandedNodeIds]);
 
 
+    const initialEdges = useMemo((): Edge[] => {
+        if (!initialNodes || initialNodes.length === 0) return [];
+        const startNode = initialNodes.find((n) => n.type === "circle" && n.id.startsWith("__start__"));
+        const endNode = initialNodes.find((n) => n.type === "circle" && n.id.startsWith("__end__"));
+        const dataNodes = initialNodes
+            .filter((n) => n.type !== "circle")
+            .sort((a, b) => (a.position?.x ?? 0) - (b.position?.x ?? 0));
 
+        const sequenceIds: string[] = [];
+        if (startNode) sequenceIds.push(startNode.id);
+        sequenceIds.push(...dataNodes.map((n) => n.id));
+        if (endNode) sequenceIds.push(endNode.id);
+
+        const edges: Edge[] = [];
+        for (let i = 0; i < sequenceIds.length - 1; i++) {
+            const source = sequenceIds[i];
+            const target = sequenceIds[i + 1];
+            edges.push({
+                id: `e-${source}-${target}`,
+                source,
+                target,
+                type: "smartEdge",
+            });
+        }
+        return edges;
+    }, [initialNodes]);
     const onNodesChange = useCallback(() => { }, []);
     const onEdgesChange = useCallback(() => { }, []);
 
@@ -206,7 +255,7 @@ export function useCanvasGraph(
 
     return {
         initialNodes,
-        initialEdges: [],
+        initialEdges,
         selected: selectedFromSources.node,
         parent: selectedFromSources.parent,
         onNodesChange,
