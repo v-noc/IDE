@@ -67,19 +67,19 @@ const Layout = ({
 }) => {
   const [isRightOpen, setIsRightOpen] = useState(true);
   const { theme, setTheme } = useThemeStore();
-  const { projectData, selectedNodeId } = useProjectStore();
+  const { projectData, selectedNode } = useProjectStore();
 
   const selectedPath = useMemo(() => {
     // Returns path from root to selected node (inclusive)
     const path: ProjectTreeResponse[] = [];
-    if (!projectData || !selectedNodeId) return path;
+    if (!projectData || !selectedNode) return path;
 
     const dfs = (
       node: ProjectTreeResponse,
       acc: ProjectTreeResponse[]
     ): boolean => {
       acc.push(node);
-      if (node.key === selectedNodeId) return true;
+      if (node.key === selectedNode.id) return true;
       if (node.children) {
         for (const child of node.children) {
           if (dfs(child, acc)) return true;
@@ -92,11 +92,11 @@ const Layout = ({
     const tmp: ProjectTreeResponse[] = [];
     if (dfs(projectData, tmp)) return tmp;
     return [];
-  }, [projectData, selectedNodeId]);
+  }, [projectData, selectedNode]);
 
   const resolvedTheme = useMemo(() => {
     // Merge themes along the path from root to selected node, allowing child to override
-    if (selectedNodeId && selectedPath.length > 0) {
+    if (selectedNode && selectedPath.length > 0) {
       let merged: ThemeConfig | undefined = undefined;
       for (const node of selectedPath) {
         merged = mergeThemes(merged, normalizeTheme(node.theme));
@@ -105,14 +105,14 @@ const Layout = ({
     }
 
     // No node found in project tree; do not override externally set theme
-    if (selectedNodeId && selectedPath.length === 0) {
+    if (selectedNode && selectedPath.length === 0) {
       return undefined;
     }
 
     // No node selected → use project theme if available and non-empty
     const projectTheme = normalizeTheme(projectData?.theme);
     return hasEffectiveTheme(projectTheme) ? projectTheme : undefined;
-  }, [selectedNodeId, selectedPath, projectData?.theme]);
+  }, [selectedNode, selectedPath, projectData?.theme]);
 
   useEffect(() => {
     if (resolvedTheme !== undefined) {

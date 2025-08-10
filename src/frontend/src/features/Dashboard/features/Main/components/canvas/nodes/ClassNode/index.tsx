@@ -39,6 +39,7 @@ const ClassNode: React.FC<
       title={data.name}
       theme={data.theme}
       isSelected={data.isSelected ?? false}
+      type="class"
       {...props}
     >
       <div className="space-y-3">

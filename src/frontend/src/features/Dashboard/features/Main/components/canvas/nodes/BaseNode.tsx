@@ -4,6 +4,9 @@ import CustomHandle from "./CustomHandle";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import { cn } from "@/lib/utils";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import type { NodeType } from "@/features/Dashboard/service/useProject";
+import { Button } from "@/components/ui/button";
+import { ExpandIcon } from "lucide-react";
 
 type BaseNodeTheme = {
   iconColor?: string;
@@ -15,8 +18,9 @@ interface BaseNodeProps extends React.ComponentProps<"div"> {
   id: string;
   iconName?: string;
   title: string;
+  type: NodeType;
   theme?: BaseNodeTheme;
-  headerRight?: React.ReactNode;
+
   showHandles?: boolean;
   isSelected: boolean;
 }
@@ -26,18 +30,18 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   iconName,
   title,
   theme,
-  headerRight,
+  type,
+
   showHandles = true,
   className = "",
   isSelected,
   children,
   ...rest
 }) => {
-  const { setSelectedNodeId } = useProjectStore();
+  const { setSelectedNode, selectedNode } = useProjectStore();
 
   const rf = useReactFlow();
   const nodeRef = useRef<HTMLDivElement | null>(null);
-  const hasCentered = useRef(false);
 
   const centerNode = useCallback(() => {
     const node = rf.getNode(id);
@@ -53,7 +57,6 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   };
 
   useEffect(() => {
-    console.log("isSelected", isSelected, " ", hasCentered);
     if (isSelected) {
       // wait a tick so layout has widths/heights
       setTimeout(() => {
@@ -66,21 +69,28 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       ref={nodeRef}
       {...rest}
       className={cn(
-        "w-[300px] rounded-xl bg-card text-card-foreground shadow border",
-        isSelected ? "ring-2 ring-primary border-primary" : "",
+        "w-[300px] rounded-xl bg-card text-card-foreground shadow border cursor-pointer",
+        selectedNode?.id === id ? "ring-2 ring-primary border-primary" : "",
         className
       )}
       style={{
         ...(rest.style as React.CSSProperties),
         ...(theme?.cardColor ? { backgroundColor: theme.cardColor } : {}),
       }}
-      onClick={() => setSelectedNodeId(id)}
+      onClick={() =>
+        setSelectedNode({
+          id,
+          type,
+          isExpanded: false,
+          doNotReRenderCanvas: true,
+        })
+      }
       onDoubleClick={handleDoubleClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
-          setSelectedNodeId(id);
+          setSelectedNode({ id, type });
         }
       }}
     >
@@ -101,7 +111,18 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             {title}
           </span>
         </div>
-        {headerRight}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hover:bg-transparent hover:cursor-pointer rounded-full "
+          onClick={(e) => {
+            e.stopPropagation();
+
+            setSelectedNode({ id, type, isExpanded: true });
+          }}
+        >
+          <ExpandIcon style={{ color: theme?.textColor }} />
+        </Button>
       </div>
       <div className="px-4 py-3">{children}</div>
       {showHandles ? (

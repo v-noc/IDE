@@ -95,8 +95,8 @@ export const useUpdateNodeTheme = (projectKey?: string) => {
         }
       );
       // Re-assert selection to avoid any transient resets
-      const { setSelectedNodeId } = useProjectStore.getState();
-      setSelectedNodeId(variables.elementKey);
+      const { setSelectedNode } = useProjectStore.getState();
+      setSelectedNode({ id: variables.elementKey, type: _data.node_type });
       // Optionally refetch in background without breaking selection
       // await queryClient.invalidateQueries({ queryKey: ["projectTree", projectKey], refetchType: "inactive" });
     },
@@ -121,8 +121,8 @@ export const useUpdateNodeIcon = (projectKey?: string) => {
           }));
         }
       );
-      const { setSelectedNodeId } = useProjectStore.getState();
-      setSelectedNodeId(variables.elementKey);
+      const { setSelectedNode } = useProjectStore.getState();
+      setSelectedNode({ id: variables.elementKey, type: _data.node_type });
     },
   });
 };
@@ -151,8 +151,8 @@ export const useUpdateNodeBasicInfo = (projectKey?: string) => {
           }));
         }
       );
-      const { setSelectedNodeId } = useProjectStore.getState();
-      setSelectedNodeId(variables.elementKey);
+      const { setSelectedNode } = useProjectStore.getState();
+      setSelectedNode({ id: variables.elementKey, type: _data.node_type });
     },
   });
 };

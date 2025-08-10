@@ -81,7 +81,7 @@ export function useCanvasGraph(
 ) {
     const { projectData } = useProjectStore();
     const projectKey = projectId || projectData?.key || "";
-    const selectedNodeId = useProjectStore((s) => s.selectedNodeId);
+    const selectedNode = useProjectStore((s) => s.selectedNode);
     // keep selected for upcoming steps; expanded will be used later when rendering
     const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
 
@@ -90,38 +90,44 @@ export function useCanvasGraph(
     const { data: projTree } = useGetProjectTreeWithKeyProject({ key: projectKey });
     // Step 1: extract selected node and its parent from project tree or virtual folders
     const selectedFromSources = useMemo(() => {
-        if (!selectedNodeId) return { node: null as CommonVNode | null, parent: null as CommonVNode | null };
+
+        if (!selectedNode) return { node: null as CommonVNode | null, parent: null as CommonVNode | null };
         // Prefer project tree first
         if (projTree) {
 
-            const hit = findNodeAndParentByKey(projTree, selectedNodeId);
+            const hit = findNodeAndParentByKey(projTree, selectedNode.id);
             if (hit.node) return hit;
         }
         if (vfs && vfs.length > 0) {
             for (const vf of vfs) {
                 const vfRoot = processVirtualFolders(vf);
-                const hit = findNodeAndParentByKey(vfRoot, selectedNodeId);
+                const hit = findNodeAndParentByKey(vfRoot, selectedNode.id);
                 if (hit.node) return hit;
             }
         }
         return { node: null as CommonVNode | null, parent: null as CommonVNode | null };
-    }, [selectedNodeId, projTree, vfs]);
+    }, [selectedNode, projTree, vfs]);
 
     const initialNodes = useMemo((): Node[] => {
         const { node, parent } = selectedFromSources;
 
-        if (!node || (!node.children || node.children.length === 0) && (!parent?.children || parent.children.length === 0)) return [];
-        let selectedNode: CommonVNode | null = null;
+        if (!node) return [];
+
         let nodesToBeRender: CommonVNode[] | null = null;
-        if (expandedNodeIds.includes(node.key) && node.children && node.children.length > 0) {
-            nodesToBeRender = node.children;
-        }
-        else if (parent == null || !["class", "function"].includes(parent.node_type)) {
-            nodesToBeRender = node.children;
+        let isDefinitionNode = false;
+
+        if (parent == null || !["class", "function"].includes(parent.node_type)) {
+            if (selectedNode?.isExpanded) {
+                nodesToBeRender = node.children;
+            } else {
+                isDefinitionNode = true;
+                nodesToBeRender = [node];
+            }
+
         } else if (parent != null &&
             ["class", "function"].includes(parent.node_type)) {
             nodesToBeRender = parent.children;
-            selectedNode = node;
+
         }
 
         if (nodesToBeRender == null) return [];
@@ -135,13 +141,14 @@ export function useCanvasGraph(
         const nodes: Node[] = [];
 
         // Add START circle node
-        nodes.push({
-            type: "circle",
-            id: `__start__-${node.key}`,
-            position: { x: -160, y: 0 },
-            data: { label: "Start", kind: "start" },
-        } as unknown as Node);
-
+        if (!isDefinitionNode) {
+            nodes.push({
+                type: "circle",
+                id: `__start__-${node.key}`,
+                position: { x: -160, y: 0 },
+                data: { label: "Start", kind: "start" },
+            } as unknown as Node);
+        }
         ordered.forEach((child, index) => {
             const position = { x: index * 420, y: 0 };
             const isExpanded = expandedNodeIds.includes(child.key);
@@ -168,7 +175,7 @@ export function useCanvasGraph(
                         icon: child.icon,
                         theme: nodeTheme,
                         isExpanded,
-                        isSelected: selectedNode?.key === child.key,
+                        isSelected: selectedNode?.id === child.key,
                     },
                 });
             } else if (child.node_type === "function" && parent != null && parent.node_type === "class") {
@@ -187,7 +194,7 @@ export function useCanvasGraph(
                         icon: child.icon,
                         theme: nodeTheme,
                         isExpanded,
-                        isSelected: selectedNode?.key === child.key,
+                        isSelected: selectedNode?.id === child.key,
                     },
                 });
             } else if (child.node_type === "function") {
@@ -205,20 +212,22 @@ export function useCanvasGraph(
                         icon: child.icon,
                         theme: nodeTheme,
                         isExpanded,
-                        isSelected: selectedNode?.key === child.key,
+                        isSelected: selectedNode?.id === child.key,
                     },
                 });
             }
         });
 
         // Add END circle node
-        nodes.push({
-            type: "circle",
-            id: `__end__-${node.key}`,
-            position: { x: ordered.length * 420, y: 0 },
-            data: { label: "End", kind: "end" },
-        } as unknown as Node);
-
+        if (!isDefinitionNode) {
+            nodes.push({
+                type: "circle",
+                id: `__end__-${node.key}`,
+                position: { x: ordered.length * 420, y: 0 },
+                data: { label: "End", kind: "end" },
+            } as unknown as Node);
+        }
+        console.log("nodes", nodes);
         return nodes;
     }, [selectedFromSources, expandedNodeIds]);
 
@@ -260,6 +269,7 @@ export function useCanvasGraph(
 
     return {
         initialNodes,
+        doNotReRenderCanvas: selectedNode?.doNotReRenderCanvas,
         initialEdges,
         selected: selectedFromSources.node,
         parent: selectedFromSources.parent,

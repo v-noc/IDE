@@ -43,11 +43,11 @@ function findNodeByKey(
 }
 
 const Dashboard = () => {
-  const { selectedNodeId, projectData } = useProjectStore();
+  const { selectedNode, projectData } = useProjectStore();
 
-  const selectedNode = useMemo(
-    () => findNodeByKey(projectData, selectedNodeId),
-    [projectData, selectedNodeId]
+  const selectedNodeFromTree = useMemo(
+    () => findNodeByKey(projectData, selectedNode?.id),
+    [projectData, selectedNode]
   );
 
   const updateIconMutation = useUpdateNodeIcon(projectData?.key);
@@ -67,11 +67,11 @@ const Dashboard = () => {
         textColor: data.textColor,
       };
       updateNodeThemeMutation.mutate({
-        elementKey: selectedNode.key,
+        elementKey: selectedNode.id,
         theme,
       });
     },
-    [selectedNode, updateNodeThemeMutation]
+    [selectedNode, updateNodeThemeMutation, selectedNodeFromTree]
   );
 
   const onChangeBasicInfo = useCallback(
@@ -79,21 +79,21 @@ const Dashboard = () => {
       if (!selectedNode) return;
       const nextIcon =
         data.icon ||
-        getIcons((selectedNode.node_type ?? "project") as NodeType);
+        getIcons((selectedNodeFromTree?.node_type ?? "project") as NodeType);
 
-      if (selectedNode.key && nextIcon !== selectedNode.icon) {
+      if (selectedNodeFromTree?.key && nextIcon !== selectedNodeFromTree.icon) {
         updateIconMutation.mutate({
-          elementKey: selectedNode.key,
+          elementKey: selectedNodeFromTree.key,
           icon: nextIcon,
         });
       }
 
       if (
-        selectedNode.name !== data.name ||
-        (selectedNode.description ?? "") !== (data.description ?? "")
+        selectedNodeFromTree?.name !== data.name ||
+        (selectedNodeFromTree?.description ?? "") !== (data.description ?? "")
       ) {
         updateNodeBasicInfoMutation.mutate({
-          elementKey: selectedNode.key,
+          elementKey: selectedNodeFromTree.key,
           basicInfo: {
             name: data.name,
             description: data.description,
@@ -105,34 +105,34 @@ const Dashboard = () => {
       selectedNode,
       updateIconMutation,
       updateNodeBasicInfoMutation,
-      selectedNodeId,
+      selectedNodeFromTree,
     ]
   );
 
   const sidebarProps = useMemo(() => {
     return {
       initialBasicInfo: {
-        name: selectedNode?.name ?? "",
-        description: selectedNode?.description ?? "",
-        icon: selectedNode
-          ? selectedNode.icon ||
-            getIcons((selectedNode.node_type ?? "project") as NodeType)
+        name: selectedNodeFromTree?.name ?? "",
+        description: selectedNodeFromTree?.description ?? "",
+        icon: selectedNodeFromTree
+          ? selectedNodeFromTree.icon ||
+            getIcons((selectedNodeFromTree.node_type ?? "project") as NodeType)
           : getIcons("project"),
       },
       initialCustomization: {
-        iconColor: selectedNode?.theme?.iconColor,
+        iconColor: selectedNodeFromTree?.theme?.iconColor,
 
-        cardColor: selectedNode?.theme?.cardColor,
-        navbarColor: selectedNode?.theme?.navbarColor,
-        backgroundColor: selectedNode?.theme?.backgroundColor,
-        leftSidebarColor: selectedNode?.theme?.leftSidebarColor,
-        rightSidebarColor: selectedNode?.theme?.rightSidebarColor,
-        textColor: selectedNode?.theme?.textColor,
+        cardColor: selectedNodeFromTree?.theme?.cardColor,
+        navbarColor: selectedNodeFromTree?.theme?.navbarColor,
+        backgroundColor: selectedNodeFromTree?.theme?.backgroundColor,
+        leftSidebarColor: selectedNodeFromTree?.theme?.leftSidebarColor,
+        rightSidebarColor: selectedNodeFromTree?.theme?.rightSidebarColor,
+        textColor: selectedNodeFromTree?.theme?.textColor,
       },
       onChangeBasicInfo,
       onChangeCustomization: onChangeTheme,
     };
-  }, [selectedNode, onChangeBasicInfo, onChangeTheme]);
+  }, [selectedNodeFromTree, onChangeBasicInfo, onChangeTheme]);
 
   return (
     <ResizablePanelGroup direction="horizontal">
@@ -143,7 +143,7 @@ const Dashboard = () => {
             right={
               <RightSidebar>
                 <ConfigSidebarContent
-                  key={selectedNode?.key}
+                  key={selectedNodeFromTree?.key}
                   {...sidebarProps}
                 />
               </RightSidebar>

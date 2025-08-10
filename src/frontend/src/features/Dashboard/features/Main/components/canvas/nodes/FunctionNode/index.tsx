@@ -31,13 +31,13 @@ const Section: React.FC<{
 const FunctionNode: React.FC<
   { data: FunctionNodeData } & React.ComponentProps<"div">
 > = ({ data, ...props }) => {
-  console.log("data", data);
   return (
     <BaseNode
       id={data.id}
       iconName={data.icon || getIcons("function")}
       title={data.name}
       isSelected={data.isSelected ?? false}
+      type="function"
       theme={data.theme}
       {...props}
     >

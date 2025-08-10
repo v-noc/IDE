@@ -8,8 +8,8 @@ import { useThemeStore } from "@/features/Dashboard/store/useThemeStore";
 
 export const useTreeNode = (node: ProjectTreeResponse) => {
   const {
-    selectedNodeId,
-    setSelectedNodeId,
+    selectedNode,
+    setSelectedNode,
     activeNodeId,
     expandedNodeIds,
     toggleNodeExpansion,
@@ -30,7 +30,7 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   >("file");
 
   const isOpen = expandedNodeIds.includes(node.key);
-  const isSelected = selectedNodeId === node.key;
+  const isSelected = selectedNode?.id === node.key;
   const isActive = activeNodeId === node.key;
   const hasChildren = node.children && node.children.length > 0;
 
@@ -40,8 +40,8 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   };
 
   const handleSelectNode = () => {
-    if (selectedNodeId === node.key) return;
-    setSelectedNodeId(node.key);
+    if (selectedNode?.id === node.key) return;
+    setSelectedNode({ id: node.key, type: node.node_type });
     // Update global theme from the selected node if provided
     setTheme(node.theme);
   };
