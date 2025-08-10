@@ -1,8 +1,30 @@
-import React from "react";
+import React, { useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { FunctionNodeProps } from "../../types/node";
 
 type FunctionNodeData = Omit<FunctionNodeProps, "id" | "children">;
+
+const Section: React.FC<{
+  title: string;
+  initiallyOpen?: boolean;
+  children: React.ReactNode;
+}> = ({ title, initiallyOpen = true, children }) => {
+  const [open, setOpen] = useState(initiallyOpen);
+  return (
+    <div className="border rounded-md">
+      <button
+        className="w-full text-left px-3 py-2 font-semibold flex items-center justify-between"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>{title}</span>
+        <span className="text-xs text-muted-foreground">
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+      {open ? <div className="px-3 pb-2 text-sm">{children}</div> : null}
+    </div>
+  );
+};
 
 const FunctionNode: React.FC<
   { data: FunctionNodeData } & React.ComponentProps<"div">
@@ -14,37 +36,36 @@ const FunctionNode: React.FC<
   return (
     <div
       {...props}
-      className={`rounded-md border bg-card text-card-foreground shadow-sm ${successColor}`}
+      className={`w-[360px] rounded-xl border-2 bg-card text-card-foreground shadow ${successColor}`}
     >
-      <div className="border-b px-3 py-2 text-sm font-medium">
-        🔧 {data.name}
+      <div className="border-b px-4 py-3 text-base font-semibold flex items-center gap-2">
+        <span>🔧</span>
+        <span>{data.name}</span>
       </div>
       {data.isExpanded ? (
-        <div className="px-3 py-2 text-xs space-y-2">
-          <div>
-            <div className="font-medium">↓ Inputs</div>
-            <ul className="list-disc ml-4">
+        <div className="px-4 py-3 text-sm space-y-3">
+          <Section title="↓ Inputs" initiallyOpen>
+            <ul className="list-disc ml-5 space-y-0.5">
               {(data.inputs ?? []).map((i) => (
                 <li key={i.name}>
-                  {i.name}: {i.type}
+                  <span className="font-medium">{i.name}</span>: {i.type}
                 </li>
               ))}
             </ul>
-          </div>
-          <div>
-            <div className="font-medium">↑ Outputs</div>
-            <ul className="list-disc ml-4">
+          </Section>
+          <Section title="↑ Outputs" initiallyOpen>
+            <ul className="list-disc ml-5 space-y-0.5">
               {(data.outputs ?? []).map((o) => (
                 <li key={o.name}>
-                  {o.name}: {o.type}
+                  <span className="font-medium">{o.name}</span>: {o.type}
                 </li>
               ))}
             </ul>
-          </div>
+          </Section>
         </div>
       ) : null}
       {data.performance ? (
-        <div className="flex items-center justify-between px-3 py-2 text-xs border-t">
+        <div className="grid grid-cols-3 items-center gap-2 px-4 py-3 text-sm border-t">
           <span>⚡ {data.performance.avgTime ?? 0}ms</span>
           <span>🔄 {data.performance.runCount ?? 0}x</span>
           <span>
