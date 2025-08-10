@@ -1,5 +1,5 @@
 import React from "react";
-import SplitRight from "@/features/Dashboard/features/Main/componets/sidebar";
+import SplitRight from "@/features/Dashboard/features/Main/components/sidebar";
 
 const MainWithRightSidebar: React.FC<{
   left: React.ReactNode;

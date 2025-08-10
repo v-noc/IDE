@@ -5,8 +5,8 @@ import MainCanvas from "@/features/Dashboard/features/Main";
 
 import { ResizablePanelGroup } from "@/components/ui/resizable";
 import MainWithRightSidebar from "@/features/Dashboard/features/Main/MainWithRightSidebar";
-import { RightSidebar } from "@/features/Dashboard/features/Main/componets/sidebar";
-import ConfigSidebarContent from "@/features/Dashboard/features/Main/componets/sidebar/components/SidebarTabs";
+import { RightSidebar } from "@/features/Dashboard/features/Main/components/sidebar";
+import ConfigSidebarContent from "@/features/Dashboard/features/Main/components/sidebar/components/SidebarTabs";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import getIcons from "@/features/Dashboard/utils/getIcons";
 import {
@@ -19,9 +19,9 @@ import type {
   ProjectTreeResponse,
   NodeType,
 } from "@/features/Dashboard/service/useProject";
-import type { BasicInfoData } from "@/features/Dashboard/features/Main/componets/sidebar/hooks/useConfigSidebarForm";
+import type { BasicInfoData } from "@/features/Dashboard/features/Main/components/sidebar/hooks/useConfigSidebarForm";
 import type { ThemeConfig } from "@/features/Dashboard/store/useThemeStore";
-import type { CustomizationData } from "@/features/Dashboard/features/Main/componets/sidebar/hooks/useConfigSidebarForm";
+import type { CustomizationData } from "@/features/Dashboard/features/Main/components/sidebar/hooks/useConfigSidebarForm";
 
 function findNodeByKey(
   root: ProjectTreeResponse | null,
