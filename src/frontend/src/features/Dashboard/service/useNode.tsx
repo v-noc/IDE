@@ -7,12 +7,12 @@ import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 
 // Low-level API functions
 const updateNodeTheme = async (
-  elementKey: string,
+  elementId: string,
   theme: Partial<ThemeConfig>
 ): Promise<ProjectTreeResponse> => {
-  console.log(elementKey, " theme ", theme);
+  console.log(elementId, " theme ", theme);
   return api<ProjectTreeResponse>(
-    `${API_ROUTES.CORE}${elementKey}/update-node-theme`,
+    `${API_ROUTES.CORE}${elementId}/update-node-theme`,
     {
       method: "POST",
       body: theme as unknown as BodyInit,
@@ -21,12 +21,12 @@ const updateNodeTheme = async (
 };
 
 const updateNodeIcon = async (
-  elementKey: string,
+  elementId: string,
   icon: string
 ): Promise<ProjectTreeResponse> => {
-  console.log(elementKey, " icon ", icon);
+  console.log(elementId, " icon ", icon);
   return api<ProjectTreeResponse>(
-    `${API_ROUTES.CORE}${elementKey}/update-icon`,
+    `${API_ROUTES.CORE}${elementId}/update-icon`,
     {
       method: "POST",
       body: { icon } as unknown as BodyInit,
@@ -35,15 +35,15 @@ const updateNodeIcon = async (
 };
 
 const updateNodeBasicInfo = async (
-  elementKey: string,
+  elementId: string,
   basicInfo: {
     name: string;
     description?: string;
   }
 ): Promise<ProjectTreeResponse> => {
-  console.log(elementKey, " ", basicInfo);
+  console.log(elementId, " ", basicInfo);
   return api<ProjectTreeResponse>(
-    `${API_ROUTES.CORE}${elementKey}/update-basic-info`,
+    `${API_ROUTES.CORE}${elementId}/update-basic-info`,
     {
       method: "POST",
       body: basicInfo as unknown as BodyInit,
@@ -54,15 +54,15 @@ const updateNodeBasicInfo = async (
 // Helpers to update cached project tree without refetching
 function updateNodeInTree(
   root: ProjectTreeResponse,
-  targetKey: string,
+  targetId: string,
   updater: (node: ProjectTreeResponse) => ProjectTreeResponse
 ): ProjectTreeResponse {
-  if (root.key === targetKey) {
+  if (root.id === targetId) {
     return updater(root);
   }
   if (!root.children || root.children.length === 0) return root;
   const nextChildren = root.children.map((child) =>
-    updateNodeInTree(child, targetKey, updater)
+    updateNodeInTree(child, targetId, updater)
   );
   // Only recreate root if children changed identities
   if (nextChildren !== root.children) {
@@ -76,19 +76,19 @@ export const useUpdateNodeTheme = (projectKey?: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
-      elementKey,
+      elementId,
       theme,
     }: {
-      elementKey: string;
+      elementId: string;
       theme: Partial<ThemeConfig>;
-    }) => updateNodeTheme(elementKey, theme),
+    }) => updateNodeTheme(elementId, theme),
     onSuccess: async (_data, variables) => {
       if (!projectKey) return;
       queryClient.setQueryData<ProjectTreeResponse>(
         ["projectTree", projectKey],
         (old) => {
           if (!old) return old as unknown as ProjectTreeResponse;
-          return updateNodeInTree(old, variables.elementKey, (node) => ({
+          return updateNodeInTree(old, variables.elementId, (node) => ({
             ...node,
             theme: { ...node.theme, ...variables.theme },
           }));
@@ -96,7 +96,7 @@ export const useUpdateNodeTheme = (projectKey?: string) => {
       );
       // Re-assert selection to avoid any transient resets
       const { setSelectedNode } = useProjectStore.getState();
-      setSelectedNode({ id: variables.elementKey, type: _data.node_type });
+      setSelectedNode({ id: variables.elementId, type: _data.node_type });
       // Optionally refetch in background without breaking selection
       // await queryClient.invalidateQueries({ queryKey: ["projectTree", projectKey], refetchType: "inactive" });
     },
@@ -106,8 +106,8 @@ export const useUpdateNodeTheme = (projectKey?: string) => {
 export const useUpdateNodeIcon = (projectKey?: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ elementKey, icon }: { elementKey: string; icon: string }) =>
-      updateNodeIcon(elementKey, icon),
+    mutationFn: ({ elementId, icon }: { elementId: string; icon: string }) =>
+      updateNodeIcon(elementId, icon),
 
     onSuccess: async (_data, variables) => {
       if (!projectKey) return;
@@ -115,14 +115,14 @@ export const useUpdateNodeIcon = (projectKey?: string) => {
         ["projectTree", projectKey],
         (old) => {
           if (!old) return old as unknown as ProjectTreeResponse;
-          return updateNodeInTree(old, variables.elementKey, (node) => ({
+          return updateNodeInTree(old, variables.elementId, (node) => ({
             ...node,
             icon: variables.icon,
           }));
         }
       );
       const { setSelectedNode } = useProjectStore.getState();
-      setSelectedNode({ id: variables.elementKey, type: _data.node_type });
+      setSelectedNode({ id: variables.elementId, type: _data.node_type });
     },
   });
 };
@@ -131,12 +131,12 @@ export const useUpdateNodeBasicInfo = (projectKey?: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
-      elementKey,
+      elementId,
       basicInfo,
     }: {
-      elementKey: string;
+      elementId: string;
       basicInfo: { name: string; description?: string };
-    }) => updateNodeBasicInfo(elementKey, basicInfo),
+    }) => updateNodeBasicInfo(elementId, basicInfo),
 
     onSuccess: async (_data, variables) => {
       if (!projectKey) return;
@@ -144,7 +144,7 @@ export const useUpdateNodeBasicInfo = (projectKey?: string) => {
         ["projectTree", projectKey],
         (old) => {
           if (!old) return old as unknown as ProjectTreeResponse;
-          return updateNodeInTree(old, variables.elementKey, (node) => ({
+          return updateNodeInTree(old, variables.elementId, (node) => ({
             ...node,
             name: variables.basicInfo.name,
             description: variables.basicInfo.description,
@@ -152,7 +152,7 @@ export const useUpdateNodeBasicInfo = (projectKey?: string) => {
         }
       );
       const { setSelectedNode } = useProjectStore.getState();
-      setSelectedNode({ id: variables.elementKey, type: _data.node_type });
+      setSelectedNode({ id: variables.elementId, type: _data.node_type });
     },
   });
 };

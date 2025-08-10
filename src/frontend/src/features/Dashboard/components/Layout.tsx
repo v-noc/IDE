@@ -79,7 +79,7 @@ const Layout = ({
       acc: ProjectTreeResponse[]
     ): boolean => {
       acc.push(node);
-      if (node.key === selectedNode.id) return true;
+      if (node.id === selectedNode.id) return true;
       if (node.children) {
         for (const child of node.children) {
           if (dfs(child, acc)) return true;

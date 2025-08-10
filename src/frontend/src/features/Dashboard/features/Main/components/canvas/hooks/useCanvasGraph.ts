@@ -8,7 +8,7 @@ import type { ThemeConfig } from "@/features/Dashboard/store/useThemeStore";
 
 
 interface CommonVNode {
-    key: string;
+    id: string;
     name: string;
     description?: string | null;
     node_type: NodeType; // final renderer type: function | class | virtual_folder | etc.
@@ -21,6 +21,8 @@ interface CommonVNode {
     fields?: FieldResponse[];
     methods?: { name: string; returnType?: string, node_type: NodeType, theme?: ThemeConfig }[];
     children: CommonVNode[];
+    root_id?: string;
+
 }
 
 
@@ -30,11 +32,13 @@ interface CommonVNode {
 function processVirtualFolders(vf: VirtualFolderResponse): CommonVNode {
     const lt = vf.link_to;
     const base: CommonVNode = {
-        key: vf.key, // always use virtual folder key (do not use link_to id)
+        id: vf.id, // always use virtual folder key (do not use link_to id)
         name: vf.name || lt?.name || "",
         call_order: vf.call_order,
         node_type: (lt?.node_type || vf.node_type) as NodeType,
+        root_id: lt?.id || vf.id,
         qname: vf.qname || lt?.qname,
+        theme: lt?.theme || vf.theme,
         children: (vf.children || []).map(processVirtualFolders),
     };
     if (lt?.node_type === "class") {
@@ -54,12 +58,12 @@ function findNodeAndParentByKey(
     root: CommonVNode,
     id: string
 ): { node: CommonVNode | null; parent: CommonVNode | null } {
-    if (root.key === id) return { node: root, parent: null };
+    if (root.id === id) return { node: root, parent: null };
     let found: CommonVNode | null = null;
     let parent: CommonVNode | null = null;
     const walk = (n: CommonVNode) => {
         for (const c of n.children || []) {
-            if ((c.key === id) && (c.node_type === "class" || c.node_type === "function")) {
+            if ((c.id === id) && (c.node_type === "class" || c.node_type === "function")) {
                 found = c;
                 parent = n;
                 return;
@@ -80,10 +84,8 @@ export function useCanvasGraph(
 
 ) {
     const { projectData } = useProjectStore();
-    const projectKey = projectId || projectData?.key || "";
+    const projectKey = projectId || projectData?.id || "";
     const selectedNode = useProjectStore((s) => s.selectedNode);
-    // keep selected for upcoming steps; expanded will be used later when rendering
-    const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
 
     // Fetch if source not provided
     const { data: vfs } = useGetVirtualFolders(projectKey);
@@ -117,7 +119,9 @@ export function useCanvasGraph(
         let isDefinitionNode = false;
 
         if (parent == null || !["class", "function"].includes(parent.node_type)) {
+
             if (selectedNode?.isExpanded) {
+
                 nodesToBeRender = node.children;
             } else {
                 isDefinitionNode = true;
@@ -126,8 +130,11 @@ export function useCanvasGraph(
 
         } else if (parent != null &&
             ["class", "function"].includes(parent.node_type)) {
-            nodesToBeRender = parent.children;
-
+            if (selectedNode?.isExpanded) {
+                nodesToBeRender = node.children;
+            } else {
+                nodesToBeRender = parent.children;
+            }
         }
 
         if (nodesToBeRender == null) return [];
@@ -144,14 +151,14 @@ export function useCanvasGraph(
         if (!isDefinitionNode) {
             nodes.push({
                 type: "circle",
-                id: `__start__-${node.key}`,
+                id: `__start__-${node.id}`,
                 position: { x: -160, y: 0 },
                 data: { label: "Start", kind: "start" },
             } as unknown as Node);
         }
         ordered.forEach((child, index) => {
             const position = { x: index * 420, y: 0 };
-            const isExpanded = expandedNodeIds.includes(child.key);
+            const isExpandable = child.children.length > 0 || (child.methods && child.methods.length > 0);
 
             const nodeTheme = getNodeStyle(child);
             if (child.node_type === "class") {
@@ -163,10 +170,10 @@ export function useCanvasGraph(
 
                 nodes.push({
                     type: "class",
-                    id: child.key,
+                    id: child.id,
                     position,
                     data: {
-                        id: child.key,
+                        id: child.id,
                         name: child.name,
                         qname: child.qname || "",
                         fields: child.fields,
@@ -174,18 +181,18 @@ export function useCanvasGraph(
                         sourceFile: child.qname || "",
                         icon: child.icon,
                         theme: nodeTheme,
-                        isExpanded,
-                        isSelected: selectedNode?.id === child.key,
+                        isExpandable: isExpandable,
+                        isSelected: selectedNode?.id === child.id,
                     },
                 });
             } else if (child.node_type === "function" && parent != null && parent.node_type === "class") {
 
                 nodes.push({
                     type: "method",
-                    id: child.key,
+                    id: child.id,
                     position,
                     data: {
-                        id: child.key,
+                        id: child.id,
                         name: child.name,
                         qname: child.qname || "",
                         inputs: child.inputs,
@@ -193,17 +200,17 @@ export function useCanvasGraph(
                         callOrder: (child.call_order as number) ?? 0,
                         icon: child.icon,
                         theme: nodeTheme,
-                        isExpanded,
-                        isSelected: selectedNode?.id === child.key,
+                        isExpandable: isExpandable,
+                        isSelected: selectedNode?.id === child.id,
                     },
                 });
             } else if (child.node_type === "function") {
                 nodes.push({
                     type: "function",
-                    id: child.key,
+                    id: child.id,
                     position,
                     data: {
-                        id: child.key,
+                        id: child.id,
                         name: child.name,
                         qname: child.qname || "",
                         inputs: child.inputs,
@@ -211,8 +218,8 @@ export function useCanvasGraph(
                         callOrder: (child.call_order as number) ?? 0,
                         icon: child.icon,
                         theme: nodeTheme,
-                        isExpanded,
-                        isSelected: selectedNode?.id === child.key,
+                        isExpandable: isExpandable,
+                        isSelected: selectedNode?.id === child.id,
                     },
                 });
             }
@@ -222,14 +229,14 @@ export function useCanvasGraph(
         if (!isDefinitionNode) {
             nodes.push({
                 type: "circle",
-                id: `__end__-${node.key}`,
+                id: `__end__-${node.id}`,
                 position: { x: ordered.length * 420, y: 0 },
                 data: { label: "End", kind: "end" },
             } as unknown as Node);
         }
-        console.log("nodes", nodes);
+
         return nodes;
-    }, [selectedFromSources, expandedNodeIds]);
+    }, [selectedFromSources, selectedNode?.isExpanded, selectedNode?.id]);
 
 
     const initialEdges = useMemo((): Edge[] => {

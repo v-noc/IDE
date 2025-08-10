@@ -11,7 +11,8 @@ export type NodeType =
   | "function"
   | "class"
   | "package"
-  | "virtual_folder";
+  | "virtual_folder"
+  | "method";
 
 export type NodePosition = {
   line_no: number;
@@ -44,7 +45,8 @@ export interface ProjectTreeResponse {
   name: string;
   path?: string;
   node_type: NodeType;
-
+  id: string;
+  root_id: string;
   label?: string;
   icon?: string;
   children: ProjectTreeResponse[];
@@ -61,6 +63,8 @@ export interface VirtualFolderResponse {
   key: string;
   name: string;
   node_type: NodeType;
+  id: string;
+  root_id: string;
   qname: string;
   description?: string | null;
   link_to?: {

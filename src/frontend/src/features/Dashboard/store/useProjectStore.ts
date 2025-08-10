@@ -57,7 +57,7 @@ const useProjectStore = create<ProjectState>()(
             virtualFolderStructures: [],
             addVirtualNode: (parentId, name, type) => {
                 const newNode: ProjectTreeResponse & { parentId?: string } = {
-                    key: uuidv4(),
+                    id: uuidv4(),
                     name,
                     path: "",
                     node_type: type,

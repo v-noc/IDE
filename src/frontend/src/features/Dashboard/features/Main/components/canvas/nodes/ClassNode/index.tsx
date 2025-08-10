@@ -40,6 +40,7 @@ const ClassNode: React.FC<
       theme={data.theme}
       isSelected={data.isSelected ?? false}
       type="class"
+      isExpandable={data.isExpandable ?? false}
       {...props}
     >
       <div className="space-y-3">

@@ -20,7 +20,7 @@ interface BaseNodeProps extends React.ComponentProps<"div"> {
   title: string;
   type: NodeType;
   theme?: BaseNodeTheme;
-
+  isExpandable?: boolean;
   showHandles?: boolean;
   isSelected: boolean;
 }
@@ -31,7 +31,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   title,
   theme,
   type,
-
+  isExpandable = false,
   showHandles = true,
   className = "",
   isSelected,
@@ -39,7 +39,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
   ...rest
 }) => {
   const { setSelectedNode, selectedNode } = useProjectStore();
-
+  console.log("isExpandable", type);
   const rf = useReactFlow();
   const nodeRef = useRef<HTMLDivElement | null>(null);
 
@@ -80,7 +80,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       onClick={() =>
         setSelectedNode({
           id,
-          type,
+          type: type == "method" ? "function" : type,
           isExpanded: false,
           doNotReRenderCanvas: true,
         })
@@ -90,7 +90,7 @@ const BaseNode: React.FC<BaseNodeProps> = ({
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
-          setSelectedNode({ id, type });
+          setSelectedNode({ id, type: type == "method" ? "function" : type });
         }
       }}
     >
@@ -111,18 +111,25 @@ const BaseNode: React.FC<BaseNodeProps> = ({
             {title}
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hover:bg-transparent hover:cursor-pointer rounded-full "
-          onClick={(e) => {
-            e.stopPropagation();
+        {isExpandable && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hover:bg-transparent hover:cursor-pointer rounded-full "
+            onClick={(e) => {
+              e.stopPropagation();
 
-            setSelectedNode({ id, type, isExpanded: true });
-          }}
-        >
-          <ExpandIcon style={{ color: theme?.textColor }} />
-        </Button>
+              setSelectedNode({
+                id,
+                type: type == "method" ? "function" : type,
+                isExpanded: true,
+                doNotReRenderCanvas: false,
+              });
+            }}
+          >
+            <ExpandIcon style={{ color: theme?.textColor }} />
+          </Button>
+        )}
       </div>
       <div className="px-4 py-3">{children}</div>
       {showHandles ? (

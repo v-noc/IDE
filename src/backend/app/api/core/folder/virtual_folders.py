@@ -22,6 +22,7 @@ class VirtualFolderUpdate(BaseModel):
 
 class VirtualFolderResponse(BaseModel):
     key: str
+    id: str
     name: str
     node_type: str
     qname: str

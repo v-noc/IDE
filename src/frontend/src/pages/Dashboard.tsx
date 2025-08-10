@@ -32,7 +32,7 @@ function findNodeByKey(
   while (stack.length) {
     const current = stack.pop()!;
 
-    if (current.key === project_key) return current;
+    if (current.id === project_key) return current;
     if (current.children && current.children.length) {
       for (let i = 0; i < current.children.length; i++) {
         stack.push(current.children[i]);
@@ -50,9 +50,9 @@ const Dashboard = () => {
     [projectData, selectedNode]
   );
 
-  const updateIconMutation = useUpdateNodeIcon(projectData?.key);
-  const updateNodeBasicInfoMutation = useUpdateNodeBasicInfo(projectData?.key);
-  const updateNodeThemeMutation = useUpdateNodeTheme(projectData?.key);
+  const updateIconMutation = useUpdateNodeIcon(projectData?.id);
+  const updateNodeBasicInfoMutation = useUpdateNodeBasicInfo(projectData?.id);
+  const updateNodeThemeMutation = useUpdateNodeTheme(projectData?.id);
 
   const onChangeTheme = useCallback(
     (data: CustomizationData) => {
@@ -67,7 +67,7 @@ const Dashboard = () => {
         textColor: data.textColor,
       };
       updateNodeThemeMutation.mutate({
-        elementKey: selectedNode.id,
+        elementId: selectedNode.id,
         theme,
       });
     },
@@ -81,9 +81,9 @@ const Dashboard = () => {
         data.icon ||
         getIcons((selectedNodeFromTree?.node_type ?? "project") as NodeType);
 
-      if (selectedNodeFromTree?.key && nextIcon !== selectedNodeFromTree.icon) {
+      if (selectedNodeFromTree?.id && nextIcon !== selectedNodeFromTree.icon) {
         updateIconMutation.mutate({
-          elementKey: selectedNodeFromTree.key,
+          elementId: selectedNodeFromTree.id,
           icon: nextIcon,
         });
       }
@@ -93,7 +93,7 @@ const Dashboard = () => {
         (selectedNodeFromTree?.description ?? "") !== (data.description ?? "")
       ) {
         updateNodeBasicInfoMutation.mutate({
-          elementKey: selectedNodeFromTree.key,
+          elementId: selectedNodeFromTree?.id ?? "",
           basicInfo: {
             name: data.name,
             description: data.description,
@@ -143,7 +143,7 @@ const Dashboard = () => {
             right={
               <RightSidebar>
                 <ConfigSidebarContent
-                  key={selectedNodeFromTree?.key}
+                  key={selectedNodeFromTree?.id}
                   {...sidebarProps}
                 />
               </RightSidebar>

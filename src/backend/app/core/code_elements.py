@@ -122,6 +122,7 @@ class Function(DomainObject[node.FunctionNode]):
                         child_dict = element.to_dict(
                             with_dependency_tree=True
                         )
+                        child_dict["tree_id"] = edge.id
                         child_dict["call_order"] = edge.order
                         children.append(child_dict)
             data["children"] = children

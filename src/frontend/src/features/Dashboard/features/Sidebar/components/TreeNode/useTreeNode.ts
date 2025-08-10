@@ -20,7 +20,7 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   const { setTheme } = useThemeStore();
 
   const queryClient = useQueryClient();
-  const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.key || "");
+  const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.id || "");
 
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
@@ -29,19 +29,19 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     NodeType
   >("file");
 
-  const isOpen = expandedNodeIds.includes(node.key);
-  const isSelected = selectedNode?.id === node.key;
-  const isActive = activeNodeId === node.key;
+  const isOpen = expandedNodeIds.includes(node.id);
+  const isSelected = selectedNode?.id === node.id;
+  const isActive = activeNodeId === node.id;
   const hasChildren = node.children && node.children.length > 0;
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleNodeExpansion(node.key);
+    toggleNodeExpansion(node.id);
   };
 
   const handleSelectNode = () => {
-    if (selectedNode?.id === node.key) return;
-    setSelectedNode({ id: node.key, type: node.node_type });
+    if (selectedNode?.id === node.id) return;
+    setSelectedNode({ id: node.id, type: node?.link_to?.node_type || node.node_type });
     // Update global theme from the selected node if provided
     setTheme(node.theme);
   };
@@ -59,16 +59,16 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
 
   const handleRemove = async () => {
     if (node.node_type !== "virtual_folder") return;
-    if (!projectData?.key) {
+    if (!projectData?.id) {
       toast.error("No project selected");
       return;
     }
     try {
-      await deleteVirtualFolderMutation.mutateAsync(node.key);
+      await deleteVirtualFolderMutation.mutateAsync(node.id);
       await Promise.all([
         // Avoid invalidating projectTree to preserve selection
-        // queryClient.invalidateQueries({ queryKey: ["projectTree", projectData.key] }),
-        queryClient.invalidateQueries({ queryKey: ["virtualFolders", projectData.key] }),
+        // queryClient.invalidateQueries({ queryKey: ["projectTree", projectData.id] }),
+        queryClient.invalidateQueries({ queryKey: ["virtualFolders", projectData.id] }),
       ]);
       toast.success("Virtual folder removed");
     } catch (error) {

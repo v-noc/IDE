@@ -35,6 +35,7 @@ class Project(DomainObject[node.ProjectNode]):
     def to_dict(self) -> dict:
         return {
             "key": self.key,
+            "id": self.id,
             "name": self.name,
             "node_type": self.model.node_type,
             "icon": self.model.icon,

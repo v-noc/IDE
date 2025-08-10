@@ -18,8 +18,10 @@ export interface FunctionNodeProps {
         successRate?: number; // 0..1
     };
     children?: FunctionNodeProps[];
+    root_id?: string;
     isSelected?: boolean;
-    isExpanded?: boolean;
+    isExpandable?: boolean;
+
 }
 
 export interface ClassNodeProps {
@@ -33,9 +35,11 @@ export interface ClassNodeProps {
         textColor?: string;
 
     };
+    root_id?: string;
+
     fields: FieldResponse[];
     methods: FunctionNodeProps[];
     sourceFile: string;
     isSelected?: boolean;
-    isExpanded?: boolean;
+    isExpandable?: boolean;
 }

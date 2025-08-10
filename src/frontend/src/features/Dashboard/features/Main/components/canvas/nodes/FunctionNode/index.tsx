@@ -39,6 +39,7 @@ const FunctionNode: React.FC<
       isSelected={data.isSelected ?? false}
       type="function"
       theme={data.theme}
+      isExpandable={data.isExpandable ?? false}
       {...props}
     >
       <div className="text-sm space-y-3">
