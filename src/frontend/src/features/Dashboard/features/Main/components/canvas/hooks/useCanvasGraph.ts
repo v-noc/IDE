@@ -109,10 +109,11 @@ export function useCanvasGraph(
 
     const initialNodes = useMemo((): Node[] => {
         const { node, parent } = selectedFromSources;
-        if (!node || !node.children || node.children.length === 0) return [];
 
+        if (!node || (!node.children || node.children.length === 0) && (!parent?.children || parent.children.length === 0)) return [];
+        let selectedNode: CommonVNode | null = null;
         let nodesToBeRender: CommonVNode[] | null = null;
-        if (expandedNodeIds.includes(node.key)) {
+        if (expandedNodeIds.includes(node.key) && node.children && node.children.length > 0) {
             nodesToBeRender = node.children;
         }
         else if (parent == null || !["class", "function"].includes(parent.node_type)) {
@@ -120,6 +121,7 @@ export function useCanvasGraph(
         } else if (parent != null &&
             ["class", "function"].includes(parent.node_type)) {
             nodesToBeRender = parent.children;
+            selectedNode = node;
         }
 
         if (nodesToBeRender == null) return [];
@@ -166,6 +168,7 @@ export function useCanvasGraph(
                         icon: child.icon,
                         theme: nodeTheme,
                         isExpanded,
+                        isSelected: selectedNode?.key === child.key,
                     },
                 });
             } else if (child.node_type === "function" && parent != null && parent.node_type === "class") {
@@ -184,6 +187,7 @@ export function useCanvasGraph(
                         icon: child.icon,
                         theme: nodeTheme,
                         isExpanded,
+                        isSelected: selectedNode?.key === child.key,
                     },
                 });
             } else if (child.node_type === "function") {
@@ -201,6 +205,7 @@ export function useCanvasGraph(
                         icon: child.icon,
                         theme: nodeTheme,
                         isExpanded,
+                        isSelected: selectedNode?.key === child.key,
                     },
                 });
             }

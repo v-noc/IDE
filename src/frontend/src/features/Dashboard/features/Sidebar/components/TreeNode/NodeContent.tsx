@@ -85,11 +85,6 @@ export const NodeContent = ({
         >
           {node.name}
         </span>
-        {hasDescription && (
-          <span className="text-xs text-muted-foreground truncate block">
-            {node.description}
-          </span>
-        )}
       </div>
     </li>
   );

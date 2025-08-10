@@ -1,19 +1,17 @@
 import React, { useState } from "react";
-import { Position } from "@xyflow/react";
-import CustomHandle from "../CustomHandle";
 import type { ClassNodeProps } from "../../types/node";
-import { DynamicIcon } from "@/components/DynamicIcon";
 import { getIcons } from "@/features/Dashboard/utils";
-import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import BaseNode from "../BaseNode";
 
-type ClassNodeData = Omit<ClassNodeProps, "id">;
+type ClassNodeData = ClassNodeProps;
 
 const Section: React.FC<{
   title: string;
   initiallyOpen?: boolean;
   children: React.ReactNode;
-}> = ({ title, initiallyOpen = true, children }) => {
+  textColor?: string;
+}> = ({ title, initiallyOpen = true, children, textColor }) => {
   const [open, setOpen] = useState(initiallyOpen);
   return (
     <div className="border rounded-md">
@@ -21,7 +19,7 @@ const Section: React.FC<{
         className="w-full text-left px-3 py-2 font-semibold flex items-center justify-between"
         onClick={() => setOpen((v) => !v)}
       >
-        <span>{title}</span>
+        <span style={{ color: textColor }}>{title}</span>
         <span className="text-xs text-muted-foreground">
           {open ? "Hide" : "Show"}
         </span>
@@ -35,35 +33,48 @@ const ClassNode: React.FC<
   { data: ClassNodeData } & React.ComponentProps<"div">
 > = ({ data, ...props }) => {
   return (
-    <div
+    <BaseNode
+      id={data.id}
+      iconName={data.icon || getIcons("class")}
+      title={data.name}
+      theme={data.theme}
+      isSelected={data.isSelected ?? false}
       {...props}
-      className="w-[300px] rounded-xl border bg-card text-card-foreground shadow"
     >
-      <div className="border-b px-4 py-3 text-base font-semibold flex items-center gap-2">
-        <DynamicIcon
-          iconName={data.icon || getIcons("class")}
-          className={cn("h-4 w-4 flex-shrink-0")}
-          color={data.theme?.iconColor}
-        />
-        <span className={cn("text-sm", data.theme?.textColor)}>
-          {data.name}
-        </span>
-      </div>
-
-      <div className="px-4 py-3 space-y-3">
-        <Section title="📋 Fields" initiallyOpen>
+      <div className="space-y-3">
+        <Section
+          title="📋 Fields"
+          initiallyOpen
+          textColor={data.theme?.textColor}
+        >
           <Separator />
-          <ul className="list-disc ml-5 space-y-0.5">
+          <ul
+            className="list-disc ml-5 space-y-0.5"
+            style={{ color: data.theme?.textColor }}
+          >
             {(data.fields ?? []).map((f) => (
               <li key={f.varname}>
-                <span className="font-medium">{f.varname}</span>: {f.varType}
+                <span
+                  className="font-medium"
+                  style={{ color: data.theme?.textColor }}
+                >
+                  {f.varname}
+                </span>
+                : {f.varType}
               </li>
             ))}
           </ul>
         </Section>
-        <Section title="🔧 Methods" initiallyOpen>
+        <Section
+          title="🔧 Methods"
+          initiallyOpen
+          textColor={data.theme?.textColor}
+        >
           <Separator />
-          <ul className="ml-1 space-y-1">
+          <ul
+            className="ml-1 space-y-1"
+            style={{ color: data.theme?.textColor }}
+          >
             {(data.methods ?? []).map((m) => (
               <li key={m.name}>
                 <button
@@ -73,12 +84,11 @@ const ClassNode: React.FC<
                     // Hook for future: expand method as separate flow
                   }}
                 >
-                  <DynamicIcon
-                    iconName={m.icon || getIcons("function")}
-                    className={cn("h-4 w-4 flex-shrink-0")}
-                    color={m.theme?.iconColor}
-                  />
-                  <span className={cn("text-sm", m.theme?.textColor)}>
+                  {/* method icon/title are simple text now; BaseNode owns header */}
+                  <span
+                    className="text-sm"
+                    style={{ color: data.theme?.textColor }}
+                  >
                     {m.name}
                   </span>
                 </button>
@@ -86,14 +96,14 @@ const ClassNode: React.FC<
             ))}
           </ul>
         </Section>
-        <div className="text-xs text-muted-foreground px-1">
+        <div
+          className="text-xs text-muted-foreground px-1"
+          style={{ color: data.theme?.textColor }}
+        >
           📦 From: {data.sourceFile}
         </div>
       </div>
-
-      <CustomHandle type="target" position={Position.Left} size={16} />
-      <CustomHandle type="source" position={Position.Right} size={16} />
-    </div>
+    </BaseNode>
   );
 };
 

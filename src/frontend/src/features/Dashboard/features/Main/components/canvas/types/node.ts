@@ -18,6 +18,7 @@ export interface FunctionNodeProps {
         successRate?: number; // 0..1
     };
     children?: FunctionNodeProps[];
+    isSelected?: boolean;
     isExpanded?: boolean;
 }
 
@@ -35,5 +36,6 @@ export interface ClassNodeProps {
     fields: FieldResponse[];
     methods: FunctionNodeProps[];
     sourceFile: string;
+    isSelected?: boolean;
     isExpanded?: boolean;
 }

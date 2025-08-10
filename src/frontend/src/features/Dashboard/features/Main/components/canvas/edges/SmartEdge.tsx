@@ -21,6 +21,9 @@ const SmartEdge: React.FC<SmartEdgeProps> = (props) => {
         path={edgePath}
         markerEnd={markerEnd}
         markerStart={markerStart}
+        style={{
+          strokeWidth: 3,
+        }}
       />
       {label ? (
         <EdgeLabelRenderer>

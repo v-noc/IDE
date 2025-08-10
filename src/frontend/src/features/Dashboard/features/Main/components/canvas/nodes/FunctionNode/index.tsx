@@ -1,18 +1,16 @@
 import React, { useState } from "react";
-import { Position } from "@xyflow/react";
-import CustomHandle from "../CustomHandle";
 import type { FunctionNodeProps } from "../../types/node";
-import { DynamicIcon } from "@/components/DynamicIcon";
 import { getIcons } from "@/features/Dashboard/utils";
-import { cn } from "@/lib/utils";
+import BaseNode from "../BaseNode";
 
-type FunctionNodeData = Omit<FunctionNodeProps, "id" | "children">;
+type FunctionNodeData = FunctionNodeProps;
 
 const Section: React.FC<{
   title: string;
   initiallyOpen?: boolean;
   children: React.ReactNode;
-}> = ({ title, initiallyOpen = true, children }) => {
+  textColor?: string;
+}> = ({ title, initiallyOpen = true, children, textColor }) => {
   const [open, setOpen] = useState(initiallyOpen);
   return (
     <div className="border rounded-md">
@@ -20,7 +18,7 @@ const Section: React.FC<{
         className="w-full text-left px-3 py-2 font-semibold flex items-center justify-between"
         onClick={() => setOpen((v) => !v)}
       >
-        <span>{title}</span>
+        <span style={{ color: textColor }}>{title}</span>
         <span className="text-xs text-muted-foreground">
           {open ? "Hide" : "Show"}
         </span>
@@ -33,41 +31,57 @@ const Section: React.FC<{
 const FunctionNode: React.FC<
   { data: FunctionNodeData } & React.ComponentProps<"div">
 > = ({ data, ...props }) => {
-  // const successColor =
-  //   data.performance?.successRate && data.performance.successRate >= 0.95
-  //     ? "border-green-500"
-  //     : "border-red-500";
+  console.log("data", data);
   return (
-    <div
+    <BaseNode
+      id={data.id}
+      iconName={data.icon || getIcons("function")}
+      title={data.name}
+      isSelected={data.isSelected ?? false}
+      theme={data.theme}
       {...props}
-      className={`w-[300px] rounded-xl border-2 bg-card text-card-foreground shadow `}
     >
-      <div className="border-b px-4 py-3 text-base font-semibold flex items-center gap-2">
-        <DynamicIcon
-          iconName={data.icon || getIcons("function")}
-          className={cn("h-4 w-4 flex-shrink-0")}
-          color={data.theme?.iconColor}
-        />
-        <span className={cn("text-sm", data.theme?.textColor)}>
-          {data.name}
-        </span>
-      </div>
-
-      <div className="px-4 py-3 text-sm space-y-3">
-        <Section title="↓ Inputs" initiallyOpen>
-          <ul className="list-disc ml-5 space-y-0.5">
+      <div className="text-sm space-y-3">
+        <Section
+          title="↓ Inputs"
+          initiallyOpen
+          textColor={data.theme?.textColor}
+        >
+          <ul
+            className="list-disc ml-5 space-y-0.5"
+            style={{ color: data.theme?.textColor }}
+          >
             {(data.inputs ?? []).map((i) => (
               <li key={i.varname}>
-                <span className="font-medium">{i.varname}</span>: {i.varType}
+                <span
+                  className="font-medium"
+                  style={{ color: data.theme?.textColor }}
+                >
+                  {i.varname}
+                </span>
+                : {i.varType}
               </li>
             ))}
           </ul>
         </Section>
-        <Section title="↑ Outputs" initiallyOpen>
-          <ul className="list-disc ml-5 space-y-0.5">
+        <Section
+          title="↑ Outputs"
+          initiallyOpen
+          textColor={data.theme?.textColor}
+        >
+          <ul
+            className="list-disc ml-5 space-y-0.5"
+            style={{ color: data.theme?.textColor }}
+          >
             {(data.outputs ?? []).map((o) => (
               <li key={o.varname}>
-                <span className="font-medium">{o.varname}</span>: {o.varType}
+                <span
+                  className="font-medium"
+                  style={{ color: data.theme?.textColor }}
+                >
+                  {o.varname}
+                </span>
+                : {o.varType}
               </li>
             ))}
           </ul>
@@ -83,9 +97,7 @@ const FunctionNode: React.FC<
           </span>
         </div>
       ) : null}
-      <CustomHandle type="target" position={Position.Left} size={16} />
-      <CustomHandle type="source" position={Position.Right} size={16} />
-    </div>
+    </BaseNode>
   );
 };
 
