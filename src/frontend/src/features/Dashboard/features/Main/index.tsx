@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useParams } from "react-router";
-import Canvas from "@/features/Dashboard/features/Main/canvas";
+import Canvas from "@/features/Dashboard/features/Main/componets/canvas";
 
 const MainCanvas = () => {
   const { projectId } = useParams();
