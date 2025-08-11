@@ -3,6 +3,7 @@ import type { ClassNodeProps } from "../../types/node";
 import { getIcons } from "@/features/Dashboard/utils";
 import { Separator } from "@/components/ui/separator";
 import BaseNode from "../BaseNode";
+import { DynamicIcon } from "@/components/DynamicIcon";
 
 type ClassNodeData = ClassNodeProps;
 
@@ -86,7 +87,10 @@ const ClassNode: React.FC<
                     // Hook for future: expand method as separate flow
                   }}
                 >
-                  {/* method icon/title are simple text now; BaseNode owns header */}
+                  <DynamicIcon
+                    iconName={m.icon || getIcons("function")}
+                    className="w-4 h-4"
+                  />
                   <span
                     className="text-sm"
                     style={{ color: data.theme?.textColor }}
