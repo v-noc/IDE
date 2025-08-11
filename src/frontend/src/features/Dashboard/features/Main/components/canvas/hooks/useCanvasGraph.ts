@@ -42,9 +42,8 @@ function processVirtualFolders(vf: VirtualFolderResponse): CommonVNode {
         children: (vf.children || []).map(processVirtualFolders),
     };
     if (lt?.node_type === "class") {
-        const methodChildren = base.children.filter((c) => c.node_type === "function");
-        const nonMethodChildren = base.children.filter((c) => c.node_type !== "function");
-        return { ...base, methods: methodChildren, children: nonMethodChildren, fields: lt?.fields, };
+
+        return { ...base, fields: lt?.fields, };
     } else if (lt?.node_type == "function") {
         return {
             ...base, inputs: lt?.inputs,
@@ -109,6 +108,8 @@ export function useCanvasGraph(
         }
         return { node: null as CommonVNode | null, parent: null as CommonVNode | null };
     }, [selectedNode, projTree, vfs]);
+
+
 
     const initialNodes = useMemo((): Node[] => {
         const { node, parent } = selectedFromSources;
