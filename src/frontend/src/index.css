@@ -114,7 +114,12 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.bn-editor {
+  height: 100% !important;
 }
