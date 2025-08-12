@@ -8,7 +8,14 @@ from app.core.virtual_folder import VirtualFolder
 from typing import Dict, Any, Optional, List
 from app.models.properties import ThemeConfig
 
+
 # Pydantic Models
+
+
+class DeleteVirtualFolderResponse(BaseModel):
+    deleted_count: int
+
+
 class VirtualFolderCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -40,6 +47,7 @@ class AddCodeElementRequest(BaseModel):
 
 router = APIRouter()
 
+
 # Helper Functions
 
 
@@ -69,7 +77,7 @@ def add_element_as_virtual_folder(
     element_node = manager.get_node(request.element_id)
     if not element_node:
         raise HTTPException(status_code=404, detail="Code element not found")
-    
+
     if element_node.node_type not in ['function', 'class']:
         raise HTTPException(
             status_code=400,
@@ -80,7 +88,7 @@ def add_element_as_virtual_folder(
         Function(element_node) if element_node.node_type == 'function' 
         else Class(element_node)
     )
-    
+
     try:
         new_folder = parent_folder.create_folder_for_element(element)
         return new_folder.to_dict()
@@ -190,7 +198,11 @@ def get_virtual_folder(
     return folder.get_descendant_tree()
 
 
-@router.delete("/{folder_key}", status_code=204)
+@router.delete(
+    "/{folder_key}",
+    response_model=DeleteVirtualFolderResponse,
+    status_code=200,
+)
 def delete_virtual_folder(
     project_key: str,
     folder_key: str,
@@ -207,8 +219,10 @@ def delete_virtual_folder(
     if not folder:
         raise HTTPException(status_code=404, detail="Virtual folder not found")
 
-    folder.delete()
-    return Response(status_code=204)
+    number_of_deleted_folders = folder.delete()
+    if number_of_deleted_folders == 0:
+        raise HTTPException(status_code=404, detail="Virtual folder not found")
+    return DeleteVirtualFolderResponse(deleted_count=number_of_deleted_folders)
 
 
 @router.post(
