@@ -61,9 +61,9 @@ const SplitRight: React.FC<SplitRightProps> = ({
           aria-label="Open right sidebar"
           title="Open right sidebar"
           onClick={() => setOpen(true)}
-          className="absolute right-1 top-1/2 z-20 -translate-y-1/2 rounded-md border bg-background/80 p-1 shadow hover:bg-accent"
+          className="absolute -right-2 top-1/2 z-20 -translate-y-1/2  rounded-md border bg-background/80 p-1 py-2 shadow hover:bg-accent"
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-4 -translate-x-1" />
         </button>
       )}
     </div>
@@ -87,7 +87,7 @@ export const RightSidebar: React.FC<{
           onClick={onToggle}
           aria-label="Hide right sidebar"
           title="Hide right sidebar"
-          className="absolute -left-3 top-1/2 z-20 -translate-y-1/2 rounded-md border bg-background/80 p-1 shadow hover:bg-accent"
+          className="absolute -left-3 top-1/2 z-20 -translate-y-1/2 rounded-md border bg-background/80 p-1 py-2 shadow hover:bg-accent"
         >
           <ChevronRight className="size-4" />
         </button>

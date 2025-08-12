@@ -1,35 +1,15 @@
 import Editor from "@monaco-editor/react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  useGetCodeFromElement,
-  useGetFileCode,
-  type CodeElementResponse,
-  type FileCodeResponse,
-} from "../../../../service/useCodeElement";
 import useProjectStore from "../../../../store/useProjectStore";
+import { useEditorCode } from "./useEditorCode";
+import { detectLanguage } from "./detectLanguage";
 
 const EditorCode = () => {
   const { selectedNode } = useProjectStore();
   const elementId = selectedNode?.id ?? "";
   const nodeType = selectedNode?.type;
 
-  const isFile = nodeType === "file";
-  const {
-    data: elementData,
-    isLoading: isElementLoading,
-    isError: isElementError,
-  } = useGetCodeFromElement(!isFile ? elementId : "");
-  const {
-    data: fileData,
-    isLoading: isFileLoading,
-    isError: isFileError,
-  } = useGetFileCode(isFile ? elementId : "");
-
-  const data: FileCodeResponse | CodeElementResponse | undefined = isFile
-    ? fileData
-    : elementData;
-  const isLoading = isFile ? isFileLoading : isElementLoading;
-  const isError = isFile ? isFileError : isElementError;
+  const { data, isLoading, isError } = useEditorCode(elementId, nodeType);
 
   const [editorValue, setEditorValue] = useState<string>("");
 
@@ -37,33 +17,7 @@ const EditorCode = () => {
     setEditorValue(data?.code ?? "");
   }, [data?.code]);
 
-  const language = useMemo(() => {
-    const fileName =
-      (data as FileCodeResponse | CodeElementResponse | undefined)?.file_name ||
-      (data as FileCodeResponse | CodeElementResponse | undefined)?.file_path ||
-      "";
-    const ext = fileName.split(".").pop()?.toLowerCase();
-    switch (ext) {
-      case "ts":
-      case "tsx":
-        return "typescript";
-      case "js":
-      case "jsx":
-        return "javascript";
-      case "json":
-        return "json";
-      case "md":
-        return "markdown";
-      case "yml":
-      case "yaml":
-        return "yaml";
-      case "sql":
-        return "sql";
-      case "py":
-      default:
-        return "python";
-    }
-  }, [data]);
+  const language = useMemo(() => detectLanguage(data), [data]);
 
   if (!elementId) {
     return (
