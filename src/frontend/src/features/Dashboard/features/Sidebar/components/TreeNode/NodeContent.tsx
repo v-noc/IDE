@@ -54,7 +54,7 @@ export const NodeContent = ({
     <li
       onClick={handleSelectNode}
       className={cn(
-        "flex items-center space-x-1 rounded-md p-1.5 transition-all duration-200 cursor-pointer ",
+        "flex items-center space-x-1 rounded-md p-1 transition-all duration-200 cursor-pointer ",
         "hover:bg-black/5"
       )}
     >

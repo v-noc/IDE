@@ -4,6 +4,7 @@ import { useParams } from "react-router";
 import Canvas from "@/features/Dashboard/features/Main/components/canvas";
 import useProjectStore from "../../store/useProjectStore";
 import Documents from "./components/docs";
+import EditorCode from "./components/code";
 
 const MainCanvas = () => {
   const { projectId } = useParams();
@@ -40,9 +41,12 @@ const MainCanvas = () => {
           </TabsContent>
         )}
         {isCodeActive && (
-          <TabsContent value="code" className="flex-1">
-            <div className="h-full w-full rounded-md border p-4">
-              MainCanvas {projectId}
+          <TabsContent
+            value="code"
+            className="flex-1 flex flex-col overflow-hidden"
+          >
+            <div className="h-full w-full overflow-auto py-4">
+              <EditorCode />
             </div>
           </TabsContent>
         )}
