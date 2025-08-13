@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -41,25 +42,29 @@ const SplitRight: React.FC<SplitRightProps> = ({
 
         {open ? (
           <>
-            <ResizableHandle withHandle onDoubleClick={() => setOpen(false)} />
+            <ResizableHandle className="hover:bg-border/70 transition-colors" />
             <ResizablePanel
               defaultSize={rightDefaultSize}
               minSize={rightMinSize}
               className="h-full min-h-0"
             >
-              {right}
+              <RightSidebar onToggle={() => setOpen(false)}>
+                {right}
+              </RightSidebar>
             </ResizablePanel>
           </>
         ) : null}
       </ResizablePanelGroup>
 
       {!open && (
-        <div
+        <button
           aria-label="Open right sidebar"
           title="Open right sidebar"
           onClick={() => setOpen(true)}
-          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize z-10 hover:bg-border/50"
-        />
+          className="absolute -right-2 top-1/2 z-20 -translate-y-1/2  rounded-md border bg-background/80 p-1 py-2 shadow hover:bg-accent"
+        >
+          <ChevronLeft className="size-4 -translate-x-1" />
+        </button>
       )}
     </div>
   );
@@ -68,13 +73,25 @@ const SplitRight: React.FC<SplitRightProps> = ({
 export const RightSidebar: React.FC<{
   children?: React.ReactNode;
   className?: string;
-}> = ({ children, className }) => {
+  onToggle?: () => void;
+}> = ({ children, className, onToggle }) => {
   return (
     <aside
-      className={`h-full w-full bg-white border-l shadow-sm flex flex-col ${
+      className={`relative h-full w-full bg-white border-l shadow-sm flex flex-col ${
         className ?? ""
       }`}
     >
+      {/* Edge-centered toggle */}
+      {onToggle ? (
+        <button
+          onClick={onToggle}
+          aria-label="Hide right sidebar"
+          title="Hide right sidebar"
+          className="absolute -left-3 top-1/2 z-20 -translate-y-1/2 rounded-md border bg-background/80 p-1 py-2 shadow hover:bg-accent"
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      ) : null}
       {children ?? <div>Right sidebar placeholder</div>}
     </aside>
   );

@@ -114,7 +114,42 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.bn-editor {
+  height: 100% !important;
+}
+
+/* Custom styles for Mermaid block alignment and resize handles */
+.bn-visual-media-wrapper {
+  width: 100%;
+  min-width: 0;
+}
+
+.bn-visual-media {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.bn-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  opacity: 0.0;
+  transition: opacity 120ms ease;
+}
+
+.bn-resize-handle:hover {
+  opacity: 0.6;
+}
+
+/* Make handles visible when hovering the block container */
+.bn-file-block-content-wrapper:hover .bn-resize-handle {
+  opacity: 0.3;
 }

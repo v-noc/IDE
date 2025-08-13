@@ -48,13 +48,13 @@ export const NodeContent = ({
   };
 
   // Check if this node has a description (for virtual folders)
-  const hasDescription = node.isVirtual && node.description;
+  const hasDescription = node.description;
 
   const nodeContent = (
     <li
       onClick={handleSelectNode}
       className={cn(
-        "flex items-center space-x-1 rounded-md p-1.5 transition-all duration-200 cursor-pointer ",
+        "flex items-center space-x-1 rounded-md p-1 transition-all duration-200 cursor-pointer ",
         "hover:bg-black/5"
       )}
     >
@@ -85,11 +85,6 @@ export const NodeContent = ({
         >
           {node.name}
         </span>
-        {hasDescription && (
-          <span className="text-xs text-muted-foreground truncate block">
-            {node.description}
-          </span>
-        )}
       </div>
     </li>
   );

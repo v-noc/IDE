@@ -11,17 +11,50 @@ export type NodeType =
   | "function"
   | "class"
   | "package"
-  | "virtual_folder";
+  | "virtual_folder"
+  | "method";
+
+export type NodePosition = {
+  line_no: number;
+  col_offset: number;
+  end_line_no: number | null;
+  end_col_offset: number | null;
+};
+
+export interface ImportResponse {
+  _key: string;
+  id: string;
+  from_id: string;
+  to_type: NodeType;
+  to_id: string;
+  from_parent_virtual_folder_id?: string | null;
+  to_parent_virtual_folder_id?: string | null;
+  alias: string;
+  qname: string;
+  position: NodePosition;
+}
+
+export interface FieldResponse {
+  varType: string;
+  varname: string;
+  position: NodePosition;
+}
+
 export interface ProjectTreeResponse {
   key: string;
   name: string;
   path?: string;
   node_type: NodeType;
+  id: string;
+  root_id: string;
   label?: string;
   icon?: string;
   children: ProjectTreeResponse[];
-  isVirtual?: boolean;
-  parentId?: string | null;
+  call_order?: number | null;
+  imports?: ImportResponse[];
+  fields?: FieldResponse[];
+  inputs?: FieldResponse[];
+  outputs?: FieldResponse[];
   description?: string | null;
   theme?: ThemeConfig;
 }
@@ -30,30 +63,27 @@ export interface VirtualFolderResponse {
   key: string;
   name: string;
   node_type: NodeType;
+  id: string;
+  root_id: string;
   qname: string;
   description?: string | null;
   link_to?: {
     id: string;
     name: string;
+    description?: string | null;
     qname: string;
     node_type: NodeType;
     icon?: string;
     theme?: ThemeConfig;
+    imports?: ImportResponse[];
+    fields?: FieldResponse[];
+    inputs?: FieldResponse[];
+    outputs?: FieldResponse[];
   } | null;
   children: VirtualFolderResponse[];
   call_order?: number | null;
   icon?: string;
   theme?: ThemeConfig;
-  imports?: Array<{
-    _key: string;
-    id: string;
-    from_id: string;
-    to_id: string;
-    from_parent_virtual_folder_id?: string | null;
-    to_parent_virtual_folder_id?: string | null;
-    alias: string;
-    qname: string;
-  }> | null;
 }
 
 export interface VirtualFolderCreateRequest {
@@ -137,8 +167,12 @@ const createVirtualFolder = async (
   name: string,
   description?: string
 ): Promise<VirtualFolderResponse> => {
+  let parsedProjectKey = projectKey;
+  if (projectKey.includes("/")) {
+    parsedProjectKey = projectKey.split("/")[1];
+  }
   const response = await api(
-    `${API_ROUTES.PROJECT}${projectKey}${API_ROUTES.VIRTUAL_FOLDER}`,
+    `${API_ROUTES.PROJECT}${parsedProjectKey}${API_ROUTES.VIRTUAL_FOLDER}`,
     {
       method: "POST",
       headers: {
@@ -158,8 +192,18 @@ const updateVirtualFolder = async (
   folderKey: string,
   data: VirtualFolderUpdateRequest
 ): Promise<VirtualFolderResponse> => {
+  let parsedFolderKey = folderKey;
+  if (folderKey.includes("/")) {
+    parsedFolderKey = folderKey.split("/")[1];
+  }
+  let parsedProjectKey = projectKey;
+  if (projectKey.includes("/")) {
+    parsedProjectKey = projectKey.split("/")[1];
+  }
+  // TODO: This is a temporary fix to handle the case where the folder key is a path
+
   const response = await api(
-    `${API_ROUTES.PROJECT}${projectKey}${API_ROUTES.VIRTUAL_FOLDER}${folderKey}`,
+    `${API_ROUTES.PROJECT}${parsedProjectKey}${API_ROUTES.VIRTUAL_FOLDER}${parsedFolderKey}`,
     {
       method: "PUT",
       headers: {
@@ -175,8 +219,16 @@ const getVirtualFolder = async (
   projectKey: string,
   folderKey: string
 ): Promise<VirtualFolderResponse> => {
+  let parsedProjectKey = projectKey;
+  if (projectKey.includes("/")) {
+    parsedProjectKey = projectKey.split("/")[1];
+  }
+  let parsedFolderKey = folderKey;
+  if (folderKey.includes("/")) {
+    parsedFolderKey = folderKey.split("/")[1];
+  }
   const response = await api(
-    `${API_ROUTES.PROJECT}${projectKey}${API_ROUTES.VIRTUAL_FOLDER}${folderKey}`
+    `${API_ROUTES.PROJECT}${parsedProjectKey}${API_ROUTES.VIRTUAL_FOLDER}${parsedFolderKey}`
   );
   return response as VirtualFolderResponse;
 };
@@ -186,8 +238,16 @@ const addCodeElementToVirtualFolder = async (
   folderKey: string,
   data: AddCodeElementRequest
 ): Promise<VirtualFolderResponse> => {
+  let parsedProjectKey = projectKey;
+  if (projectKey.includes("/")) {
+    parsedProjectKey = projectKey.split("/")[1];
+  }
+  let parsedFolderKey = folderKey;
+  if (folderKey.includes("/")) {
+    parsedFolderKey = folderKey.split("/")[1];
+  }
   const response = await api(
-    `${API_ROUTES.PROJECT}${projectKey}${API_ROUTES.VIRTUAL_FOLDER}${folderKey}/add-code-element`,
+    `${API_ROUTES.PROJECT}${parsedProjectKey}${API_ROUTES.VIRTUAL_FOLDER}${parsedFolderKey}/add-code-element`,
     {
       method: "POST",
       headers: {
@@ -204,8 +264,17 @@ const removeCodeElementFromVirtualFolder = async (
   folderKey: string,
   elementKey: string
 ): Promise<void> => {
+  let parsedFolderKey = folderKey;
+  if (folderKey.includes("/")) {
+    parsedFolderKey = folderKey.split("/")[1];
+  }
+  // TODO: This is a temporary fix to handle the case where the folder key is a path
+  let parsedElementKey = elementKey;
+  if (elementKey.includes("/")) {
+    parsedElementKey = elementKey.split("/")[1];
+  }
   const response = await api(
-    `${API_ROUTES.PROJECT}${projectKey}${API_ROUTES.VIRTUAL_FOLDER}${folderKey}/code-element/${elementKey}`,
+    `${API_ROUTES.PROJECT}${projectKey}${API_ROUTES.VIRTUAL_FOLDER}${parsedFolderKey}/code-element/${parsedElementKey}`,
     {
       method: "DELETE",
     }
@@ -235,8 +304,12 @@ const createPathForElement = async (
   elementKey: string,
   data: { name: string; description: string }
 ): Promise<VirtualFolderResponse> => {
+  let parsedProjectKey = projectKey;
+  if (projectKey.includes("/")) {
+    parsedProjectKey = projectKey.split("/")[1];
+  }
   const response = await api(
-    `${API_ROUTES.PROJECT}${projectKey}${API_ROUTES.VIRTUAL_FOLDER}create-path/${elementKey}`,
+    `${API_ROUTES.PROJECT}${parsedProjectKey}${API_ROUTES.VIRTUAL_FOLDER}create-path/${elementKey}`,
     {
       method: "POST",
       body: data as unknown as BodyInit,
@@ -284,8 +357,17 @@ const deleteVirtualFolder = async (
   projectKey: string,
   folderKey: string
 ): Promise<void> => {
+  let parsedProjectKey = projectKey;
+  if (projectKey.includes("/")) {
+    parsedProjectKey = projectKey.split("/")[1];
+  }
+  // TODO: This is a temporary fix to handle the case where the folder key is a path
+  let parsedFolderKey = folderKey;
+  if (folderKey.includes("/")) {
+    parsedFolderKey = folderKey.split("/")[1];
+  }
   await api(
-    `${API_ROUTES.PROJECT}${projectKey}${API_ROUTES.VIRTUAL_FOLDER}${folderKey}`,
+    `${API_ROUTES.PROJECT}${parsedProjectKey}${API_ROUTES.VIRTUAL_FOLDER}${parsedFolderKey}`,
     {
       method: "DELETE",
     }

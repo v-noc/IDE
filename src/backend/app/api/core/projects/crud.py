@@ -29,14 +29,20 @@ class ProjectResponse(BaseModel):
 class ProjectTreeResponse(BaseModel):
     key: str
     name: str
+    id: str
     icon: Optional[str]
     description: Optional[str]
     node_type: str
     qname: str
     properties: dict
     theme: Optional[ThemeConfig] = None
+    root_id: Optional[str] = None
     children: List["ProjectTreeResponse"]
-
+    call_order: Optional[int] = None
+    imports: Optional[List[Dict[str, Any]]] = None
+    fields: Optional[List[Dict[str, Any]]] = None
+    inputs: Optional[List[Dict[str, Any]]] = None
+    outputs: Optional[List[Dict[str, Any]]] = None
 
 def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
     """
@@ -47,9 +53,11 @@ def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
         children = [
             map_tree_to_response(child) for child in tree_data["children"]
         ]
+    
    
     return ProjectTreeResponse(
         key=tree_data.get("_key", tree_data.get("key", "")),
+        id=tree_data.get("tree_id", tree_data.get("id", "")),
         name=tree_data.get("name", ""),
         icon=tree_data.get("icon", ""),
         description=tree_data.get("description", ""),
@@ -57,7 +65,13 @@ def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
         qname=tree_data.get("qname", ""),
         properties=tree_data.get("properties", {}),
         theme=tree_data.get("theme", {}),
-        children=children
+        call_order=tree_data.get("call_order", None),
+        imports=tree_data.get("imports", []),
+        fields=tree_data.get("fields", []),
+        inputs=tree_data.get("inputs", []),
+        outputs=tree_data.get("outputs", []),
+        children=children,
+        root_id=tree_data.get("id", ""),
     )
 
 

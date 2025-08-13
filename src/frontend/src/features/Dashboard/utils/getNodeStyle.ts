@@ -1,6 +1,7 @@
-import type { ProjectTreeResponse } from "../service/useProject";
+import type { NodeType } from "../service/useProject";
+import type { ThemeConfig } from "../store/useThemeStore";
 
-const getNodeStyle = (node: ProjectTreeResponse) => {
+const getNodeStyle = (node: { node_type: NodeType, theme?: ThemeConfig }) => {
     // If node has theme overrides, prefer them
     const themed = node.theme || {};
 
@@ -11,13 +12,17 @@ const getNodeStyle = (node: ProjectTreeResponse) => {
                     backgroundColor: "#F3EDF7",
                     color: "#1C1B1F",
                     iconColor: "#6750A4",
+                    cardColor: "#F3EDF7",
                     borderColor: "#E7E0EC",
+                    textColor: "#1C1B1F",
                 };
             case "folder":
                 return {
                     backgroundColor: "#FFFBFE",
                     color: "#1C1B1F",
                     iconColor: "#625B71",
+                    cardColor: "#FFFBFE",
+                    textColor: "#1C1B1F",
                     borderColor: "#E7E0EC",
                 };
             case "file":
@@ -25,13 +30,17 @@ const getNodeStyle = (node: ProjectTreeResponse) => {
                     backgroundColor: "#FFFFFF",
                     color: "#1C1B1F",
                     iconColor: "#49454F",
+                    cardColor: "#FFFFFF",
                     borderColor: "#E7E0EC",
+                    textColor: "#1C1B1F",
                 };
             case "function":
                 return {
                     backgroundColor: "#FFFFFF",
                     color: "#7D5260",
                     iconColor: "#7D5260",
+                    cardColor: "#FFFFFF",
+                    textColor: "#7D5260",
                     borderColor: "#F4E7ED",
                 };
             case "class":
@@ -39,6 +48,8 @@ const getNodeStyle = (node: ProjectTreeResponse) => {
                     backgroundColor: "#FFFFFF",
                     color: "#6750A4",
                     iconColor: "#6750A4",
+                    cardColor: "#FFFFFF",
+                    textColor: "#6750A4",
                     borderColor: "#E9E1F6",
                 };
             case "package":
@@ -47,6 +58,8 @@ const getNodeStyle = (node: ProjectTreeResponse) => {
                     color: "#1C1B1F",
                     iconColor: "#625B71",
                     borderColor: "#E7E0EC",
+                    textColor: "#1C1B1F",
+                    cardColor: "#FEF7FF",
                 };
             default:
                 return {
@@ -54,14 +67,18 @@ const getNodeStyle = (node: ProjectTreeResponse) => {
                     color: "#1C1B1F",
                     iconColor: "#49454F",
                     borderColor: "#E7E0EC",
+                    cardColor: "#FFFBFE",
+                    textColor: "#1C1B1F",
                 };
         }
     })();
 
     return {
+        cardColor: themed.cardColor || defaults.cardColor,
         backgroundColor: themed.cardColor || defaults.backgroundColor,
         color: themed.textColor || defaults.color,
         iconColor: themed.iconColor || defaults.iconColor,
+        textColor: themed.textColor || defaults.textColor,
         borderColor: defaults.borderColor,
     };
 };

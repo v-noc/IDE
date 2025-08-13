@@ -3,9 +3,9 @@ import api from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 
 export interface CodeElementResponse {
-  element_id: string;
-  element_name: string;
-  element_type: string;
+  id: string;
+  name: string;
+  node_type: string;
   qname: string;
   code: string;
   file_path: string;
@@ -23,10 +23,32 @@ export const useGetCodeFromElement = (elementId: string) => {
     queryKey: ["codeElement", elementId],
     queryFn: async () => {
       const response = await api(
-        `${API_ROUTES.CODE_ELEMENTS}/${elementId}/code`
+        `${API_ROUTES.CODE_ELEMENTS}${elementId}/code`
       );
       return response as CodeElementResponse;
     },
     enabled: !!elementId,
+  });
+};
+
+export interface FileCodeResponse {
+  file_id: string;
+  file_name: string;
+  file_path: string;
+  node_type: string;
+  qname: string;
+  code: string;
+}
+
+export const useGetFileCode = (fileId: string) => {
+  return useQuery<FileCodeResponse>({
+    queryKey: ["fileCode", fileId],
+    queryFn: async () => {
+      const response = await api(
+        `${API_ROUTES.CODE_ELEMENTS}${fileId}/file-code`
+      );
+      return response as FileCodeResponse;
+    },
+    enabled: !!fileId,
   });
 };

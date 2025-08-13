@@ -1,12 +1,12 @@
 import Layout from "@/features/Dashboard/components/Layout";
 import SideBar from "@/features/Dashboard/features/Sidebar/components/SideBar";
 import Navbar from "@/features/Dashboard/features/Navbar/componets/Navbar";
-import MainCanvas from "@/features/Dashboard/features/Canvas";
+import MainCanvas from "@/features/Dashboard/features/Main";
 
 import { ResizablePanelGroup } from "@/components/ui/resizable";
-import MainWithRightSidebar from "@/features/Dashboard/features/Canvas/MainWithRightSidebar";
-import { RightSidebar } from "@/features/Dashboard/features/Canvas/componets/sidebar";
-import ConfigSidebarContent from "@/features/Dashboard/features/Canvas/componets/sidebar/components/SidebarTabs";
+import MainWithRightSidebar from "@/features/Dashboard/features/Main/MainWithRightSidebar";
+import { RightSidebar } from "@/features/Dashboard/features/Main/components/sidebar";
+import ConfigSidebarContent from "@/features/Dashboard/features/Main/components/sidebar/components/SidebarTabs";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import getIcons from "@/features/Dashboard/utils/getIcons";
 import {
@@ -19,9 +19,9 @@ import type {
   ProjectTreeResponse,
   NodeType,
 } from "@/features/Dashboard/service/useProject";
-import type { BasicInfoData } from "@/features/Dashboard/features/Canvas/componets/sidebar/hooks/useConfigSidebarForm";
+import type { BasicInfoData } from "@/features/Dashboard/features/Main/components/sidebar/hooks/useConfigSidebarForm";
 import type { ThemeConfig } from "@/features/Dashboard/store/useThemeStore";
-import type { CustomizationData } from "@/features/Dashboard/features/Canvas/componets/sidebar/hooks/useConfigSidebarForm";
+import type { CustomizationData } from "@/features/Dashboard/features/Main/components/sidebar/hooks/useConfigSidebarForm";
 
 function findNodeByKey(
   root: ProjectTreeResponse | null,
@@ -32,7 +32,7 @@ function findNodeByKey(
   while (stack.length) {
     const current = stack.pop()!;
 
-    if (current.key === project_key) return current;
+    if (current.id === project_key) return current;
     if (current.children && current.children.length) {
       for (let i = 0; i < current.children.length; i++) {
         stack.push(current.children[i]);
@@ -43,16 +43,16 @@ function findNodeByKey(
 }
 
 const Dashboard = () => {
-  const { selectedNodeId, projectData } = useProjectStore();
+  const { selectedNode, projectData } = useProjectStore();
 
-  const selectedNode = useMemo(
-    () => findNodeByKey(projectData, selectedNodeId),
-    [projectData, selectedNodeId]
+  const selectedNodeFromTree = useMemo(
+    () => findNodeByKey(projectData, selectedNode?.id),
+    [projectData, selectedNode]
   );
 
-  const updateIconMutation = useUpdateNodeIcon(projectData?.key);
-  const updateNodeBasicInfoMutation = useUpdateNodeBasicInfo(projectData?.key);
-  const updateNodeThemeMutation = useUpdateNodeTheme(projectData?.key);
+  const updateIconMutation = useUpdateNodeIcon(projectData?.id);
+  const updateNodeBasicInfoMutation = useUpdateNodeBasicInfo(projectData?.id);
+  const updateNodeThemeMutation = useUpdateNodeTheme(projectData?.id);
 
   const onChangeTheme = useCallback(
     (data: CustomizationData) => {
@@ -67,11 +67,11 @@ const Dashboard = () => {
         textColor: data.textColor,
       };
       updateNodeThemeMutation.mutate({
-        elementKey: selectedNode.key,
+        elementId: selectedNode.id,
         theme,
       });
     },
-    [selectedNode, updateNodeThemeMutation]
+    [selectedNode, updateNodeThemeMutation, selectedNodeFromTree]
   );
 
   const onChangeBasicInfo = useCallback(
@@ -79,21 +79,21 @@ const Dashboard = () => {
       if (!selectedNode) return;
       const nextIcon =
         data.icon ||
-        getIcons((selectedNode.node_type ?? "project") as NodeType);
+        getIcons((selectedNodeFromTree?.node_type ?? "project") as NodeType);
 
-      if (selectedNode.key && nextIcon !== selectedNode.icon) {
+      if (selectedNodeFromTree?.id && nextIcon !== selectedNodeFromTree.icon) {
         updateIconMutation.mutate({
-          elementKey: selectedNode.key,
+          elementId: selectedNodeFromTree.id,
           icon: nextIcon,
         });
       }
 
       if (
-        selectedNode.name !== data.name ||
-        (selectedNode.description ?? "") !== (data.description ?? "")
+        selectedNodeFromTree?.name !== data.name ||
+        (selectedNodeFromTree?.description ?? "") !== (data.description ?? "")
       ) {
         updateNodeBasicInfoMutation.mutate({
-          elementKey: selectedNode.key,
+          elementId: selectedNodeFromTree?.id ?? "",
           basicInfo: {
             name: data.name,
             description: data.description,
@@ -105,34 +105,34 @@ const Dashboard = () => {
       selectedNode,
       updateIconMutation,
       updateNodeBasicInfoMutation,
-      selectedNodeId,
+      selectedNodeFromTree,
     ]
   );
 
   const sidebarProps = useMemo(() => {
     return {
       initialBasicInfo: {
-        name: selectedNode?.name ?? "",
-        description: selectedNode?.description ?? "",
-        icon: selectedNode
-          ? selectedNode.icon ||
-            getIcons((selectedNode.node_type ?? "project") as NodeType)
+        name: selectedNodeFromTree?.name ?? "",
+        description: selectedNodeFromTree?.description ?? "",
+        icon: selectedNodeFromTree
+          ? selectedNodeFromTree.icon ||
+            getIcons((selectedNodeFromTree.node_type ?? "project") as NodeType)
           : getIcons("project"),
       },
       initialCustomization: {
-        iconColor: selectedNode?.theme?.iconColor,
+        iconColor: selectedNodeFromTree?.theme?.iconColor,
 
-        cardColor: selectedNode?.theme?.cardColor,
-        navbarColor: selectedNode?.theme?.navbarColor,
-        backgroundColor: selectedNode?.theme?.backgroundColor,
-        leftSidebarColor: selectedNode?.theme?.leftSidebarColor,
-        rightSidebarColor: selectedNode?.theme?.rightSidebarColor,
-        textColor: selectedNode?.theme?.textColor,
+        cardColor: selectedNodeFromTree?.theme?.cardColor,
+        navbarColor: selectedNodeFromTree?.theme?.navbarColor,
+        backgroundColor: selectedNodeFromTree?.theme?.backgroundColor,
+        leftSidebarColor: selectedNodeFromTree?.theme?.leftSidebarColor,
+        rightSidebarColor: selectedNodeFromTree?.theme?.rightSidebarColor,
+        textColor: selectedNodeFromTree?.theme?.textColor,
       },
       onChangeBasicInfo,
       onChangeCustomization: onChangeTheme,
     };
-  }, [selectedNode, onChangeBasicInfo, onChangeTheme]);
+  }, [selectedNodeFromTree, onChangeBasicInfo, onChangeTheme]);
 
   return (
     <ResizablePanelGroup direction="horizontal">
@@ -143,7 +143,7 @@ const Dashboard = () => {
             right={
               <RightSidebar>
                 <ConfigSidebarContent
-                  key={selectedNode?.key}
+                  key={selectedNodeFromTree?.id}
                   {...sidebarProps}
                 />
               </RightSidebar>

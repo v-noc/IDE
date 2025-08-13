@@ -38,8 +38,12 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
         return self.model.node_type
 
     @staticmethod
-    def get_by_key(key: str) -> 'VirtualFolder':
-        return VirtualFolder(db.nodes.get(key))
+    def get_by_key(key: str) -> Optional['VirtualFolder']:
+        node_model = db.nodes.get(key)
+        if not node_model:
+            print(f"Virtual folder not found: {key}")
+            return None
+        return VirtualFolder(node_model)
 
     @staticmethod
     def get_folder_linked_to_element(
@@ -105,7 +109,7 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             "icon": self.model.icon,
         }
 
-    def delete(self) -> None:
+    def delete(self) -> int:
         """
         Deletes a virtual folder and all its descendants using a bottom-up
         approach. This method is non-recursive and ensures that child folders
@@ -124,6 +128,8 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
 
             # Delete the folder node itself.
             db.nodes.delete(folder.model.key)
+
+        return len(all_folders_to_delete)
 
     def _collect_all_descendants(self) -> list['VirtualFolder']:
         """
@@ -152,7 +158,10 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
     def update(self, update_data: dict) -> 'VirtualFolder':
         updated_model = self.model.model_copy(update=update_data)
         db.nodes.update(updated_model)
-        return self.get_by_key(self.key)
+        refreshed = db.nodes.get(updated_model.key)
+        if not refreshed:
+            raise ValueError("Updated virtual folder not found")
+        return VirtualFolder(refreshed)
 
     def add_virtual_folder(
         self, folder_name: str, description: Optional[str] = None,
@@ -191,7 +200,6 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
     def get_descendant_tree(self) -> dict[str, any]:
         """
         Builds a recursive JSON tree of the virtual folder and its descendants.
-        Includes import information from UsesImportEdge edges.
         """
         cursor = db.virtual_contains_edges.get_descendant_tree_query(self.id)
 
@@ -225,7 +233,8 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
 
     def _to_dict_with_imports(self) -> dict:
         """
-        Helper method to serialize virtual folder with import information.
+        Helper method to serialize virtual folder details. Import info is
+        intentionally omitted; consumers should rely on `link_to`.
         """
         link_edge = self.get_linked_element_edge()
         linked_element_data = None
@@ -249,32 +258,6 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
                         with_dependency_tree=False
                     )
 
-        imports_data = []
-        import_edges = self.get_imports()
-        if import_edges:
-            for import_edge in import_edges:
-                from_node = db.nodes.get(import_edge.from_id)
-                to_node = db.nodes.get(import_edge.to_id)
-
-                from_vf = self.get_folder_linked_to_element(from_node.id)
-                to_vf = self.get_folder_linked_to_element(to_node.id)
-
-                imports_data.append({
-                    "_key": import_edge.key,
-                    "id": import_edge.id,
-                    "from_id": import_edge.from_id,
-                    "to_id": import_edge.to_id,
-                    "from_parent_virtual_folder_id": (
-                        from_vf.id if from_vf else None
-                    ),
-                    "to_parent_virtual_folder_id": (
-                        to_vf.id if to_vf else None
-                    ),
-                    "alias": (
-                        import_edge.alias or import_edge.target_symbol
-                    ),
-                    "qname": import_edge.target_qname,
-                })
         theme = None
         if self.model.properties:
             theme = (
@@ -295,9 +278,6 @@ class VirtualFolder(DomainObject[node.VirtualFolderNode]):
             "icon": self.model.icon,
             "theme": theme,
         }
-
-        if imports_data:
-            result["imports"] = imports_data
 
         return result
 

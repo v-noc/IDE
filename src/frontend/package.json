@@ -10,7 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@blocknote/core": "^0.35.0",
+    "@blocknote/react": "^0.35.0",
+    "@blocknote/shadcn": "^0.35.0",
     "@hookform/resolvers": "^5.2.1",
+    "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -38,6 +42,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@tanstack/react-query": "^5.83.0",
     "@tanstack/react-virtual": "^3.13.12",
+    "@xyflow/react": "^12.8.2",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -45,6 +50,7 @@
     "date-fns": "^4.1.0",
     "immer": "^10.1.1",
     "lucide-react": "^0.532.0",
+    "mermaid": "^11.9.0",
     "next-themes": "^0.4.6",
     "postcss": "^8.5.6",
     "react": "^19.1.0",

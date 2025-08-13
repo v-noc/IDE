@@ -22,7 +22,7 @@ class BasicInfo(BaseModel):
     )
 
 
-@router.post("/{element_key}/update-node-theme")
+@router.post("/nodes/{element_key}/update-node-theme")
 def update_node_theme(
     element_key: str,
     theme: ThemeConfig,
@@ -65,7 +65,7 @@ def update_node_theme(
     return nodes.get(element_key)
 
 
-@router.post("/{element_key}/update-icon")
+@router.post("/nodes/{element_key}/update-icon")
 def update_icon(
     element_key: str,
     icon: str = Body(embed=True),
@@ -80,7 +80,7 @@ def update_icon(
     return nodes.get(element_key)
 
 
-@router.post("/{element_key}/update-basic-info")
+@router.post("/nodes/{element_key}/update-basic-info")
 def update_basic_info(
     element_key: str,
     basic_info: BasicInfo,

@@ -6,8 +6,8 @@ import type { NodeType, ProjectTreeResponse } from "@/features/Dashboard/service
 const uuidv4 = () => new Date().getTime().toString() + Math.random().toString(36).substr(2, 9);
 
 interface ProjectState {
-    selectedNodeId: string | null;
-    setSelectedNodeId: (nodeId: string | null) => void;
+    selectedNode: { id: string, type: NodeType, isExpanded?: boolean, doNotReRenderCanvas?: boolean } | null;
+    setSelectedNode: (node: { id: string, type: NodeType, isExpanded?: boolean, doNotReRenderCanvas?: boolean } | null) => void;
     activeNodeId: string | null;
     expandedNodeIds: string[];
     toggleNodeExpansion: (nodeId: string) => void;
@@ -38,8 +38,8 @@ const addNodeToParent = (nodes: ProjectTreeResponse[], parentId: string, newNode
 const useProjectStore = create<ProjectState>()(
     devtools(
         immer((set) => ({
-            selectedNodeId: null,
-            setSelectedNodeId: (nodeId) => set({ selectedNodeId: nodeId }),
+            selectedNode: null,
+            setSelectedNode: (node) => set({ selectedNode: node }),
             activeNodeId: null,
             expandedNodeIds: [],
             toggleNodeExpansion: (nodeId) => {
@@ -56,14 +56,13 @@ const useProjectStore = create<ProjectState>()(
             setProjectData: (data) => set({ projectData: data }),
             virtualFolderStructures: [],
             addVirtualNode: (parentId, name, type) => {
-                const newNode: ProjectTreeResponse = {
-                    key: uuidv4(),
+                const newNode: ProjectTreeResponse & { parentId?: string } = {
+                    id: uuidv4(),
                     name,
                     path: "",
                     node_type: type,
                     label: name,
                     children: type === "folder" ? [] : [],
-                    isVirtual: true,
                     parentId,
                 };
                 set(state => {

@@ -1,6 +1,7 @@
 import { ResizableHandle, ResizablePanel } from "@/components/ui/resizable";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { ImperativePanelHandle } from "react-resizable-panels";
 import { useThemeStore, type ThemeConfig } from "../store/useThemeStore";
 
 import useProjectStore from "../store/useProjectStore";
@@ -66,20 +67,33 @@ const Layout = ({
   rightSidebar?: React.ReactNode;
 }) => {
   const [isRightOpen, setIsRightOpen] = useState(true);
+  const [isLeftOpen, setIsLeftOpen] = useState(true);
+  const leftPanelRef = useRef<ImperativePanelHandle>(null);
+
+  // Sync panel collapsed state with our local boolean
+  useEffect(() => {
+    const panel = leftPanelRef.current;
+    if (!panel) return;
+    if (isLeftOpen && panel.isCollapsed()) {
+      panel.expand();
+    } else if (!isLeftOpen && !panel.isCollapsed()) {
+      panel.collapse();
+    }
+  }, [isLeftOpen]);
   const { theme, setTheme } = useThemeStore();
-  const { projectData, selectedNodeId } = useProjectStore();
+  const { projectData, selectedNode } = useProjectStore();
 
   const selectedPath = useMemo(() => {
     // Returns path from root to selected node (inclusive)
     const path: ProjectTreeResponse[] = [];
-    if (!projectData || !selectedNodeId) return path;
+    if (!projectData || !selectedNode) return path;
 
     const dfs = (
       node: ProjectTreeResponse,
       acc: ProjectTreeResponse[]
     ): boolean => {
       acc.push(node);
-      if (node.key === selectedNodeId) return true;
+      if (node.id === selectedNode.id) return true;
       if (node.children) {
         for (const child of node.children) {
           if (dfs(child, acc)) return true;
@@ -92,11 +106,11 @@ const Layout = ({
     const tmp: ProjectTreeResponse[] = [];
     if (dfs(projectData, tmp)) return tmp;
     return [];
-  }, [projectData, selectedNodeId]);
+  }, [projectData, selectedNode]);
 
   const resolvedTheme = useMemo(() => {
     // Merge themes along the path from root to selected node, allowing child to override
-    if (selectedNodeId && selectedPath.length > 0) {
+    if (selectedNode && selectedPath.length > 0) {
       let merged: ThemeConfig | undefined = undefined;
       for (const node of selectedPath) {
         merged = mergeThemes(merged, normalizeTheme(node.theme));
@@ -105,14 +119,14 @@ const Layout = ({
     }
 
     // No node found in project tree; do not override externally set theme
-    if (selectedNodeId && selectedPath.length === 0) {
+    if (selectedNode && selectedPath.length === 0) {
       return undefined;
     }
 
     // No node selected → use project theme if available and non-empty
     const projectTheme = normalizeTheme(projectData?.theme);
     return hasEffectiveTheme(projectTheme) ? projectTheme : undefined;
-  }, [selectedNodeId, selectedPath, projectData?.theme]);
+  }, [selectedNode, selectedPath, projectData?.theme]);
 
   useEffect(() => {
     if (resolvedTheme !== undefined) {
@@ -125,7 +139,7 @@ const Layout = ({
         "--navbar-color": theme.navbarColor,
         "--left-sidebar-color": theme.leftSidebarColor,
         "--right-sidebar-color": theme.rightSidebarColor,
-        "--background-color": theme.backgroundColor,
+        "--background-color": theme.cardColor,
         "--text-color": theme.textColor,
         "--icon-color": theme.iconColor,
         "--card-color": theme.cardColor,
@@ -137,14 +151,39 @@ const Layout = ({
       className="relative flex min-h-screen max-h-screen w-full h-full"
       style={style}
     >
-      {/* Left Sidebar */}
+      {/* Left Sidebar (always mounted; collapsed via imperative API) */}
       <ResizablePanel
+        ref={leftPanelRef}
         defaultSize={20}
-        className="bg-[var(--left-sidebar-color)]"
+        collapsible
+        collapsedSize={0}
+        minSize={12}
+        className="relative bg-[var(--left-sidebar-color)] group"
       >
+        {/* Edge-centered toggle to collapse */}
+        <button
+          type="button"
+          aria-label="Close left sidebar"
+          onClick={() => setIsLeftOpen(false)}
+          className="absolute -right-3 top-1/2 z-50 -translate-y-1/2 rounded-md border bg-background/80 p-1 py-2 shadow hover:bg-accent opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        >
+          <ChevronLeft className="h-4 w-4 -translate-x-1" />
+        </button>
         {leftSidebar}
       </ResizablePanel>
-      <ResizableHandle withHandle />
+      {/* Minimal handle: only color changes on hover */}
+      <ResizableHandle className="w-px px-0 border-l border-transparent hover:border-border hover:bg-border/20 transition-colors duration-150" />
+      {/* When left is closed, show open toggle */}
+      {!isLeftOpen && (
+        <button
+          type="button"
+          aria-label="Open left sidebar"
+          onClick={() => setIsLeftOpen(true)}
+          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-50 p-1 py-2 bg-white border rounded-r-md shadow hover:bg-gray-50"
+        >
+          <ChevronRight className="h-4 w-4 translate-x-1" />
+        </button>
+      )}
       {/* Main Content Area */}
       <ResizablePanel
         defaultSize={rightSidebar ? 60 : 80}

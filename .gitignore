@@ -13,7 +13,9 @@ wheels/
 src/frontend/node_modules
 src/frontend/dist
 src/frontend/.env
-src/frontend/.yarn
+# Ignore Yarn directory in the frontend app completely (and its contents)
+src/frontend/.yarn/
+src/frontend/.yarn/**
 src/frontend/.env.local
 src/frontend/.env.*.local
 npm-debug.log*
