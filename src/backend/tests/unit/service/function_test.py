@@ -14,7 +14,6 @@ def test_create_function(create_repos):
         "Test Function",
         "test_project.test_function",
         "This is a test function",
-        "test_function",
         position
     )
     assert function is not None

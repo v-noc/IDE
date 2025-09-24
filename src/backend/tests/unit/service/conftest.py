@@ -6,6 +6,7 @@ from app.core.services.file_service import FileService
 from app.core.services.function_service import FunctionService
 from app.core.model.properties import CodePosition
 from app.core.services.class_service import ClassService
+from app.core.services.call_service import CallService
 
 
 @pytest.fixture
@@ -58,7 +59,7 @@ def create_function(create_repos):
         "Test Function",
         "test_project.test_function",
         "This is a test function",
-        "test_function",
+
         position
     )
 
@@ -76,7 +77,7 @@ def create_function2(create_repos):
         "Test Function 2",
         "test_project.test_function2",
         "This is a test function",
-        "test_function",
+
         position
     )
 
@@ -94,7 +95,7 @@ def create_class(create_repos):
         "Test Class",
         "test_project.test_class",
         "This is a test class",
-        "test_class",
+
         position
     )
 
@@ -112,6 +113,22 @@ def create_class2(create_repos):
         "Test Class 2",
         "test_project.test_class2",
         "This is a test class",
-        "test_class",
+
         position
     )
+
+# def test_create_call(create_repos):
+#     call_service = CallService(create_repos)
+#     position = CodePosition(
+#         line_no=1,
+#         col_offset=0,
+#         end_line_no=1,
+#         end_col_offset=0
+#     )
+#     return call_service.create(
+#         "Test Call",
+#         "test_project.test_call",
+#         "This is a test call",
+#         "test_call",
+#         position
+#     )

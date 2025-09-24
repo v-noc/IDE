@@ -8,12 +8,12 @@ class FunctionService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(self, name: str, qname: str, description: str, path: str, position: CodePosition):
+    def create(self, name: str, qname: str, description: str,  position: CodePosition):
         function = FunctionNode(
             name=name,
             qname=qname,
             description=description,
-            path=path,
+
             position=position,
         )
         return self.repos.function_repo.create(function)

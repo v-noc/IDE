@@ -8,12 +8,11 @@ class ClassService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(self, name: str, qname: str, description: str, path: str, position: CodePosition):
+    def create(self, name: str, qname: str, description: str,  position: CodePosition):
         class_node = ClassNode(
             name=name,
             qname=qname,
             description=description,
-            path=path,
             position=position,
         )
         return self.repos.class_repo.create(class_node)
