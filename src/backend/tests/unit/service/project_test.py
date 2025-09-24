@@ -67,3 +67,37 @@ def test_delete_project(create_project, create_repos):
     projects = project_service.get_all()
 
     assert len(projects) == 0
+
+
+def test_add_folder_to_project(create_project, create_folder, create_repos):
+    project_service = ProjectService(
+        create_repos
+    )
+
+    project_service.add_folder_to_project(
+        create_project.id,
+        create_folder.id
+    )
+
+    children = project_service.get_children(
+        create_project.id
+    )
+
+    assert len(children) == 1
+
+
+def test_add_file_to_project(create_project, create_file, create_repos):
+    project_service = ProjectService(
+        create_repos
+    )
+
+    project_service.add_file_to_project(
+        create_project.id,
+        create_file.id
+    )
+
+    children = project_service.get_children(
+        create_project.id
+    )
+
+    assert len(children) == 1

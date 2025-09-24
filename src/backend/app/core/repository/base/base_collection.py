@@ -148,9 +148,15 @@ class BaseRepository(Generic[T]):
         dump["updated_at"] = (
             datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         )
+        # python-arango expects a document payload containing _id or _key,
+        # not a separate key argument. Provide the key inline with the
+        # update body.
+        document = {
+            "_key": key,
+            **dump,
+        }
         meta = self.collection.update(
-            key,
-            dump,
+            document,
             return_new=True,
         )
         return self._validate(meta["new"])

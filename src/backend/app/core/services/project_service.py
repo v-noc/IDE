@@ -34,3 +34,6 @@ class ProjectService(ContainerService):
 
     def add_file_to_project(self, project_id: str, file_id: str):
         return self.add_child_to_container(project_id, file_id, "project_to_file")
+
+    def get_children(self, project_id: str):
+        return self.repos.project_repo.get_containment_tree(project_id)
