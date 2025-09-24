@@ -22,3 +22,12 @@ def test_create_call(create_repos, create_function):
     assert new_call.name == "Test Call"
     assert new_call.qname == "test_project.test_call"
     assert new_call.description == "This is a test call"
+
+
+def test_get_call(create_repos, create_call):
+    call_service = CallService(create_repos)
+    new_call = call_service.get(create_call.id)
+    assert new_call is not None
+    assert new_call.name == "Test Call"
+    assert new_call.qname == "test_project.test_call"
+    assert new_call.description == "This is a test call"
