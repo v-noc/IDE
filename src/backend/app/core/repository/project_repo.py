@@ -11,3 +11,6 @@ class ProjectRepo(NodeRepository[ProjectNode]):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def get_all_projects(self):
+        return self.find({"node_type": "project"})
