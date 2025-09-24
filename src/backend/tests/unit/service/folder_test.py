@@ -28,7 +28,7 @@ def test_update_folder(create_repos, create_folder):
     folder_service = FolderService(create_repos)
     create_folder.name = "Updated Folder"
     create_folder.description = "This is an updated folder"
-    print(create_folder)
+
     folder = folder_service.update(create_folder)
 
     assert folder is not None

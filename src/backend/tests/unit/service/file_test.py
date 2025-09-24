@@ -57,3 +57,12 @@ def test_nested_functions(create_repos, create_file, create_function, create_fun
     assert len(functions) == 2
 
     # assert functions[0]['vertex']['_id'] == create_function.id
+
+
+def test_add_class_to_file(create_repos, create_file, create_class):
+    file_service = FileService(create_repos)
+    file_service.add_class_to_file(create_file.id, create_class.id)
+    classes = file_service.get_children(create_file.id)
+    assert len(classes) == 1
+
+    assert classes[0]['vertex']['_id'] == create_class.id
