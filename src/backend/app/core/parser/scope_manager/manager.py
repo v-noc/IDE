@@ -1,0 +1,205 @@
+from typing import Dict, List, Optional
+
+
+from app.core.parser.scope_manager.core.symbol import Symbol
+from app.core.parser.scope_manager.class_analysis.mro import MROCalculator
+from app.core.parser.scope_manager.class_analysis.method_resolver import MethodResolver
+from app.core.parser.scope_manager.class_analysis.model import InheritanceGraph
+from app.core.parser.scope_manager.core.scope import Scope
+
+
+class ScopeManager:
+    """
+    Manages the creation and navigation of a scope hierarchy and provides
+    class analysis and context-sensitive analysis capabilities.
+    """
+
+    def __init__(self):
+        self.root_scope: Optional[Scope] = None
+        self.current_scope: Optional[Scope] = None
+        self._scope_index: Dict[str, Scope] = {}
+
+        # --- Class Analysis Components ---
+        self.inheritance_graph = InheritanceGraph()
+        self.mro_calculator = MROCalculator(self.inheritance_graph)
+        self.method_resolver = MethodResolver(self.inheritance_graph)
+
+        # A map to track what symbol an alias points to.
+        self._assignment_map: Dict[Symbol, Symbol] = {}
+        self.current_frame_stack = []
+
+    # Class Analysis Methods
+
+    def register_class(self, base_qnames: List[str]):
+        """
+        Registers a new class in the inheritance graph.
+        """
+        if not self.current_scope or self.current_scope.scope_type != ScopeType.CLASS:
+            raise TypeError("Can only register a class scope.")
+
+        self.inheritance_graph.add_class(self.current_scope, base_qnames)
+
+    def calculate_all_mro(self):
+        """
+        Calculates the MRO for all classes in the inheritance graph.
+        """
+        self.mro_calculator.calculate_all()
+
+    def get_mro(self, class_qname: str) -> List[str]:
+        """
+        Gets the MRO for a specific class.
+        """
+        return self.mro_calculator.get_mro(class_qname)
+
+    def resolve_method(self, class_qname: str, method_name: str) -> Optional[Symbol]:
+        """
+        Resolves a method on a class using its MRO.
+        """
+        return self.method_resolver.resolve_method(class_qname, method_name)
+
+    def resolve_super_call(
+        self, method_scope: Scope, method_name: str
+    ) -> Optional[Symbol]:
+        """
+        Resolves a super().method() call from within a method's scope.
+        """
+        if not method_scope.parent or method_scope.parent.scope_type != ScopeType.CLASS:
+            raise ValueError(
+                "super() can only be resolved within a method of a class."
+            )
+
+        class_qname = method_scope.parent.qualified_name
+        return self.method_resolver.resolve_super_call(
+            class_qname, method_name
+        )
+
+# ---
+
+# Symbol Management Methods
+
+    def add_symbol(self, symbol: Symbol):
+        """
+        Adds a symbol to the current scope.
+        """
+        self.current_scope.add_symbol(symbol)
+
+    def track_static_assignment(self, alias: Symbol, target: Symbol):
+        """
+        Creates a static assignment relationship between symbols.
+        This uses the enhanced Symbol assignment tracking.
+        """
+        alias.assign_to(target)
+        # Keep the old mapping for backward compatibility if needed
+        self._assignment_map[alias] = target
+
+    def resolve_final_symbol(self, name: str) -> Optional[Symbol]:
+        """
+        Resolves a symbol by name and follows any alias chains to find the
+        final, underlying symbol (e.g., a class or function).
+        """
+        immediate_symbol = self.lookup_symbol(name)
+        if not immediate_symbol:
+            return None
+
+        # Use the enhanced symbol resolution
+        return immediate_symbol.resolve_final()
+
+     def define_symbol(
+        self, name: str, symbol_type: SymbolType, **kwargs: Any
+    ) -> Symbol:
+        """
+        Defines a new symbol in the current scope.
+        """
+        if not self.current_scope:
+            raise ValueError("Cannot define a symbol without an active scope.")
+
+        symbol = Symbol(
+            name=name,
+            symbol_type=symbol_type,
+            defining_scope=self.current_scope,
+            **kwargs,
+        )
+        self.current_scope.add_symbol(symbol)
+        return symbol
+
+    def lookup_symbol(self, name: str) -> Optional[Symbol]:
+        """
+        Looks up a symbol by name, starting from the current scope and
+        walking up the parent chain according to LEGB rules (Local, Enclosing, Global).
+
+        Note: Built-in scope is not checked here.
+        """
+        scope = self.current_scope
+        while scope:
+            # Direct symbol in scope
+            if name in scope.symbols:
+                return scope.symbols[name]
+
+            # Wildcard-imported module scopes (last-import wins)
+            for module_scope in reversed(scope.wildcard_import_scopes):
+                if name in module_scope.symbols:
+                    return module_scope.symbols[name]
+
+            scope = scope.parent
+
+        return None
+
+
+
+# Scope Management Methods
+    def create_root_scope(self, name: str = "__main__") -> Scope:
+        """
+        Creates the root (module-level) scope. This must be the first call.
+        """
+        if self.root_scope:
+            raise ValueError("Root scope has already been created.")
+
+        root = Scope(name=name, scope_type=ScopeType.MODULE)
+        self.root_scope = root
+        self.current_scope = root
+        self._scope_index[name] = root
+
+        # --- Initialize Dynamic Analysis Components ---
+        # Now that we have a root scope, we can initialize the components.
+
+        # self.call_tracker = CallGraphTracker(self)
+        # self.context_resolver = ExecutionContextResolver(self)
+        # self.class_instantiator = ClassInstantiationHandler(self)
+
+        return root
+        
+     def get_scope_by_qname(self, qualified_name: str) -> Optional[Scope]:
+        """
+        Retrieves a scope directly by its qualified name.
+        """
+
+        return self._scope_index.get(qualified_name)
+
+    def register_wildcard_import(
+        self, target_scope_qname: Optional[str], module_qname: str
+    ):
+        """
+        Register that `from module_qname import *` is in effect in `target_scope_qname`.
+        If target_scope_qname is None, use the current scope.
+        """
+        target_scope = (
+            self.current_scope
+            if target_scope_qname is None
+            else self.get_scope_by_qname(target_scope_qname)
+        )
+        module_scope = self.get_scope_by_qname(module_qname)
+
+        if not target_scope or not module_scope:
+            return
+
+        target_scope.add_wildcard_import(module_scope)
+
+    def enter_scope_by_scope(self, scope: Scope) -> Scope:
+        """
+        Enters a new scope by name.
+        """
+
+        if not scope:
+            raise ValueError("Please provide a scope")
+        self.current_scope = scope
+        return scope
