@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 
 from app.core.parser.scope_manager.core.symbol import Symbol
@@ -6,6 +6,11 @@ from app.core.parser.scope_manager.class_analysis.mro import MROCalculator
 from app.core.parser.scope_manager.class_analysis.method_resolver import MethodResolver
 from app.core.parser.scope_manager.class_analysis.model import InheritanceGraph
 from app.core.parser.scope_manager.core.scope import Scope
+from app.core.parser.scope_manager.call_context.tracker import CallGraphTracker
+from app.core.parser.scope_manager.call_context.resolver import ExecutionContextResolver
+from app.core.parser.scope_manager.call_context.instantiation import ClassInstantiationHandler
+from app.core.parser.scope_manager.core import SymbolType
+from app.core.parser.scope_manager.call_context.models import CallFrame, CallGraph
 
 
 class ScopeManager:
@@ -162,9 +167,9 @@ class ScopeManager:
         # --- Initialize Dynamic Analysis Components ---
         # Now that we have a root scope, we can initialize the components.
 
-        # self.call_tracker = CallGraphTracker(self)
-        # self.context_resolver = ExecutionContextResolver(self)
-        # self.class_instantiator = ClassInstantiationHandler(self)
+        self.call_tracker = CallGraphTracker(self)
+        self.context_resolver = ExecutionContextResolver(self)
+        self.class_instantiator = ClassInstantiationHandler(self)
 
         return root
         
@@ -203,3 +208,73 @@ class ScopeManager:
             raise ValueError("Please provide a scope")
         self.current_scope = scope
         return scope
+
+
+# --- Call Context Methods ---
+
+    def instantiate(self, class_name: str) -> Symbol:
+        """
+        High-level API to find a class and create an instance of it.
+        Note: This does NOT call __init__. Invoke it explicitly if needed.
+        """
+        class_symbol = self.lookup_symbol(class_name)
+        if not class_symbol or class_symbol.symbol_type != SymbolType.CLASS:
+            raise NameError(f"Unknown class: {class_name}")
+
+        # The class_instantiator does the work and returns the new instance symbol
+        instance_symbol = self.class_instantiator.instantiate_class(
+            class_symbol
+        )
+        return instance_symbol  # <-- RETURN THE INSTANCE SYMBOL
+
+    def invoke(
+        self,
+        callee_name: str | Symbol,
+        args: Dict[str, Any],
+        
+    ) -> CallFrame:
+
+        """
+        High-level API to simulate a function call.
+        Note: For class instantiation, use the `instantiate()` method.
+        """
+        callee_symbol = callee_name
+        if isinstance(callee_symbol, str):
+            callee_symbol = self.lookup_symbol(callee_symbol)
+        if not callee_symbol:
+            raise NameError(f"Unknown function: {callee_name}")
+
+        if callee_symbol.symbol_type == SymbolType.CLASS:
+            raise TypeError(
+                f"'{callee_name}' is a class. Use the .instantiate() method to create an object."
+            )
+
+        # Now invoke is ONLY for function/method calls
+        frame = self.call_tracker.start_call(callee_symbol, args)
+        if len(self.current_frame_stack) == 0:
+            self.current_scope.children[frame.id] = frame.execution_scope
+        else:
+
+            self.current_frame_stack[-1].execution_scope.children[frame.id] = frame.execution_scope
+        self.current_frame_stack.append(frame)
+        return frame
+
+    def resolve_symbol_in_context(self, name: str) -> Optional[Symbol]:
+        """
+        Context-aware symbol resolution.
+        """
+        return self.context_resolver.resolve(name)
+
+    def end_current_call(self, return_value: Optional[Symbol] = None) -> Optional[Symbol]:
+        """
+        End the current function call.
+        """
+        self.current_frame_stack.pop()
+        return self.call_tracker.end_call(return_value)
+
+    def get_call_graph(self) -> CallGraph:
+        """
+        Get the current call graph.
+        """
+        return self.call_tracker.call_graph
+
