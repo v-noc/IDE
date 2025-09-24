@@ -1,7 +1,4 @@
-from typing import Literal
-from .properties import CodePosition
 from pydantic import ConfigDict, Field
-from .base import BaseEdge
 from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field, ConfigDict

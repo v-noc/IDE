@@ -1,8 +1,0 @@
-name = "v-noc"
-version = "0.1.0"
-authors = ["v-noc"]
-description = "v-noc is a tool for creating and managing projects."
-
-
-[ignore]
-patterns = ["build/", "*.pyc", "*.md", "__init__.py"]

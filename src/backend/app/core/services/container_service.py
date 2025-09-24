@@ -2,7 +2,7 @@
 
 from app.core.model.edges import ContainsEdge
 
-from backend.app.core.repository import Repositories
+from app.core.repository import Repositories
 
 
 class ContainerService:

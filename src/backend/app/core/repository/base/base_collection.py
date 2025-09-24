@@ -157,8 +157,8 @@ class BaseRepository(Generic[T]):
 
     def delete(self, key: str) -> bool:
         try:
-            self.collection.delete(key)
-            return True
+            return self.collection.delete(key)
+
         except DocumentGetError:
             return False
 
