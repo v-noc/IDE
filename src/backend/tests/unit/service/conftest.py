@@ -3,6 +3,8 @@ from app.core.services.project_service import ProjectService
 from app.core.repository import Repositories
 from app.core.services.folder_service import FolderService
 from app.core.services.file_service import FileService
+from app.core.services.function_service import FunctionService
+from app.core.model.properties import CodePosition
 
 
 @pytest.fixture
@@ -39,4 +41,40 @@ def create_file(create_repos):
         "test_project.test_file",
         "This is a test file",
         "test_file"
+    )
+
+
+@pytest.fixture
+def create_function(create_repos):
+    function_service = FunctionService(create_repos)
+    position = CodePosition(
+        line_no=1,
+        col_offset=0,
+        end_line_no=1,
+        end_col_offset=0
+    )
+    return function_service.create(
+        "Test Function",
+        "test_project.test_function",
+        "This is a test function",
+        "test_function",
+        position
+    )
+
+
+@pytest.fixture
+def create_function2(create_repos):
+    function_service = FunctionService(create_repos)
+    position = CodePosition(
+        line_no=1,
+        col_offset=0,
+        end_line_no=1,
+        end_col_offset=0
+    )
+    return function_service.create(
+        "Test Function 2",
+        "test_project.test_function2",
+        "This is a test function",
+        "test_function",
+        position
     )
