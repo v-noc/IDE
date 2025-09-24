@@ -1,14 +1,9 @@
 
 
 from typing import List, Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from orm.models.nodes import CallNode
-from orm.models.nodes import ClassNode
-from orm.models.nodes import FunctionNode
-from orm.models.nodes import FileNode
-from orm.models.nodes import FolderNode
-from orm.models.nodes import ProjectNode
+from app.core.model.nodes import CallNode, ClassNode, FunctionNode, FileNode, FolderNode, ProjectNode
 
 
 class CallTreeNode(CallNode):

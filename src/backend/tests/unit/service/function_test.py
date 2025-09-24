@@ -65,3 +65,12 @@ def test_add_class_to_function(create_repos, create_function, create_class):
     assert len(classes) == 1
 
     assert classes[0]['vertex']['_id'] == create_class.id
+
+
+def test_add_call_to_function(create_repos, create_function, create_call):
+    function_service = FunctionService(create_repos)
+    function_service.add_call_to_function(create_function.id, create_call.id)
+    calls = function_service.get_children(create_function.id)
+    assert len(calls) == 1
+
+    assert calls[0]['vertex']['_id'] == create_call.id

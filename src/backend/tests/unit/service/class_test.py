@@ -65,3 +65,12 @@ def test_add_class_to_class(create_repos, create_class, create_class2):
     assert len(classes) == 1
 
     assert classes[0]['vertex']['_id'] == create_class2.id
+
+
+def test_add_call_to_class(create_repos, create_class, create_call):
+    class_service = ClassService(create_repos)
+    class_service.add_call_to_class(create_class.id, create_call.id)
+    calls = class_service.get_children(create_class.id)
+    assert len(calls) == 1
+
+    assert calls[0]['vertex']['_id'] == create_call.id

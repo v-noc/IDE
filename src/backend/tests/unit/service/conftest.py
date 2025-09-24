@@ -135,3 +135,21 @@ def create_call(create_repos, create_function):
         create_function.id
 
     )
+
+
+@pytest.fixture
+def create_call2(create_repos, create_function2):
+    call_service = CallService(create_repos)
+    position = CodePosition(
+        line_no=1,
+        col_offset=0,
+        end_line_no=1,
+        end_col_offset=0
+    )
+    return call_service.create(
+        "Test Call 2",
+        "test_project.test_call2",
+        "This is a test call",
+        position,
+        create_function2.id
+    )
