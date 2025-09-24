@@ -15,9 +15,6 @@ class CallSite(BaseModel):
     # What was called (after alias resolution)
     callee_symbol: "Any" = Field(..., exclude=True)
 
-    code_position: CodePosition = Field(
-        ..., description="The position of the call in the source code.")
-
 
 class CallFrame(BaseModel):
 

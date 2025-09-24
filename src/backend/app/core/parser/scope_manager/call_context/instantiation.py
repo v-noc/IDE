@@ -59,7 +59,7 @@ class ClassInstantiationHandler:
 
         return instance_scope
 
-    def __call_init_method(self, class_symbol: Symbol, instance_symbol: Symbol, init_args: List[Any]):
+    def _call_init_method(self, class_symbol: Symbol, instance_symbol: Symbol, init_args: List[Any]):
         """
         Calls the __init__ method on the instance.
         """
