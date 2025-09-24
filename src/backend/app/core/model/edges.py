@@ -29,3 +29,7 @@ class ContainsEdge(BaseEdge):
         "function_to_call",
         "call_to_call",  # For nested calls e.g. foo(bar())
     ] = Field(..., description="The specific type of containment.")
+
+
+class TargetsEdge(BaseEdge):
+    edge_type: str = "targets_edges"
