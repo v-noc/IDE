@@ -50,3 +50,22 @@ def test_add_folder_to_folder(create_repos, create_folder):
     children_tree = folder_service.get_children(create_folder.id)
 
     assert len(children_tree) == 1
+
+
+def test_add_file_to_folder(create_repos, create_folder):
+    folder_service = FolderService(create_repos)
+    file = folder_service.create(
+        "Test File",
+        "test_project.test_folder.test_file",
+        "This is a test file",
+        "test_folder/test_file"
+    )
+
+    children = folder_service.get_children(create_folder.id)
+
+    assert len(children) == 0
+    folder_service.add_file_to_folder(create_folder.id, file.id)
+
+    children = folder_service.get_children(create_folder.id)
+
+    assert len(children) == 1
