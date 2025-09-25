@@ -68,6 +68,8 @@ class ScopeManager:
         """
         Resolves a super().method() call from within a method's scope.
         """
+        print(
+            f"Lalal {method_scope.parent.scope_type}- method_sc  {method_scope.parent.qualified_name}")
         if not method_scope.parent or method_scope.parent.scope_type != ScopeType.CLASS:
             raise ValueError(
                 "super() can only be resolved within a method of a class."
@@ -151,6 +153,7 @@ class ScopeManager:
 
 
 # Scope Management Methods
+
 
     def create_root_scope(self, name: str = "__main__") -> Scope:
         """
@@ -251,6 +254,7 @@ class ScopeManager:
 
 
 # --- Call Context Methods ---
+
 
     def instantiate(self, class_name: str) -> Symbol:
         """

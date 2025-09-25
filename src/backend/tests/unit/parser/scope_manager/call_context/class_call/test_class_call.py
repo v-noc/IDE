@@ -35,8 +35,14 @@ def test_instance_method_call(class_hierarchy_manager: ScopeManager):
     Tests calling a regular method on a class instance.
     """
     manager = class_hierarchy_manager
-    instance_symbol = manager.instantiate("Dog", {"name": "Buddy"})
-    manager.end_current_call()  # End Dog.__init__
+    instance_symbol = manager.instantiate("Dog")
+
+    init_method = manager.resolve_method("__main__.Dog", "__init__")
+
+    assert init_method is not None
+
+    manager.invoke(init_method, {"self": instance_symbol})
+    manager.end_current_call()  # End __init__ call
 
     # Simulate: my_dog.bark()
     bark_method = manager.resolve_method("__main__.Dog", "bark")
@@ -57,8 +63,14 @@ def test_inherited_method_call(class_hierarchy_manager: ScopeManager):
     Tests calling an inherited method, ensuring it's resolved up the MRO.
     """
     manager = class_hierarchy_manager
-    instance_symbol = manager.instantiate("Dog", {"name": "Lucy"})
-    manager.end_current_call()
+    instance_symbol = manager.instantiate("Dog")
+
+    init_method = manager.resolve_method("__main__.Dog", "__init__")
+
+    assert init_method is not None
+
+    manager.invoke(init_method, {"self": instance_symbol})
+    manager.end_current_call()  # End __init__ call
 
     # Simulate: my_dog.wake_up() -> should resolve to Animal.wake_up
     wake_up_method = manager.resolve_method("__main__.Dog", "wake_up")
@@ -79,8 +91,14 @@ def test_overridden_method_call(class_hierarchy_manager: ScopeManager):
     Tests that calling an overridden method resolves to the subclass's version.
     """
     manager = class_hierarchy_manager
-    instance_symbol = manager.instantiate("Dog", {"name": "Max"})
-    manager.end_current_call()
+    instance_symbol = manager.instantiate("Dog")
+
+    init_method = manager.resolve_method("__main__.Dog", "__init__")
+
+    assert init_method is not None
+
+    manager.invoke(init_method, {"self": instance_symbol})
+    manager.end_current_call()  # End __init__ call
 
     # Simulate: my_dog.speak() -> should resolve to Dog.speak
     speak_method = manager.resolve_method("__main__.Dog", "speak")
@@ -101,17 +119,26 @@ def test_super_call_from_child(class_hierarchy_manager: ScopeManager):
     Tests resolving a `super()` call from a child method to the parent method.
     """
     manager = class_hierarchy_manager
-    instance_symbol = manager.instantiate("Dog", {"name": "Charlie"})
-    manager.end_current_call()  # End Dog.__init__
+    instance_symbol = manager.instantiate("Dog")
+
+    init_method = manager.resolve_method("__main__.Dog", "__init__")
+
+    assert init_method is not None
+
+    manager.invoke(init_method, {"self": instance_symbol})
+    manager.end_current_call()  # End __init__ call
 
     # 1. Start the call to the child's overridden method
     dog_speak_method = manager.resolve_method("__main__.Dog", "speak")
     dog_speak_frame = manager.invoke(
         dog_speak_method, {"self": instance_symbol})
 
+    dog_speak_scope = manager.get_scope_by_qname(
+        dog_speak_method.qualified_name)
+
     # 2. Inside Dog.speak(), simulate a `super().speak()` call
     # We need the scope of Dog.speak to resolve `super` correctly.
-    dog_speak_scope = dog_speak_frame.callee_symbol.defining_scope
+
     super_speak_method = manager.resolve_super_call(dog_speak_scope, "speak")
 
     assert super_speak_method is not None
