@@ -29,7 +29,7 @@ class SymbolType(str, Enum):
 
 
 class Symbol(BaseModel):
-     """
+    """
     Represents a single symbol's definition within a scope.
     It contains only the essential information about its declaration.
     """
@@ -42,7 +42,6 @@ class Symbol(BaseModel):
     # A reference to the scope object where this symbol is defined.
     # This avoids storing scope IDs and allows direct traversal.
     defining_scope: "Scope" = Field(..., exclude=True)
-
 
     code_position: CodePosition
 
@@ -65,8 +64,6 @@ class Symbol(BaseModel):
     instance_scope: Optional["Scope"] = Field(default=None, exclude=True,
                                               description="Scope for object instance attributes")
 
-
-    
     class Config:
         arbitrary_types_allowed = True
 
