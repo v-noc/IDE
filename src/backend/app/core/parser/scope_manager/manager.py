@@ -1,15 +1,13 @@
 from typing import Dict, List, Optional, Any
 
 
-from app.core.parser.scope_manager.core.symbol import Symbol
 from app.core.parser.scope_manager.class_analysis.mro import MROCalculator
 from app.core.parser.scope_manager.class_analysis.method_resolver import MethodResolver
 from app.core.parser.scope_manager.class_analysis.model import InheritanceGraph
-from app.core.parser.scope_manager.core.scope import Scope, ScopeType
 from app.core.parser.scope_manager.call_context.tracker import CallGraphTracker
 from app.core.parser.scope_manager.call_context.resolver import ExecutionContextResolver
 from app.core.parser.scope_manager.call_context.instantiation import ClassInstantiationHandler
-from app.core.parser.scope_manager.core import SymbolType
+from app.core.parser.scope_manager.core import SymbolType, Scope, ScopeType, Symbol
 from app.core.parser.scope_manager.call_context.models import CallFrame, CallGraph
 
 
@@ -154,7 +152,6 @@ class ScopeManager:
 
 # Scope Management Methods
 
-
     def create_root_scope(self, name: str = "__main__") -> Scope:
         """
         Creates the root (module-level) scope. This must be the first call.
@@ -254,7 +251,6 @@ class ScopeManager:
 
 
 # --- Call Context Methods ---
-
 
     def instantiate(self, class_name: str) -> Symbol:
         """

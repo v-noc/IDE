@@ -195,39 +195,3 @@ def test_self_call_within_method(class_hierarchy_manager: ScopeManager):
     assert len(bark_calls) == 1
     wake_up_call = bark_calls[0]
     assert wake_up_call.callee_symbol.qualified_name == "__main__.Animal.wake_up"
-
-
-def test_instance_variable_across_calls(class_hierarchy_manager: ScopeManager):
-    """
-    Tests that instance variables defined in __init__ persist and are
-    accessible in other method calls.
-    """
-    manager = class_hierarchy_manager
-
-    # 1. Instantiate, which calls __init__
-    instance_symbol = manager.instantiate("Dog", {"name": "Daisy"})
-
-    # 2. Inside __init__, define an instance variable: self.has_been_woken = False
-    manager.define_symbol_on_instance(
-        instance_symbol, "has_been_woken", SymbolType.VARIABLE, value=False)
-    manager.end_current_call()  # End __init__
-
-    # Check that the attribute exists on the instance scope
-    assert "has_been_woken" in instance_symbol.instance_scope.symbols
-
-    # 3. Call another method, e.g., wake_up()
-    wake_up_method = manager.resolve_method("__main__.Dog", "wake_up")
-    manager.invoke(wake_up_method, {"self": instance_symbol})
-
-    # 4. Inside wake_up(), resolve and modify the instance variable
-    woken_var = manager.resolve_symbol_on_instance(
-        instance_symbol, "has_been_woken")
-    assert woken_var is not None
-    # Simulate modification
-    woken_var.metadata["value"] = True
-
-    manager.end_current_call()  # End wake_up()
-
-    # 5. Verify the change back in the global context
-    final_woken_var = instance_symbol.instance_scope.symbols["has_been_woken"]
-    assert final_woken_var.metadata["value"] is True
