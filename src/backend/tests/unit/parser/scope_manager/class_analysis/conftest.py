@@ -20,10 +20,16 @@ def populated_scope_manager(code_position):
 
     manager.enter_scope(name="Animal", scope_type=ScopeType.CLASS)
 
+    manager.enter_scope(name="wake_up", scope_type=ScopeType.FUNCTION)
+
+    manager.define_symbol("self", SymbolType.PARAMETER)
+    manager.exit_scope()
+
     manager.enter_scope(name="speak", scope_type=ScopeType.FUNCTION)
 
     manager.define_symbol("self", SymbolType.PARAMETER)
     manager.exit_scope()
+
     manager.register_class([])  # Inherits from object implicitly
     manager.exit_scope()
 

@@ -54,7 +54,7 @@ class MethodResolver:
         search_mro = class_node.mro_list[current_class_index + 1:]
 
         for base_qname in search_mro:
-            base_node = self._graph.get_class(base_qname)
+            base_node = self.inheritance_graph.get_class(base_qname)
             if method_name in base_node.scope.symbols:
                 return base_node.scope.symbols[method_name]
 
