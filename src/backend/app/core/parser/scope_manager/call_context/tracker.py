@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Dict, Any, List, Optional
 from typing import TYPE_CHECKING
 from .models import CallGraph, CallFrame, CallSite
@@ -61,11 +62,22 @@ class CallGraphTracker:
 
         frame.call_site = call_site
 
-        # 6. Add frame to call graph
-        self.call_graph.add_frame(frame)
+        # 7. Populate execution scope with arguments
+        self._populate_arguments(frame, args)
 
-        # 7. Push frame to active stack
+        # 8. Update call stack
         self.call_graph.active_frames.append(frame)
+
+        # 9. Update call graph
+        if previous_frame is not None:
+            # Normal nested call: record caller -> callee
+            self.call_graph.add_call(call_site)
+        else:
+            # Root-level call: attribute it to the module scope
+            module_qname = self.scope_manager.current_scope.qualified_name
+            if module_qname not in self.call_graph.edges:
+                self.call_graph.edges[module_qname] = []
+            self.call_graph.edges[module_qname].append(call_site)
 
         return frame
 
@@ -82,6 +94,7 @@ class CallGraphTracker:
         # 1. Pop the completed frame
         completed_frame = self.call_graph.active_frames.pop()
 
+        return_value = deepcopy(return_value)
         # 2. CRITICAL CLOSURE LOGIC:
         # If returning a function, stamp it with the captured frame
         processed_return = self._process_return_value(
