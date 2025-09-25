@@ -43,7 +43,7 @@ class Symbol(BaseModel):
     # This avoids storing scope IDs and allows direct traversal.
     defining_scope: "Scope" = Field(..., exclude=True)
 
-    code_position: CodePosition
+    # code_position: CodePosition
 
     # --- Assignment Tracking ---
     # Tracks what this symbol is assigned to (for alias resolution)

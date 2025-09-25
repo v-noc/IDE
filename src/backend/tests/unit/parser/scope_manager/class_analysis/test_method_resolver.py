@@ -5,9 +5,10 @@ def test_resolve_method_override(populated_scope_manager):
     """
     method_symbol = populated_scope_manager.resolve_method(
         '__main__.Dog', 'speak')
+    print("method_symbol-->", method_symbol)
     assert method_symbol is not None
     assert method_symbol.name == 'speak'
-    assert method_symbol.defining_scope.parent.name == 'Dog'
+    assert method_symbol.defining_scope.name == 'Dog'
 
 
 def test_resolve_method_from_base(populated_scope_manager):

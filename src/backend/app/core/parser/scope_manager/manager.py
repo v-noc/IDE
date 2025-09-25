@@ -152,7 +152,6 @@ class ScopeManager:
 
 # Scope Management Methods
 
-
     def create_root_scope(self, name: str = "__main__") -> Scope:
         """
         Creates the root (module-level) scope. This must be the first call.
@@ -173,6 +172,46 @@ class ScopeManager:
         self.class_instantiator = ClassInstantiationHandler(self)
 
         return root
+
+    def enter_scope(self, name: str, scope_type: ScopeType) -> Scope:
+        """
+        Enters a new nested scope and creates a corresponding symbol
+        in the parent scope if necessary (for functions and classes).
+        """
+        if not self.current_scope:
+            raise ValueError(
+                "Cannot enter scope without a root. Call create_root_scope() first."
+            )
+
+        # --- KEY CHANGE ---
+        # Create a symbol in the current scope for the new scope-creating entity.
+        if scope_type in (ScopeType.FUNCTION, ScopeType.CLASS, ScopeType.MODULE):
+            symbol_type = {
+                ScopeType.FUNCTION: SymbolType.FUNCTION,
+                ScopeType.CLASS: SymbolType.CLASS,
+                ScopeType.MODULE: SymbolType.MODULE,
+            }[scope_type]
+            # This defines the symbol in the *current* scope, before we descend.
+            self.define_symbol(name, symbol_type)
+        # --- END KEY CHANGE ---
+
+        new_scope = Scope(name=name, scope_type=scope_type)
+        self.current_scope.add_child_scope(new_scope)
+        self.current_scope = new_scope
+        self._scope_index[new_scope.qualified_name] = new_scope
+        return new_scope
+
+    def exit_scope(self) -> Optional[Scope]:
+        """
+        Exits the current scope and moves to its parent.
+        Returns the scope that was exited.
+        """
+        if not self.current_scope:
+            return None
+
+        exited_scope = self.current_scope
+        self.current_scope = self.current_scope.parent
+        return exited_scope
 
     def get_scope_by_qname(self, qualified_name: str) -> Optional[Scope]:
         """
@@ -212,7 +251,6 @@ class ScopeManager:
 
 
 # --- Call Context Methods ---
-
 
     def instantiate(self, class_name: str) -> Symbol:
         """
