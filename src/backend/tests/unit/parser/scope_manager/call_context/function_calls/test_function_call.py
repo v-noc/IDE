@@ -141,7 +141,7 @@ def test_nested_function_call(scope_manager: ScopeManager):
     outer_frame = scope_manager.invoke("outer", {})
 
     # 3. From within outer's context, look up and call inner()
-    inner_symbol = scope_manager.lookup_symbol("inner")
+    inner_symbol = scope_manager.resolve_symbol_in_context("inner")
     assert inner_symbol is not None, "Could not find 'inner' from within 'outer'"
     scope_manager.invoke(inner_symbol, {})
     scope_manager.end_current_call()  # End inner call
@@ -208,9 +208,12 @@ def test_callback_function(scope_manager: ScopeManager):
     assert main_calls[0].callee_symbol.qualified_name == "__main__.invoker"
 
     # invoker -> my_callback
-    invoker_exec_qname = invoker_frame.execution_scope.qualified_name
+    invoker_exec_qname = invoker_frame.callee_symbol.qualified_name
+    call_graph = scope_manager.get_call_graph()
+
     invoker_calls = call_graph.edges.get(invoker_exec_qname, [])
     assert len(invoker_calls) == 1
+
     assert invoker_calls[0].callee_symbol.qualified_name == "__main__.my_callback"
 
 
@@ -255,7 +258,7 @@ def test_closure_calling_another_function(scope_manager: ScopeManager):
     assert main_calls[1].callee_symbol.qualified_name == "__main__.factory.closure"
 
     # Check calls made from the closure's execution scope
-    closure_exec_qname = closure_frame.execution_scope.qualified_name
+    closure_exec_qname = closure_frame.callee_symbol.qualified_name
     closure_calls = call_graph.edges.get(closure_exec_qname, [])
     assert len(closure_calls) == 1
     assert closure_calls[0].callee_symbol.qualified_name == "__main__.target_func"
