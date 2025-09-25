@@ -54,7 +54,7 @@ class Scope(BaseModel):
         exclude=True
     )
 
-    code_position: CodePosition
+    # code_position: CodePosition
 
     class Config:
         arbitrary_types_allowed = True

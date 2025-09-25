@@ -1,7 +1,7 @@
 import uuid
 from pydantic import BaseModel, Field
 
-from __future__ import annotations
+
 from typing import Any, Optional, Dict, List
 from app.core.model.properties import CodePosition
 
@@ -18,7 +18,7 @@ class CallSite(BaseModel):
 
 class CallFrame(BaseModel):
 
-     """Represents a single invocation on the call stack."""
+    """Represents a single invocation on the call stack."""
 
     # Unique identifier for this specific call
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -37,7 +37,6 @@ class CallFrame(BaseModel):
     # What this specific invocation returned
     return_value: Optional["Any"] = Field(default=None, exclude=True)
 
-
     class Config:
         arbitrary_types_allowed = True
 
@@ -50,13 +49,14 @@ class CallFrame(BaseModel):
             frame = frame.parent_frame
         return depth
 
+
 class CallGraph(BaseModel):
     """
     The single source of truth for call relationships.
     Stores the actual graph structure without duplicating data elsewhere.
     """
 
-     # The core graph: caller qualified name -> list of call sites
+    # The core graph: caller qualified name -> list of call sites
     edges: Dict[str, List[CallSite]] = Field(default_factory=dict)
 
     # Currently active call stack
@@ -71,7 +71,6 @@ class CallGraph(BaseModel):
         if caller_qname not in self.edges:
             self.edges[caller_qname] = []
         self.edges[caller_qname].append(call_site)
-
 
     def get_callees(self, caller_qname: str) -> List[CallSite]:
         """Get functions called by the specified caller."""

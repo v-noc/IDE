@@ -5,7 +5,7 @@ from app.core.parser.scope_manager.core.symbol import Symbol
 from app.core.parser.scope_manager.class_analysis.mro import MROCalculator
 from app.core.parser.scope_manager.class_analysis.method_resolver import MethodResolver
 from app.core.parser.scope_manager.class_analysis.model import InheritanceGraph
-from app.core.parser.scope_manager.core.scope import Scope
+from app.core.parser.scope_manager.core.scope import Scope, ScopeType
 from app.core.parser.scope_manager.call_context.tracker import CallGraphTracker
 from app.core.parser.scope_manager.call_context.resolver import ExecutionContextResolver
 from app.core.parser.scope_manager.call_context.instantiation import ClassInstantiationHandler
@@ -109,7 +109,7 @@ class ScopeManager:
         # Use the enhanced symbol resolution
         return immediate_symbol.resolve_final()
 
-     def define_symbol(
+    def define_symbol(
         self, name: str, symbol_type: SymbolType, **kwargs: Any
     ) -> Symbol:
         """
@@ -150,8 +150,9 @@ class ScopeManager:
         return None
 
 
-
 # Scope Management Methods
+
+
     def create_root_scope(self, name: str = "__main__") -> Scope:
         """
         Creates the root (module-level) scope. This must be the first call.
@@ -172,8 +173,8 @@ class ScopeManager:
         self.class_instantiator = ClassInstantiationHandler(self)
 
         return root
-        
-     def get_scope_by_qname(self, qualified_name: str) -> Optional[Scope]:
+
+    def get_scope_by_qname(self, qualified_name: str) -> Optional[Scope]:
         """
         Retrieves a scope directly by its qualified name.
         """
@@ -212,6 +213,7 @@ class ScopeManager:
 
 # --- Call Context Methods ---
 
+
     def instantiate(self, class_name: str) -> Symbol:
         """
         High-level API to find a class and create an instance of it.
@@ -231,9 +233,8 @@ class ScopeManager:
         self,
         callee_name: str | Symbol,
         args: Dict[str, Any],
-        
-    ) -> CallFrame:
 
+    ) -> CallFrame:
         """
         High-level API to simulate a function call.
         Note: For class instantiation, use the `instantiate()` method.
@@ -277,4 +278,3 @@ class ScopeManager:
         Get the current call graph.
         """
         return self.call_tracker.call_graph
-

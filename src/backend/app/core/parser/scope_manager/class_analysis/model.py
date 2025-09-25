@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from __future__ import annotations
+
 from typing import List, Dict, Any
 
 from app.core.parser.scope_manager.core.scope import Scope

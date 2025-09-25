@@ -21,7 +21,7 @@ class MROCalculator:
         if class_qname in self._mro_cache:
             return self._mro_cache[class_qname]
 
-        class_node = self._graph.get_class(class_qname)
+        class_node = self.inheritance_graph.get_class(class_qname)
 
         # The merge operation is the core of the C3 algorithm.
         mro = self._merge(
