@@ -167,8 +167,14 @@ def test_self_call_within_method(class_hierarchy_manager: ScopeManager):
     Tests a method calling another method on `self`.
     """
     manager = class_hierarchy_manager
-    instance_symbol = manager.instantiate("Dog", {"name": "Rocky"})
-    manager.end_current_call()
+    instance_symbol = manager.instantiate("Dog")
+
+    init_method = manager.resolve_method("__main__.Dog", "__init__")
+
+    assert init_method is not None
+
+    manager.invoke(init_method, {"self": instance_symbol})
+    manager.end_current_call()  # End __init__ call
 
     # 1. Call a method, e.g., Dog.bark()
     bark_method = manager.resolve_method("__main__.Dog", "bark")
