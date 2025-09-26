@@ -1,11 +1,11 @@
 import ast
 from typing import List
 
-from .models import BaseNode
+from .models import BaseSchema
 from .visitor import CodeStructureVisitor
 
 
-def scan(content: str) -> List[BaseNode]:
+def scan(content: str) -> List[BaseSchema]:
     """
 Parses Python code content and returns a hierarchical list of structured
 Pydantic nodes representing the code.
@@ -18,6 +18,7 @@ Returns:
 """
     try:
         ast_tree = ast.parse(content)
+
         visitor = CodeStructureVisitor()
         visitor.visit(ast_tree)
         return visitor.get_root_nodes()

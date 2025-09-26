@@ -2,8 +2,8 @@ from __future__ import annotations
 import ast
 from typing import List
 
-from .converters import NodeConverter
-from .models import BaseNode, ParentNode
+from .converters import SchemaConverter
+from .models import BaseSchema, ParentSchema
 
 
 class CodeStructureVisitor(ast.NodeVisitor):
@@ -16,14 +16,14 @@ class CodeStructureVisitor(ast.NodeVisitor):
     """
 
     def __init__(self):
-        self.converter = NodeConverter()
-        self.root_nodes: List[BaseNode] = []
-        self._context_stack: List[ParentNode] = []
+        self.converter = SchemaConverter()
+        self.root_nodes: List[BaseSchema] = []
+        self._context_stack: List[ParentSchema] = []
 
-    def get_root_nodes(self) -> List[BaseNode]:
+    def get_root_nodes(self) -> List[BaseSchema]:
         return self.root_nodes
 
-    def _add_node(self, node: BaseNode):
+    def _add_node(self, node: BaseSchema):
         """Adds a node to the tree, linking it to the current parent."""
         if not self._context_stack:
             self.root_nodes.append(node)
@@ -31,15 +31,15 @@ class CodeStructureVisitor(ast.NodeVisitor):
             parent = self._context_stack[-1]
             parent.children.append(node)
 
-        def _visit_and_manage_context(self, pydantic_node: ParentNode, ast_node: ast.AST):
-            """
-            Helper to handle the common pattern for context-managing nodes
-            (classes, functions).
-            """
-            self._add_node(pydantic_node)
-            self._context_stack.append(pydantic_node)
-            self.generic_visit(ast_node)
-            self._context_stack.pop()
+    def _visit_and_manage_context(self, pydantic_node: ParentSchema, ast_node: ast.AST):
+        """
+        Helper to handle the common pattern for context-managing nodes
+        (classes, functions).
+        """
+        self._add_node(pydantic_node)
+        self._context_stack.append(pydantic_node)
+        self.generic_visit(ast_node)
+        self._context_stack.pop()
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         # Pre-scan for return statements to pass to the converter
