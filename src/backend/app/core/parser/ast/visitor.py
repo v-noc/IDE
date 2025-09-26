@@ -65,7 +65,7 @@ class CodeStructureVisitor(ast.NodeVisitor):
         pydantic_node = self.converter.convert_assign(node)
         self._add_node(pydantic_node)
         # We must visit the value side to find nested calls, e.g., x = my_func()
-        self.generic_visit(node)
+        # self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         pydantic_node = self.converter.convert_annassign(node)

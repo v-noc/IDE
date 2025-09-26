@@ -60,3 +60,18 @@ def test_attribute_assign():
     assert len(assign_schema.targets) == 1
     assert assign_schema.targets[0].name == "b"
     assert assign_schema.targets[0].value.name == "a"
+
+
+call_assign = """
+a = a.d.foo()
+"""
+
+
+def test_call_assign():
+    result = scan(call_assign)
+
+    assert len(result) == 1
+    assign_schema = result[0]
+    assert isinstance(assign_schema, AssignSchema)
+    assert len(assign_schema.targets) == 1
+    assert assign_schema.targets[0].name == "a"

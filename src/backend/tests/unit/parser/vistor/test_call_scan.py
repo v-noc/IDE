@@ -72,8 +72,7 @@ def test_chained_method_call():
     assert isinstance(call_schema, CallSchema)
     assert isinstance(call_schema.func, AttributeSchema)
     assert call_schema.func.name == "bar"
-    print("----------=---------")
-    print(call_schema)
+
     assert isinstance(call_schema.func.value, CallSchema)
     assert call_schema.func.value.func.name == "foo"
     assert call_schema.func.value.func.value.name == "obj"

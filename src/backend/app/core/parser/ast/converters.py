@@ -1,5 +1,6 @@
 import ast
 from typing import List, Optional, Union
+import astpretty
 
 from .models import (
     AnnAssignSchema, ArgSchema, AssignSchema, AttributeSchema, BaseSchema, CallSchema,
@@ -46,11 +47,11 @@ class SchemaConverter:
         return None
 
     def convert_functiondef(
-            self, Schema: ast.FunctionDef, returns: List[ast.Return]
+            self, node: ast.FunctionDef, returns: List[ast.Return]
     ) -> FunctionSchema:
         args: List[ArgSchema] = []
-        if Schema.args:
-            for arg in Schema.args.args:
+        if node.args:
+            for arg in node.args.args:
                 annotation = (
                     extract_annotation(
                         arg.annotation) if arg.annotation else None
@@ -64,7 +65,7 @@ class SchemaConverter:
                 )
 
         return_annotation = (
-            extract_annotation(Schema.returns) if Schema.returns else None
+            extract_annotation(node.returns) if node.returns else None
         )
 
         return_values = []
@@ -75,28 +76,28 @@ class SchemaConverter:
                     return_values.extend(value)
 
         return FunctionSchema(
-            name=Schema.name or "anonymous",
-            position=extract_position(Schema),
+            name=node.name or "anonymous",
+            position=extract_position(node),
             args=args,
             return_annotation=return_annotation,
             return_values=return_values,
         )
 
-    def convert_classdef(self, Schema: ast.ClassDef) -> ClassSchema:
+    def convert_classdef(self, node: ast.ClassDef) -> ClassSchema:
         implements = []
-        if Schema.bases:
-            for base in Schema.bases:
+        if node.bases:
+            for base in node.bases:
                 extracted = extract_name_or_attribute(base)
                 if extracted:
                     implements.append(extracted)
         return ClassSchema(
-            name=Schema.name, implements=implements, position=extract_position(
-                Schema)
+            name=node.name, implements=implements, position=extract_position(
+                node)
         )
 
-    def convert_import(self, Schema: ast.Import) -> ImportSchema:
+    def convert_import(self, node: ast.Import) -> ImportSchema:
         names: list[ImportAliasSchema] = []
-        for alias in Schema.names:
+        for alias in node.names:
             names.append(
                 ImportAliasSchema(
                     name=alias.name,
@@ -104,11 +105,11 @@ class SchemaConverter:
                     position=extract_position(alias),
                 )
             )
-        return ImportSchema(names=names, position=extract_position(Schema))
+        return ImportSchema(names=names, position=extract_position(node))
 
-    def convert_importfrom(self, Schema: ast.ImportFrom) -> ImportFromSchema:
+    def convert_importfrom(self, node: ast.ImportFrom) -> ImportFromSchema:
         names: list[ImportAliasSchema] = []
-        for alias in Schema.names:
+        for alias in node.names:
             names.append(
                 ImportAliasSchema(
                     name=alias.name,
@@ -117,51 +118,53 @@ class SchemaConverter:
                 )
             )
         return ImportFromSchema(
-            module_name=Schema.module,
+            module_name=node.module,
             names=names,
-            level=Schema.level,
-            position=extract_position(Schema),
+            level=node.level,
+            position=extract_position(node),
         )
 
-    def convert_assign(self, Schema: ast.Assign) -> AssignSchema:
-        targets: List[Union[NameSchema, AttributeSchema]] = []
-        for target in Schema.targets:
-            targets.extend(extract_value(target))
+    def convert_assign(self, node: ast.Assign) -> AssignSchema:
 
-        value = []
-        # We handle Call conversion in its own visitor method,
-        # so we only extract non-call values here.
-        if not isinstance(Schema.value, ast.Call):
-            value = extract_value(Schema.value)
+        targets = [
+            extract_name_or_attribute(t)
+            for t in node.targets
+            if extract_name_or_attribute(t)
+        ]
+        value = self._convert_expression(node.value)
+
+        # The value can be a single item or a list from a tuple/list expression
+        value_list = value if isinstance(value, list) else [value]
 
         return AssignSchema(
-            targets=targets, value=value, position=extract_position(Schema)
+            targets=targets, value=value_list, position=extract_position(
+                node)
         )
 
-    def convert_annassign(self, Schema: ast.AnnAssign) -> AnnAssignSchema:
-        target = extract_value(Schema.target)[0]
-        annotation = extract_annotation(Schema.annotation)
+    def convert_annassign(self, node: ast.AnnAssign) -> AnnAssignSchema:
+        target = extract_value(node.target)[0]
+        annotation = extract_annotation(node.annotation)
 
         value = []
-        if Schema.value and not isinstance(Schema.value, ast.Call):
-            value = extract_value(Schema.value)
+        if node.value and not isinstance(node.value, ast.Call):
+            value = extract_value(node.value)
 
         return AnnAssignSchema(
             target=target,
             value=value,
             annotation=annotation,
-            position=extract_position(Schema),
+            position=extract_position(node),
         )
 
-    def _deconstruct_list_or_tuple(self, Schema: ast.AST):
+    def _deconstruct_list_or_tuple(self, node: ast.AST):
         items = []
-        if hasattr(Schema, "elts"):
-            for elt in Schema.elts:
+        if hasattr(node, "elts"):
+            for elt in node.elts:
                 items.extend(self._deconstruct_list_or_tuple(elt))
-        elif isinstance(Schema, ast.Call):
-            items.append(self.convert_call(Schema))
+        elif isinstance(node, ast.Call):
+            items.append(self.convert_call(node))
         else:
-            value = extract_value(Schema)
+            value = extract_value(node)
             if value:
                 items.extend(value)
         return items
