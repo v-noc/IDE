@@ -1,5 +1,5 @@
 import ast
-from typing import List, Union
+from typing import List, Optional, Union
 
 from .models import (
     AnnAssignSchema, ArgSchema, AssignSchema, AttributeSchema, BaseSchema, CallSchema,
@@ -14,8 +14,36 @@ from .utils import (
 
 class SchemaConverter:
     """
-A stateless converter that translates ast.AST Schemas into Pydantic models.
-"""
+    A stateless converter that translates ast.AST Schemas into Pydantic models.
+    """
+
+    def _convert_expression(
+        self, node: ast.AST
+    ) -> Optional[Union[BaseSchema, list, object]]:
+        """
+        Recursively converts an expression AST node into a Pydantic model.
+        This is the core of handling nested structures like `a.b().k()`.
+        """
+        if isinstance(node, ast.Name):
+            return NameSchema(name=node.id, position=extract_position(node))
+        if isinstance(node, ast.Attribute):
+            # Recursively convert the owner of the attribute (e.g., `a.b()` in `a.b().k`)
+            value = self._convert_expression(node.value)
+            return AttributeSchema(
+                name=node.attr, value=value, position=extract_position(node)
+            )
+        if isinstance(node, ast.Call):
+            # If we encounter a call, convert it fully.
+
+            return self.convert_call(node)
+        if isinstance(node, (ast.List, ast.Tuple)):
+            # Handle list/tuple literals: [a(), b]
+            return [self._convert_expression(elt) for elt in node.elts]
+        if isinstance(node, ast.Constant):
+            return node.value
+
+        # Return None for unhandled expression types
+        return None
 
     def convert_functiondef(
             self, Schema: ast.FunctionDef, returns: List[ast.Return]
@@ -138,40 +166,23 @@ A stateless converter that translates ast.AST Schemas into Pydantic models.
                 items.extend(value)
         return items
 
-    def convert_call(self, Schema: ast.Call) -> CallSchema:
-        func: Union[NameSchema, AttributeSchema, CallSchema, None] = None
-        if isinstance(Schema.func, (ast.Name, ast.Attribute)):
-            func = extract_value(Schema.func)[0]
-        elif isinstance(Schema.func, ast.Call):
-            func = self.convert_call(Schema.func)
+    def convert_call(self, node: ast.Call) -> CallSchema:
+        # Use the powerful _convert_expression to handle the function part
+        func = self._convert_expression(node.func)
 
-        args = []
-        for arg in Schema.args:
-            if isinstance(arg, (ast.Name, ast.Attribute)):
-                args.extend(extract_value(arg))
-            elif hasattr(arg, "elts"):
-                args.append(self._deconstruct_list_or_tuple(arg))
-            elif isinstance(arg, ast.Call):
-                args.append(self.convert_call(arg))
-            else:
-                # Placeholder for constants, etc.
-                args.append(None)
-
+        # Convert args and keywords using the same recursive logic
+        args = [self._convert_expression(arg) for arg in node.args]
         keywords = []
-        for keyword in Schema.keywords:
-            value: Union[NameSchema, AttributeSchema, CallSchema, None] = None
-            if isinstance(keyword.value, (ast.Name, ast.Attribute)):
-                value = extract_value(keyword.value)[0]
-            elif isinstance(keyword.value, ast.Call):
-                value = self.convert_call(keyword.value)
+        for keyword in node.keywords:
             keywords.append(
                 KeywordSchema(
-                    name=keyword.arg, value=value, position=extract_position(
-                        keyword)
+                    name=keyword.arg,
+                    value=self._convert_expression(keyword.value),
+                    position=extract_position(keyword),
                 )
             )
 
         return CallSchema(
             func=func, args=args, keywords=keywords, position=extract_position(
-                Schema)
+                node)
         )

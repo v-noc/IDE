@@ -54,7 +54,7 @@ class NameSchema(BaseSchema):
 class AttributeSchema(BaseSchema):
     schema_type: SchemaType = SchemaType.ATTRIBUTE
     name: str  # The attribute name (e.g., 'method' in obj.method)
-    value: Optional[Union["NameSchema", "AttributeSchema"]
+    value: Optional[Union["NameSchema", "AttributeSchema", "CallSchema"]
                     ] = None  # The object being accessed
 
 
