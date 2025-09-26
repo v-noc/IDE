@@ -2,7 +2,6 @@ from pathlib import Path
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.analyzer.symbol_collector.collector import SymbolCollector
-from app.models.node import FileNode, FolderNode, ProjectNode
 from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.scope_manager.core import ScopeType
 
@@ -13,16 +12,13 @@ class SymbolAnalyzer:
         self.symbol_table.scope_manager = ScopeManager()
         self.symbol_collector = SymbolCollector(self.symbol_table)
 
-    def create_project_node(self, project_name: str, project_qname: str, project_path: str):
-        schema = ProjectNode(
-            name=project_name,
-            qname=project_qname,
-            path=project_path
-        )
-        self.symbol_table.project_node = schema
+    def create_project_node(self, project_name: str, project_description: str, project_path: str):
+        project_node = self.symbol_table.node_service["project"].create(
+            project_name, project_description, project_path)
+        self.symbol_table.project_node = project_node
 
         self.symbol_table.scope_manager.create_root_scope(
-            project_qname
+            project_node.qname
         )
 
     def add_file(self, file_container: FileContainer):
@@ -32,7 +28,7 @@ class SymbolAnalyzer:
             "." + ".".join(all_parts[:-1] + (file_path.stem,))
         print(
             f"Adding file: {file_qname} to {self.symbol_table.unprocessed_files} {file_path}")
-        self.symbol_table.file_nodes[file_qname] = file_container
+        self.symbol_table.file_containers[file_qname] = file_container
         self.symbol_table.unprocessed_files.append(file_qname)
 
         # Build and visualize hierarchy
@@ -75,35 +71,39 @@ class SymbolAnalyzer:
         current_name = Path(part).stem if is_last_part else part
         current_qname = f"{parent_qname}.{current_name}"
 
+        parent_node = self.symbol_table.qname_to_node[parent_qname]
+        parent_node_service = self.symbol_table.node_service[parent_node.type]
         # --- Node Creation ---
         # This logic handles both folders and the final file.
         if current_qname not in self.symbol_table.qname_to_node:
             if is_last_part:
                 # It's the file node
                 print(f"{indent}📄 {part} (qname: {current_qname})")
-                file_schema = FileNode(
-                    name=part,
-                    path="/".join(path_parts),
-                    qname=current_qname,
-                    parent_qname=parent_qname,
+                file_node_service = self.symbol_table.node_service["file"]
+                file_node = file_node_service.create(
+                    part,
+                    current_qname,
+                    "file node"
+                    "/".join(path_parts),
+
                 )
-                self.symbol_table.qname_to_node[current_qname] = file_schema
+                self.symbol_table.qname_to_node[current_qname] = file_node
+                parent_node_service.add_file(parent_node.id, file_node.id)
 
             else:
                 # It's a folder node
                 print(f"{indent}📁 {part}/ (qname: {current_qname})")
-                folder_schema = FolderNode(
-                    name=part,
-                    qname=current_qname,
-                    path="/".join(path_parts[: index + 1]) + "/",
-                    parent_qname=parent_qname,
-                )
-                self.symbol_table.qname_to_node[current_qname] = folder_schema
 
-            # Link the parent to the new node
-            # self.symbol_table.contains.append(
-            #     Contains(from_qname=parent_qname, to_qname=current_qname)
-            # )
+                folder_node_service = self.symbol_table.node_service["folder"]
+                folder_node = folder_node_service.create(
+                    part,
+                    current_qname,
+                    "folder node",
+                    "/".join(path_parts[: index + 1]) + "/",
+                )
+                self.symbol_table.qname_to_node[current_qname] = folder_node
+                parent_node_service.add_folder(parent_node.id, folder_node.id)
+
         else:
             # Node already exists
             icon = "📄" if is_last_part else "📁"

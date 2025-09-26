@@ -16,7 +16,7 @@ class ProjectService(ContainerService):
     def create(self, name: str, description: str, path: str):
         project = ProjectNode(
             name=name,
-            qname=path,
+            qname=name.lower().replace(" ", "_"),
             description=description,
             path=path,
             theme_config=None

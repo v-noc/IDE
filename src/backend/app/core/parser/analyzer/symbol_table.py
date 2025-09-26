@@ -3,6 +3,7 @@ from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.ast.models import BaseSchema
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.models.node import ProjectNode
+from app.core.services import ProjectService, FolderService, FileService, ClassService, FunctionService, CallService
 
 
 class SymbolTable:
@@ -16,3 +17,12 @@ class SymbolTable:
         self.file_containers: Dict[str, FileContainer] = {}
 
         self.unprocessed_files: List[str] = []
+
+        self.node_service = {
+            "project": ProjectService,
+            "folder": FolderService,
+            "file": FileService,
+            "class": ClassService,
+            "function": FunctionService,
+            "call": CallService,
+        }
