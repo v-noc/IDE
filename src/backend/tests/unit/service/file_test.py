@@ -38,7 +38,7 @@ def test_update_file(create_repos, create_file):
 
 def test_add_function_to_file(create_repos, create_file, create_function):
     file_service = FileService(create_repos)
-    file_service.add_function_to_file(create_file.id, create_function.id)
+    file_service.add_function(create_file.id, create_function.id)
     functions = file_service.get_children(create_file.id)
     assert len(functions) == 1
 
@@ -49,8 +49,8 @@ def test_nested_functions(create_repos, create_file, create_function, create_fun
     file_service = FileService(create_repos)
     function_service = FunctionService(create_repos)
 
-    file_service.add_function_to_file(create_file.id, create_function.id)
-    function_service.add_function_to_function(
+    file_service.add_function(create_file.id, create_function.id)
+    function_service.add_function(
         create_function.id, create_function2.id)
 
     functions = file_service.get_children(create_file.id)
@@ -61,7 +61,7 @@ def test_nested_functions(create_repos, create_file, create_function, create_fun
 
 def test_add_class_to_file(create_repos, create_file, create_class):
     file_service = FileService(create_repos)
-    file_service.add_class_to_file(create_file.id, create_class.id)
+    file_service.add_class(create_file.id, create_class.id)
     classes = file_service.get_children(create_file.id)
     assert len(classes) == 1
 

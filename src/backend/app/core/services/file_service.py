@@ -25,13 +25,13 @@ class FileService(ContainerService):
     def delete(self, file_key: str):
         return self.repos.file_repo.delete(file_key)
 
-    def add_function_to_file(self, file_id: str, function_id: str):
+    def add_function(self, file_id: str, function_id: str):
         return self.add_child_to_container(file_id, function_id, "file_to_function")
 
-    def add_call_to_file(self, file_id: str, call_id: str):
+    def add_call(self, file_id: str, call_id: str):
         return self.add_child_to_container(file_id, call_id, "file_to_call")
 
-    def add_class_to_file(self, file_id: str, class_id: str):
+    def add_class(self, file_id: str, class_id: str):
         return self.add_child_to_container(file_id, class_id, "file_to_class")
 
     def get_children(self, file_id: str):

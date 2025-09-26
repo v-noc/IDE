@@ -29,10 +29,10 @@ class ProjectService(ContainerService):
     def get_all(self):
         return self.repos.project_repo.get_all_projects()
 
-    def add_folder_to_project(self, project_id: str, folder_id: str):
+    def add_folder(self, project_id: str, folder_id: str):
         return self.add_child_to_container(project_id, folder_id, "project_to_folder")
 
-    def add_file_to_project(self, project_id: str, file_id: str):
+    def add_file(self, project_id: str, file_id: str):
         return self.add_child_to_container(project_id, file_id, "project_to_file")
 
     def get_children(self, project_id: str):

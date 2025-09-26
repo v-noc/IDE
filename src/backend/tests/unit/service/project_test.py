@@ -74,7 +74,7 @@ def test_add_folder_to_project(create_project, create_folder, create_repos):
         create_repos
     )
 
-    project_service.add_folder_to_project(
+    project_service.add_folder(
         create_project.id,
         create_folder.id
     )
@@ -91,7 +91,7 @@ def test_add_file_to_project(create_project, create_file, create_repos):
         create_repos
     )
 
-    project_service.add_file_to_project(
+    project_service.add_file(
         create_project.id,
         create_file.id
     )

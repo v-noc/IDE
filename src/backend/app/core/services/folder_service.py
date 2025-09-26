@@ -26,10 +26,10 @@ class FolderService(ContainerService):
     def delete(self, folder_key: str):
         return self.repos.folder_repo.delete(folder_key)
 
-    def add_folder_to_folder(self, parent_folder_id: str, folder_id: str):
+    def add_folder(self, parent_folder_id: str, folder_id: str):
         return self.add_child_to_container(parent_folder_id, folder_id, "folder_to_folder")
 
-    def add_file_to_folder(self, parent_folder_id: str, file_id: str):
+    def add_file(self, parent_folder_id: str, file_id: str):
         return self.add_child_to_container(parent_folder_id, file_id, "folder_to_file")
 
     def get_children(self, folder_id: str):

@@ -50,7 +50,7 @@ def test_delete_function(create_repos, create_function):
 
 def test_add_function_to_function(create_repos, create_function, create_function2):
     function_service = FunctionService(create_repos)
-    function_service.add_function_to_function(
+    function_service.add_function(
         create_function.id, create_function2.id)
     functions = function_service.get_children(create_function.id)
     assert len(functions) == 1
@@ -60,7 +60,7 @@ def test_add_function_to_function(create_repos, create_function, create_function
 
 def test_add_class_to_function(create_repos, create_function, create_class):
     function_service = FunctionService(create_repos)
-    function_service.add_class_to_function(create_function.id, create_class.id)
+    function_service.add_class(create_function.id, create_class.id)
     classes = function_service.get_children(create_function.id)
     assert len(classes) == 1
 
@@ -69,7 +69,7 @@ def test_add_class_to_function(create_repos, create_function, create_class):
 
 def test_add_call_to_function(create_repos, create_function, create_call):
     function_service = FunctionService(create_repos)
-    function_service.add_call_to_function(create_function.id, create_call.id)
+    function_service.add_call(create_function.id, create_call.id)
     calls = function_service.get_children(create_function.id)
     assert len(calls) == 1
 

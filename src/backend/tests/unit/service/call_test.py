@@ -52,7 +52,7 @@ def test_delete_call(create_repos, create_call):
 
 def test_add_call_to_call(create_repos, create_call, create_call2):
     call_service = CallService(create_repos)
-    call_service.add_call_to_call(create_call.id, create_call2.id)
+    call_service.add_call(create_call.id, create_call2.id)
     calls = call_service.get_children(create_call.id)
     assert len(calls) == 1
     assert calls[0]['vertex']['_id'] == create_call2.id

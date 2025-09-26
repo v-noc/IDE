@@ -36,7 +36,7 @@ class CallService(ContainerService):
     def delete(self, call_key: str):
         return self.repos.call_repo.delete(call_key)
 
-    def add_call_to_call(self, parent_call_id: str, call_id: str):
+    def add_call(self, parent_call_id: str, call_id: str):
         return self.add_child_to_container(parent_call_id, call_id, "call_to_call")
 
     def get_children(self, call_id: str):

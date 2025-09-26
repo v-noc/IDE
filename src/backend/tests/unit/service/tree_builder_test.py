@@ -24,18 +24,18 @@ def test_build_tree(
     call_service = CallService(create_repos)
     class_service = ClassService(create_repos)
 
-    project_service.add_folder_to_project(
+    project_service.add_folder(
         create_project.id, create_folder.id)
 
-    folder_service.add_file_to_folder(create_folder.id, create_file.id)
+    folder_service.add_file(create_folder.id, create_file.id)
 
     # Build a strict tree (no node has multiple parents):
     # project -> folder -> file -> class -> function -> call -> call2
-    file_service.add_class_to_file(create_file.id, create_class.id)
-    class_service.add_function_to_class(create_class.id, create_function.id)
-    function_service.add_call_to_function(create_function.id, create_call.id)
+    file_service.add_class(create_file.id, create_class.id)
+    class_service.add_function(create_class.id, create_function.id)
+    function_service.add_call(create_function.id, create_call.id)
 
-    call_service.add_call_to_call(create_call.id, create_call2.id)
+    call_service.add_call(create_call.id, create_call2.id)
 
     project_tree = project_service.get_children(create_project.id)
 

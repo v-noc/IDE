@@ -27,13 +27,13 @@ class FunctionService(ContainerService):
     def delete(self, function_key: str):
         return self.repos.function_repo.delete(function_key)
 
-    def add_function_to_function(self, parent_function_id: str, function_id: str):
+    def add_function(self, parent_function_id: str, function_id: str):
         return self.add_child_to_container(parent_function_id, function_id, "function_to_function")
 
-    def add_call_to_function(self, parent_function_id: str, call_id: str):
+    def add_call(self, parent_function_id: str, call_id: str):
         return self.add_child_to_container(parent_function_id, call_id, "function_to_call")
 
-    def add_class_to_function(self, parent_function_id: str, class_id: str):
+    def add_class(self, parent_function_id: str, class_id: str):
         return self.add_child_to_container(parent_function_id, class_id, "function_to_class")
 
     def get_children(self, function_id: str):

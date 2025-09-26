@@ -51,7 +51,7 @@ def test_delete_class(create_repos, create_class):
 
 def test_add_function_to_class(create_repos, create_class, create_function):
     class_service = ClassService(create_repos)
-    class_service.add_function_to_class(create_class.id, create_function.id)
+    class_service.add_function(create_class.id, create_function.id)
     functions = class_service.get_children(create_class.id)
     assert len(functions) == 1
 
@@ -60,7 +60,7 @@ def test_add_function_to_class(create_repos, create_class, create_function):
 
 def test_add_class_to_class(create_repos, create_class, create_class2):
     class_service = ClassService(create_repos)
-    class_service.add_class_to_class(create_class.id, create_class2.id)
+    class_service.add_class(create_class.id, create_class2.id)
     classes = class_service.get_children(create_class.id)
     assert len(classes) == 1
 
@@ -69,7 +69,7 @@ def test_add_class_to_class(create_repos, create_class, create_class2):
 
 def test_add_call_to_class(create_repos, create_class, create_call):
     class_service = ClassService(create_repos)
-    class_service.add_call_to_class(create_class.id, create_call.id)
+    class_service.add_call(create_class.id, create_call.id)
     calls = class_service.get_children(create_class.id)
     assert len(calls) == 1
 
