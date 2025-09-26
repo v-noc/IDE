@@ -4,18 +4,20 @@ from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.analyzer.symbol_collector.collector import SymbolCollector
 from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.scope_manager.core import ScopeType
+from arango.database import StandardDatabase
 
 
 class SymbolAnalyzer:
-    def __init__(self):
-        self.symbol_table = SymbolTable()
+    def __init__(self, db: StandardDatabase):
+        self.symbol_table = SymbolTable(db)
         self.symbol_table.scope_manager = ScopeManager()
         self.symbol_collector = SymbolCollector(self.symbol_table)
 
     def create_project_node(self, project_name: str, project_description: str, project_path: str):
         project_node = self.symbol_table.node_service["project"].create(
-            project_name, project_description, project_path)
+            name=project_name, description=project_description, path=project_path)
         self.symbol_table.project_node = project_node
+        self.symbol_table.qname_to_node[project_node.qname] = project_node
 
         self.symbol_table.scope_manager.create_root_scope(
             project_node.qname
@@ -72,7 +74,7 @@ class SymbolAnalyzer:
         current_qname = f"{parent_qname}.{current_name}"
 
         parent_node = self.symbol_table.qname_to_node[parent_qname]
-        parent_node_service = self.symbol_table.node_service[parent_node.type]
+        parent_node_service = self.symbol_table.node_service[parent_node.node_type]
         # --- Node Creation ---
         # This logic handles both folders and the final file.
         if current_qname not in self.symbol_table.qname_to_node:
@@ -83,8 +85,8 @@ class SymbolAnalyzer:
                 file_node = file_node_service.create(
                     part,
                     current_qname,
-                    "file node"
-                    "/".join(path_parts),
+                    "file node",
+                    path="/".join(path_parts),
 
                 )
                 self.symbol_table.qname_to_node[current_qname] = file_node
@@ -99,7 +101,7 @@ class SymbolAnalyzer:
                     part,
                     current_qname,
                     "folder node",
-                    "/".join(path_parts[: index + 1]) + "/",
+                    path="/".join(path_parts[: index + 1]) + "/",
                 )
                 self.symbol_table.qname_to_node[current_qname] = folder_node
                 parent_node_service.add_folder(parent_node.id, folder_node.id)
