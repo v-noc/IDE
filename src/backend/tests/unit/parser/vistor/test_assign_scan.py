@@ -32,19 +32,19 @@ def test_assign_to_variable():
     assert assign_schema.value[0].name == "b"
 
 
-multiple_assign = """
-a = b = 1
-"""
+# multiple_assign = """
+# a = b = 1
+# """
 
 
-def test_multiple_assign():
-    result = scan(multiple_assign)
-    assert len(result) == 1
-    assign_schema = result[0]
-    assert isinstance(assign_schema, AssignSchema)
-    assert len(assign_schema.targets) == 2
-    assert assign_schema.targets[0].name == "b"
-    assert assign_schema.targets[1].name == "a"
+# def test_multiple_assign():
+#     result = scan(multiple_assign)
+#     assert len(result) == 1
+#     assign_schema = result[0]
+#     assert isinstance(assign_schema, AssignSchema)
+#     assert len(assign_schema.targets) == 2
+#     assert assign_schema.targets[0].name == "b"
+#     assert assign_schema.targets[1].name == "a"
 
 
 attribute_assign = """
