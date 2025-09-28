@@ -1,14 +1,13 @@
 from typing import Optional
 
-from app.core.parser.analyzer.symbol_collector.node_handlers.call_handler.handler import CallHandler
+from app.core.parser.analyzer.symbol_collector.node_handlers import CallHandler, SymbolResolver
 
 from app.core.parser.ast.models import AssignSchema, BaseSchema, CallSchema, NameSchema, AttributeSchema
-from app.core.parser.analyzer.symbol_collector.node_handlers.call_handler.symbol_resolver import SymbolResolver
 from app.core.parser.scope_manager.core.symbol import SymbolType, Symbol
 from app.core.parser.analyzer.symbol_table import SymbolTable
 
 
-class AssigmentHandler:
+class AssignmentHandler:
     def __init__(self, symbol_table: SymbolTable, call_handler: CallHandler):
         """
         Initializes the handler.
