@@ -24,7 +24,7 @@ class SymbolCollector:
             self._collect_symbols_recursive(node)
 
     def _collect_symbols_recursive(self, node: BaseSchema):
-        if node.node_type == SchemaType.FUNCTION:
+        if node.schema_type == SchemaType.FUNCTION:
             self.symbol_table.scope_manager.enter_scope(
                 node.name, ScopeType.FUNCTION)
 
@@ -38,7 +38,7 @@ class SymbolCollector:
 
             self.symbol_table.scope_manager.exit_scope()
 
-        elif node.node_type == SchemaType.CLASS:
+        elif node.schema_type == SchemaType.CLASS:
             self.symbol_table.scope_manager.enter_scope(
                 node.name, ScopeType.CLASS)
 
@@ -61,7 +61,7 @@ class SymbolCollector:
             self._analyze_node_recursive(node)
 
     def _analyze_node_context_recursive(self, node: BaseSchema):
-        if node.node_type == SchemaType.IMPORT:
+        if node.schema_type == SchemaType.IMPORT:
             imported_modules = self.import_handler.handle_import_node(
                 node, self.symbol_table.scope_manager.current_scope.qualified_name, self.current_file_path
             )
@@ -79,7 +79,7 @@ class SymbolCollector:
                 self.symbol_table.scope_manager.enter_scope_by_scope(
                     current_scope)
 
-        elif node.node_type == SchemaType.IMPORT_FROM:
+        elif node.schema_type == SchemaType.IMPORT_FROM:
             imported_modules = self.import_handler.handle_import_from_node(
                 node, self.symbol_table.scope_manager.current_scope.qualified_name, self.current_file_path
             )
@@ -96,7 +96,7 @@ class SymbolCollector:
                 self.symbol_table.scope_manager.enter_scope_by_scope(
                     current_scope)
 
-        elif node.node_type == SchemaType.FUNCTION or node.node_type == SchemaType.CLASS:
+        elif node.schema_type == SchemaType.FUNCTION or node.schema_type == SchemaType.CLASS:
             qname = f"{self.symbol_table.scope_manager.current_scope.qualified_name}.{node.name}"
             scope = self.symbol_table.scope_manager.get_scope_by_qname(qname)
 
@@ -104,14 +104,14 @@ class SymbolCollector:
                 self.symbol_table.scope_manager.enter_scope_by_scope(
                     scope)
 
-                if node.node_type == SchemaType.CLASS:
+                if node.schema_type == SchemaType.CLASS:
                     self.class_handler.handle_class_node(node)
                 for child in node.children:
                     self._analyze_node_context_recursive(child)
 
                 self.symbol_table.scope_manager.exit_scope()
 
-        elif node.node_type == SchemaType.CALL:
+        elif node.schema_type == SchemaType.CALL:
             current_frame = self.symbol_table.scope_manager.call_tracker.current_frame
 
             if current_frame and current_frame.callee_symbol.qualified_name != self.symbol_table.scope_manager.current_scope.qualified_name:
@@ -119,7 +119,7 @@ class SymbolCollector:
 
             self.call_handler.handle_call(node)
 
-        elif node.node_type == SchemaType.ASSIGN or node.node_type == SchemaType.ANN_ASSIGN:
+        elif node.schema_type == SchemaType.ASSIGN or node.schema_type == SchemaType.ANN_ASSIGN:
 
             self.assignment_handler.handle_assign_node(
                 node)

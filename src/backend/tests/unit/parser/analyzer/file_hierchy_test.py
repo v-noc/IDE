@@ -17,7 +17,7 @@ PROJECT_PATH = Path(current_dir, "./simple_project").absolute()
 def test_file_hierarchy(arangodb_client):
     graph_builder = GraphBuilder(
         project_path=PROJECT_PATH.as_posix(),
-        ignore_file_name="./v-noc.toml",
+        ignore_file_name=None,
         db=arangodb_client
     )
     graph_builder.build(

@@ -15,7 +15,7 @@ class FileContainer(BaseModel):
 
 
 class FileNavigator:
-    def __init__(self, root_path: str, ignore_file_name: str = ".gitignore"):
+    def __init__(self, root_path: str, ignore_file_name: Optional[str] = ".gitignore"):
         self.root_path = Path(root_path)
         if not self.root_path.exists():
             raise FileNotFoundError(f"Root path {root_path} does not exist")
@@ -23,6 +23,8 @@ class FileNavigator:
         self.spec = self._load_ignore_spec()
 
     def _load_ignore_spec(self) -> Optional[pathspec.PathSpec]:
+        if self.ignore_file_name is None:
+            return None
         ignore_file = self.root_path / self.ignore_file_name
         if ignore_file.is_file():
             with ignore_file.open("rb") as f:
