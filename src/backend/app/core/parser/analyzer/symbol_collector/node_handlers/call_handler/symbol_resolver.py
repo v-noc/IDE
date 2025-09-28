@@ -2,14 +2,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from advance_scope_mangerv2.core.symbol import Symbol, SymbolType
-from advance_scope_mangerv2.scope_manager import ScopeManager
-from vistors.converter.models import (
-    BaseNode,
-    NameNode,
-    AttributeNode,
-    CallNode,
-)
+from app.core.parser.scope_manager.core.symbol import Symbol, SymbolType
+from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.parser.ast.models import AttributeSchema, BaseSchema, CallSchema, NameSchema
 
 
 @dataclass
@@ -22,17 +17,17 @@ class SymbolResolver:
     def __init__(self, scope_manager: ScopeManager):
         self.scope_manager = scope_manager
         self.call_handler_callback: Optional[
-            Callable[[CallNode], Optional[Symbol]]
+            Callable[[CallSchema], Optional[Symbol]]
         ] = None
 
-    def resolve_expression(self, node: BaseNode) -> ResolutionResult:
-        if isinstance(node, NameNode):
+    def resolve_expression(self, node: BaseSchema) -> ResolutionResult:
+        if isinstance(node, NameSchema):
             return self._resolve_name(node)
 
-        if isinstance(node, AttributeNode):
+        if isinstance(node, AttributeSchema):
             return self._resolve_attribute(node)
 
-        if isinstance(node, CallNode):
+        if isinstance(node, CallSchema):
             if self.call_handler_callback is None:
                 return ResolutionResult()
             sym = self.call_handler_callback(node)
@@ -41,7 +36,7 @@ class SymbolResolver:
         return ResolutionResult()
 
     # --- Internals ---
-    def _resolve_name(self, node: NameNode) -> ResolutionResult:
+    def _resolve_name(self, node: NameSchema) -> ResolutionResult:
         sym = self.scope_manager.resolve_symbol_in_context(node.name)
         if not sym:
             return ResolutionResult()
@@ -80,7 +75,7 @@ class SymbolResolver:
 
         return ResolutionResult(symbol=sym)
 
-    def _resolve_attribute(self, node: AttributeNode) -> ResolutionResult:
+    def _resolve_attribute(self, node: AttributeSchema) -> ResolutionResult:
         # Handle super() before any base resolution attempts
         super_result = self._resolve_super_attribute(node)
         if super_result is not None and super_result.symbol is not None:
@@ -146,11 +141,11 @@ class SymbolResolver:
             if target is not base_symbol:
                 # Retry with a synthetic name access on the resolved target
                 return self._resolve_attribute(
-                    AttributeNode(
+                    AttributeSchema(
                         node_type=node.node_type,
                         position=node.position,
                         name=attr_name,
-                        value=NameNode(
+                        value=NameSchema(
                             node_type=node.node_type,
                             position=node.position,
                             name=target.name,

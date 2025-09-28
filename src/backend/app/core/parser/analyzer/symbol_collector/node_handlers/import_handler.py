@@ -2,8 +2,8 @@ from typing import Optional, Tuple
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.parser.ast.models import ImportFromSchema, ImportSchema
 from app.core.parser.scope_manager.core.symbol import SymbolType
-from backend.app.core.model.nodes import FolderNode, FileNode
-from backend.app.core.parser.scope_manager.core.scope import ScopeType
+from app.core.model.nodes import FolderNode, FileNode
+from app.core.parser.scope_manager.core.scope import ScopeType
 
 
 class ImportHandler:

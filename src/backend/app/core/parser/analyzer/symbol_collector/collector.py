@@ -10,9 +10,9 @@ class SymbolCollector:
     def __init__(self, symbol_table: SymbolTable):
         self.symbol_table = symbol_table
 
-        self.import_handler = ImportHandler(symbol_table, self.import_resolver)
+        self.import_handler = ImportHandler(symbol_table)
         self.call_handler = CallHandler(
-            symbol_table, self._analyze_node_recursive)
+            symbol_table, self._analyze_node_context_recursive)
         self.assignment_handler = AssignmentHandler(
             symbol_table, call_handler=self.call_handler)
         self.function_handler = FunctionHandler(symbol_table)
