@@ -127,6 +127,30 @@ class ScopeManager:
         self.current_scope.add_symbol(symbol)
         return symbol
 
+    def define_runtime_variable(
+        self, name: str, symbol_type: SymbolType, **kwargs: Any
+    ) -> Symbol:
+        """
+        Defines a new symbol in the CURRENT EXECUTION FRAME's scope.
+        This is the correct way to handle local variable assignments during dynamic analysis.
+        """
+        if not self.call_tracker or not self.call_tracker.current_frame:
+            raise RuntimeError(
+                "Cannot define a runtime variable without an active call frame."
+            )
+
+        # Delegate directly to the current frame's execution scope
+        execution_scope = self.call_tracker.current_frame.execution_scope
+
+        symbol = Symbol(
+            name=name,
+            symbol_type=symbol_type,
+            defining_scope=execution_scope,  # CRITICAL: Defined in the execution scope
+            **kwargs,
+        )
+        execution_scope.add_symbol(symbol)
+        return symbol
+
     def lookup_symbol(self, name: str) -> Optional[Symbol]:
         """
         Looks up a symbol by name, starting from the current scope and
