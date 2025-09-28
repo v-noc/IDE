@@ -7,6 +7,7 @@ from app.core.repository import Repositories
 from arango.database import StandardDatabase
 
 from app.core.model.base import BaseNode
+from app.core.parser.ast.models import FunctionSchema
 
 
 class SymbolTable:
@@ -18,6 +19,8 @@ class SymbolTable:
         self.file_containers: Dict[str, FileContainer] = {}
 
         self.unprocessed_files: List[str] = []
+
+        self.qname_to_function_node: Dict[str, FunctionSchema] = {}
 
         repos = Repositories(db)
         self.node_service = {
