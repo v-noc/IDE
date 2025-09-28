@@ -1,8 +1,11 @@
 from __future__ import annotations
 from typing import Callable, Dict, Any, Optional, List
+
+from pydantic import BaseModel
 from app.core.parser.scope_manager.core.symbol import Symbol, SymbolType
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.ast.models import (
+    ArgSchema,
     BaseSchema,
     KeywordSchema,
     NameSchema,
@@ -10,6 +13,12 @@ from app.core.parser.ast.models import (
 )
 
 from .symbol_resolver import ResolutionResult
+from app.core.parser.analyzer.symbol_table import SymbolTable
+
+
+class Args(BaseModel):
+    name: str
+    type: Optional[str] = None
 
 
 class FunctionExecutor:
@@ -17,7 +26,7 @@ class FunctionExecutor:
         self,
         scope_manager: ScopeManager,
         analyzer_callback: Callable[[BaseSchema], None],
-        symbol_table,
+        symbol_table: SymbolTable,
     ):
         self.scope_manager = scope_manager
         self.analyzer_callback = analyzer_callback
@@ -40,7 +49,7 @@ class FunctionExecutor:
         ):
             return None
 
-        func_node = self.symbol_table.qname_to_node.get(
+        func_node = self.symbol_table.qname_to_function_node.get(
             callee_symbol.qualified_name
         )
 
@@ -49,6 +58,11 @@ class FunctionExecutor:
             constructed_args["self"] = callee_result.instance_context
 
         if func_node and getattr(func_node, "args", None):
+            args = []
+            for arg in func_node.args:
+                arg_name = arg.name
+                args.append(Args(name=arg_name, type=None))
+
             constructed_args.update(
                 self._build_arguments(func_node, args, keywords)
             )
@@ -74,7 +88,7 @@ class FunctionExecutor:
         if not scope:
             return self.scope_manager.end_current_call(None)
 
-        self.scope_manager.enter_scope_by_scope_type(scope)
+        self.scope_manager.enter_scope_by_scope(scope)
         for child in func_node.children:
             self.analyzer_callback(child)
 
@@ -85,7 +99,7 @@ class FunctionExecutor:
         resolved_return_value = self.scope_manager.end_current_call(
             return_value
         )
-        self.scope_manager.enter_scope_by_scope_type(current_scope)
+        self.scope_manager.enter_scope_by_scope(current_scope)
         return resolved_return_value
 
     def instantiate_class(
