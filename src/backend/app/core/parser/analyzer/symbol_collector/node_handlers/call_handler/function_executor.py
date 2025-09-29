@@ -58,13 +58,13 @@ class FunctionExecutor:
             constructed_args["self"] = callee_result.instance_context
 
         if func_node and getattr(func_node, "args", None):
-            args = []
+            func_node_args = []
             for arg in func_node.args:
                 arg_name = arg.name
-                args.append(Args(name=arg_name, type=None))
+                func_node_args.append(Args(name=arg_name, type=None))
 
             constructed_args.update(
-                self._build_arguments(func_node, args, keywords)
+                self._build_arguments(func_node_args, args, keywords)
             )
 
         # Start call frame
@@ -128,7 +128,7 @@ class FunctionExecutor:
 
     def _build_arguments(
         self,
-        func_schema: Any,
+        func_schema: List[Args],
         positional_args: List[BaseSchema] | List[Any],
         keyword_args: List[KeywordSchema],
     ) -> Dict[str, Any]:
@@ -136,7 +136,7 @@ class FunctionExecutor:
 
         # Gather parameter names in order
         param_names = [
-            getattr(a, "name", None) for a in getattr(func_schema, "args", [])
+            f.name for f in func_schema
         ]
 
         # 1) Positional arguments

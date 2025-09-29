@@ -4,7 +4,12 @@ from typing import Callable, Optional
 
 from app.core.parser.scope_manager.core.symbol import Symbol, SymbolType
 from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.ast.models import AttributeSchema, BaseSchema, CallSchema, NameSchema
+from app.core.parser.ast.models import (
+    AttributeSchema,
+    BaseSchema,
+    CallSchema,
+    NameSchema,
+)
 
 
 @dataclass
@@ -42,6 +47,8 @@ class SymbolResolver:
             return ResolutionResult()
 
         sym = sym.resolve_final()
+        if not sym:
+            return ResolutionResult()
 
         # If "self" parameter is visible, expose it as instance context
         if sym.name == "self" and sym.symbol_type in (
@@ -67,9 +74,7 @@ class SymbolResolver:
             return ResolutionResult(
                 symbol=sym,
                 instance_context=(
-                    sym
-                    if sym.symbol_type == SymbolType.OBJECT_INSTANCE
-                    else None
+                    sym if sym.symbol_type == SymbolType.OBJECT_INSTANCE else None
                 ),
             )
 
@@ -82,9 +87,7 @@ class SymbolResolver:
             return super_result
 
         base_result = (
-            self.resolve_expression(node.value)
-            if node.value
-            else ResolutionResult()
+            self.resolve_expression(node.value) if node.value else ResolutionResult()
         )
         if not base_result.symbol:
             return ResolutionResult()
@@ -111,9 +114,7 @@ class SymbolResolver:
                         symbol=inst_scope.symbols[attr_name],
                         instance_context=base_symbol,
                     )
-                if inst_scope.parent and (
-                    attr_name in inst_scope.parent.symbols
-                ):
+                if inst_scope.parent and (attr_name in inst_scope.parent.symbols):
                     return ResolutionResult(
                         symbol=inst_scope.parent.symbols[attr_name],
                         instance_context=base_symbol,

@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Dict, Any, Set
@@ -14,6 +13,7 @@ class SymbolType(str, Enum):
     An enumeration of the basic types of symbols we can identify.
     This is kept simple and can be extended if more granularity is needed.
     """
+
     VARIABLE = "variable"
     FUNCTION = "function"
     CLASS = "class"
@@ -24,7 +24,7 @@ class SymbolType(str, Enum):
     # -- Add ONLY essential dynamic types --
     # Instantiated object (obj = MyClass())
     OBJECT_INSTANCE = "object_instance"
-    CAPTURED_CLOSURE = "captured_closure"   # Function with captured environment
+    CAPTURED_CLOSURE = "captured_closure"  # Function with captured environment
     UNKNOWN = "unknown"
 
 
@@ -58,11 +58,13 @@ class Symbol(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     # For closures: Link to the frame this function captured (kept as Any to avoid early import cycles)
-    captured_frame: Optional[Any] = Field(default=None, exclude=True,
-                                          description="Frame this closure captured")
+    captured_frame: Optional[Any] = Field(
+        default=None, exclude=True, description="Frame this closure captured"
+    )
 
-    instance_scope: Optional["Scope"] = Field(default=None, exclude=True,
-                                              description="Scope for object instance attributes")
+    instance_scope: Optional["Scope"] = Field(
+        default=None, exclude=True, description="Scope for object instance attributes"
+    )
 
     class Config:
         arbitrary_types_allowed = True
@@ -73,13 +75,17 @@ class Symbol(BaseModel):
 
     def is_instance(self) -> bool:
         """Check if this symbol is an object instance."""
-        return (self.symbol_type == SymbolType.OBJECT_INSTANCE and
-                self.instance_scope is not None)
+        return (
+            self.symbol_type == SymbolType.OBJECT_INSTANCE
+            and self.instance_scope is not None
+        )
 
     def is_closure(self) -> bool:
         """Check if this symbol is a closure with captured environment."""
-        return (self.symbol_type == SymbolType.CAPTURED_CLOSURE and
-                self.captured_frame is not None)
+        return (
+            self.symbol_type == SymbolType.CAPTURED_CLOSURE
+            and self.captured_frame is not None
+        )
 
     @property
     def qualified_name(self) -> str:
@@ -105,7 +111,8 @@ class Symbol(BaseModel):
 
         if self in visited:
             raise RecursionError(
-                f"Circular assignment detected for symbol '{self.name}'")
+                f"Circular assignment detected for symbol '{self.name}'"
+            )
 
         visited.add(self)
 
@@ -116,6 +123,8 @@ class Symbol(BaseModel):
         # If this symbol has an assignment, follow the chain
         if self.assigned_to:
             return self.assigned_to.resolve_final(visited)
+        if self.assigned_to == None and self.symbol_type == SymbolType.PARAMETER:
+            return None
 
         # For other types with no assignment, return self (could represent None/unknown)
         return self
@@ -130,5 +139,7 @@ class Symbol(BaseModel):
         target.assigned_from.add(self)
 
     def __repr__(self):
-        assignment_info = f" -> {self.assigned_to.qualified_name}" if self.assigned_to else ""
+        assignment_info = (
+            f" -> {self.assigned_to.qualified_name}" if self.assigned_to else ""
+        )
         return f"<Symbol(name='{self.name}', type='{self.symbol_type.value}'{assignment_info})>"
