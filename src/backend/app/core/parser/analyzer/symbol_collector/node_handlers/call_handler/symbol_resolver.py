@@ -167,15 +167,15 @@ class SymbolResolver:
         return ResolutionResult()
 
     def _resolve_super_attribute(
-        self, node: AttributeNode
+        self, node: AttributeSchema
     ) -> Optional[ResolutionResult]:
         # Detect super access patterns: super.attr or super().attr
         is_super_value = False
-        if isinstance(node.value, NameNode) and node.value.name == "super":
+        if isinstance(node.value, NameSchema) and node.value.name == "super":
             is_super_value = True
-        elif isinstance(node.value, CallNode):
+        elif isinstance(node.value, CallSchema):
             func_node = node.value.func
-            if isinstance(func_node, NameNode) and func_node.name == "super":
+            if isinstance(func_node, NameSchema) and func_node.name == "super":
                 is_super_value = True
 
         if not is_super_value:
@@ -185,7 +185,8 @@ class SymbolResolver:
         instance_symbol = None
         parent_self = self.scope_manager.resolve_symbol_in_context("self")
         if parent_self:
-            parent_self = parent_self.resolve_final()
+            if parent_self.resolve_final():
+                parent_self = parent_self.resolve_final()
             if (
                 parent_self.symbol_type == SymbolType.PARAMETER
                 and parent_self.defining_scope

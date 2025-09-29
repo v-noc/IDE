@@ -9,6 +9,9 @@ class ContainerService:
     def __init__(self, repos: Repositories):
         self.repos = repos
 
+    def get_by_qname(self, qname: str):
+        return self.repos.class_repo.find_by_qname(qname)
+
     def add_child_to_container(self, container_id: str, child_id: str, contain_type: str):
         container = self.repos.nodes.get_by_id(container_id)
         if not container:

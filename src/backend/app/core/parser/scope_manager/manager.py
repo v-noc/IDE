@@ -66,8 +66,7 @@ class ScopeManager:
         """
         Resolves a super().method() call from within a method's scope.
         """
-        print(
-            f"Lalal {method_scope.parent.scope_type}- method_sc  {method_scope.parent.qualified_name}")
+
         if not method_scope.parent or method_scope.parent.scope_type != ScopeType.CLASS:
             raise ValueError(
                 "super() can only be resolved within a method of a class."

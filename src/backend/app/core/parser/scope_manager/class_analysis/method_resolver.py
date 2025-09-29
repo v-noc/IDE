@@ -16,16 +16,14 @@ class MethodResolver:
         This handles normal method calls like `instance.method()`.
         """
         class_node = self.inheritance_graph.get_class(class_qname)
-        print("")
-        print("Class Resolved: ", class_node)
+
         if not class_node.mro_list:
             raise RuntimeError(
                 f"MRO not calculated for class '{class_qname}'.")
 
         for base_qname in class_node.mro_list:
             base_node = self.inheritance_graph.get_class(base_qname)
-            print("Base Node Resolved: ", base_qname,
-                  " ", base_node.scope.symbols.keys())
+
             if method_name in base_node.scope.symbols:
                 symbol = base_node.scope.symbols[method_name]
                 # You might want to add a check here to ensure it's a function/method symbol

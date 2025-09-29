@@ -28,10 +28,6 @@ class SymbolCollector:
             self.symbol_table.scope_manager.enter_scope(
                 node.name, ScopeType.FUNCTION)
 
-            current_scope = self.symbol_table.scope_manager.current_scope
-            qname = f"{current_scope.qualified_name}"
-
-            self.symbol_table.qname_to_node[qname] = node
             self.function_handler.handle_function_node(node)
             for child in node.children:
                 self._collect_symbols_recursive(child)
@@ -42,10 +38,7 @@ class SymbolCollector:
             self.symbol_table.scope_manager.enter_scope(
                 node.name, ScopeType.CLASS)
 
-            current_scope = self.symbol_table.scope_manager.current_scope
-            qname = f"{current_scope.qualified_name}"
-
-            self.symbol_table.qname_to_node[qname] = node
+            self.class_handler.handle_class_node(node)
             for child in node.children:
                 self._collect_symbols_recursive(child)
             self.symbol_table.scope_manager.exit_scope()
@@ -105,7 +98,7 @@ class SymbolCollector:
                     scope)
 
                 if node.schema_type == SchemaType.CLASS:
-                    self.class_handler.handle_class_node(node)
+                    self.class_handler.handle_inherit_class_node(node)
                 for child in node.children:
                     self._analyze_node_context_recursive(child)
 

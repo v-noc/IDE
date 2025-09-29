@@ -13,6 +13,7 @@ class ClassService(ContainerService):
             name=name,
             qname=qname,
             description=description,
+            implements=[qname],
             position=position,
         )
         return self.repos.class_repo.create(class_node)

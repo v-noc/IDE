@@ -11,6 +11,7 @@ from .utils import (
     extract_annotation, extract_name_or_attribute, extract_position,
     extract_value
 )
+import astpretty
 
 
 class SchemaConverter:
@@ -35,6 +36,13 @@ class SchemaConverter:
             )
         if isinstance(node, ast.Call):
             # If we encounter a call, convert it fully.
+
+            if node.func.id == 'super':
+                super_node = NameSchema(
+                    name='super',
+                    position=extract_position(node)
+                )
+                return super_node
 
             return self.convert_call(node)
         if isinstance(node, (ast.List, ast.Tuple)):
