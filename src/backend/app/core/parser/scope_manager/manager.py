@@ -281,6 +281,7 @@ class ScopeManager:
         Note: This does NOT call __init__. Invoke it explicitly if needed.
         """
         class_symbol = self.lookup_symbol(class_name)
+        class_symbol = class_symbol.resolve_final()
         if not class_symbol or class_symbol.symbol_type != SymbolType.CLASS:
             raise NameError(f"Unknown class: {class_name}")
 

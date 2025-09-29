@@ -1,14 +1,17 @@
 from app.core.parser.analyzer.symbol_table import SymbolTable
-from app.core.parser.ast.models import ClassSchema
+from app.core.parser.ast.models import ClassSchema, FunctionSchema
 from app.core.model.properties import CodePosition
 from app.core.model.nodes import ClassNode
+from app.core.parser.scope_manager.core.scope import ScopeType
+from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler import FunctionHandler
 
 
 class ClassHandler:
     """Handles class-related nodes"""
 
-    def __init__(self, symbol_table: SymbolTable):
+    def __init__(self, symbol_table: SymbolTable, function_handler: FunctionHandler):
         self.symbol_table = symbol_table
+        self.function_handler = function_handler
 
     def handle_inherit_class_node(self, node: ClassSchema):
         """Process a class node and set up inheritance"""
@@ -37,6 +40,17 @@ class ClassHandler:
 
         # Populate inherited members
         scope_manager.calculate_all_mro()
+
+        init_symbol = scope_manager.resolve_method(qname, "__init__")
+        if init_symbol is None:
+            scope_manager.enter_scope("__init__", ScopeType.FUNCTION)
+            function_schema = FunctionSchema(
+                name="__init__",
+                args=[],
+                position=node.position
+            )
+            self.function_handler.handle_function_node(function_schema)
+            scope_manager.exit_scope()
 
         class_node.implements = classes
         class_service.update(class_node)

@@ -29,9 +29,9 @@ def test_file_hierarchy(arangodb_client):
     project = project_service.get_all()
     print(project)
 
-    ff = project_service.get_children(project[0].id)
+    children = project_service.get_children(project[0].id)
 
-    tree_builder = TreeBuilder(ff)
+    tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
     # The root should have 3 children: main.py, app/, and core/

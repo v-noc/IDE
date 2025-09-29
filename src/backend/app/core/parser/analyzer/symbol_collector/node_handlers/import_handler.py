@@ -74,7 +74,7 @@ class ImportHandler:
             imported_name = alias.asname if alias.asname else alias.name
 
             target_qname, module_path = self._compute_from_import_targets(
-                alias.name, node, current_scope.qualified_name, parent_file_scope.qualified_name
+                alias.name, node,  parent_file_scope.qualified_name
             )
 
             if not target_qname:
@@ -99,7 +99,7 @@ class ImportHandler:
                     if imported_name == "*":
                         # Register wildcard import on the current scope
                         self.symbol_table.scope_manager.register_wildcard_import(
-                            current_scope,
+                            current_scope.qualified_name,
                             module_path,
                         )
 
@@ -120,7 +120,7 @@ class ImportHandler:
                                 f"{module_path}.{alias.name}"
                             )
                     else:
-                        self._log(f"Module node: {module_node}")
+
                         local_import_modules.append(module_path)
         return local_import_modules
 
@@ -133,7 +133,7 @@ class ImportHandler:
         self,
         alias_name: str,
         node: ImportFromSchema,
-        current_scope: str,
+
         file_scope: str,
     ) -> Tuple[Optional[str], Optional[str]]:
         """Return (target_qname, module_path) for a from-import alias."""
@@ -141,7 +141,7 @@ class ImportHandler:
         module_path: Optional[str] = None
 
         if alias_name == "*":
-            module_path = self._resolve_module_path(node, current_scope)
+            module_path = self._resolve_module_path(node, file_scope)
             if module_path:
                 target_qname = module_path
             return target_qname, module_path
@@ -186,3 +186,41 @@ class ImportHandler:
 
         print(f"Target qname: {target_module}")
         return target_module
+
+    def _resolve_module_path(
+        self, node: ImportFromSchema, file_scope: str
+    ) -> Optional[str]:
+        """Resolve the full module path for from...import"""
+        if node.level == 0:
+            # Absolute import
+            return node.module_name
+
+        if node.module_name is None:
+            # This case should be handled by _resolve_relative_module_import
+            # But if we get here, handle it
+            current_parts = file_scope.split(".")
+            if node.level <= len(current_parts):
+                if node.level > 0:
+                    base_parts = current_parts[:-node.level]
+                else:
+                    base_parts = current_parts
+                return ".".join(base_parts) if base_parts else None
+            return None
+
+        # Relative import with module name
+        current_parts = file_scope.split(".")
+
+        if node.level > len(current_parts):
+            self._log(
+                f"  Warning: Relative import level {node.level} exceeds "
+                f"directory depth"
+            )
+            return None
+
+        # Go up 'level' directories
+        if node.level > 0:
+            base_parts = current_parts[:-node.level]
+        else:
+            base_parts = current_parts
+
+        return ".".join(base_parts + [node.module_name])

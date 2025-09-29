@@ -16,7 +16,7 @@ class SymbolCollector:
         self.assignment_handler = AssignmentHandler(
             symbol_table, call_handler=self.call_handler)
         self.function_handler = FunctionHandler(symbol_table)
-        self.class_handler = ClassHandler(symbol_table)
+        self.class_handler = ClassHandler(symbol_table, self.function_handler)
         self.current_file_path = ""
 
     def collect_symbols(self, file_node: FileContainer):
@@ -56,15 +56,15 @@ class SymbolCollector:
     def _analyze_node_context_recursive(self, node: BaseSchema):
         if node.schema_type == SchemaType.IMPORT:
             imported_modules = self.import_handler.handle_import_node(
-                node, self.symbol_table.scope_manager.current_scope.qualified_name, self.current_file_path
+                node
             )
 
             for imported_module in imported_modules:
-                file_node = self.symbol_table.file_nodes[imported_module]
+                file_node = self.symbol_table.file_containers[imported_module]
                 scope = self.symbol_table.scope_manager.get_scope_by_qname(
                     imported_module)
                 current_scope = self.symbol_table.scope_manager.current_scope
-                self.symbol_table.scope_manager.enter_scope_by_scope_type(
+                self.symbol_table.scope_manager.enter_scope_by_scope(
                     scope)
                 self.context_analyze_symbols(file_node)
 
@@ -74,11 +74,11 @@ class SymbolCollector:
 
         elif node.schema_type == SchemaType.IMPORT_FROM:
             imported_modules = self.import_handler.handle_import_from_node(
-                node, self.symbol_table.scope_manager.current_scope.qualified_name, self.current_file_path
+                node
             )
 
             for imported_module in imported_modules:
-                file_node = self.symbol_table.file_nodes[imported_module]
+                file_node = self.symbol_table.file_containers[imported_module]
                 current_scope = self.symbol_table.scope_manager.current_scope
                 scope = self.symbol_table.scope_manager.get_scope_by_qname(
                     imported_module)

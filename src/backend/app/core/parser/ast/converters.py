@@ -36,7 +36,8 @@ class SchemaConverter:
             )
         if isinstance(node, ast.Call):
             # If we encounter a call, convert it fully.
-
+            if isinstance(node.func, ast.Attribute):
+                return self._convert_expression(node.func)
             if node.func.id == 'super':
                 super_node = NameSchema(
                     name='super',

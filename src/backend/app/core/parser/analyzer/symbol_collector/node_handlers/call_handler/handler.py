@@ -140,5 +140,7 @@ class CallHandler:
         parent_service.add_call(parent_node.id, call_node.id)
         try:
             yield call_node
+        except Exception as e:
+            print(f"Error in call node context: {e}")
         finally:
             self.symbol_table.call_node_stack.pop()
