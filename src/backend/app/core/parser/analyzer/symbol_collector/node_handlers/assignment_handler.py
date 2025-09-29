@@ -67,9 +67,11 @@ class AssignmentHandler:
 
         if isinstance(value_node, AttributeSchema):
             # Resolve attribute path via call handler logic.
-            return self.resolver._resolve_attribute(
+            result = self.resolver._resolve_attribute(
                 value_node
             )  # type: ignore[attr-defined]
+            if result.symbol:
+                return result.symbol
 
         # Handle other literal types (int, str, etc.) if you have them.
         return None
