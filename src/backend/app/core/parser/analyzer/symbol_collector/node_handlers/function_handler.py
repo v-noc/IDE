@@ -29,7 +29,7 @@ class FunctionHandler:
         function_node = self.symbol_table.node_service['function'].create(
             name=name_node,
             qname=current_scope,
-            description="",
+            description=f"{name_node} function",
             position=code_position
         )
 

@@ -33,3 +33,5 @@ class GraphBuilder:
 
                 self.symbol_analyzer.add_file(file_container)
                 self.file_containers.append(file_container)
+
+        self.symbol_analyzer.build_symbol_table()

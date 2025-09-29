@@ -8,6 +8,7 @@ from arango.database import StandardDatabase
 
 from app.core.model.base import BaseNode
 from app.core.parser.ast.models import FunctionSchema
+from app.core.model.nodes import CallNode
 
 
 class SymbolTable:
@@ -19,6 +20,8 @@ class SymbolTable:
         self.file_containers: Dict[str, FileContainer] = {}
 
         self.unprocessed_files: List[str] = []
+
+        self.call_node_stack: List[CallNode] = []
 
         self.qname_to_function_node: Dict[str, FunctionSchema] = {}
 

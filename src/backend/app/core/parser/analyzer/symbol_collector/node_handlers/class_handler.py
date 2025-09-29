@@ -46,7 +46,7 @@ class ClassHandler:
             name=class_name,
             qname=qname,
             implements=scope_manager.get_mro(qname)[1:],
-            description="",
+            description=f"{class_name} function",
             position=code_position
         )
         self.symbol_table.qname_to_node[qname] = class_node

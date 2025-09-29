@@ -32,7 +32,7 @@ class SymbolCollector:
             qname = f"{current_scope.qualified_name}"
 
             self.symbol_table.qname_to_node[qname] = node
-            self.function_handler.handle_function_node(node, qname)
+            self.function_handler.handle_function_node(node)
             for child in node.children:
                 self._collect_symbols_recursive(child)
 
@@ -58,7 +58,7 @@ class SymbolCollector:
             print(f"File {self.current_file_path} already processed")
             return
         for node in file_node.parsed_nodes:
-            self._analyze_node_recursive(node)
+            self._analyze_node_context_recursive(node)
 
     def _analyze_node_context_recursive(self, node: BaseSchema):
         if node.schema_type == SchemaType.IMPORT:

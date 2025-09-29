@@ -34,7 +34,7 @@ class ClassNode(BaseNode):
 
 
 class CallNode(BaseNode):
-    node_type: str = "class"
+    node_type: str = "call"
     position: CodePosition = Field(
         ...,
         description="Function position"

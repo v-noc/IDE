@@ -2,6 +2,7 @@ from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 from app.core.parser.graph_builder import GraphBuilder
 from app.core.builder.tree_builder import TreeBuilder
+from app.core.builder.tree_builder import TreeBuilder
 
 from pathlib import Path
 
@@ -28,4 +29,8 @@ def test_function_collector(arangodb_client):
     project_service = ProjectService(repos)
 
     project = project_service.get_all()
-    print(project)
+
+    children = project_service.get_children(project[0].id)
+    tree_builder = TreeBuilder(children)
+    tree = tree_builder.build()
+    print(tree)

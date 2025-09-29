@@ -12,10 +12,7 @@ class ImportHandler:
         self.symbol_table = symbol_table
 
     def handle_import_node(self, node: ImportSchema):
-        imported_modules = self.process_import(
-            node
-
-        )
+        imported_modules = self.process_import(node)
 
         return imported_modules
 

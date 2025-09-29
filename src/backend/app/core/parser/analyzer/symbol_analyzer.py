@@ -36,6 +36,18 @@ class SymbolAnalyzer:
         # Build and visualize hierarchy
         self._build_hierarchy_with_tree_view(file_path, file_container)
 
+    def build_symbol_table(self):
+        for unprocessed_file in list(self.symbol_table.unprocessed_files):
+            print(f"Analyzing file: {unprocessed_file}")
+
+            scope = self.symbol_table.scope_manager.get_scope_by_qname(
+                unprocessed_file)
+
+            self.symbol_table.scope_manager.enter_scope_by_scope(scope)
+            file_node = self.symbol_table.file_containers[unprocessed_file]
+            self.symbol_collector.context_analyze_symbols(file_node)
+            self.symbol_table.scope_manager.exit_scope()
+
     def _build_hierarchy_with_tree_view(self, file_path: Path, file_container: FileContainer):
         """
         Builds the file hierarchy using a unified recursive function

@@ -69,8 +69,9 @@ class FunctionExecutor:
 
         # Start call frame
         self.scope_manager.invoke(
-            callee_symbol, constructed_args, line=0, column=0
+            callee_symbol, constructed_args
         )
+
         # call_schema = CallSchema(
         #     name=callee_symbol.name,
         #     qname=callee_symbol.qualified_name,
