@@ -67,9 +67,21 @@ class CallHandler:
 
         # Class instantiation
         if final_callee.symbol_type == SymbolType.CLASS:
-            return self.executor.instantiate_class(
-                final_callee, node.args, node.keywords
-            )
+            # Resolve __init__ and, if present, call it with instance bound as self
+            init_symbol = self.symbol_table.scope_manager.resolve_method(
+                final_callee.qualified_name,
+                "__init__",)
+            if init_symbol:
+                position = CodePosition(
+                    line_no=node.position.line_no,
+                    col_offset=node.position.col_offset,
+                    end_line_no=node.position.end_line_no,
+                    end_col_offset=node.position.end_col_offset,
+                )
+                with self._call_node_context(init_symbol, position):
+                    return self.executor.instantiate_class(
+                        final_callee, node.args, node.keywords
+                    )
 
         # Regular function or closure execution
         if final_callee.symbol_type in (
