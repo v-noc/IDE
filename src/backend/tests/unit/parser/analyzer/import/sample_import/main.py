@@ -1,3 +1,3 @@
-import utils.helper
+import sample_import.utils.helper
 
-utils.helper()
+sample_import.utils.helper.create_user()

@@ -10,10 +10,10 @@ from app.core.parser.ast.models import (
     CallSchema,
     NameSchema,
 )
+from pydantic import BaseModel
 
 
-@dataclass
-class ResolutionResult:
+class ResolutionResult(BaseModel):
     symbol: Optional[Symbol] = None
     instance_context: Optional[Symbol] = None
 
@@ -46,35 +46,35 @@ class SymbolResolver:
         if not sym:
             return ResolutionResult()
 
-        sym = sym.resolve_final()
+        sym_final = sym.resolve_final()
         if not sym:
             return ResolutionResult()
 
         # If "self" parameter is visible, expose it as instance context
-        if sym.name == "self" and sym.symbol_type in (
+        if sym_final.name == "self" and sym_final.symbol_type in (
             SymbolType.PARAMETER,
             SymbolType.OBJECT_INSTANCE,
         ):
             # If parameter, try to get/create an instance for
             # context-sensitive attribute/method resolution
             if (
-                sym.symbol_type == SymbolType.PARAMETER
-                and sym.defining_scope
-                and sym.defining_scope.parent
+                sym_final.symbol_type == SymbolType.PARAMETER
+                and sym_final.defining_scope
+                and sym_final.defining_scope.parent
             ):
                 try:
                     instance_obj = self.scope_manager.instantiate(
-                        sym.defining_scope.parent.name
+                        sym_final.defining_scope.parent.name
                     )
                     return ResolutionResult(
-                        symbol=instance_obj, instance_context=instance_obj
+                        symbol=sym, instance_context=instance_obj
                     )
                 except Exception:
                     return ResolutionResult(symbol=sym)
             return ResolutionResult(
                 symbol=sym,
                 instance_context=(
-                    sym if sym.symbol_type == SymbolType.OBJECT_INSTANCE else None
+                    sym_final if sym_final.symbol_type == SymbolType.OBJECT_INSTANCE else None
                 ),
             )
 
@@ -87,7 +87,8 @@ class SymbolResolver:
             return super_result
 
         base_result = (
-            self.resolve_expression(node.value) if node.value else ResolutionResult()
+            self.resolve_expression(
+                node.value) if node.value else ResolutionResult()
         )
         if not base_result.symbol:
             return ResolutionResult()

@@ -16,9 +16,9 @@ from .symbol_resolver import ResolutionResult, SymbolResolver
 class CallHandler:
     """Handles call-related nodes"""
 
-    def __init__(self,
-                 symbol_table: SymbolTable,
-                 analyzer_callback: Callable[[BaseNode], None]):
+    def __init__(
+        self, symbol_table: SymbolTable, analyzer_callback: Callable[[BaseNode], None]
+    ):
         self.symbol_table = symbol_table
         self.resolver = SymbolResolver(symbol_table.scope_manager)
         self.executor = FunctionExecutor(
@@ -26,10 +26,8 @@ class CallHandler:
         )
 
     def handle_call(self, node: CallSchema) -> Optional[Symbol]:
-
         # Nested call case: if func itself is a call, attempt execution result
         if isinstance(node.func, CallSchema):
-
             inner_symbol = self.handle_call(node.func)
 
             if inner_symbol:
@@ -63,14 +61,15 @@ class CallHandler:
             return None
 
         final_callee = callee_result.symbol.resolve_final()
-        callee_result.symbol = final_callee
+        # callee_result.symbol = final_callee
 
         # Class instantiation
         if final_callee.symbol_type == SymbolType.CLASS:
             # Resolve __init__ and, if present, call it with instance bound as self
             init_symbol = self.symbol_table.scope_manager.resolve_method(
                 final_callee.qualified_name,
-                "__init__",)
+                "__init__",
+            )
             if init_symbol:
                 position = CodePosition(
                     line_no=node.position.line_no,
@@ -78,10 +77,10 @@ class CallHandler:
                     end_line_no=node.position.end_line_no,
                     end_col_offset=node.position.end_col_offset,
                 )
-                with self._call_node_context(init_symbol, position):
-                    return self.executor.instantiate_class(
-                        final_callee, node.args, node.keywords
-                    )
+                # with self._call_node_context(init_symbol, position):
+                return self.executor.instantiate_class(
+                    callee_result.symbol, node.args, node.keywords
+                )
 
         # Regular function or closure execution
         if final_callee.symbol_type in (
@@ -94,10 +93,8 @@ class CallHandler:
                 end_line_no=node.position.end_line_no,
                 end_col_offset=node.position.end_col_offset,
             )
-            with self._call_node_context(callee_result.symbol, position):
-                return self.executor.execute(
-                    callee_result, node.args, node.keywords
-                )
+            with self._call_node_context(final_callee, position):
+                return self.executor.execute(callee_result, node.args, node.keywords)
 
         return None
 
@@ -112,18 +109,14 @@ class CallHandler:
         Ensures the call node is added to the correct parent (scope or
         last call), pushed onto the call stack, and then popped on exit.
         """
-        call_service = self.symbol_table.node_service['call']
+        call_service = self.symbol_table.node_service["call"]
 
-        parent_qname = (
-            self.symbol_table.scope_manager.current_scope.qualified_name
-        )
+        parent_qname = self.symbol_table.scope_manager.current_scope.qualified_name
         parent_node = self.symbol_table.qname_to_node[parent_qname]
         if len(self.symbol_table.call_node_stack) > 0:
             parent_node = self.symbol_table.call_node_stack[-1]
 
-        callee_node = self.symbol_table.qname_to_node[
-            callee_symbol.qualified_name
-        ]
+        callee_node = self.symbol_table.qname_to_node[callee_symbol.qualified_name]
         parent_service = self.symbol_table.node_service[parent_node.node_type]
 
         call_node = call_service.create(

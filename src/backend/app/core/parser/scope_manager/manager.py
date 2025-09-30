@@ -6,7 +6,9 @@ from app.core.parser.scope_manager.class_analysis.method_resolver import MethodR
 from app.core.parser.scope_manager.class_analysis.model import InheritanceGraph
 from app.core.parser.scope_manager.call_context.tracker import CallGraphTracker
 from app.core.parser.scope_manager.call_context.resolver import ExecutionContextResolver
-from app.core.parser.scope_manager.call_context.instantiation import ClassInstantiationHandler
+from app.core.parser.scope_manager.call_context.instantiation import (
+    ClassInstantiationHandler,
+)
 from app.core.parser.scope_manager.core import SymbolType, Scope, ScopeType, Symbol
 from app.core.parser.scope_manager.call_context.models import CallFrame, CallGraph
 
@@ -68,18 +70,14 @@ class ScopeManager:
         """
 
         if not method_scope.parent or method_scope.parent.scope_type != ScopeType.CLASS:
-            raise ValueError(
-                "super() can only be resolved within a method of a class."
-            )
+            raise ValueError("super() can only be resolved within a method of a class.")
 
         class_qname = method_scope.parent.qualified_name
-        return self.method_resolver.resolve_super_call(
-            class_qname, method_name
-        )
+        return self.method_resolver.resolve_super_call(class_qname, method_name)
 
-# ---
+    # ---
 
-# Symbol Management Methods
+    # Symbol Management Methods
 
     def add_symbol(self, symbol: Symbol):
         """
@@ -172,8 +170,7 @@ class ScopeManager:
 
         return None
 
-
-# Scope Management Methods
+    # Scope Management Methods
 
     def create_root_scope(self, name: str = "__main__") -> Scope:
         """
@@ -272,8 +269,7 @@ class ScopeManager:
         self.current_scope = scope
         return scope
 
-
-# --- Call Context Methods ---
+    # --- Call Context Methods ---
 
     def instantiate(self, class_name: str) -> Symbol:
         """
@@ -281,21 +277,19 @@ class ScopeManager:
         Note: This does NOT call __init__. Invoke it explicitly if needed.
         """
         class_symbol = self.lookup_symbol(class_name)
-        class_symbol = class_symbol.resolve_final()
-        if not class_symbol or class_symbol.symbol_type != SymbolType.CLASS:
+        class_symbol_final = class_symbol.resolve_final()
+        # class_symbol = class_symbol.resolve_final()
+        if not class_symbol_final or class_symbol_final.symbol_type != SymbolType.CLASS:
             raise NameError(f"Unknown class: {class_name}")
 
         # The class_instantiator does the work and returns the new instance symbol
-        instance_symbol = self.class_instantiator.instantiate_class(
-            class_symbol
-        )
+        instance_symbol = self.class_instantiator.instantiate_class(class_symbol_final)
         return instance_symbol  # <-- RETURN THE INSTANCE SYMBOL
 
     def invoke(
         self,
         callee_name: str | Symbol,
         args: Dict[str, Any],
-
     ) -> CallFrame:
         """
         High-level API to simulate a function call.
@@ -317,8 +311,9 @@ class ScopeManager:
         if len(self.current_frame_stack) == 0:
             self.current_scope.children[frame.id] = frame.execution_scope
         else:
-
-            self.current_frame_stack[-1].execution_scope.children[frame.id] = frame.execution_scope
+            self.current_frame_stack[-1].execution_scope.children[frame.id] = (
+                frame.execution_scope
+            )
         self.current_frame_stack.append(frame)
         return frame
 
@@ -328,7 +323,9 @@ class ScopeManager:
         """
         return self.context_resolver.resolve(name)
 
-    def end_current_call(self, return_value: Optional[Symbol] = None) -> Optional[Symbol]:
+    def end_current_call(
+        self, return_value: Optional[Symbol] = None
+    ) -> Optional[Symbol]:
         """
         End the current function call.
         """

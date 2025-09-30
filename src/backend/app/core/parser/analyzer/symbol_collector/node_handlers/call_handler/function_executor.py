@@ -43,6 +43,8 @@ class FunctionExecutor:
         if not callee_symbol:
             return None
 
+        callee_symbol = callee_symbol.resolve_final()
+
         if callee_symbol.symbol_type not in (
             SymbolType.FUNCTION,
             SymbolType.CAPTURED_CLOSURE,

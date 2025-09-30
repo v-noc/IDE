@@ -167,7 +167,7 @@ class ImportHandler:
         else:
             target_qname = alias_name
             module_path = target_qname
-        return f"{self.symbol_table.project_node.qname}.{target_qname}", f"{self.symbol_table.project_node.qname}.{module_path}"
+        return f"{target_qname}", f"{module_path}"
 
     def _resolve_relative_module_import(
         self, module_name: str, level: int, file_scope: str

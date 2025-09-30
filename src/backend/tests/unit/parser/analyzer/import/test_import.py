@@ -14,14 +14,14 @@ current_dir = current_file_path.parent
 PROJECT_PATH = Path(current_dir, "./sample_import").absolute()
 
 
-def test_absoulte_path_import(arangodb_client):
+def test_absolute_path_import(arangodb_client):
     graph_builder = GraphBuilder(
         project_path=PROJECT_PATH.as_posix(),
         ignore_file_name=None,
         db=arangodb_client
     )
     graph_builder.build(
-        "Protector", "Protector is a tool for protecting your code.")
+        "sample_import", "Protector is a tool for protecting your code.")
 
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
@@ -34,7 +34,7 @@ def test_absoulte_path_import(arangodb_client):
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    print(tree)
+    # print(tree)
 
 
 def test_relative_path_import():
