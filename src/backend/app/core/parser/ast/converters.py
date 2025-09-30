@@ -3,13 +3,26 @@ from typing import List, Optional, Union
 import astpretty
 
 from .models import (
-    AnnAssignSchema, ArgSchema, AssignSchema, AttributeSchema, BaseSchema, CallSchema,
-    ClassSchema, FunctionSchema, ImportAliasSchema, ImportFromSchema, ImportSchema,
-    KeywordSchema, NameSchema, SubscriptSchema
+    AnnAssignSchema,
+    ArgSchema,
+    AssignSchema,
+    AttributeSchema,
+    BaseSchema,
+    CallSchema,
+    ClassSchema,
+    FunctionSchema,
+    ImportAliasSchema,
+    ImportFromSchema,
+    ImportSchema,
+    KeywordSchema,
+    NameSchema,
+    SubscriptSchema,
 )
 from .utils import (
-    extract_annotation, extract_name_or_attribute, extract_position,
-    extract_value
+    extract_annotation,
+    extract_name_or_attribute,
+    extract_position,
+    extract_value,
 )
 import astpretty
 
@@ -38,11 +51,8 @@ class SchemaConverter:
             # If we encounter a call, convert it fully.
             if isinstance(node.func, ast.Attribute):
                 return self._convert_expression(node.func)
-            if node.func.id == 'super':
-                super_node = NameSchema(
-                    name='super',
-                    position=extract_position(node)
-                )
+            if node.func.id == "super":
+                super_node = NameSchema(name="super", position=extract_position(node))
                 return super_node
 
             return self.convert_call(node)
@@ -50,20 +60,19 @@ class SchemaConverter:
             # Handle list/tuple literals: [a(), b]
             return [self._convert_expression(elt) for elt in node.elts]
         if isinstance(node, ast.Constant):
-            return node.value
+            return None
 
         # Return None for unhandled expression types
         return None
 
     def convert_functiondef(
-            self, node: ast.FunctionDef, returns: List[ast.Return]
+        self, node: ast.FunctionDef, returns: List[ast.Return]
     ) -> FunctionSchema:
         args: List[ArgSchema] = []
         if node.args:
             for arg in node.args.args:
                 annotation = (
-                    extract_annotation(
-                        arg.annotation) if arg.annotation else None
+                    extract_annotation(arg.annotation) if arg.annotation else None
                 )
                 args.append(
                     ArgSchema(
@@ -73,9 +82,7 @@ class SchemaConverter:
                     )
                 )
 
-        return_annotation = (
-            extract_annotation(node.returns) if node.returns else None
-        )
+        return_annotation = extract_annotation(node.returns) if node.returns else None
 
         return_values = []
         for return_Schema in returns:
@@ -100,8 +107,7 @@ class SchemaConverter:
                 if extracted:
                     implements.append(extracted)
         return ClassSchema(
-            name=node.name, implements=implements, position=extract_position(
-                node)
+            name=node.name, implements=implements, position=extract_position(node)
         )
 
     def convert_import(self, node: ast.Import) -> ImportSchema:
@@ -134,7 +140,6 @@ class SchemaConverter:
         )
 
     def convert_assign(self, node: ast.Assign) -> AssignSchema:
-
         targets = [
             extract_name_or_attribute(t)
             for t in node.targets
@@ -146,8 +151,7 @@ class SchemaConverter:
         value_list = value if isinstance(value, list) else [value]
 
         return AssignSchema(
-            targets=targets, value=value_list, position=extract_position(
-                node)
+            targets=targets, value=value_list, position=extract_position(node)
         )
 
     def convert_annassign(self, node: ast.AnnAssign) -> AnnAssignSchema:
@@ -195,6 +199,5 @@ class SchemaConverter:
             )
 
         return CallSchema(
-            func=func, args=args, keywords=keywords, position=extract_position(
-                node)
+            func=func, args=args, keywords=keywords, position=extract_position(node)
         )

@@ -47,7 +47,7 @@ class SymbolResolver:
             return ResolutionResult()
 
         sym_final = sym.resolve_final()
-        if not sym:
+        if not sym_final:
             return ResolutionResult()
 
         # If "self" parameter is visible, expose it as instance context

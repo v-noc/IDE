@@ -49,11 +49,16 @@ def test_file_hierarchy(arangodb_client):
     # Check the 'core' folder
     core_folder = tree[1]
     assert core_folder.name == "core"
-    assert len(core_folder.children) == 2
+    assert len(core_folder.children) == 3
     # Sort children for predictable order
     core_folder.children.sort(key=lambda x: x.name)
-    assert core_folder.children[0].name == "post.py"
-    assert core_folder.children[1].name == "user.py"
+    assert core_folder.children[0].name == "data"
+
+    assert core_folder.children[1].name == "post.py"
+    assert core_folder.children[1].node_type == "file"
+
+    assert core_folder.children[2].name == "user.py"
+    assert core_folder.children[1].node_type == "file"
 
     # Check for main.py at the root
     main_file = tree[2]
