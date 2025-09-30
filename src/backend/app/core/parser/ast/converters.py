@@ -51,8 +51,9 @@ class SchemaConverter:
             # If we encounter a call, convert it fully.
             # if isinstance(node.func, ast.Attribute):
             #     return self._convert_expression(node.func)
-            if isinstance(node.func, ast.Name) and node.func.value.id == "super":
-                super_node = NameSchema(name="super", position=extract_position(node))
+            if isinstance(node.func, ast.Name) and node.func.id == "super":
+                super_node = NameSchema(
+                    name="super", position=extract_position(node))
                 return super_node
 
             return self.convert_call(node)
@@ -72,7 +73,8 @@ class SchemaConverter:
         if node.args:
             for arg in node.args.args:
                 annotation = (
-                    extract_annotation(arg.annotation) if arg.annotation else None
+                    extract_annotation(
+                        arg.annotation) if arg.annotation else None
                 )
                 args.append(
                     ArgSchema(
@@ -82,7 +84,8 @@ class SchemaConverter:
                     )
                 )
 
-        return_annotation = extract_annotation(node.returns) if node.returns else None
+        return_annotation = extract_annotation(
+            node.returns) if node.returns else None
 
         return_values = []
         for return_Schema in returns:
@@ -107,7 +110,8 @@ class SchemaConverter:
                 if extracted:
                     implements.append(extracted)
         return ClassSchema(
-            name=node.name, implements=implements, position=extract_position(node)
+            name=node.name, implements=implements, position=extract_position(
+                node)
         )
 
     def convert_import(self, node: ast.Import) -> ImportSchema:
@@ -199,5 +203,6 @@ class SchemaConverter:
             )
 
         return CallSchema(
-            func=func, args=args, keywords=keywords, position=extract_position(node)
+            func=func, args=args, keywords=keywords, position=extract_position(
+                node)
         )
