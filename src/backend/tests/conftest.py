@@ -4,6 +4,7 @@ from arango.client import ArangoClient
 import pytest
 
 from app.db.client import get_db
+from app.core.repository import Repositories
 
 
 TEST_DB_NAME = "test_db"
@@ -35,3 +36,8 @@ def arangodb_client():
     except DatabaseDeleteError:
         print(
             f"Failed to delete the test database '{TEST_DB_NAME}'. It may require manual cleanup.")
+
+
+@pytest.fixture
+def create_repos(arangodb_client):
+    return Repositories(arangodb_client)

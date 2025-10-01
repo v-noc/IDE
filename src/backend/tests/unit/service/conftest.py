@@ -10,11 +10,6 @@ from app.core.services.call_service import CallService
 
 
 @pytest.fixture
-def create_repos(arangodb_client):
-    return Repositories(arangodb_client)
-
-
-@pytest.fixture
 def create_project(create_repos):
     project_service = ProjectService(create_repos)
     return project_service.create(

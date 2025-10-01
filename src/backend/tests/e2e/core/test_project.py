@@ -105,3 +105,23 @@ def test_create_project(client, sample_project_path):
     assert len(create_child_func['children']) == 1
     init_call = create_child_func['children'][0]
     assert init_call['name'] == '__init__' and init_call['node_type'] == 'call'
+
+
+def test_get_project(client, sample_project_node):
+    response = client.get(f"/api/v1/projects/{sample_project_node.key}")
+    assert response.status_code == 200
+    project_tree = response.json()
+    assert project_tree['name'] == sample_project_node.name
+    assert project_tree['description'] == sample_project_node.description
+    assert project_tree['path'] == sample_project_node.path
+
+
+def test_update_project(client, sample_project_node):
+    response = client.put(f"/api/v1/projects/{sample_project_node.key}", json={
+        "name": "test_project_updated",
+
+    })
+    assert response.status_code == 200
+    project_tree = response.json()
+    assert project_tree['name'] == "test_project_updated"
+    assert project_tree['description'] == sample_project_node.description

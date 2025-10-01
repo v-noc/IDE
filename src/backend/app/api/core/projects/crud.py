@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional
 
 from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
 from app.core.parser.graph_builder import GraphBuilder
@@ -7,15 +8,21 @@ from app.core.builder.tree_builder import TreeBuilder
 from app.db.client import get_db
 from arango.database import StandardDatabase
 from app.core.services.project_service import ProjectService
-from app.core.repository import Repositories
 from app.api.dependencies import get_project_service
 from pathlib import Path
+
+from app.core.model.nodes import ProjectNode
 
 
 class CreateProjectRequest(BaseModel):
     name: str
     description: str
     path: str
+
+
+class UpdateProjectRequest(BaseModel):
+    name: Optional[str] = Field(default=None)
+    description: Optional[str] = Field(default=None)
 
 
 router = APIRouter()
@@ -72,3 +79,66 @@ def get_projects(
 ) -> list[AnyTreeNode]:
     projects = project_service.get_all()
     return projects
+
+
+@router.get("/{project_id}/children", response_model=list[AnyTreeNode])
+def get_project_children(
+    project_id: str,
+    project_service: ProjectService = Depends(get_project_service),
+
+) -> list[AnyTreeNode]:
+    project_node = project_service.get(project_id)
+    children = project_service.get_children(project_node.id)
+
+    tree_builder = TreeBuilder(children)
+    tree = tree_builder.build()
+
+    project_tree = ProjectTreeNode(
+        **project_node.model_dump(),
+        children=tree
+    )
+    return project_tree
+
+
+@router.get("/{project_id}", response_model=ProjectNode)
+def get_project(
+    project_id: str,
+    project_service: ProjectService = Depends(get_project_service),
+) -> ProjectTreeNode:
+    project_node = project_service.get(project_id)
+    return project_node
+
+
+@router.get("/", response_model=list[ProjectTreeNode])
+def get_all_projects(
+    project_service: ProjectService = Depends(get_project_service),
+) -> list[AnyTreeNode]:
+    projects = project_service.get_all()
+    return projects
+
+
+@router.delete("/{project_id}", response_model=bool)
+def delete_project(
+    project_id: str,
+    project_service: ProjectService = Depends(get_project_service),
+) -> bool:
+    return project_service.delete(project_id)
+
+
+@router.put("/{project_id}", response_model=ProjectNode)
+def update_project(
+    project_id: str,
+    project: UpdateProjectRequest,
+    project_service: ProjectService = Depends(get_project_service),
+) -> ProjectNode:
+    project_node = project_service.get(project_id)
+    if project_node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+    if project.name is not None:
+        project_node.name = project.name
+    if project.description is not None:
+        project_node.description = project.description
+    return project_service.update(project_node)

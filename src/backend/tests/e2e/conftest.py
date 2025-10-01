@@ -5,6 +5,7 @@ from arango.database import StandardDatabase
 from app.main import app
 from pathlib import Path
 from app.db.client import get_db
+from app.core.services.project_service import ProjectService
 
 
 @pytest.fixture()
@@ -31,4 +32,16 @@ def sample_project_path():
     return str(
         Path(__file__).parent
         / "core/sample_project"
+    )
+
+
+@pytest.fixture
+def sample_project_node(create_repos):
+    """Returns the sample project node for E2E tests."""
+
+    project_service = ProjectService(create_repos)
+    return project_service.create(
+        "sample_project",
+        "A sample project for E2E tests",
+        "sample/path"
     )

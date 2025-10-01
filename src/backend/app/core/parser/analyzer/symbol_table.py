@@ -1,14 +1,14 @@
 from typing import List, Optional, Dict
 from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.scope_manager.manager import ScopeManager
-from app.models.node import ProjectNode
+
 from app.core.services import ProjectService, FolderService, FileService, ClassService, FunctionService, CallService
 from app.core.repository import Repositories
 from arango.database import StandardDatabase
 
 from app.core.model.base import BaseNode
 from app.core.parser.ast.models import FunctionSchema
-from app.core.model.nodes import CallNode
+from app.core.model.nodes import CallNode, ProjectNode
 
 
 class SymbolTable:

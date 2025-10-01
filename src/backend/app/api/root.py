@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from . import health
 from .core.projects import crud as project_crud
-from .core import base as core_base
+# from .core import base as core_base
 router = APIRouter()
 
 
@@ -17,6 +17,6 @@ router.include_router(
     project_crud.router, prefix="/projects", tags=["projects"]
 )
 
-router.include_router(
-    core_base.router, prefix="/core", tags=["core"]
-)
+# router.include_router(
+#     core_base.router, prefix="/core", tags=["core"]
+# )
