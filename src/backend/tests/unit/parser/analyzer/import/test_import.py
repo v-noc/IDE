@@ -19,9 +19,7 @@ def find_file_node(nodes: list[AnyTreeNode], file_name: str) -> FileTreeNode | N
 
 def test_absolute_path_import(project_tree: ProjectNode):
     file_node = find_file_node(project_tree.children, "import_absolute.py")
-    print(file_node)
-    print(project_tree)
-    print("______________")
+
     assert file_node is not None
     assert len(file_node.children) == 2
 

@@ -12,11 +12,12 @@ class GraphBuilder:
         self.file_navigator = FileNavigator(project_path, ignore_file_name)
         self.symbol_analyzer = SymbolAnalyzer(db)
         self.file_containers = []
+        self.project_node = None
 
     def build(self, project_name: str, project_description: str):
-        self.symbol_analyzer.create_project_node(
+        project_node = self.symbol_analyzer.create_project_node(
             project_name, project_description, str(self.file_navigator.root_path))
-
+        self.project_node = project_node
         py_files = self.file_navigator.find_files(extensions=[".py"])
 
         for file_path in py_files:

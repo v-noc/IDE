@@ -3,6 +3,7 @@
 from app.core.model.edges import ContainsEdge
 
 from app.core.repository import Repositories
+from app.core.model.properties import ThemeConfig
 
 
 class ContainerService:
@@ -32,3 +33,6 @@ class ContainerService:
 
     def get_parent_container(self, container_id: str):
         return self.repos.nodes.get_parent(container_id)
+
+    def update_theme_config(self, container_id: str, theme_config: ThemeConfig):
+        return self.repos.nodes.update(container_id, theme_config)
