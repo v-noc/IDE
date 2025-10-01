@@ -3,7 +3,9 @@ from app.core.parser.ast.models import ClassSchema, FunctionSchema
 from app.core.model.properties import CodePosition
 from app.core.model.nodes import ClassNode
 from app.core.parser.scope_manager.core.scope import ScopeType
-from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler import FunctionHandler
+from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler import (
+    FunctionHandler,
+)
 
 
 class ClassHandler:
@@ -20,7 +22,7 @@ class ClassHandler:
         # Register class schema
         # Shortcuts
         qname = self.symbol_table.scope_manager.current_scope.qualified_name
-        class_service = self.symbol_table.node_service['class']
+        class_service = self.symbol_table.node_service["class"]
         class_node: ClassNode = class_service.get_by_qname(qname)
 
         if class_node is None:
@@ -31,10 +33,11 @@ class ClassHandler:
         classes = []
         for implemented_base in node.implements:
             resolved_base_qname = scope_manager.resolve_symbol_in_context(
-                implemented_base.name)
+                implemented_base.name
+            )
             if not resolved_base_qname:
                 continue
-            classes.append(resolved_base_qname.qualified_name)
+            classes.append(resolved_base_qname.resolve_final().qualified_name)
 
         scope_manager.register_class(classes)
 
@@ -45,9 +48,7 @@ class ClassHandler:
         if init_symbol is None:
             scope_manager.enter_scope("__init__", ScopeType.FUNCTION)
             function_schema = FunctionSchema(
-                name="__init__",
-                args=[],
-                position=node.position
+                name="__init__", args=[], position=node.position
             )
             self.function_handler.handle_function_node(function_schema)
             scope_manager.exit_scope()
@@ -61,7 +62,9 @@ class ClassHandler:
 
         # Register class schema
         qname = self.symbol_table.scope_manager.current_scope.qualified_name
-        parent_qname = self.symbol_table.scope_manager.current_scope.parent.qualified_name
+        parent_qname = (
+            self.symbol_table.scope_manager.current_scope.parent.qualified_name
+        )
         parent_node = self.symbol_table.qname_to_node[parent_qname]
         class_name = node.name
 
@@ -69,15 +72,14 @@ class ClassHandler:
             line_no=node.position.line_no,
             col_offset=node.position.col_offset,
             end_line_no=node.position.end_line_no,
-            end_col_offset=node.position.end_col_offset
+            end_col_offset=node.position.end_col_offset,
         )
 
-        class_node = self.symbol_table.node_service['class'].create(
+        class_node = self.symbol_table.node_service["class"].create(
             name=class_name,
             qname=qname,
-
             description=f"{class_name} function",
-            position=code_position
+            position=code_position,
         )
         print(f"Class node: {class_node}")
         self.symbol_table.qname_to_node[qname] = class_node

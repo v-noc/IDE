@@ -22,6 +22,7 @@ class SymbolAnalyzer:
         self.symbol_table.scope_manager.create_root_scope(
             project_node.qname
         )
+        return project_node
 
     def add_file(self, file_container: FileContainer):
         file_path = Path(file_container.file_path)

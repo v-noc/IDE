@@ -21,7 +21,7 @@ class ProjectService(ContainerService):
             path=path,
             theme_config=None
         )
-        return self.repos.nodes.create(project)
+        return self.repos.project_repo.create(project)
 
     def get(self, project_id: str):
         return self.repos.project_repo.get_by_id(project_id)
