@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from . import health
 from .core.projects import crud as project_crud
+from .core import container
 # from .core import base as core_base
 router = APIRouter()
 
@@ -15,6 +16,9 @@ router.include_router(
 )
 router.include_router(
     project_crud.router, prefix="/projects", tags=["projects"]
+)
+router.include_router(
+    container.router, prefix="/containers", tags=["containers"]
 )
 
 # router.include_router(

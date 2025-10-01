@@ -1,6 +1,6 @@
 from arango.database import StandardDatabase
 
-from app.core.model import nodes, edges
+from app.core.model import AllNodes, edges, nodes
 from app.core.repository.base.base_collection import BaseRepository
 from app.core.repository.base.node_repo import NodeRepository
 
@@ -17,7 +17,7 @@ class Repositories:
 
     def __init__(self, db: StandardDatabase):
         # Generic Node Repo for mixed-type queries
-        self.nodes = NodeRepository(db, "nodes", nodes.BaseNode)
+        self.nodes = NodeRepository(db, "nodes", AllNodes)
 
         # Specific Node Repos for type-specific operations
         self.project_repo = ProjectRepo(db)

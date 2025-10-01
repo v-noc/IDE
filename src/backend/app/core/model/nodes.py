@@ -1,24 +1,32 @@
 
 from .base import BaseNode
 from .properties import TypeKeyValuesProperties, CodePosition, ThemeConfig
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import Field, PrivateAttr
 
 
-class FunctionNode(BaseNode):
-    node_type: str = "function"
+class ContainerNode(BaseNode):
+    node_type: str = "container"
+    theme_config: Optional[ThemeConfig] = Field(
+        default=None,
+        description="Container theme configuration."
+    )
+    icon: Optional[str] = Field(
+        default=None,
+        description="Container icon."
+    )
+
+
+class FunctionNode(ContainerNode):
+    node_type: Literal["function"] = "function"
     position: CodePosition = Field(
         ...,
         description="Function position."
     )
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None,
-        description="Function theme configuration."
-    )
 
 
-class ClassNode(BaseNode):
-    node_type: str = "class"
+class ClassNode(ContainerNode):
+    node_type: Literal["class"] = "class"
     implements: List[str] = Field(
         default_factory=list,
         description="Class implements."
@@ -27,55 +35,35 @@ class ClassNode(BaseNode):
         ...,
         description="Function position"
     )
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None,
-        description="Function theme configuration."
-    )
 
 
-class CallNode(BaseNode):
-    node_type: str = "call"
+class CallNode(ContainerNode):
+    node_type: Literal["call"] = "call"
     position: CodePosition = Field(
         ...,
         description="Function position"
     )
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None,
-        description="Function theme configuration."
-    )
 
 
-class FileNode(BaseNode):
-    node_type: str = "file"
+class FileNode(ContainerNode):
+    node_type: Literal["file"] = "file"
     path: str = Field(
         ...,
         description="File path."
     )
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None,
-        description="File theme configuration."
-    )
 
 
-class FolderNode(BaseNode):
-    node_type: str = "folder"
+class FolderNode(ContainerNode):
+    node_type: Literal["folder"] = "folder"
     path: str = Field(
         ...,
         description="Folder path."
     )
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None,
-        description="Folder theme configuration."
-    )
 
 
-class ProjectNode(BaseNode):
-    node_type: str = "project"
+class ProjectNode(ContainerNode):
+    node_type: Literal["project"] = "project"
     path: str = Field(
         ...,
         description="Folder path"
-    )
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None,
-        description="Folder theme configuration."
     )
