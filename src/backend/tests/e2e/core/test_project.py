@@ -143,3 +143,21 @@ def test_get_all_projects(client, sample_project_node):
     assert response.json()[0]['name'] == sample_project_node.name
     assert response.json()[0]['description'] == sample_project_node.description
     assert response.json()[0]['path'] == sample_project_node.path
+
+
+def test_get_project_children(client, sample_project_path):
+    # Single API call to create the project and get the full tree
+    response = client.post("/api/v1/projects", json={
+        "name": "test_project",
+        "description": "test_project",
+        "path": sample_project_path
+    })
+    assert response.status_code == 200
+    key = response.json()['_key']
+
+    response = client.get(f"/api/v1/projects/{key}/children")
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+    assert response.json()[0]['name'] == 'main.py'
+    assert response.json()[1]['name'] == 'core'

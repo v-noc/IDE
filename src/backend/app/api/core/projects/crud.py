@@ -93,11 +93,11 @@ def get_project_children(
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    project_tree = ProjectTreeNode(
-        **project_node.model_dump(),
-        children=tree
-    )
-    return project_tree
+    # project_tree = ProjectTreeNode(
+    #     **project_node.model_dump(),
+    #     children=tree
+    # )
+    return tree
 
 
 @router.get("/{project_id}", response_model=ProjectNode)
