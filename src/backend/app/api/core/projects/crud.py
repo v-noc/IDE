@@ -106,6 +106,11 @@ def get_project(
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectTreeNode:
     project_node = project_service.get(project_id)
+    if project_node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
     return project_node
 
 
@@ -122,7 +127,10 @@ def delete_project(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service),
 ) -> bool:
-    return project_service.delete(project_id)
+    result = project_service.delete(project_id)
+    if result is False:
+        return False
+    return True
 
 
 @router.put("/{project_id}", response_model=ProjectNode)

@@ -125,3 +125,12 @@ def test_update_project(client, sample_project_node):
     project_tree = response.json()
     assert project_tree['name'] == "test_project_updated"
     assert project_tree['description'] == sample_project_node.description
+
+
+def test_delete_project(client, sample_project_node):
+    response = client.delete(f"/api/v1/projects/{sample_project_node.key}")
+    assert response.status_code == 200
+    assert response.json() == True
+
+    # response = client.get(f"/api/v1/projects/{sample_project_node.key}")
+    # assert response.status_code == 404
