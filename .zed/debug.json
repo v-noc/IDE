@@ -1,10 +1,14 @@
 [
   {
-    "label": "debug parser",
+    "label": "debug test",
     "adapter": "Debugpy",
     "request": "launch",
     "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
-    "program": "/Users/yared/Documents/Programing/ide/v-noc/src/backend/tests/unit/core/parser/runner_test.py",
+    "module": "pytest",
+    "args": [
+      "-s",
+      "tests/unit/parser/analyzer/import/test_import_from.py::test_import_from_with_alias"
+    ],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
       "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"
