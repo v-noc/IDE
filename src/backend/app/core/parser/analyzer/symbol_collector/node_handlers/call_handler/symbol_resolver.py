@@ -67,14 +67,16 @@ class SymbolResolver:
                         sym_final.defining_scope.parent.name
                     )
                     return ResolutionResult(
-                        symbol=sym, instance_context=instance_obj
+                        symbol=instance_obj, instance_context=instance_obj
                     )
                 except Exception:
                     return ResolutionResult(symbol=sym)
             return ResolutionResult(
                 symbol=sym,
                 instance_context=(
-                    sym_final if sym_final.symbol_type == SymbolType.OBJECT_INSTANCE else None
+                    sym_final
+                    if sym_final.symbol_type == SymbolType.OBJECT_INSTANCE
+                    else None
                 ),
             )
 
@@ -87,8 +89,7 @@ class SymbolResolver:
             return super_result
 
         base_result = (
-            self.resolve_expression(
-                node.value) if node.value else ResolutionResult()
+            self.resolve_expression(node.value) if node.value else ResolutionResult()
         )
         if not base_result.symbol:
             return ResolutionResult()

@@ -109,8 +109,8 @@ class AssignmentHandler:
 
         Behavior:
         - Resolve the base object of the attribute chain using context-aware
-          resolution (names, nested attributes, or calls via the shared
-          call handler).
+          resolution via SymbolResolver (handles self/super, nested attributes,
+          or calls via the shared call handler).
         - If the base resolves to an OBJECT_INSTANCE, define or update the
           attribute in the instance's scope.
         - If the base resolves to a CLASS, define or update the attribute in
@@ -123,20 +123,17 @@ class AssignmentHandler:
           the assignment.
         """
 
-        # Resolve the left side base of the attribute chain recursively
-        def _resolve_attribute_base(node: AttributeSchema) -> Optional[Symbol]:
-            base = node.value
-            if isinstance(base, NameSchema):
-                return self.scope_manager.resolve_symbol_in_context(
-                    base.name
-                )
-            if isinstance(base, AttributeSchema):
-                return _resolve_attribute_base(base)
-            if isinstance(base, CallSchema):
-                return self.call_handler.handle_call(base)
-            return None
+        # Resolve the base expression on the left side using SymbolResolver so
+        # we inherit its handling for self/super and nested attributes.
+        base_result = (
+            self.resolver.resolve_expression(target_node.value)
+            if target_node.value
+            else None
+        )
+        base_symbol = None
+        if base_result is not None:
+            base_symbol = base_result.symbol or base_result.instance_context
 
-        base_symbol = _resolve_attribute_base(target_node)
         attr_name = target_node.name
 
         if base_symbol is None:
@@ -175,7 +172,7 @@ class AssignmentHandler:
                 new_attr.assign_to(value_symbol)
             return
 
-         # Class attribute assignment
+        # Class attribute assignment
         if base_symbol.symbol_type == SymbolType.CLASS:
             class_scope = self.scope_manager.get_scope_by_qname(
                 base_symbol.qualified_name

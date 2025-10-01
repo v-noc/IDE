@@ -1,3 +1,6 @@
+def call_back():
+    print("call_back")
+
 
 class GrandParent:
     def wake_up(self):
@@ -5,7 +8,8 @@ class GrandParent:
 
 
 class Parent(GrandParent):
-    def __init__(self):
+    def __init__(self, callback):
+        self.callback = callback
         self.wake_up()
 
     def greet(self):
@@ -14,8 +18,9 @@ class Parent(GrandParent):
 
 class Child(Parent):
     def greet(self):
+        self.callback()
         super().greet()
 
 
-child = Child()
+child = Child(call_back)
 child.greet()

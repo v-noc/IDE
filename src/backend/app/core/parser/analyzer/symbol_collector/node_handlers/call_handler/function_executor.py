@@ -56,23 +56,25 @@ class FunctionExecutor:
         )
 
         constructed_args: Dict[str, Any] = {}
+
+        prepopulated_args = []
         if callee_result.instance_context is not None:
             constructed_args["self"] = callee_result.instance_context
+            prepopulated_args.append("self")
 
         if func_node and getattr(func_node, "args", None):
             func_node_args = []
             for arg in func_node.args:
                 arg_name = arg.name
-                func_node_args.append(Args(name=arg_name, type=None))
+                if arg_name not in prepopulated_args:
+                    func_node_args.append(Args(name=arg_name, type=None))
 
             constructed_args.update(
                 self._build_arguments(func_node_args, args, keywords)
             )
 
         # Start call frame
-        self.scope_manager.invoke(
-            callee_symbol, constructed_args
-        )
+        self.scope_manager.invoke(callee_symbol, constructed_args)
 
         # call_schema = CallSchema(
         #     name=callee_symbol.name,
@@ -85,9 +87,7 @@ class FunctionExecutor:
 
         # Execute function body
         current_scope = self.scope_manager.current_scope
-        scope = self.scope_manager.get_scope_by_qname(
-            callee_symbol.qualified_name
-        )
+        scope = self.scope_manager.get_scope_by_qname(callee_symbol.qualified_name)
         if not scope:
             return self.scope_manager.end_current_call(None)
 
@@ -99,9 +99,7 @@ class FunctionExecutor:
 
         self.scope_manager.exit_scope()
 
-        resolved_return_value = self.scope_manager.end_current_call(
-            return_value
-        )
+        resolved_return_value = self.scope_manager.end_current_call(return_value)
         self.scope_manager.enter_scope_by_scope(current_scope)
         return resolved_return_value
 
@@ -137,9 +135,7 @@ class FunctionExecutor:
         result: Dict[str, Any] = {}
 
         # Gather parameter names in order
-        param_names = [
-            f.name for f in func_schema
-        ]
+        param_names = [f.name for f in func_schema]
 
         # 1) Positional arguments
         for idx, call_arg in enumerate(positional_args or []):
@@ -151,9 +147,7 @@ class FunctionExecutor:
 
             resolved = None
             if isinstance(call_arg, NameSchema):
-                resolved = self.scope_manager.resolve_symbol_in_context(
-                    call_arg.name
-                )
+                resolved = self.scope_manager.resolve_symbol_in_context(call_arg.name)
                 if resolved:
                     resolved = resolved.resolve_final()
             elif isinstance(call_arg, AttributeSchema):

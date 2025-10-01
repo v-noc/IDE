@@ -124,6 +124,8 @@ class Symbol(BaseModel):
         if self.assigned_to:
             return self.assigned_to.resolve_final(visited)
         if self.assigned_to == None and self.symbol_type == SymbolType.PARAMETER:
+            if self.name == "self":
+                return self
             return None
 
         # For other types with no assignment, return self (could represent None/unknown)

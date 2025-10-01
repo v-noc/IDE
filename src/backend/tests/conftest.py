@@ -9,7 +9,7 @@ from app.db.client import get_db
 TEST_DB_NAME = "test_db"
 
 
-@pytest.fixture()  # pyright: ignore[reportUndefinedVariable]
+@pytest.fixture()
 def arangodb_client():
     client = get_db()
 
