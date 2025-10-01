@@ -1,45 +1,42 @@
-from app.core.repository import Repositories
-from app.core.services.project_service import ProjectService
-from app.core.parser.graph_builder import GraphBuilder
-from app.core.builder.tree_builder import TreeBuilder
-
-from pathlib import Path
-
-
-current_file_path = Path(__file__).resolve()
-print("Current file path:", current_file_path)
-
-# Get the directory of the current file
-current_dir = current_file_path.parent
-PROJECT_PATH = Path(current_dir, "./sample_import").absolute()
+from app.core.schemas.tree import (
+    ProjectNode,
+    FileTreeNode,
+    AnyTreeNode,
+    CallTreeNode,
+)
 
 
-def test_absolute_path_import(arangodb_client):
-    graph_builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        ignore_file_name=None,
-        db=arangodb_client
+def find_file_node(nodes: list[AnyTreeNode], file_name: str) -> FileTreeNode | None:
+    for node in nodes:
+        if isinstance(node, FileTreeNode) and node.name == file_name:
+            return node
+        if hasattr(node, "children") and node.children:
+            found = find_file_node(node.children, file_name)
+            if found:
+                return found
+    return None
+
+
+def test_absolute_path_import(project_tree: ProjectNode):
+    file_node = find_file_node(project_tree.children, "import_absolute.py")
+    print(file_node)
+    print(project_tree)
+    print("______________")
+    assert file_node is not None
+    assert len(file_node.children) == 2
+
+    # Check for helper.create_user() call
+    create_user_call = file_node.children[0]
+    assert isinstance(create_user_call, CallTreeNode)
+    assert create_user_call.name == "create_user"
+    assert create_user_call.target is not None
+    assert (
+        create_user_call.target.qname == "sample_import.utils.helper.create_user"
     )
-    graph_builder.build(
-        "sample_import", "Protector is a tool for protecting your code.")
 
-    repos = Repositories(arangodb_client)
-    project_service = ProjectService(repos)
-
-    project = project_service.get_all()
-    print(project)
-
-    children = project_service.get_children(project[0].id)
-
-    tree_builder = TreeBuilder(children)
-    tree = tree_builder.build()
-
-    # print(tree)
-
-
-def test_relative_path_import():
-    pass
-
-
-def test_import_with_alias():
-    pass
+    # Check for User() instantiation
+    user_call = file_node.children[1]
+    assert isinstance(user_call, CallTreeNode)
+    assert user_call.name == "__init__"
+    assert user_call.target is not None
+    assert user_call.target.qname == "sample_import.utils.data.user.User.__init__"

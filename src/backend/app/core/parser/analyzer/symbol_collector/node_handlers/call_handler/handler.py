@@ -77,10 +77,10 @@ class CallHandler:
                     end_line_no=node.position.end_line_no,
                     end_col_offset=node.position.end_col_offset,
                 )
-                # with self._call_node_context(init_symbol, position):
-                return self.executor.instantiate_class(
-                    callee_result.symbol, node.args, node.keywords
-                )
+                with self._call_node_context(init_symbol, position):
+                    return self.executor.instantiate_class(
+                        callee_result.symbol, node.args, node.keywords
+                    )
 
         # Regular function or closure execution
         if final_callee.symbol_type in (

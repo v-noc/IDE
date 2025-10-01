@@ -7,7 +7,6 @@ from app.core.parser.scope_manager.core.scope import ScopeType
 
 
 class ImportHandler:
-
     def __init__(self, symbol_table: SymbolTable):
         self.symbol_table = symbol_table
 
@@ -22,14 +21,11 @@ class ImportHandler:
 
         for alias in node.names:
             imported_name = alias.asname if alias.asname else alias.name
-            imported_qname = (
-                f"{self.symbol_table.project_node.qname}.{alias.name}"
-            )
+            imported_qname = f"{alias.name}"
 
             if imported_qname in self.symbol_table.qname_to_node:
                 imported_symbol = self.symbol_table.scope_manager.define_symbol(
-                    imported_name,
-                    SymbolType.IMPORT
+                    imported_name, SymbolType.IMPORT
                 )
                 node = self.symbol_table.qname_to_node.get(imported_qname)
                 if isinstance(node, FileNode):
@@ -42,12 +38,12 @@ class ImportHandler:
                     symbol = scope.parent.symbols[scope.name]
                     if symbol:
                         self.symbol_table.scope_manager.track_static_assignment(
-                            imported_symbol, symbol)
+                            imported_symbol, symbol
+                        )
 
             else:
                 alias = self.symbol_table.scope_manager.define_symbol(
-                    imported_name,
-                    SymbolType.IMPORT
+                    imported_name, SymbolType.IMPORT
                 )
 
         return local_import_modules
@@ -58,7 +54,6 @@ class ImportHandler:
         return imported_modules
 
     def process_import_from(self, node: ImportFromSchema):
-
         local_import_modules = []
         current_scope = self.symbol_table.scope_manager.current_scope
         parent_file_scope = None
@@ -74,7 +69,7 @@ class ImportHandler:
             imported_name = alias.asname if alias.asname else alias.name
 
             target_qname, module_path = self._compute_from_import_targets(
-                alias.name, node,  parent_file_scope.qualified_name
+                alias.name, node, parent_file_scope.qualified_name
             )
 
             if not target_qname:
@@ -91,9 +86,7 @@ class ImportHandler:
                 )
 
             if not is_external:
-                scope = self.symbol_table.scope_manager.get_scope_by_qname(
-                    module_path
-                )
+                scope = self.symbol_table.scope_manager.get_scope_by_qname(module_path)
 
                 if scope:
                     if imported_name == "*":
@@ -116,11 +109,8 @@ class ImportHandler:
                         if imported_name == "*":
                             local_import_modules.append(module_path)
                         else:
-                            local_import_modules.append(
-                                f"{module_path}.{alias.name}"
-                            )
+                            local_import_modules.append(f"{module_path}.{alias.name}")
                     else:
-
                         local_import_modules.append(module_path)
         return local_import_modules
 
@@ -133,7 +123,6 @@ class ImportHandler:
         self,
         alias_name: str,
         node: ImportFromSchema,
-
         file_scope: str,
     ) -> Tuple[Optional[str], Optional[str]]:
         """Return (target_qname, module_path) for a from-import alias."""
@@ -201,7 +190,7 @@ class ImportHandler:
             current_parts = file_scope.split(".")
             if node.level <= len(current_parts):
                 if node.level > 0:
-                    base_parts = current_parts[:-node.level]
+                    base_parts = current_parts[: -node.level]
                 else:
                     base_parts = current_parts
                 return ".".join(base_parts) if base_parts else None
@@ -212,14 +201,13 @@ class ImportHandler:
 
         if node.level > len(current_parts):
             self._log(
-                f"  Warning: Relative import level {node.level} exceeds "
-                f"directory depth"
+                f"  Warning: Relative import level {node.level} exceeds directory depth"
             )
             return None
 
         # Go up 'level' directories
         if node.level > 0:
-            base_parts = current_parts[:-node.level]
+            base_parts = current_parts[: -node.level]
         else:
             base_parts = current_parts
 

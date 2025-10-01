@@ -35,13 +35,3 @@ class GraphBuilder:
                 self.file_containers.append(file_container)
 
         self.symbol_analyzer.build_symbol_table()
-
-        current_scope = self.symbol_analyzer.symbol_table.scope_manager.root_scope
-
-        def print_scope(current, indent=0):
-
-            for scope in current.children:
-                print("  " * indent + current.children[scope].qualified_name)
-                print_scope(current.children[scope], indent + 1)
-
-        print_scope(current_scope, 0)
