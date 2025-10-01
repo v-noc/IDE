@@ -132,5 +132,14 @@ def test_delete_project(client, sample_project_node):
     assert response.status_code == 200
     assert response.json() == True
 
-    # response = client.get(f"/api/v1/projects/{sample_project_node.key}")
-    # assert response.status_code == 404
+    response = client.get(f"/api/v1/projects/{sample_project_node.key}")
+    assert response.status_code == 404
+
+
+def test_get_all_projects(client, sample_project_node):
+    response = client.get("/api/v1/projects")
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]['name'] == sample_project_node.name
+    assert response.json()[0]['description'] == sample_project_node.description
+    assert response.json()[0]['path'] == sample_project_node.path
