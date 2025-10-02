@@ -14,9 +14,12 @@ def get_root():
 router.include_router(
     health.router, prefix="/health", tags=["health"]
 )
+
+
 router.include_router(
     project_crud.router, prefix="/projects", tags=["projects"]
 )
+
 router.include_router(
     container.router, prefix="/containers", tags=["containers"]
 )

@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 
 
 def strip_dynamic_keys(data):
@@ -127,13 +125,43 @@ def test_update_project(client, sample_project_node):
     assert project_tree['description'] == sample_project_node.description
 
 
-def test_delete_project(client, sample_project_node):
-    response = client.delete(f"/api/v1/projects/{sample_project_node.key}")
+def test_delete_project(client, sample_project_path, create_repos):
+    # 1. Create a project to ensure it has children to be deleted
+    response = client.post("/api/v1/projects", json={
+        "name": "test_project_to_delete",
+        "description": "A project to test deletion",
+        "path": sample_project_path
+    })
     assert response.status_code == 200
-    assert response.json() == True
+    project_data = response.json()
+    project_key = project_data['_key']
 
-    response = client.get(f"/api/v1/projects/{sample_project_node.key}")
+    # 2. Verify that some child files exist in the database
+    file_repo = create_repos.file_repo
+    main_py_node = file_repo.find_by_qname("test_project_to_delete.main")
+    child_py_node = file_repo.find_by_qname(
+        "test_project_to_delete.core.model.child")
+
+    assert main_py_node is not None
+    assert child_py_node is not None
+
+    # 3. Delete the project
+    response = client.delete(f"/api/v1/projects/{project_key}")
+    assert response.status_code == 200
+    assert response.json() is True
+
+    # 4. Verify the project is gone
+    response = client.get(f"/api/v1/projects/{project_key}")
     assert response.status_code == 404
+
+    # 5. Verify that the child files are also gone from the database
+    main_py_node_after_delete = file_repo.find_by_qname(
+        "test_project_to_delete.main")
+    child_py_node_after_delete = file_repo.find_by_qname(
+        "test_project_to_delete.core.model.child")
+
+    assert main_py_node_after_delete is None
+    assert child_py_node_after_delete is None
 
 
 def test_get_all_projects(client, sample_project_node):

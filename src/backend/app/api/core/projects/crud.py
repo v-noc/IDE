@@ -15,9 +15,9 @@ from app.core.model.nodes import ProjectNode
 
 
 class CreateProjectRequest(BaseModel):
-    name: str
+    name: str = Field(required=True, min_length=3)
     description: str
-    path: str
+    path: str = Field(required=True)
 
 
 class UpdateProjectRequest(BaseModel):
@@ -36,14 +36,18 @@ def create_project(
 ) -> ProjectTreeNode:
     """Create a project graph from a local path.
 
-    Returns a `ProjectTreeNode` built from the analyzed source code if successful.
+    Returns a `ProjectTreeNode` built from the analyzed source code if
+    successful.
     Raises 400 when the provided path does not exist.
     """
     project_root = Path(project.path)
     if not project_root.exists():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Root path {project.path} does not exist",
+            detail={
+                "field": "path",
+                "message": f"Project path {project.path} does not exist",
+            },
         )
 
     try:
@@ -51,7 +55,11 @@ def create_project(
         graph_builder.build(project.name, project.description)
     except FileNotFoundError as exc:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "field": "path",
+                "message": str(exc),
+            },
         )
     except Exception as exc:
         print(exc)
@@ -73,11 +81,12 @@ def create_project(
     return project_tree
 
 
-@router.get("/", response_model=list[ProjectTreeNode])
+@router.get("/", response_model=list[ProjectNode])
 def get_projects(
     project_service: ProjectService = Depends(get_project_service),
 ) -> list[AnyTreeNode]:
     projects = project_service.get_all()
+
     return projects
 
 
@@ -100,7 +109,7 @@ def get_project_children(
     return tree
 
 
-@router.get("/{project_id}", response_model=ProjectNode)
+@router.get("/{project_id}", response_model=ProjectTreeNode)
 def get_project(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service),
@@ -111,7 +120,17 @@ def get_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
         )
-    return project_node
+
+    children = project_service.get_children(project_node.id)
+
+    tree_builder = TreeBuilder(children)
+    tree = tree_builder.build()
+
+    project_tree = ProjectTreeNode(
+        **project_node.model_dump(),
+        children=tree
+    )
+    return project_tree
 
 
 @router.get("/", response_model=list[ProjectTreeNode])
