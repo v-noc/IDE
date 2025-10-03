@@ -46,7 +46,7 @@ def test_class_analysis(arangodb_client):
 
     # Test 'child = Child(call_back)' call
     init_call = next(
-        (call for call in module_level_calls if call.name == "__init__"),
+        (call for call in module_level_calls if call.name == "(Parent).__init__"),
         None,
     )
     assert init_call is not None
@@ -62,14 +62,14 @@ def test_class_analysis(arangodb_client):
         None,
     )
     assert wake_up_in_init is not None
-    assert wake_up_in_init.name == "wake_up"
+    assert wake_up_in_init.name == "(GrandParent).wake_up"
     assert (
         wake_up_in_init.target.qname == "protector.main.GrandParent.wake_up"
     )
 
     # Test 'child.greet()' call
     greet_call = next(
-        (call for call in module_level_calls if call.name == "greet"), None
+        (call for call in module_level_calls if call.name == "(Child).greet"), None
     )
     assert greet_call is not None
     assert greet_call.target.qname == "protector.main.Child.greet"
@@ -95,7 +95,7 @@ def test_class_analysis(arangodb_client):
 
     # Test 'super().greet()' call within 'greet'
     super_greet_in_greet = next(
-        (call for call in greet_call_children if call.name == "greet"),
+        (call for call in greet_call_children if call.name == "(Parent).greet"),
         None,
     )
     assert super_greet_in_greet is not None

@@ -4,8 +4,8 @@ from contextlib import contextmanager
 
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.model.base import BaseNode
-from app.core.model.nodes import CallNode
 from app.core.parser.scope_manager.core.symbol import Symbol, SymbolType
+from app.core.parser.scope_manager.core.scope import ScopeType
 from app.core.model.properties import CodePosition
 from app.core.parser.ast.models import CallSchema
 
@@ -17,7 +17,9 @@ class CallHandler:
     """Handles call-related nodes"""
 
     def __init__(
-        self, symbol_table: SymbolTable, analyzer_callback: Callable[[BaseNode], None]
+        self,
+        symbol_table: SymbolTable,
+        analyzer_callback: Callable[[BaseNode], None],
     ):
         self.symbol_table = symbol_table
         self.resolver = SymbolResolver(symbol_table.scope_manager)
@@ -47,7 +49,9 @@ class CallHandler:
                 ):
                     with self._call_node_context(final_inner, position):
                         return self.executor.execute(
-                            callee_result, node.args, node.keywords
+                            callee_result,
+                            node.args,
+                            node.keywords,
                         )
 
                 if final_inner.symbol_type == SymbolType.CLASS:
@@ -65,7 +69,8 @@ class CallHandler:
 
         # Class instantiation
         if final_callee.symbol_type == SymbolType.CLASS:
-            # Resolve __init__ and, if present, call it with instance bound as self
+            # Resolve __init__ and, if present, call it with instance bound
+            # as self
             init_symbol = self.symbol_table.scope_manager.resolve_method(
                 final_callee.qualified_name,
                 "__init__",
@@ -94,7 +99,11 @@ class CallHandler:
                 end_col_offset=node.position.end_col_offset,
             )
             with self._call_node_context(final_callee, position):
-                return self.executor.execute(callee_result, node.args, node.keywords)
+                return self.executor.execute(
+                    callee_result,
+                    node.args,
+                    node.keywords,
+                )
 
         return None
 
@@ -111,21 +120,39 @@ class CallHandler:
         """
         call_service = self.symbol_table.node_service["call"]
 
-        parent_qname = self.symbol_table.scope_manager.current_scope.qualified_name
+        parent_qname = (
+            self.symbol_table.scope_manager.current_scope.qualified_name
+        )
         parent_node = self.symbol_table.qname_to_node[parent_qname]
         if len(self.symbol_table.call_node_stack) > 0:
             parent_node = self.symbol_table.call_node_stack[-1]
 
-        callee_node = self.symbol_table.qname_to_node[callee_symbol.qualified_name]
+        callee_node = self.symbol_table.qname_to_node[
+            callee_symbol.qualified_name
+        ]
         parent_service = self.symbol_table.node_service[parent_node.node_type]
 
+        # Adjust display name: prefix class for methods -> (ClassName).method
+        display_name = callee_symbol.name
+        try:
+            defining_scope = getattr(callee_symbol, "defining_scope", None)
+            if (
+                defining_scope
+                and getattr(defining_scope, "scope_type", None)
+                == ScopeType.CLASS
+            ):
+                display_name = f"({defining_scope.name}).{callee_symbol.name}"
+        except Exception:
+            # Fallback to basic name if any metadata is missing
+            display_name = callee_symbol.name
+
         call_node = call_service.create(
-            name=callee_symbol.name,
+            name=display_name,
             qname=(
                 f"{callee_symbol.qualified_name}L{position.line_no}"
                 f"C{position.col_offset}"
             ),
-            description=f"{callee_symbol.name} function",
+            description=f"{display_name} function",
             position=position,
             target_id=callee_node.id,
         )
