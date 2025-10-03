@@ -6,8 +6,8 @@ import { detectLanguage } from "./detectLanguage";
 
 const EditorCode = () => {
   const { selectedNode } = useProjectStore();
-  const elementId = selectedNode?.id ?? "";
-  const nodeType = selectedNode?.type;
+  const elementId = selectedNode?._key ?? "";
+  const nodeType = selectedNode?.node_type;
 
   const { data, isLoading, isError } = useEditorCode(elementId, nodeType);
 

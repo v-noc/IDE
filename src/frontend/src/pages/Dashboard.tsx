@@ -133,14 +133,12 @@ const Dashboard = () => {
       <Layout
         main={
           <MainWithRightSidebar
-            left={<></>}
+            left={<MainCanvas />}
             right={
-              // <RightSidebar>
               <ConfigSidebarContent
                 key={selectedNodeFromTree?._key}
                 {...sidebarProps}
               />
-              // </RightSidebar>
             }
           />
         }

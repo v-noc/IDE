@@ -1,10 +1,7 @@
-import type {
-    CodeElementResponse,
-    FileCodeResponse,
-} from "../../../../service/useCodeElement";
+import type { CodeResponse } from "../../../../service/useCodeElement";
 
 export function detectLanguage(
-    data: FileCodeResponse | CodeElementResponse | undefined
+    data: CodeResponse | undefined
 ): string {
     const fileName = data?.file_name || data?.file_path || "";
     const ext = fileName.split(".").pop()?.toLowerCase();

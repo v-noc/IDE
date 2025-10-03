@@ -42,7 +42,8 @@ class NodeRepository(BaseRepository[T]):
         """
         # AQL's "p.vertices[-2]" is a clever way to get the parent in a path.
         query = """
-        FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id @@contains_collection
+        FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id 
+            @@contains_collection
             OPTIONS { order: "bfs" }
             // Use a LET statement to conditionally find the target
             LET target_node = (
@@ -67,6 +68,44 @@ class NodeRepository(BaseRepository[T]):
         # because the structure is custom ("vertex", "parent_id").
         cursor = self.db.aql.execute(query, bind_vars=bind_vars)
         return list(cursor)
+
+    def get_nearest_file_and_project(self, node_id: str) -> Dict[str, Any]:
+        """Return nearest file and project ancestors in one traversal.
+
+        Performs a BFS INBOUND traversal on contains_edges starting from
+        node_id. Selects first encountered file and project nodes.
+
+        Returns a dict with keys file and project whose values are the raw
+        vertex documents or None if not found.
+        """
+        query = """
+        LET ancestors = (
+          FOR v IN 1..50 INBOUND @start_node_id @@contains_collection
+            OPTIONS { order: "bfs" }
+            RETURN v
+        )
+        RETURN {
+          file: FIRST(
+            FOR a IN ancestors
+              FILTER a.node_type == "file"
+              RETURN a
+          ),
+          project: FIRST(
+            FOR a IN ancestors
+              FILTER a.node_type == "project"
+              RETURN a
+          )
+        }
+        """
+        bind_vars = {
+            "start_node_id": node_id,
+            "@contains_collection": "contains_edges",
+        }
+        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+        results = list(cursor)
+        if results:
+            return results[0]
+        return {"file": None, "project": None}
 
     def find_by_qname(self, qname: str) -> Optional[T]:
         return self.find_one({"qname": qname})

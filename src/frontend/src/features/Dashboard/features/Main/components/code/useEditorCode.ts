@@ -1,15 +1,14 @@
 import { useMemo } from "react";
 import {
-    useGetCodeFromElement,
+    useGetCodeForNode,
     useGetFileCode,
-    type CodeElementResponse,
-    type FileCodeResponse,
+    type CodeResponse,
 } from "../../../../service/useCodeElement";
+import type { NodeType } from "@/types/project";
 
-type NodeType = "file" | "function" | "class" | "virtual_folder" | string | undefined;
 
 export interface EditorCodeResult {
-    data: FileCodeResponse | CodeElementResponse | undefined;
+    data: CodeResponse | undefined;
     isLoading: boolean;
     isError: boolean;
 }
@@ -21,15 +20,15 @@ export interface EditorCodeResult {
  */
 export function useEditorCode(elementId: string, nodeType: NodeType): EditorCodeResult {
     const isFile = nodeType === "file";
-    const isCodeElement = nodeType === "function" || nodeType === "class";
-    const isVirtualFolder = nodeType === "virtual_folder";
+    const isCodeElement = nodeType === "function" || nodeType === "class" || nodeType === "call";
+    // const isVirtualFolder = nodeType === "virtual_folder";
 
     // File nodes → only file-code
-    const fileQuery = useGetFileCode(isFile || isVirtualFolder ? elementId : "");
+    const fileQuery = useGetFileCode(isFile ? elementId : "");
 
-    // Function/Class nodes → only element-code
-    const elementQuery = useGetCodeFromElement(
-        isCodeElement || isVirtualFolder ? elementId : ""
+    // Code element nodes → use unified code endpoint
+    const elementQuery = useGetCodeForNode(
+        isCodeElement ? elementId : ""
     );
 
     const { data, isLoading, isError } = useMemo(() => {
@@ -42,7 +41,7 @@ export function useEditorCode(elementId: string, nodeType: NodeType): EditorCode
             };
         }
 
-        // Code element nodes
+        // Code element nodes (function/class/call)
         if (isCodeElement) {
             return {
                 data: elementQuery.data,
@@ -52,31 +51,28 @@ export function useEditorCode(elementId: string, nodeType: NodeType): EditorCode
         }
 
         // Virtual folder: prefer whichever succeeded; otherwise wait until both settle
-        if (isVirtualFolder) {
-            const data = fileQuery.data ?? elementQuery.data;
-            const isLoading = fileQuery.isLoading || elementQuery.isLoading;
-            const isError =
-                !isLoading &&
-                Boolean(fileQuery.error) &&
-                Boolean(elementQuery.error) &&
-                !data;
-            return { data, isLoading, isError };
-        }
+        // if (isVirtualFolder) {
+        //     const data = fileQuery.data ?? elementQuery.data;
+        //     const isLoading = fileQuery.isLoading || elementQuery.isLoading;
+        //     const isError =
+        //         !isLoading &&
+        //         Boolean(fileQuery.error) &&
+        //         Boolean(elementQuery.error) &&
+        //         !data;
+        //     return { data, isLoading, isError };
+        // }
 
         // Fallback
         return { data: undefined, isLoading: false, isError: true };
     }, [
         isFile,
         isCodeElement,
-        isVirtualFolder,
         fileQuery.data,
         fileQuery.isLoading,
         fileQuery.isError,
-        fileQuery.error,
         elementQuery.data,
         elementQuery.isLoading,
         elementQuery.isError,
-        elementQuery.error,
     ]);
 
     return { data, isLoading, isError };

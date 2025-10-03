@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useParams } from "react-router";
-import Canvas from "@/features/Dashboard/features/Main/components/canvas";
+
 import useProjectStore from "../../store/useProjectStore";
 import Documents from "./components/docs";
 import EditorCode from "./components/code";
@@ -15,20 +14,15 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 const MainCanvas = () => {
-  const { projectId } = useParams();
   const { selectedNode } = useProjectStore();
-
-  const isCanvasActive = useMemo(() => {
-    return selectedNode?.type === "function" || selectedNode?.type === "class";
-  }, [selectedNode?.type]);
 
   const isCodeActive = useMemo(() => {
     return (
-      selectedNode?.type === "function" ||
-      selectedNode?.type === "class" ||
-      selectedNode?.type == "file"
+      selectedNode?.node_type === "function" ||
+      selectedNode?.node_type === "class" ||
+      selectedNode?.node_type == "file"
     );
-  }, [selectedNode?.type]);
+  }, [selectedNode?.node_type]);
 
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
   const bottomPanelRef = useRef<ImperativePanelHandle>(null);
@@ -57,18 +51,10 @@ const MainCanvas = () => {
           >
             <TabsList>
               {isCodeActive && <TabsTrigger value="code">Code</TabsTrigger>}
-              {isCanvasActive && (
-                <TabsTrigger value="canvas">Canvas</TabsTrigger>
-              )}
+
               <TabsTrigger value="docs">Docs</TabsTrigger>
             </TabsList>
-            {isCanvasActive && (
-              <TabsContent value="canvas" className="flex-1">
-                <div className="h-full w-full rounded-md border">
-                  <Canvas projectId={projectId} />
-                </div>
-              </TabsContent>
-            )}
+
             {isCodeActive && (
               <TabsContent
                 value="code"
