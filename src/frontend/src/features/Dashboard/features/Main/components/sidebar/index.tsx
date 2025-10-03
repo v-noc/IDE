@@ -5,10 +5,9 @@ import {
   ResizableHandle,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import {
-  Panel as ResizablePanel,
-  type ImperativePanelHandle,
-} from "react-resizable-panels";
+import { Panel as ResizablePanel } from "react-resizable-panels";
+import BaseClass from "./BaseClass";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const RightSidebar: React.FC<{
   children?: React.ReactNode;
@@ -44,8 +43,22 @@ export const RightSidebar: React.FC<{
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel collapsible defaultSize={35} minSize={20}>
-          <div className="h-full min-h-0">
-            <CallSidebar />
+          <div className="h-full min-h-0 flex flex-col px-2 pt-2">
+            <Tabs defaultValue="calls" className="flex-1 min-h-0 flex flex-col">
+              <TabsList className="w-full">
+                <TabsTrigger value="calls">Calls</TabsTrigger>
+                <TabsTrigger value="base">Base Class</TabsTrigger>
+              </TabsList>
+              <TabsContent value="calls" className="flex-1 min-h-0">
+                <CallSidebar hideHeader />
+              </TabsContent>
+              <TabsContent
+                value="base"
+                className="flex-1 min-h-0 overflow-auto px-1 py-2"
+              >
+                <BaseClass />
+              </TabsContent>
+            </Tabs>
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

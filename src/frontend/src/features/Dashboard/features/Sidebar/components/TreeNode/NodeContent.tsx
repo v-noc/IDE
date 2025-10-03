@@ -74,7 +74,12 @@ export const NodeContent = ({
         </CollapsibleTrigger>
       )}
       <DynamicIcon
-        iconName={node.icon || getIcons(node.node_type)}
+        iconName={
+          node.icon ||
+          getIcons(
+            node.node_type == "call" ? node.target.node_type : node.node_type
+          )
+        }
         className={cn("h-4 w-4 flex-shrink-0")}
         color={nodeStyle.iconColor}
       />

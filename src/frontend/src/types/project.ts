@@ -11,6 +11,7 @@ export interface BaseNode {
     name: string
     description: string;
     node_type: NodeType
+    qname?: string
 
 }
 

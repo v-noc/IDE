@@ -18,7 +18,7 @@ const MainWithRightSidebar: React.FC<{
 }> = ({
   left,
   right,
-  defaultOpen,
+  defaultOpen = true,
   className,
   rightDefaultSize = 25,
   rightMinSize = 15,
