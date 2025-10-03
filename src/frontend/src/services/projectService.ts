@@ -1,36 +1,20 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
 import apiClient from '@/lib/api';
 import API_ROUTES from '@/lib/apiRoutes';
+import type { ProjectNode, ProjectNodeTree } from '@/types/project';
 
-interface Project {
-  key: string;
-  name: string;
-  path: string;
-}
+
 
 // API functions using the new client
-const fetchProjects = (): Promise<Project[]> => {
+export const fetchProjects = (): Promise<ProjectNode[]> => {
   return apiClient(API_ROUTES.PROJECTS);
 };
 
-const createProject = (newProject: { name: string; path: string }): Promise<Project> => {
-  return apiClient(API_ROUTES.PROJECTS, { body: newProject });
+export const createProject = (newProject: { name: string; description: string; path: string }): Promise<ProjectNodeTree> => {
+  return apiClient(API_ROUTES.PROJECTS, { body: newProject, method: 'POST' });
 };
 
-// React Query hooks (no changes needed here)
-export const useProjects = () => {
-  return useQuery<Project[], Error>({
-    queryKey: ['projects'],
-    queryFn: fetchProjects,
-  });
-};
 
-export const useCreateProject = () => {
-  const queryClient = useQueryClient();
-  return useMutation<Project, Error, { name: string; path: string }>({
-    mutationFn: createProject,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-  });
-};
+export const deleteProject = (project_key: string) => {
+  return apiClient(API_ROUTES.PROJECTS + project_key, { method: 'DELETE' })
+}

@@ -2,11 +2,11 @@ import { useState } from "react";
 import Header from "@/features/Home/componets/Header";
 import SearchAndViewController from "@/features/Home/componets/SearchAndViewController";
 import ProjectList from "@/features/Home/componets/ProjectList";
-import { useProjects } from "@/services/projectService";
+import { useProjects } from "@/features/Home/hook/useProject";
 
 const HomePage = () => {
-  const { data: projects, error, isLoading } = useProjects();
-  console.log(error);
+  const { data: projects, isLoading } = useProjects();
+
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
 
   return (

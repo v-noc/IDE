@@ -1,7 +1,7 @@
-import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import type { ProjectNodeTree } from "@/types/project";
 import { TreeNode } from "./TreeNode";
 
-const ProjectTree = ({ projectTree }: { projectTree: ProjectTreeResponse }) => {
+const ProjectTree = ({ projectTree }: { projectTree: ProjectNodeTree }) => {
   return (
     <ul className="space-y-1">
       <TreeNode node={projectTree} />

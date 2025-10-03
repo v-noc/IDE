@@ -5,10 +5,7 @@
     "request": "launch",
     "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
     "module": "pytest",
-    "args": [
-      "-s",
-      "tests/unit/parser/analyzer/import/test_import_from.py::test_import_from_with_alias"
-    ],
+    "args": ["-s", "tests/e2e/core/test_project.py::test_create_project"],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
       "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"

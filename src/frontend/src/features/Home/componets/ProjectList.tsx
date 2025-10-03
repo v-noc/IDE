@@ -12,27 +12,38 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, Clock, Edit, Folder, MoreHorizontal } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  Edit,
+  Folder,
+  MoreHorizontal,
+  Trash,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import { truncatePath } from "@/utils";
-import type { Project } from "@/types/project";
+import type { ProjectNode } from "@/types/project";
+import { useDeleteProject } from "../hook/useProject";
+import { formatDate } from "date-fns";
 
 const ProjectList = ({
   viewMode,
   projects,
 }: {
   viewMode: "list" | "grid";
-  projects: Project[];
+  projects: ProjectNode[];
 }) => {
+  console.log(projects);
+  const { mutate: deleteProject } = useDeleteProject();
   const navigate = useNavigate();
   if (viewMode === "grid") {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
           <Card
-            key={project.key}
+            key={project._key}
             className="hover:shadow-md transition-shadow p-4 cursor-pointer"
-            onClick={() => navigate(`/project/${project.key}`)}
+            onClick={() => navigate(`/project/${project._key}`)}
           >
             <CardHeader className="p-0 ">
               <div className="flex items-start justify-between">
@@ -55,6 +66,16 @@ const ProjectList = ({
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
                     </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        deleteProject(project._key);
+                      }}
+                    >
+                      <Trash className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -64,16 +85,16 @@ const ProjectList = ({
                 {truncatePath(project.path, 40)}
               </p>
               <CardDescription className="mb-4 line-clamp-2">
-                {/* {project.description} */}
+                {project.description}
               </CardDescription>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  {/* Created: {formatDate(project.createdDate, "MM/dd/yyyy")} */}
+                  Created: {formatDate(project.created_at, "MM/dd/yyyy")}
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  {/* Modified: {formatDate(project.lastModified, "MM/dd/yyyy")} */}
+                  Modified: {formatDate(project.updated_at, "MM/dd/yyyy")}
                 </div>
               </div>
             </CardContent>
@@ -86,9 +107,9 @@ const ProjectList = ({
     <div className="space-y-4">
       {projects.map((project) => (
         <Card
-          key={project.key}
+          key={project._key}
           className="hover:shadow-md transition-shadow p-4 cursor-pointer"
-          onClick={() => navigate(`/project/${project.key}`)}
+          onClick={() => navigate(`/project/${project._key}`)}
         >
           <CardContent className="p-2">
             <div className="flex items-start justify-between">
@@ -103,16 +124,16 @@ const ProjectList = ({
                   {truncatePath(project.path)}
                 </p>
                 <p className="text-sm text-muted-foreground mb-3">
-                  {/* {project.description} */}
+                  {project.description}
                 </p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    {/* Created: {formatDate(project.createdDate, "MM/dd/yyyy")} */}
+                    Created: {formatDate(project.created_at, "MM/dd/yyyy")}
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {/* Modified: {formatDate(project.lastModified, "MM/dd/yyyy")} */}
+                    Modified: {formatDate(project.updated_at, "MM/dd/yyyy")}
                   </div>
                 </div>
               </div>
@@ -126,6 +147,16 @@ const ProjectList = ({
                   <DropdownMenuItem>
                     <Edit className="h-4 w-4 mr-2" />
                     Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation(x);
+                      e.preventDefault();
+                      deleteProject(project._key);
+                    }}
+                  >
+                    <Trash className="h-4 w-4 mr-2" />
+                    Delete
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

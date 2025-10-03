@@ -1,26 +1,26 @@
 import { useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import type { NodeType, ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
-import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { useThemeStore } from "@/features/Dashboard/store/useThemeStore";
+import type { NodeType, ContainerNodeTree } from "@/types/project";
+// import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
+// import { useQueryClient } from "@tanstack/react-query";
+// import { toast } from "sonner";
+// import { useThemeStore } from "@/features/Dashboard/store/useThemeStore";
 
-export const useTreeNode = (node: ProjectTreeResponse) => {
+export const useTreeNode = (node: ContainerNodeTree) => {
   const {
     selectedNode,
     setSelectedNode,
     activeNodeId,
     expandedNodeIds,
     toggleNodeExpansion,
-    addVirtualNode,
-    projectData,
+    // addVirtualNode,
+    // projectData,
   } = useProjectStore();
 
-  const { setTheme } = useThemeStore();
+  // const { setTheme } = useThemeStore();
 
-  const queryClient = useQueryClient();
-  const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.id || "");
+  // const queryClient = useQueryClient();
+  // const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.id || "");
 
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
@@ -29,21 +29,21 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     NodeType
   >("file");
 
-  const isOpen = expandedNodeIds.includes(node.id);
-  const isSelected = selectedNode?.id === node.id;
-  const isActive = activeNodeId === node.id;
+  const isOpen = expandedNodeIds.includes(node._key);
+  const isSelected = selectedNode?.id === node._key;
+  const isActive = activeNodeId === node._key;
   const hasChildren = node.children && node.children.length > 0;
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleNodeExpansion(node.id);
+    toggleNodeExpansion(node._key);
   };
 
   const handleSelectNode = () => {
-    if (selectedNode?.id === node.id) return;
-    setSelectedNode({ id: node.id, type: node?.link_to?.node_type || node.node_type });
-    // Update global theme from the selected node if provided
-    setTheme(node.theme);
+    if (selectedNode?.id === node._key) return;
+    setSelectedNode({ id: node._key, type: node.node_type });
+    // // Update global theme from the selected node if provided
+    // setTheme(node.theme);
   };
 
   const handleFocus = () => {
@@ -58,23 +58,23 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
   };
 
   const handleRemove = async () => {
-    if (node.node_type !== "virtual_folder") return;
-    if (!projectData?.id) {
-      toast.error("No project selected");
-      return;
-    }
-    try {
-      await deleteVirtualFolderMutation.mutateAsync(node.id);
-      await Promise.all([
-        // Avoid invalidating projectTree to preserve selection
-        // queryClient.invalidateQueries({ queryKey: ["projectTree", projectData.id] }),
-        queryClient.invalidateQueries({ queryKey: ["virtualFolders", projectData.id] }),
-      ]);
-      toast.success("Virtual folder removed");
-    } catch (error) {
-      console.error("Failed to remove virtual folder:", error);
-      toast.error("Failed to remove virtual folder");
-    }
+    // if (node.node_type !== "virtual_folder") return;
+    // if (!projectData?.id) {
+    //   toast.error("No project selected");
+    //   return;
+    // }
+    // try {
+    //   await deleteVirtualFolderMutation.mutateAsync(node.id);
+    //   await Promise.all([
+    //     // Avoid invalidating projectTree to preserve selection
+    //     // queryClient.invalidateQueries({ queryKey: ["projectTree", projectData.id] }),
+    //     queryClient.invalidateQueries({ queryKey: ["virtualFolders", projectData.id] }),
+    //   ]);
+    //   toast.success("Virtual folder removed");
+    // } catch (error) {
+    //   console.error("Failed to remove virtual folder:", error);
+    //   toast.error("Failed to remove virtual folder");
+    // }
   };
 
   const handleEdit = () => {
@@ -128,6 +128,6 @@ export const useTreeNode = (node: ProjectTreeResponse) => {
     closeCreateDialog,
     closeEditDialog,
     closeCreatePathDialog,
-    addVirtualNode,
+    // addVirtualNode,
   };
 };

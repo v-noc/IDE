@@ -1,15 +1,8 @@
 import { create } from 'zustand';
+import type { ThemeConfig } from '@/types/project';
 
-export interface ThemeConfig {
-    navbarColor?: string;
-    leftSidebarColor?: string;
-    rightSidebarColor?: string;
-    backgroundColor?: string;
-    textColor?: string;
-    iconColor?: string;
-    cardColor?: string;
 
-}
+
 
 interface ThemeState {
     theme: ThemeConfig | undefined;

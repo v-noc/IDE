@@ -14,12 +14,12 @@ import {
 } from "@/components/ui/tooltip";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import getIcons from "@/features/Dashboard/utils/getIcons";
-import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import type { ContainerNodeTree } from "@/types/project";
 import getNodeStyle from "@/features/Dashboard/utils/getNodeStyle";
 import { TreeNode } from ".";
 
 interface NodeContentProps {
-  node: ProjectTreeResponse;
+  node: ContainerNodeTree;
   isOpen: boolean;
   isSelected: boolean;
   isActive: boolean;

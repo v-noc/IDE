@@ -1,35 +1,35 @@
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
-import { TreeNode } from "../TreeNode";
-import { useGetVirtualFolders } from "@/features/Dashboard/service/useProject";
-import { useParams } from "react-router-dom";
-import { Skeleton } from "@/components/ui/skeleton";
+// import { TreeNode } from "../TreeNode";
+// import { useGetVirtualFolders } from "@/features/Dashboard/service/useProject";
+// import { useParams } from "react-router-dom";
+// import { Skeleton } from "@/components/ui/skeleton";
 
 const VirtualFolders = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const { projectId } = useParams();
-  const { data: virtualFolders, isLoading } = useGetVirtualFolders(
-    projectId || ""
-  );
+  // const { projectId } = useParams();
+  // const { data: virtualFolders, isLoading } = useGetVirtualFolders(
+  //   projectId || ""
+  // );
 
-  const filteredFolders = useMemo(() => {
-    if (!virtualFolders) {
-      return [];
-    }
-    return virtualFolders.filter((folder) =>
-      folder.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [virtualFolders, searchTerm]);
+  // const filteredFolders = useMemo(() => {
+  //   if (!virtualFolders) {
+  //     return [];
+  //   }
+  //   return virtualFolders.filter((folder) =>
+  //     folder.name.toLowerCase().includes(searchTerm.toLowerCase())
+  //   );
+  // }, [virtualFolders, searchTerm]);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
-      </div>
-    );
-  }
+  // if (isLoading) {
+  //   return (
+  //     <div className="space-y-2">
+  //       <Skeleton className="h-8 w-full" />
+  //       <Skeleton className="h-8 w-full" />
+  //       <Skeleton className="h-8 w-full" />
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="flex flex-col gap-2">
@@ -40,7 +40,7 @@ const VirtualFolders = () => {
         onChange={(e) => setSearchTerm(e.target.value)}
         className="w-full"
       />
-      {filteredFolders && filteredFolders.length > 0 ? (
+      {/* {filteredFolders && filteredFolders.length > 0 ? (
         <div className="space-y-1">
           {filteredFolders.map((folder) => (
             <TreeNode key={folder.key} node={folder} />
@@ -55,7 +55,7 @@ const VirtualFolders = () => {
             Click the + button above to create your first virtual folder
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 };

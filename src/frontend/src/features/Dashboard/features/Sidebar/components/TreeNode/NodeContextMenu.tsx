@@ -4,11 +4,11 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import type { ContainerNodeTree } from "@/types/project";
 
 interface NodeContextMenuProps {
   children: React.ReactNode;
-  node: ProjectTreeResponse;
+  node: ContainerNodeTree;
   onFocus: () => void;
   onExpand: () => void;
   onRemove: () => void;
@@ -32,9 +32,7 @@ export const NodeContextMenu = ({
       <ContextMenuContent>
         <ContextMenuItem onClick={onFocus}>Focus</ContextMenuItem>
         <ContextMenuItem onClick={onExpand}>Expand</ContextMenuItem>
-        {node.isVirtual && onEdit && (
-          <ContextMenuItem onClick={onEdit}>Edit</ContextMenuItem>
-        )}
+        {onEdit && <ContextMenuItem onClick={onEdit}>Edit</ContextMenuItem>}
         {(node.node_type == "function" ||
           node.node_type == "class" ||
           node.node_type == "file" ||
@@ -42,7 +40,7 @@ export const NodeContextMenu = ({
           <ContextMenuItem onClick={onCreatePath}>Create Path</ContextMenuItem>
         )}
 
-        {node.node_type == "virtual_folder" && (
+        {node.node_type == "folder" && (
           <ContextMenuItem onClick={onRemove}>Remove</ContextMenuItem>
         )}
       </ContextMenuContent>

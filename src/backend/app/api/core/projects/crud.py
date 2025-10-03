@@ -139,10 +139,17 @@ def delete_project(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service),
 ) -> bool:
-    result = project_service.delete(project_id)
-    if result is False:
-        return False
-    return True
+    project = project_service.get(project_id=project_id)
+    if project:
+        result = project_service.delete(project_id)
+        if result is False:
+            return False
+        return True
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with {project_id} not found"
+        )
 
 
 @router.put("/{project_id}", response_model=ProjectNode)
