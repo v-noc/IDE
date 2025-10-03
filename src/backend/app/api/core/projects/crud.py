@@ -74,10 +74,7 @@ def create_project(
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    project_tree = ProjectTreeNode(
-        **project_node.model_dump(),
-        children=tree
-    )
+    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
     return project_tree
 
 
@@ -94,7 +91,6 @@ def get_projects(
 def get_project_children(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service),
-
 ) -> list[AnyTreeNode]:
     project_node = project_service.get(project_id)
     children = project_service.get_children(project_node.id)
@@ -126,10 +122,7 @@ def get_project(
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    project_tree = ProjectTreeNode(
-        **project_node.model_dump(),
-        children=tree
-    )
+    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
     return project_tree
 
 

@@ -97,7 +97,9 @@ class ImportHandler:
                         )
 
                     else:
-                        symbol = scope.symbols[alias.name]
+                        symbol = scope.symbols.get(alias.name)
+                        if target_qname == module_path:
+                            symbol = scope.parent.symbols.get(scope.name)
 
                         if symbol and alias_symbol is not None:
                             self.symbol_table.scope_manager.track_static_assignment(
