@@ -193,7 +193,7 @@ const Layout = ({
         </nav>
 
         {/* Content */}
-        {/* <main className="flex-1 min-h-0 h-full">{main}</main> */}
+        <main className="flex-1 min-h-0 h-full">{main}</main>
       </ResizablePanel>
 
       {/* Right Sidebar (collapsible) */}

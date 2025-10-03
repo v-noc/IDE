@@ -1,4 +1,4 @@
-import type { ContainerNodeTree } from "@/types/project";
+import type { AnyNodeTree } from "@/types/project";
 import { useTreeNode } from "../../hooks/useTreeNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeContent } from "./NodeContent";
@@ -7,11 +7,16 @@ import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
 // import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
 
 interface TreeNodeProps {
-  node: ContainerNodeTree;
+  node: AnyNodeTree;
   nestingLevel?: number;
+  childFilter?: (node: AnyNodeTree) => boolean;
 }
 
-export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
+export const TreeNode = ({
+  node,
+  nestingLevel = 0,
+  childFilter,
+}: TreeNodeProps) => {
   const {
     isOpen,
     isSelected,
@@ -31,7 +36,7 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
     closeCreateDialog,
     closeEditDialog,
     closeCreatePathDialog,
-  } = useTreeNode(node);
+  } = useTreeNode(node, childFilter);
 
   return (
     <>
@@ -52,12 +57,13 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
           nestingLevel={nestingLevel}
           handleToggle={handleToggle}
           handleSelectNode={handleSelectNode}
+          childFilter={childFilter}
         />
       </NodeContextMenu>
       <CreateVirtualNodeDialog
         isOpen={isCreateDialogOpen}
         onClose={closeCreateDialog}
-        parentId={node.key}
+        parentId={node._key}
         nodeType={nodeTypeToCreate}
       />
       <EditVirtualFolderDialog

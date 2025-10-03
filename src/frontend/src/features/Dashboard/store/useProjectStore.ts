@@ -1,12 +1,12 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
-import type { NodeType, ProjectNodeTree } from "@/types/project";
+import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 // const uuidv4 = () => new Date().getTime().toString() + Math.random().toString(36).substr(2, 9);
 
 interface ProjectState {
-    selectedNode: { id: string, type: NodeType, isExpanded?: boolean, doNotReRenderCanvas?: boolean } | null;
-    setSelectedNode: (node: { id: string, type: NodeType, isExpanded?: boolean, doNotReRenderCanvas?: boolean } | null) => void;
+    selectedNode: AnyNodeTree | null;
+    setSelectedNode: (node: AnyNodeTree) => void;
     activeNodeId: string | null;
     expandedNodeIds: string[];
     toggleNodeExpansion: (nodeId: string) => void;

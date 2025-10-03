@@ -33,7 +33,6 @@ const ProjectList = ({
   viewMode: "list" | "grid";
   projects: ProjectNode[];
 }) => {
-  console.log(projects);
   const { mutate: deleteProject } = useDeleteProject();
   const navigate = useNavigate();
   if (viewMode === "grid") {
@@ -150,7 +149,7 @@ const ProjectList = ({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={(e: React.MouseEvent) => {
-                      e.stopPropagation(x);
+                      e.stopPropagation();
                       e.preventDefault();
                       deleteProject(project._key);
                     }}

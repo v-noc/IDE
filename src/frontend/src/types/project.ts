@@ -72,7 +72,7 @@ export interface ProjectNode extends ContainerNode {
 // Tree
 
 export interface ContainerNodeTree extends ContainerNode {
-    children: (FunctionNodeTree | ClassNodeTree | CallNodeTree | FileNodeTree | FolderNodeTree | ContainerNodeTree)[]
+    children: AnyNodeTree[]
 }
 
 export interface CallNodeTree extends CallNode {
@@ -99,3 +99,5 @@ export interface FolderNodeTree extends FolderNode {
 export interface ProjectNodeTree extends ProjectNode {
     children: (FolderNode | FileNodeTree)[]
 }
+
+export type AnyNodeTree = ProjectNodeTree | FolderNodeTree | FileNodeTree | FunctionNodeTree | ClassNodeTree | CallNodeTree

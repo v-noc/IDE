@@ -17,8 +17,8 @@ import FileAndFolderSelector from "@/components/FileAndFolderSelector";
 import { useCreateProject } from "@/features/Home/hook/useProject";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router";
-import * as toml from "toml";
-import { useEffect } from "react";
+import { parse } from "toml";
+
 import { extractFieldErrors } from "@/utils/errorMessagextractor";
 
 interface CreateProjectDialogProps {
@@ -42,13 +42,13 @@ const CreateProjectDialog = ({
   title,
   description,
 }: CreateProjectDialogProps) => {
-  const { mutate: createProject, isSuccess, isPending } = useCreateProject();
+  const { mutate: createProject, isPending } = useCreateProject();
   const navigate = useNavigate();
   const {
     register,
     handleSubmit,
     setValue,
-    reset,
+
     setError,
     formState: { errors },
   } = useForm<FormValues>({
@@ -124,7 +124,7 @@ const CreateProjectDialog = ({
 
           console.log("TOML content:", tomlContent);
           try {
-            const tomlData = toml.parse(tomlContent);
+            const tomlData = parse(tomlContent);
             // Set the folder path in the form
             setValue("path", tomlData.pwd);
             setValue("name", tomlData.name);

@@ -5,7 +5,10 @@ import MainCanvas from "@/features/Dashboard/features/Main";
 
 import { ResizablePanelGroup } from "@/components/ui/resizable";
 import MainWithRightSidebar from "@/features/Dashboard/features/Main/MainWithRightSidebar";
-import { RightSidebar } from "@/features/Dashboard/features/Main/components/sidebar";
+import {
+  ConfigSidebarContent,
+  RightSidebar,
+} from "@/features/Dashboard/features/Main/components/sidebar";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import getIcons from "@/features/Dashboard/utils/getIcons";
 
@@ -25,7 +28,7 @@ function findNodeByKey(
   while (stack.length) {
     const current = stack.pop()!;
 
-    if (current.id === project_key) return current;
+    if (current._key === project_key) return current;
     if (current.children && current.children.length) {
       for (let i = 0; i < current.children.length; i++) {
         stack.push(current.children[i]);
@@ -39,7 +42,7 @@ const Dashboard = () => {
   const { selectedNode, projectData } = useProjectStore();
 
   const selectedNodeFromTree = useMemo(
-    () => findNodeByKey(projectData, selectedNode?.id),
+    () => findNodeByKey(projectData, selectedNode?._key),
     [projectData, selectedNode]
   );
 
@@ -130,14 +133,14 @@ const Dashboard = () => {
       <Layout
         main={
           <MainWithRightSidebar
-            left={<MainCanvas />}
+            left={<></>}
             right={
-              <RightSidebar>
-                {/* <ConfigSidebarContent
-                  key={selectedNodeFromTree?.id}
-                  {...sidebarProps}
-                /> */}
-              </RightSidebar>
+              // <RightSidebar>
+              <ConfigSidebarContent
+                key={selectedNodeFromTree?._key}
+                {...sidebarProps}
+              />
+              // </RightSidebar>
             }
           />
         }

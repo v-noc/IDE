@@ -43,7 +43,7 @@ class ClassHandler:
 
         # Populate inherited members
         scope_manager.calculate_all_mro()
-
+        mro = scope_manager.get_mro(qname)
         init_symbol = scope_manager.resolve_method(qname, "__init__")
         if init_symbol is None:
             scope_manager.enter_scope("__init__", ScopeType.FUNCTION)
@@ -53,7 +53,7 @@ class ClassHandler:
             self.function_handler.handle_function_node(function_schema)
             scope_manager.exit_scope()
 
-        class_node.implements = classes
+        class_node.implements = mro
         class_service.update(class_node)
 
     def handle_class_node(self, node: ClassSchema):

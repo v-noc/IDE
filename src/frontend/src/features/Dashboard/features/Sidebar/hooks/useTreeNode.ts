@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import type { NodeType, ContainerNodeTree } from "@/types/project";
+import type { NodeType, AnyNodeTree } from "@/types/project";
 // import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
 // import { useQueryClient } from "@tanstack/react-query";
 // import { toast } from "sonner";
 // import { useThemeStore } from "@/features/Dashboard/store/useThemeStore";
 
-export const useTreeNode = (node: ContainerNodeTree) => {
+export const useTreeNode = (
+  node: AnyNodeTree,
+  childFilter: (node: AnyNodeTree) => boolean = () => true,
+) => {
   const {
     selectedNode,
     setSelectedNode,
@@ -30,9 +33,11 @@ export const useTreeNode = (node: ContainerNodeTree) => {
   >("file");
 
   const isOpen = expandedNodeIds.includes(node._key);
-  const isSelected = selectedNode?.id === node._key;
+  const isSelected = selectedNode?._key === node._key;
   const isActive = activeNodeId === node._key;
-  const hasChildren = node.children && node.children.length > 0;
+  const hasChildren = useMemo(() => {
+    return !!node.children?.some(childFilter);
+  }, [node, childFilter]);
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -40,8 +45,8 @@ export const useTreeNode = (node: ContainerNodeTree) => {
   };
 
   const handleSelectNode = () => {
-    if (selectedNode?.id === node._key) return;
-    setSelectedNode({ id: node._key, type: node.node_type });
+    if (selectedNode?._key === node._key) return;
+    setSelectedNode(node);
     // // Update global theme from the selected node if provided
     // setTheme(node.theme);
   };
@@ -53,7 +58,7 @@ export const useTreeNode = (node: ContainerNodeTree) => {
   const handleExpand = () => {
     console.log("Expand:", node.name);
     if (hasChildren) {
-      toggleNodeExpansion(node.key);
+      toggleNodeExpansion(node._key);
     }
   };
 

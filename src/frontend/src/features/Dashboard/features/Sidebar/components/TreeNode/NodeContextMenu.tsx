@@ -4,11 +4,11 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import type { ContainerNodeTree } from "@/types/project";
+import type { AnyNodeTree } from "@/types/project";
 
 interface NodeContextMenuProps {
   children: React.ReactNode;
-  node: ContainerNodeTree;
+  node: AnyNodeTree;
   onFocus: () => void;
   onExpand: () => void;
   onRemove: () => void;

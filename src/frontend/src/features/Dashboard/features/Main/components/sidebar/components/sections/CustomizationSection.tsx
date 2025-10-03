@@ -5,8 +5,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import ColorRow from "../shared/ColorRow";
-import type { CustomizationData } from "../hooks/useConfigSidebarForm";
+import ColorRow from "./shared/ColorRow";
+import type { CustomizationData } from "../../hooks/useConfigSidebarForm";
 
 export type CustomizationSectionProps = {
   value: CustomizationData;
