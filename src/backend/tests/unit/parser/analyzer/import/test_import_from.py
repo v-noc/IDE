@@ -42,14 +42,15 @@ def test_import_from_relative_path(project_tree: ProjectNode):
 
     user_call = file_node.children[1]
     assert isinstance(user_call, CallTreeNode)
-    assert user_call.name == "__init__"
+    assert user_call.name == "(User).__init__"
     assert user_call.target is not None
     assert user_call.target.qname == "sample_import.utils.data.user.User.__init__"
 
 
 def test_import_from_wildcard(project_tree: ProjectNode):
     # Test relative wildcard import
-    file_node_relative = find_file_node(project_tree.children, "import_wild_card.py")
+    file_node_relative = find_file_node(
+        project_tree.children, "import_wild_card.py")
     assert file_node_relative is not None
     assert len(file_node_relative.children) == 1
     call_node_relative = file_node_relative.children[0]

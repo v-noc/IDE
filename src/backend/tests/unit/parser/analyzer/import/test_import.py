@@ -35,6 +35,6 @@ def test_absolute_path_import(project_tree: ProjectNode):
     # Check for User() instantiation
     user_call = file_node.children[1]
     assert isinstance(user_call, CallTreeNode)
-    assert user_call.name == "__init__"
+    assert user_call.name == "(User).__init__"
     assert user_call.target is not None
     assert user_call.target.qname == "sample_import.utils.data.user.User.__init__"
