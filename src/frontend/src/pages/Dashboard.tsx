@@ -17,14 +17,14 @@ import { useMemo, useCallback } from "react";
 import type { BasicInfoData } from "@/features/Dashboard/features/Main/components/sidebar/hooks/useConfigSidebarForm";
 
 import type { CustomizationData } from "@/features/Dashboard/features/Main/components/sidebar/hooks/useConfigSidebarForm";
-import type { ContainerNodeTree, ThemeConfig } from "@/types/project";
+import type { AnyNodeTree, ThemeConfig } from "@/types/project";
 
 function findNodeByKey(
-  root: ContainerNodeTree | null,
+  root: AnyNodeTree | null,
   project_key?: string | null
-): ContainerNodeTree | null {
+): AnyNodeTree | null {
   if (!root || !project_key) return null;
-  const stack: ContainerNodeTree[] = [root];
+  const stack: AnyNodeTree[] = [root];
   while (stack.length) {
     const current = stack.pop()!;
 

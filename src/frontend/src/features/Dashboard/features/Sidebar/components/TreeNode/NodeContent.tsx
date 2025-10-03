@@ -109,6 +109,7 @@ export const NodeContent = ({
           isActive && "ring-2 ring-blue-600"
         )}
         style={currentStyle}
+        data-node-key={node._key}
       >
         <TooltipProvider>
           <Tooltip>
@@ -123,8 +124,8 @@ export const NodeContent = ({
         {hasChildren && (
           <CollapsibleContent>
             <ul className="pl-2 pt-1 space-y-1">
-              {node.children
-                ?.filter((node) => (childFilter ? childFilter(node) : true))
+              {(node.children as unknown as AnyNodeTree[])
+                ?.filter((n) => (childFilter ? childFilter(n) : true))
                 .map((child) => (
                   <TreeNode
                     key={child._key}

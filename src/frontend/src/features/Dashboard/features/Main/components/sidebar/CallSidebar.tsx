@@ -14,6 +14,7 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
     }
     return [];
   }, [selectedNode]);
+
   return (
     <div className="h-full flex flex-col">
       {!hideHeader && (
