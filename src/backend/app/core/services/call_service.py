@@ -9,7 +9,14 @@ class CallService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(self, name: str, qname: str, description: str,  position: CodePosition, target_id: str):
+    def create(
+        self,
+        name: str,
+        qname: str,
+        description: str,
+        position: CodePosition,
+        target_id: str,
+    ):
         call = CallNode(
             name=name,
             qname=qname,
@@ -22,7 +29,6 @@ class CallService(ContainerService):
         target = TargetsEdge(
             from_id=new_call.id,
             to_id=target_id,
-
         )
         self.repos.targets_edges.create(target)
         return new_call
@@ -37,7 +43,40 @@ class CallService(ContainerService):
         return self.repos.call_repo.delete(call_key)
 
     def add_call(self, parent_call_id: str, call_id: str):
-        return self.add_child_to_container(parent_call_id, call_id, "call_to_call")
+        return self.add_child_to_container(
+            parent_call_id,
+            call_id,
+            "call_to_call",
+        )
 
     def get_children(self, call_id: str):
         return self.repos.call_repo.get_containment_tree(call_id)
+
+    def get_code(self, call_id: str):
+        call = self.repos.call_repo.get_by_id(call_id)
+        if not call:
+            return None
+
+        file_doc, project_doc = self._resolve_file_and_project(call.id)
+        if not file_doc or not project_doc:
+            return None
+
+        abs_path = self._build_abs_file_path(
+            project_doc.get("path"),
+            file_doc.get("path"),
+        )
+        code = self._extract_code_from_file(
+            abs_path,
+            call.position,
+        )
+
+        return {
+            "id": call.id,
+            "name": call.name,
+            "node_type": call.node_type,
+            "qname": call.qname,
+            "file_path": file_doc.get("path"),
+            "file_name": file_doc.get("name"),
+            "position": call.position.model_dump(),
+            "code": code,
+        }

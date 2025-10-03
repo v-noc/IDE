@@ -7,6 +7,8 @@ from app.core.schemas.tree import AnyTreeNode
 from pathlib import Path
 from typing import List
 
+from app.core.services.function_service import FunctionService
+
 
 current_file_path = Path(__file__).resolve()
 print("Current file path:", current_file_path)
@@ -18,6 +20,61 @@ PROJECT_PATH = Path(current_dir, "./simple_function").absolute()
 
 def find_node_by_name(nodes: List[AnyTreeNode], name: str):
     return next((node for node in nodes if node.name == name), None)
+
+
+def test_function_get_code(arangodb_client):
+
+    builder = GraphBuilder(
+        project_path=PROJECT_PATH.as_posix(),
+        ignore_file_name=None,
+        db=arangodb_client
+    )
+    builder.build(
+        "Protector", "Protector is a tool for protecting your code.")
+
+    repos = Repositories(arangodb_client)
+    proj_service = ProjectService(repos)
+    project = proj_service.get_all()
+
+    children = proj_service.get_children(project[0].id)
+
+    tree_builder = TreeBuilder(children)
+    tree = tree_builder.build()
+
+    assert tree, "No tree nodes built"
+
+    file_node = tree[0]
+    # Pick a deterministic function by name from simple_function/main.py
+    factory_func = next(
+        (
+            c
+            for c in file_node.children
+            if (
+                getattr(c, 'node_type', '') == 'function'
+                and c.name == 'factory'
+            )
+        ),
+        None,
+    )
+    assert factory_func is not None, (
+        "No 'factory' function node found"
+    )
+
+    func_service = FunctionService(repos)
+    snippet = func_service.get_code(factory_func.id)
+
+    assert snippet is not None, "get_code returned None"
+    assert 'code' in snippet, "snippet missing 'code' field"
+    assert snippet['name'] == 'factory'
+    assert isinstance(snippet['code'], str)
+    assert len(snippet['code']) > 0
+
+    code = snippet['code']
+    # Basic content checks aligned with simple_function/main.py
+    assert 'def factory' in code
+    assert 'def add' in code
+    assert 'def build' in code
+    assert 'return add' in code
 
 
 def test_function_collector(arangodb_client):
@@ -113,7 +170,6 @@ def test_function_collector(arangodb_client):
     assert final_build_call.target.id == build_func.id
 
     # 6. Top-level `main()` call
-    main_call_at_root = find_node_by_name(file_node.children, 'main')
     # This logic needs adjustment based on how you identify top-level calls.
     # Assuming the second 'main' is the call.
     all_main_nodes = [
