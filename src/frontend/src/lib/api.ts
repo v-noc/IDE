@@ -11,11 +11,13 @@ class ApiError extends Error {
   }
 }
 
+type JsonRequestInit = Omit<RequestInit, "body"> & { body?: unknown };
+
 async function apiClient<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: JsonRequestInit = {}
 ): Promise<T> {
-  const { headers, body, ...customConfig } = options;
+  const { headers, body, ...customConfig } = options as JsonRequestInit;
 
   const config: RequestInit = {
     method: body ? 'POST' : 'GET',
@@ -26,8 +28,8 @@ async function apiClient<T>(
     ...customConfig,
   };
 
-  if (body) {
-    config.body = JSON.stringify(body);
+  if (body !== undefined) {
+    config.body = typeof body === 'string' ? body : JSON.stringify(body);
   }
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, config);

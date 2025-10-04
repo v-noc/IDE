@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/resizable";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
 import SettingsDialog from "../components/SettingsDialog";
+import { Separator } from "@/components/ui/separator";
+import { PlusIcon } from "lucide-react";
+import { useRunCode } from "@/features/Dashboard/features/Main/hooks/usePlayGround";
 
 const PlayGround = () => {
   const [code, setCode] = useState("");
@@ -26,23 +29,29 @@ const PlayGround = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [examplesPath, setExamplesPath] = useState("examples");
   const [commandPrefix, setCommandPrefix] = useState("python");
+  const runCode = useRunCode();
 
   const language = useMemo(() => detectLanguage(fileName), [fileName]);
 
   const handleRun = async () => {
     setIsRunning(true);
+    const relativeFile =
+      selectedId === "playground" ? "playground.py" : `${selectedId}.py`;
+    const fullPath = `${examplesPath}/${relativeFile}`;
+    const runCommand = `${commandPrefix} ${fullPath}`;
+    setOutput(`Command: ${runCommand}`);
     try {
-      // Placeholder: run logic can be integrated with backend later
-      await new Promise((r) => setTimeout(r, 800));
-      const relativeFile =
-        selectedId === "playground" ? "playground.py" : `${selectedId}.py`;
-      const fullPath = `${examplesPath}/${relativeFile}`;
-      const runCommand = `${commandPrefix} ${fullPath}`;
-      setOutput(
-        `Command: ${runCommand}\nExecuted at ${new Date().toLocaleTimeString()}\n\n${
-          code ? code : "# (no code)"
-        }`
-      );
+      const resp = await runCode.mutateAsync({
+        code,
+        path: ".",
+        executable_path: null,
+        examples_path: examplesPath,
+        command_prefix: commandPrefix,
+        filename: relativeFile,
+      });
+      setOutput((prev) => `${prev}\n${resp.response}`);
+    } catch {
+      setOutput((prev) => `${prev}\nError running code`);
     } finally {
       setIsRunning(false);
     }
@@ -69,9 +78,10 @@ const PlayGround = () => {
         onOpenSettings={() => setSettingsOpen(true)}
         className="mb-2"
       />
+      <Separator />
       <ResizablePanelGroup
         direction="horizontal"
-        className="h-[calc(100%-2rem)]"
+        className="h-[calc(100%-2rem)] py-1"
       >
         <ResizablePanel defaultSize={20} minSize={16}>
           <div className="flex h-full flex-col gap-2 pr-2 border-r">
@@ -82,11 +92,11 @@ const PlayGround = () => {
               <button
                 type="button"
                 onClick={handleAdd}
-                className="h-6 w-6 rounded border text-xs leading-6 text-center hover:bg-accent"
+                className="h-6 w-6 rounded border text-xs leading-6 flex justify-center items-center hover:bg-accent"
                 aria-label="Add snippet"
                 title="Add snippet"
               >
-                +
+                <PlusIcon size={15} />
               </button>
             </div>
             <SelectableList
@@ -112,11 +122,11 @@ const PlayGround = () => {
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={40} minSize={20}>
-              <div className="h-full border-l p-2">
+              <div className="h-full border-l p-2 flex flex-col">
                 <div className="mb-2 text-sm font-medium text-muted-foreground">
                   Output
                 </div>
-                <pre className="h-full w-full overflow-auto rounded border bg-muted/40 p-2 text-xs">
+                <pre className="h-full w-full overflow-auto rounded border bg-muted/40 p-2 text-xs whitespace-break-spaces">
                   {output}
                 </pre>
               </div>

@@ -1,16 +1,31 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any
 
-from app.core.services.container_service import ContainerService
-from app.core.services.file_service import FileService
-from app.core.services.function_service import FunctionService
-from app.core.services.class_service import ClassService
-from app.core.services.call_service import CallService
+from pydantic import BaseModel
+
+from app.core.services import (
+    ContainerService,
+    FileService,
+    FunctionService,
+    ClassService,
+    CallService,
+)
+
 from app.core.repository import Repositories
 from app.db.client import get_db
 from arango.database import StandardDatabase
+from app.core.sandbox.code_run import CodeResponse, CodeRunner
 
 router = APIRouter()
+
+
+class RunCode(BaseModel):
+    code: str
+    path: str
+    executable_path: str | None = None
+    examples_path: str | None = None
+    command_prefix: str | None = None
+    filename: str | None = None
 
 
 def _get_services(db: StandardDatabase):
@@ -96,3 +111,17 @@ def get_file_code(
             detail="File or project not found",
         )
     return result
+
+
+@router.post("/run-code")
+def run_code(run_code: RunCode) -> CodeResponse:
+    """Execute provided code with optional settings and
+    return stdout/stderr."""
+    return CodeRunner().run_code(
+        project_root_path=run_code.path,
+        python_executable=run_code.executable_path,
+        code=run_code.code,
+        examples_path=run_code.examples_path,
+        command_prefix=run_code.command_prefix,
+        filename=run_code.filename,
+    )
