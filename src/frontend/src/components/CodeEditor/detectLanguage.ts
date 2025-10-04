@@ -1,9 +1,8 @@
-import type { CodeResponse } from "../../../../service/useCodeElement";
 
 export function detectLanguage(
-    data: CodeResponse | undefined
+    fileName: string
 ): string {
-    const fileName = data?.file_name || data?.file_path || "";
+
     const ext = fileName.split(".").pop()?.toLowerCase();
     switch (ext) {
         case "ts":

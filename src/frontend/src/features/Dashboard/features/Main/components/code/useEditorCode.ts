@@ -3,7 +3,7 @@ import {
     useGetCodeForNode,
     useGetFileCode,
     type CodeResponse,
-} from "../../../../service/useCodeElement";
+} from "@/features/Dashboard/service/useCodeElement";
 import type { NodeType } from "@/types/project";
 
 

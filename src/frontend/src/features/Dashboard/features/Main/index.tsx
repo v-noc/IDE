@@ -78,7 +78,7 @@ const MainCanvas = () => {
             </TabsContent>
           </Tabs>
         </ResizablePanel>
-        <ResizableHandle className="data-[panel-group-direction=vertical]:h-0.5 opacity-0 bg-transparent after:hidden" />
+        <ResizableHandle className="data-[panel-group-direction=vertical]:h-0.5 " />
         <ResizablePanel
           ref={bottomPanelRef}
           defaultSize={30}
