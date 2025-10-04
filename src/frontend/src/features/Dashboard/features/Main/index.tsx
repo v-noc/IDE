@@ -15,6 +15,10 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 
 const MainCanvas = () => {
   const { selectedNode } = useProjectStore();
+  const selectedPath = useMemo(
+    () => selectedNode?.qname?.replace(/\./g, " / ") ?? "",
+    [selectedNode?.qname]
+  );
 
   const isCodeActive = useMemo(() => {
     return (
@@ -45,6 +49,9 @@ const MainCanvas = () => {
         className="h-full min-h-0 relative"
       >
         <ResizablePanel defaultSize={70} minSize={40} className="flex flex-col">
+          <div className="px-2 pb-2 text-xs text-muted-foreground truncate">
+            {selectedPath || "No selection"}
+          </div>
           <Tabs
             defaultValue={isCodeActive ? "code" : "docs"}
             className="flex h-full w-full flex-col bg-background rounded"

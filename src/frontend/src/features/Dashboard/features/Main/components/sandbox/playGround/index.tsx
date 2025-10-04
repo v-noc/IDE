@@ -14,6 +14,7 @@ import SettingsDialog from "../components/SettingsDialog";
 import { Separator } from "@/components/ui/separator";
 import { PlusIcon } from "lucide-react";
 import { useRunCode } from "@/features/Dashboard/features/Main/hooks/usePlayGround";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 
 const PlayGround = () => {
   const [code, setCode] = useState("");
@@ -29,7 +30,8 @@ const PlayGround = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [examplesPath, setExamplesPath] = useState("examples");
   const [commandPrefix, setCommandPrefix] = useState("python");
-  const runCode = useRunCode();
+  const project = useProjectStore((s) => s.projectData);
+  const runCode = useRunCode(project?._key);
 
   const language = useMemo(() => detectLanguage(fileName), [fileName]);
 
@@ -43,7 +45,6 @@ const PlayGround = () => {
     try {
       const resp = await runCode.mutateAsync({
         code,
-        path: ".",
         executable_path: null,
         examples_path: examplesPath,
         command_prefix: commandPrefix,
@@ -121,14 +122,16 @@ const PlayGround = () => {
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={40} minSize={20}>
-              <div className="h-full border-l p-2 flex flex-col">
+            <ResizablePanel defaultSize={40} minSize={20} className="flex">
+              <div className="flex-1  flex-col border-l p-2 overflow-hidden">
                 <div className="mb-2 text-sm font-medium text-muted-foreground">
                   Output
                 </div>
-                <pre className="h-full w-full overflow-auto rounded border bg-muted/40 p-2 text-xs whitespace-break-spaces">
-                  {output}
-                </pre>
+                <div className="h-full overflow-hidden">
+                  <pre className="whitespace-break-spaces rounded border bg-muted/40 p-2 text-xs min-h-full  overflow-auto">
+                    {output}
+                  </pre>
+                </div>
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>

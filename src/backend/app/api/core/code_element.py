@@ -15,13 +15,15 @@ from app.core.repository import Repositories
 from app.db.client import get_db
 from arango.database import StandardDatabase
 from app.core.sandbox.code_run import CodeResponse, CodeRunner
+from app.api.dependencies import get_project_service
+from app.core.services.project_service import ProjectService
+import os
 
 router = APIRouter()
 
 
 class RunCode(BaseModel):
     code: str
-    path: str
     executable_path: str | None = None
     examples_path: str | None = None
     command_prefix: str | None = None
@@ -113,12 +115,30 @@ def get_file_code(
     return result
 
 
-@router.post("/run-code")
-def run_code(run_code: RunCode) -> CodeResponse:
-    """Execute provided code with optional settings and
+@router.post("/{project_id}/run-code")
+def run_code(
+    project_id: str,
+    run_code: RunCode,
+    project_service: ProjectService = Depends(get_project_service),
+) -> CodeResponse:
+    """Execute provided code using the project's absolute root path and
     return stdout/stderr."""
+    project_node = project_service.get(project_id)
+    if project_node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    project_path = os.path.abspath(getattr(project_node, "path", ""))
+    if not project_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Project path is missing",
+        )
+
     return CodeRunner().run_code(
-        project_root_path=run_code.path,
+        project_root_path=project_path,
         python_executable=run_code.executable_path,
         code=run_code.code,
         examples_path=run_code.examples_path,
