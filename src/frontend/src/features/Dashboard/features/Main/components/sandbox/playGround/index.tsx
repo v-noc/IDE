@@ -122,16 +122,18 @@ const PlayGround = () => {
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={40} minSize={20} className="flex">
-              <div className="flex-1  flex-col border-l p-2 overflow-hidden">
+            <ResizablePanel defaultSize={40} minSize={20}>
+              {/* This is the parent container for the output panel */}
+              <div className="h-full border-l p-2 flex flex-col overflow-hidden">
+                {/* 1. This label stays fixed at the top */}
                 <div className="mb-2 text-sm font-medium text-muted-foreground">
                   Output
                 </div>
-                <div className="h-full overflow-hidden">
-                  <pre className="whitespace-break-spaces rounded border bg-muted/40 p-2 text-xs min-h-full  overflow-auto">
-                    {output}
-                  </pre>
-                </div>
+
+                {/* 2. The <pre> tag now uses flex-1 and min-h-0 for proper scrolling */}
+                <pre className="flex-grow min-h-0 overflow-y-auto whitespace-break-spaces rounded border bg-muted/40 p-2 text-xs">
+                  {output}
+                </pre>
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>

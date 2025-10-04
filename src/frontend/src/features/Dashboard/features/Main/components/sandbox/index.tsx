@@ -9,12 +9,12 @@ export default function Sandbox() {
         <TabsTrigger value="playground">Playground</TabsTrigger>
         <TabsTrigger value="test">Test</TabsTrigger>
       </TabsList>
-      <TabsContent value="test" className="mt-2 h-full w-full ">
+      <TabsContent value="test" className="mt-2 h-full w-full overflow-hidden">
         <div className="rounded border p-2">
           <Test />
         </div>
       </TabsContent>
-      <TabsContent value="playground" className="mt-2">
+      <TabsContent value="playground" className="mt-2 overflow-hidden">
         <PlayGround />
       </TabsContent>
     </Tabs>

@@ -52,38 +52,40 @@ const MainCanvas = () => {
           <div className="px-2 pb-2 text-xs text-muted-foreground truncate">
             {selectedPath || "No selection"}
           </div>
-          <Tabs
-            defaultValue={isCodeActive ? "code" : "docs"}
-            className="flex h-full w-full flex-col bg-background rounded"
-          >
-            <TabsList>
-              {isCodeActive && <TabsTrigger value="code">Code</TabsTrigger>}
+          <div className="flex-1 overflow-hidden">
+            <Tabs
+              defaultValue={isCodeActive ? "code" : "docs"}
+              className="flex h-full w-full flex-col bg-background rounded"
+            >
+              <TabsList>
+                {isCodeActive && <TabsTrigger value="code">Code</TabsTrigger>}
 
-              <TabsTrigger value="docs">Docs</TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="docs">Docs</TabsTrigger>
+              </TabsList>
 
-            {isCodeActive && (
+              {isCodeActive && (
+                <TabsContent
+                  value="code"
+                  className="flex-1 flex flex-col overflow-hidden"
+                >
+                  <div className="h-full w-full overflow-auto py-4">
+                    <EditorCode />
+                  </div>
+                </TabsContent>
+              )}
+
               <TabsContent
-                value="code"
-                className="flex-1 flex flex-col overflow-hidden"
+                value="docs"
+                className="flex flex-col overflow-hidden"
               >
-                <div className="h-full w-full overflow-auto py-4">
-                  <EditorCode />
+                <div className="flex-1 rounded-md border overflow-hidden">
+                  <div className="h-full w-full overflow-auto py-4">
+                    <Documents />
+                  </div>
                 </div>
               </TabsContent>
-            )}
-
-            <TabsContent
-              value="docs"
-              className="flex-1 flex flex-col overflow-hidden"
-            >
-              <div className="flex-1 rounded-md border overflow-hidden">
-                <div className="h-full w-full overflow-auto py-4">
-                  <Documents />
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+            </Tabs>
+          </div>
         </ResizablePanel>
         <ResizableHandle className="data-[panel-group-direction=vertical]:h-0.5 " />
         <ResizablePanel
