@@ -10,6 +10,7 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
+import SettingsDialog from "../components/SettingsDialog";
 
 const PlayGround = () => {
   const [code, setCode] = useState("");
@@ -22,6 +23,9 @@ const PlayGround = () => {
     "playground"
   );
   const [output, setOutput] = useState<string>("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [examplesPath, setExamplesPath] = useState("examples");
+  const [commandPrefix, setCommandPrefix] = useState("python");
 
   const language = useMemo(() => detectLanguage(fileName), [fileName]);
 
@@ -30,8 +34,12 @@ const PlayGround = () => {
     try {
       // Placeholder: run logic can be integrated with backend later
       await new Promise((r) => setTimeout(r, 800));
+      const relativeFile =
+        selectedId === "playground" ? "playground.py" : `${selectedId}.py`;
+      const fullPath = `${examplesPath}/${relativeFile}`;
+      const runCommand = `${commandPrefix} ${fullPath}`;
       setOutput(
-        `Executed at ${new Date().toLocaleTimeString()}\n\n${
+        `Command: ${runCommand}\nExecuted at ${new Date().toLocaleTimeString()}\n\n${
           code ? code : "# (no code)"
         }`
       );
@@ -55,7 +63,12 @@ const PlayGround = () => {
 
   return (
     <div className="h-full w-full rounded border p-2 flex flex-col">
-      <RunToolbar onRun={handleRun} isRunning={isRunning} className="mb-2" />
+      <RunToolbar
+        onRun={handleRun}
+        isRunning={isRunning}
+        onOpenSettings={() => setSettingsOpen(true)}
+        className="mb-2"
+      />
       <ResizablePanelGroup
         direction="horizontal"
         className="h-[calc(100%-2rem)]"
@@ -111,6 +124,14 @@ const PlayGround = () => {
           </ResizablePanelGroup>
         </ResizablePanel>
       </ResizablePanelGroup>
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        examplesPath={examplesPath}
+        commandPrefix={commandPrefix}
+        onChangeExamplesPath={setExamplesPath}
+        onChangeCommandPrefix={setCommandPrefix}
+      />
     </div>
   );
 };
