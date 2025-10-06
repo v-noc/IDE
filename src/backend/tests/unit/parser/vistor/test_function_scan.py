@@ -13,6 +13,7 @@ def test_function_scan():
     assert len(result) == 1
 
     assert isinstance(result[0], FunctionSchema)
+    print(result[0])
 
 
 simple_func_with_param_return = """
@@ -108,3 +109,17 @@ def test_func_position():
     assert isinstance(schema, FunctionSchema)
     assert schema.position.line_no == 2
     assert schema.position.end_line_no == 3
+
+
+simple_func = """
+# ID: 1
+def foo():
+    pass
+"""
+
+
+def test_func_id():
+    result = scan(simple_func)
+    assert len(result) == 1
+    schema = result[0]
+    assert schema.id == "1"

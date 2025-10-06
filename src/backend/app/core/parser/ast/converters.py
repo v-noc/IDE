@@ -1,7 +1,20 @@
-import ast
+from .ast_comment import (
+    AST,
+    Name,
+    Attribute,
+    Call,
+    List as AstList,
+    Tuple as AstTuple,
+    Constant,
+    FunctionDef,
+    Return,
+    ClassDef,
+    Import,
+    ImportFrom,
+    Assign,
+    AnnAssign,
+)
 from typing import List, Optional, Union
-import astpretty
-import re
 from .models import (
     AnnAssignSchema,
     ArgSchema,
@@ -16,7 +29,6 @@ from .models import (
     ImportSchema,
     KeywordSchema,
     NameSchema,
-    SubscriptSchema,
 )
 from .utils import (
     extract_annotation,
@@ -24,16 +36,8 @@ from .utils import (
     extract_position,
     extract_value,
 )
-import astpretty
 
-
-def extract_id(docstring: str):
-    info = {}
-    for line in docstring.splitlines():
-        if match := re.match(r"(\w+):\s*(.*)", line.strip()):
-            info[match[1]] = match[2]
-
-    return info.get("ID")
+from .node_tracking import build_comment_map, _parse_comment_data
 
 
 class SchemaConverter:
@@ -42,47 +46,61 @@ class SchemaConverter:
     """
 
     def _convert_expression(
-        self, node: ast.AST
+        self, node: AST
     ) -> Optional[Union[BaseSchema, list, object]]:
         """
         Recursively converts an expression AST node into a Pydantic model.
         This is the core of handling nested structures like `a.b().k()`.
         """
-        if isinstance(node, ast.Name):
+        if isinstance(node, Name):
             return NameSchema(name=node.id, position=extract_position(node))
-        if isinstance(node, ast.Attribute):
-            # Recursively convert the owner of the attribute (e.g., `a.b()` in `a.b().k`)
+        if isinstance(node, Attribute):
+            # Recursively convert the owner of the attribute
+            # (e.g., `a.b()` in `a.b().k`)
             value = self._convert_expression(node.value)
             return AttributeSchema(
-                name=node.attr, value=value, position=extract_position(node)
+                name=node.attr,
+                value=value,
+                position=extract_position(node),
             )
-        if isinstance(node, ast.Call):
+        if isinstance(node, Call):
             # If we encounter a call, convert it fully.
-            # if isinstance(node.func, ast.Attribute):
-            #     return self._convert_expression(node.func)
-            if isinstance(node.func, ast.Name) and node.func.id == "super":
+            if isinstance(node.func, Name) and node.func.id == "super":
                 super_node = NameSchema(
-                    name="super", position=extract_position(node))
+                    name="super",
+                    position=extract_position(node),
+                )
                 return super_node
 
             return self.convert_call(node)
-        if isinstance(node, (ast.List, ast.Tuple)):
+        if isinstance(node, (AstList, AstTuple)):
             # Handle list/tuple literals: [a(), b]
             return [self._convert_expression(elt) for elt in node.elts]
-        if isinstance(node, ast.Constant):
+        if isinstance(node, Constant):
             return None
 
         # Return None for unhandled expression types
         return None
 
     def convert_functiondef(
-        self, node: ast.FunctionDef, returns: List[ast.Return]
+        self, node: FunctionDef, returns: List[Return]
     ) -> FunctionSchema:
         args: List[ArgSchema] = []
-        doc_string = ast.get_docstring(node)
+        # ID extraction removed in favor of comment-based metadata
         func_id = None
-        if doc_string:
-            func_id = extract_id(doc_string)
+        try:
+            tree = node
+            while hasattr(tree, "parent"):
+                tree = tree.parent
+            comment_map = build_comment_map(tree)
+            meta = comment_map.get(node.lineno)
+            if not meta and (node.lineno - 1) in comment_map:
+                meta = comment_map.get(node.lineno - 1)
+            if meta:
+                parsed = _parse_comment_data(meta)
+                func_id = parsed.get("ID")
+        except Exception:
+            pass
 
         if node.args:
             for arg in node.args.args:
@@ -98,8 +116,9 @@ class SchemaConverter:
                     )
                 )
 
-        return_annotation = extract_annotation(
-            node.returns) if node.returns else None
+        return_annotation = (
+            extract_annotation(node.returns) if node.returns else None
+        )
 
         return_values = []
         for return_Schema in returns:
@@ -117,12 +136,23 @@ class SchemaConverter:
             return_values=return_values,
         )
 
-    def convert_classdef(self, node: ast.ClassDef) -> ClassSchema:
+    def convert_classdef(self, node: ClassDef) -> ClassSchema:
         implements = []
-        doc_string = ast.get_docstring(node)
+        # ID extraction removed in favor of comment-based metadata
         class_id = None
-        if doc_string:
-            class_id = extract_id(doc_string)
+        try:
+            tree = node
+            while hasattr(tree, "parent"):
+                tree = tree.parent
+            comment_map = build_comment_map(tree)
+            meta = comment_map.get(node.lineno)
+            if not meta and (node.lineno - 1) in comment_map:
+                meta = comment_map.get(node.lineno - 1)
+            if meta:
+                parsed = _parse_comment_data(meta)
+                class_id = parsed.get("ID")
+        except Exception:
+            pass
 
         if node.bases:
             for base in node.bases:
@@ -131,11 +161,12 @@ class SchemaConverter:
                     implements.append(extracted)
         return ClassSchema(
             id=class_id,
-            name=node.name, implements=implements, position=extract_position(
-                node)
+            name=node.name,
+            implements=implements,
+            position=extract_position(node),
         )
 
-    def convert_import(self, node: ast.Import) -> ImportSchema:
+    def convert_import(self, node: Import) -> ImportSchema:
         names: list[ImportAliasSchema] = []
         for alias in node.names:
             names.append(
@@ -147,7 +178,7 @@ class SchemaConverter:
             )
         return ImportSchema(names=names, position=extract_position(node))
 
-    def convert_importfrom(self, node: ast.ImportFrom) -> ImportFromSchema:
+    def convert_importfrom(self, node: ImportFrom) -> ImportFromSchema:
         names: list[ImportAliasSchema] = []
         for alias in node.names:
             names.append(
@@ -164,7 +195,7 @@ class SchemaConverter:
             position=extract_position(node),
         )
 
-    def convert_assign(self, node: ast.Assign) -> AssignSchema:
+    def convert_assign(self, node: Assign) -> AssignSchema:
         targets = [
             extract_name_or_attribute(t)
             for t in node.targets
@@ -179,12 +210,12 @@ class SchemaConverter:
             targets=targets, value=value_list, position=extract_position(node)
         )
 
-    def convert_annassign(self, node: ast.AnnAssign) -> AnnAssignSchema:
+    def convert_annassign(self, node: AnnAssign) -> AnnAssignSchema:
         target = extract_value(node.target)[0]
         annotation = extract_annotation(node.annotation)
 
         value = []
-        if node.value and not isinstance(node.value, ast.Call):
+        if node.value and not isinstance(node.value, Call):
             value = extract_value(node.value)
 
         return AnnAssignSchema(
@@ -194,12 +225,12 @@ class SchemaConverter:
             position=extract_position(node),
         )
 
-    def _deconstruct_list_or_tuple(self, node: ast.AST):
+    def _deconstruct_list_or_tuple(self, node: AST):
         items = []
         if hasattr(node, "elts"):
             for elt in node.elts:
                 items.extend(self._deconstruct_list_or_tuple(elt))
-        elif isinstance(node, ast.Call):
+        elif isinstance(node, Call):
             items.append(self.convert_call(node))
         else:
             value = extract_value(node)
@@ -207,7 +238,7 @@ class SchemaConverter:
                 items.extend(value)
         return items
 
-    def convert_call(self, node: ast.Call) -> CallSchema:
+    def convert_call(self, node: Call) -> CallSchema:
         # Use the powerful _convert_expression to handle the function part
         func = self._convert_expression(node.func)
 
@@ -223,7 +254,25 @@ class SchemaConverter:
                 )
             )
 
+        call_id = None
+        try:
+            tree = node
+            while hasattr(tree, "parent"):
+                tree = tree.parent
+            comment_map = build_comment_map(tree)
+            meta = comment_map.get(node.lineno)
+            if not meta and (node.lineno - 1) in comment_map:
+                meta = comment_map.get(node.lineno - 1)
+            if meta:
+                parsed = _parse_comment_data(meta)
+                call_id = parsed.get("ID")
+        except Exception:
+            pass
+
         return CallSchema(
-            func=func, args=args, keywords=keywords, position=extract_position(
-                node)
+            id=call_id,
+            func=func,
+            args=args,
+            keywords=keywords,
+            position=extract_position(node),
         )

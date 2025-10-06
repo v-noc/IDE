@@ -61,7 +61,9 @@ class AttributeSchema(BaseSchema):
 
 
 class SubscriptSchema(BaseSchema):
-    """Represents a complex subscripted type like List[int] or Dict[str, User]"""
+    """
+    Represents a complex subscripted type like List[int] or Dict[str, User]
+    """
 
     schema_type: SchemaType = SchemaType.SUBSCRIPT
     # The full, readable string representation, e.g., "List[Union[s,b]]"
@@ -98,9 +100,9 @@ class ImportFromSchema(BaseSchema):
 class ArgSchema(BaseSchema):
     schema_type: SchemaType = SchemaType.ARG
     name: str
-    annotation: Optional[Union[NameSchema, AttributeSchema, SubscriptSchema, str]] = (
-        None
-    )
+    annotation: Optional[
+        Union[NameSchema, AttributeSchema, SubscriptSchema, str]
+    ] = None
 
 
 class FunctionSchema(ParentSchema):
@@ -111,9 +113,9 @@ class FunctionSchema(ParentSchema):
     return_annotation: Optional[
         Union[NameSchema, AttributeSchema, SubscriptSchema, str]
     ] = None
-    return_values: List[Union[NameSchema, AttributeSchema, SubscriptSchema, str]] = (
-        Field(default_factory=list)
-    )
+    return_values: List[
+        Union[NameSchema, AttributeSchema, SubscriptSchema, str]
+    ] = Field(default_factory=list)
     decorator_list: List[Union[NameSchema, AttributeSchema]] = Field(
         default_factory=list
     )
@@ -142,6 +144,7 @@ class KeywordSchema(BaseSchema):
 
 class CallSchema(BaseSchema):
     schema_type: SchemaType = SchemaType.CALL
+    id: Optional[str] = None
     func: Union[NameSchema, AttributeSchema,
                 "BaseSchema"]  # Function being called
     args: List[Union[NameSchema, AttributeSchema, object]] = Field(
