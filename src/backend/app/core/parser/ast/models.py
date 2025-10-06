@@ -106,6 +106,7 @@ class ArgSchema(BaseSchema):
 class FunctionSchema(ParentSchema):
     schema_type: SchemaType = SchemaType.FUNCTION
     name: str
+    id: Optional[str] = None
     args: List[ArgSchema] = Field(default_factory=list)
     return_annotation: Optional[
         Union[NameSchema, AttributeSchema, SubscriptSchema, str]
@@ -119,9 +120,11 @@ class FunctionSchema(ParentSchema):
 
 
 class ClassSchema(ParentSchema):
+    id: Optional[str] = None
     schema_type: SchemaType = SchemaType.CLASS
     name: str
-    implements: List[Union[NameSchema, AttributeSchema]] = Field(default_factory=list)
+    implements: List[Union[NameSchema, AttributeSchema]
+                     ] = Field(default_factory=list)
     decorator_list: List[Union[NameSchema, AttributeSchema]] = Field(
         default_factory=list
     )
@@ -133,12 +136,14 @@ class ClassSchema(ParentSchema):
 class KeywordSchema(BaseSchema):
     schema_type: SchemaType = SchemaType.KEYWORD
     name: str
-    value: Optional[Union[NameSchema, AttributeSchema, BaseSchema, str, object]] = None
+    value: Optional[Union[NameSchema, AttributeSchema,
+                          BaseSchema, str, object]] = None
 
 
 class CallSchema(BaseSchema):
     schema_type: SchemaType = SchemaType.CALL
-    func: Union[NameSchema, AttributeSchema, "BaseSchema"]  # Function being called
+    func: Union[NameSchema, AttributeSchema,
+                "BaseSchema"]  # Function being called
     args: List[Union[NameSchema, AttributeSchema, object]] = Field(
         default_factory=list
     )  # Only track name/attribute args

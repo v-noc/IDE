@@ -1,7 +1,7 @@
 import ast
 from typing import List, Optional, Union
 import astpretty
-
+import re
 from .models import (
     AnnAssignSchema,
     ArgSchema,
@@ -25,6 +25,15 @@ from .utils import (
     extract_value,
 )
 import astpretty
+
+
+def extract_id(docstring: str):
+    info = {}
+    for line in docstring.splitlines():
+        if match := re.match(r"(\w+):\s*(.*)", line.strip()):
+            info[match[1]] = match[2]
+
+    return info.get("ID")
 
 
 class SchemaConverter:
@@ -70,6 +79,11 @@ class SchemaConverter:
         self, node: ast.FunctionDef, returns: List[ast.Return]
     ) -> FunctionSchema:
         args: List[ArgSchema] = []
+        doc_string = ast.get_docstring(node)
+        func_id = None
+        if doc_string:
+            func_id = extract_id(doc_string)
+
         if node.args:
             for arg in node.args.args:
                 annotation = (
@@ -95,6 +109,7 @@ class SchemaConverter:
                     return_values.extend(value)
 
         return FunctionSchema(
+            id=func_id,
             name=node.name or "anonymous",
             position=extract_position(node),
             args=args,
@@ -104,12 +119,18 @@ class SchemaConverter:
 
     def convert_classdef(self, node: ast.ClassDef) -> ClassSchema:
         implements = []
+        doc_string = ast.get_docstring(node)
+        class_id = None
+        if doc_string:
+            class_id = extract_id(doc_string)
+
         if node.bases:
             for base in node.bases:
                 extracted = extract_name_or_attribute(base)
                 if extracted:
                     implements.append(extracted)
         return ClassSchema(
+            id=class_id,
             name=node.name, implements=implements, position=extract_position(
                 node)
         )

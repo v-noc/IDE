@@ -1,4 +1,4 @@
-import ast
+from .ast_comment import parse
 from typing import List
 
 from .models import BaseSchema
@@ -17,7 +17,7 @@ Returns:
     A list of root nodes representing the parsed code structure.
 """
     try:
-        ast_tree = ast.parse(content)
+        ast_tree = parse(content)
 
         visitor = CodeStructureVisitor()
         visitor.visit(ast_tree)
