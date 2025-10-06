@@ -2,7 +2,14 @@ from typing import List, Optional, Dict
 from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.scope_manager.manager import ScopeManager
 
-from app.core.services import ProjectService, FolderService, FileService, ClassService, FunctionService, CallService
+from app.core.services import (
+    ProjectService,
+    FolderService,
+    FileService,
+    ClassService,
+    FunctionService,
+    CallService,
+)
 from app.core.repository import Repositories
 from arango.database import StandardDatabase
 
@@ -24,6 +31,10 @@ class SymbolTable:
         self.call_node_stack: List[CallNode] = []
 
         self.qname_to_function_node: Dict[str, FunctionSchema] = {}
+
+        # Track how many lines we've inserted per file when writing comments,
+        # so later writes can adjust line numbers accordingly.
+        self.file_path_to_line_inserts: Dict[str, int] = {}
 
         repos = Repositories(db)
         self.node_service = {

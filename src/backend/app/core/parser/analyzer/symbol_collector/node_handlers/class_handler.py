@@ -1,17 +1,22 @@
+import os
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.parser.ast.models import ClassSchema, FunctionSchema
 from app.core.model.properties import CodePosition
 from app.core.model.nodes import ClassNode
 from app.core.parser.scope_manager.core.scope import ScopeType
-from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler import (
-    FunctionHandler,
-)
+from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler \
+    import FunctionHandler
+from app.core.parser.ast.node_tracking import add_comment
 
 
 class ClassHandler:
     """Handles class-related nodes"""
 
-    def __init__(self, symbol_table: SymbolTable, function_handler: FunctionHandler):
+    def __init__(
+        self,
+        symbol_table: SymbolTable,
+        function_handler: FunctionHandler,
+    ):
         self.symbol_table = symbol_table
         self.function_handler = function_handler
 
@@ -66,23 +71,103 @@ class ClassHandler:
             self.symbol_table.scope_manager.current_scope.parent.qualified_name
         )
         parent_node = self.symbol_table.qname_to_node[parent_qname]
+        class_service = self.symbol_table.node_service["class"]
         class_name = node.name
 
+        # Resolve absolute path and current line-shift for the file
+        abs_path = None
+        prior_inserts = 0
+        try:
+            scope = self.symbol_table.scope_manager.current_scope
+            while scope.parent and scope.scope_type != ScopeType.MODULE:
+                scope = scope.parent
+            module_qname = scope.qualified_name
+            file_container = self.symbol_table.file_containers.get(
+                module_qname
+            )
+            if file_container:
+                project_root = self.symbol_table.project_node.path
+                file_path = file_container.file_path
+                abs_path = (
+                    file_path
+                    if os.path.isabs(file_path)
+                    else os.path.normpath(
+                        os.path.join(project_root, file_path)
+                    )
+                )
+                prior_inserts = (
+                    self.symbol_table.file_path_to_line_inserts.get(
+                        abs_path, 0
+                    )
+                )
+        except Exception:
+            pass
+
+        adjusted_start = node.position.line_no + prior_inserts
+        adjusted_end = (
+            node.position.end_line_no + prior_inserts
+            if node.position.end_line_no is not None
+            else None
+        )
         code_position = CodePosition(
-            line_no=node.position.line_no,
+            line_no=adjusted_start,
             col_offset=node.position.col_offset,
-            end_line_no=node.position.end_line_no,
+            end_line_no=adjusted_end,
             end_col_offset=node.position.end_col_offset,
         )
 
-        class_node = self.symbol_table.node_service["class"].create(
-            name=class_name,
-            qname=qname,
-            description=f"{class_name} function",
-            position=code_position,
-        )
+        class_node = None
+        if node.id:
+            class_node = class_service.get(node.id)
+            if class_node:
+                class_node.position = code_position
+                class_service.update(class_node)
+
+        if class_node is None:
+            class_node = class_service.create(
+                name=class_name,
+                qname=qname,
+                description=f"{class_name} class",
+                position=code_position
+            )
+            parent_service = self.symbol_table.node_service[
+                parent_node.node_type
+            ]
+            parent_service.add_class(parent_node.id, class_node.id)
+
+            # Persist the created class id back into source as a comment
+            try:
+                # Ascend to module scope
+                scope = self.symbol_table.scope_manager.current_scope
+                while scope.parent and scope.scope_type != ScopeType.MODULE:
+                    scope = scope.parent
+                module_qname = scope.qualified_name
+                if abs_path:
+                    adjusted_line = node.position.line_no + prior_inserts
+                    result = add_comment(
+                        filepath=abs_path,
+                        target_name=node.name,
+                        comment_text=f"ID: {class_node.id}",
+                        line_number=adjusted_line,
+                        position="above",
+                    )
+                    if result.get("success"):
+                        added = result.get("added_lines", 0)
+                        if added:
+                            self.symbol_table.file_path_to_line_inserts[
+                                abs_path
+                            ] = prior_inserts + added
+                            class_node.position.line_no = (
+                                class_node.position.line_no + added
+                            )
+                            if class_node.position.end_line_no is not None:
+                                class_node.position.end_line_no = (
+                                    class_node.position.end_line_no + added
+                                )
+                            class_service.update(class_node)
+            except Exception:
+                # Best-effort; failures here should not break analysis
+                pass
+
         print(f"Class node: {class_node}")
         self.symbol_table.qname_to_node[qname] = class_node
-
-        parent_service = self.symbol_table.node_service[parent_node.node_type]
-        parent_service.add_class(parent_node.id, class_node.id)
