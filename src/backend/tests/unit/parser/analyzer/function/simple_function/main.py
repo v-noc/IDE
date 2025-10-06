@@ -1,36 +1,36 @@
 
-# ID: nodes/158eeac7-aca1-4f7b-9806-f527f297d93b
+# ID: nodes/826bf132-c642-4dfb-88d6-9a8da252b4e2
 def factory():
 
-    # ID: nodes/df32a56e-26d5-4b87-b9f2-eab131775987
+    # ID: nodes/01cb74cc-f4b0-4550-bead-0aedcdaab082
     def add():
         build()
         pass
 
-    # ID: nodes/1a2a83b0-47b2-409a-ad4f-d14dbf0227ab
+    # ID: nodes/92206c1d-77f2-41d3-9b59-04e1c8a89dfd
     def build():
         pass
 
     return add
 
 
-# ID: nodes/bf20778c-b4b2-4252-acb1-b0df6900f8ec
+# ID: nodes/d6fd2bd2-8a75-4870-ae65-3d6fe17f344f
 def call_back(call_back_func):
     call_back_func()
 
 
-# ID: nodes/c733e17c-c62e-4d17-b9ee-b14114ff9288
+# ID: nodes/efe45ab1-6608-4155-be04-11e66f908431
 def factory_call():
     add = factory()
     add()
 
 
-# ID: nodes/abd7e38e-cd0d-4c3f-a458-33f2562fbe9f
+# ID: nodes/38bae5aa-4d74-4c67-a8d4-f9ee924e1bc6
 def curry_call():
     factory()()
 
 
-# ID: nodes/652012d4-10a9-4fd0-997c-3b217b2b707e
+# ID: nodes/b7342110-0774-451f-a7d4-7500d798e87f
 def main():
     factory_call()
     curry_call()

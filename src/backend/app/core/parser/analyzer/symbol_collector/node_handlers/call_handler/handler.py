@@ -61,7 +61,6 @@ class CallHandler:
 
         callee_result = self.resolver.resolve_expression(node.func)
         if not callee_result or not callee_result.symbol:
-            print("No callee result", node.func)
             return None
 
         final_callee = callee_result.symbol.resolve_final()

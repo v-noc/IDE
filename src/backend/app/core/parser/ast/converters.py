@@ -37,10 +37,10 @@ from .utils import (
     extract_value,
 )
 
-from .node_tracking import (
+from .metadata import (
     build_comment_map,
     resolve_metadata_for_line,
-    _parse_comment_data,
+    parse_comment_data,
 )
 
 
@@ -108,7 +108,7 @@ class SchemaConverter:
                 ):
                     i -= 1
                 if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
-                    func_id = _parse_comment_data(lines[i - 1]).get("ID")
+                    func_id = parse_comment_data(lines[i - 1]).get("ID")
         except Exception:
             pass
 
@@ -166,7 +166,7 @@ class SchemaConverter:
                 ):
                     i -= 1
                 if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
-                    class_id = _parse_comment_data(lines[i - 1]).get("ID")
+                    class_id = parse_comment_data(lines[i - 1]).get("ID")
         except Exception:
             pass
 
@@ -287,7 +287,7 @@ class SchemaConverter:
                 ):
                     i -= 1
                 if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
-                    call_id = _parse_comment_data(lines[i - 1]).get("ID")
+                    call_id = parse_comment_data(lines[i - 1]).get("ID")
         except Exception:
             pass
 
