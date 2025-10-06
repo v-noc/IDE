@@ -56,19 +56,54 @@ def _extract_metadata_for_line(
     return {}
 
 
+def resolve_metadata_for_line(
+    comment_map: Dict[int, str], lines: List[str], line_no: int
+) -> Dict[str, str]:
+    """
+    Find metadata for a node at line_no, allowing blank lines between the
+    node and the preceding comment. Stops when a non-blank, non-comment line
+    is encountered.
+    """
+    # Prefer inline
+    if line_no in comment_map:
+        parsed = _parse_comment_data(comment_map[line_no])
+        if parsed:
+            return parsed
+
+    # Walk upward skipping blank lines
+    idx = line_no - 1
+    while idx > 0:
+        # If there's a comment on this line, parse it
+        if idx in comment_map:
+            parsed = _parse_comment_data(comment_map[idx])
+            if parsed:
+                return parsed
+            break
+
+        # If the line is blank, continue walking up
+        if idx - 1 < len(lines) and lines[idx - 1].strip() == "":
+            idx -= 1
+            continue
+
+        # Non-blank, non-comment line encountered -> stop
+        break
+
+    return {}
+
+
 def get_call_metadata(source: str) -> List[Dict[str, object]]:
     try:
         tree = parse(source)
     except Exception:
         return []
     comment_map = build_comment_map(tree)
+    lines = source.splitlines()
     results: List[Dict[str, object]] = []
     for node in walk(tree):
         if isinstance(node, Expr) and isinstance(node.value, Call):
             call_node: Call = node.value
-            metadata = _extract_metadata_for_line(
-                comment_map,
-                call_node.lineno,
+            metadata = resolve_metadata_for_line(
+                comment_map, lines, call_node.lineno
             )
             if not metadata:
                 continue
@@ -91,10 +126,12 @@ def get_function_metadata(source: str) -> List[Dict[str, object]]:
     except Exception:
         return []
     comment_map = build_comment_map(tree)
+    lines = source.splitlines()
     results: List[Dict[str, object]] = []
     for node in walk(tree):
         if isinstance(node, FunctionDef):
-            metadata = _extract_metadata_for_line(comment_map, node.lineno)
+            metadata = resolve_metadata_for_line(
+                comment_map, lines, node.lineno)
             if not metadata:
                 continue
             results.append(
@@ -113,10 +150,12 @@ def get_class_metadata(source: str) -> List[Dict[str, object]]:
     except Exception:
         return []
     comment_map = build_comment_map(tree)
+    lines = source.splitlines()
     results: List[Dict[str, object]] = []
     for node in walk(tree):
         if isinstance(node, ClassDef):
-            metadata = _extract_metadata_for_line(comment_map, node.lineno)
+            metadata = resolve_metadata_for_line(
+                comment_map, lines, node.lineno)
             if not metadata:
                 continue
             results.append(

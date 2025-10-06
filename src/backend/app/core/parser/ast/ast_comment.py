@@ -63,15 +63,14 @@ def _enrich(source: _t.Union[str, bytes], tree: ast.AST) -> None:
     tree_intervals = _get_tree_intervals_and_update_ast_nodes(tree, source)
     for c_node in comment_nodes:
         c_lineno = c_node.lineno
-        possible_intervals_for_c_node = [
-            (x, y) for x, y in tree_intervals if x <= c_lineno <= y
-        ]
+        possible_intervals_for_c_node = [(x, y) for x, y in tree_intervals
+                                         if x <= c_lineno <= y]
 
         if possible_intervals_for_c_node:
-            target_interval = tree_intervals[
-                max(possible_intervals_for_c_node,
-                    key=lambda item: (item[0], -item[1]))
-            ]
+            target_interval = tree_intervals[max(
+                possible_intervals_for_c_node,
+                key=lambda item: (item[0], -item[1]),
+            )]
 
             target_node = target_interval["node"]
             # intervals for every attribute from _CONTAINER_ATTRS for the target node
@@ -152,7 +151,10 @@ def _get_tree_intervals_and_update_ast_nodes(
                     else max(attr_intervals)[1]
                 )
 
-            res[(low, high)] = {"intervals": attr_intervals, "node": node}
+            res[(low, high)] = {
+                "intervals": attr_intervals,
+                "node": node,
+            }
     return res
 
 
@@ -162,8 +164,8 @@ def _get_tree_intervals_and_update_ast_nodes(
 # of the interval
 def _extend_interval(interval: _t.Tuple[int, int], code: str) -> _t.Tuple[int, int]:
     lines = code.split("\n")
-    # Insert an empty line to correspond to the lineno values from ast nodes which start at 1
-    # instead of 0
+    # Insert an empty line to correspond to the lineno values from ast nodes
+    # which start at 1 instead of 0
     lines.insert(0, "")
 
     low = interval[0]
@@ -185,12 +187,11 @@ def _extend_interval(interval: _t.Tuple[int, int], code: str) -> _t.Tuple[int, i
             skip_lower = True
 
     while not skip_lower and low - 1 > 0:
-        # The upper bound ignores comments which are not correctly aligned, due to the fact
-        # that there must always be an ast node other than a comment one with a lower indentation
-        # above
-        if re.match(
-            r"^ *#.*", lines[low - 1]
-        ) or start_indentation <= _get_indentation_lvl(lines[low - 1]):
+        # The upper bound ignores mis-aligned comments; there must be an ast node
+        # with a lower indentation above
+        if re.match(r"^ *#.*", lines[low - 1]) or (
+            start_indentation <= _get_indentation_lvl(lines[low - 1])
+        ):
             low -= 1
         else:
             break

@@ -109,6 +109,7 @@ def test_function_collector(arangodb_client):
         assert func_name in expected_func_names
 
     main_func = find_node_by_name(file_node.children, 'main')
+
     factory_func = find_node_by_name(file_node.children, 'factory')
     call_back_func = find_node_by_name(file_node.children, 'call_back')
     factory_call_func = find_node_by_name(

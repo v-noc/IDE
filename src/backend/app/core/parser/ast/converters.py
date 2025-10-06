@@ -37,7 +37,11 @@ from .utils import (
     extract_value,
 )
 
-from .node_tracking import build_comment_map, _parse_comment_data
+from .node_tracking import (
+    build_comment_map,
+    resolve_metadata_for_line,
+    _parse_comment_data,
+)
 
 
 class SchemaConverter:
@@ -93,12 +97,18 @@ class SchemaConverter:
             while hasattr(tree, "parent"):
                 tree = tree.parent
             comment_map = build_comment_map(tree)
-            meta = comment_map.get(node.lineno)
-            if not meta and (node.lineno - 1) in comment_map:
-                meta = comment_map.get(node.lineno - 1)
+            lines = getattr(tree, "_source_lines", [])
+            meta = resolve_metadata_for_line(comment_map, lines, node.lineno)
             if meta:
-                parsed = _parse_comment_data(meta)
-                func_id = parsed.get("ID")
+                func_id = meta.get("ID")
+            else:
+                i = node.lineno - 1
+                while (
+                    i > 0 and i - 1 < len(lines) and lines[i - 1].strip() == ""
+                ):
+                    i -= 1
+                if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
+                    func_id = _parse_comment_data(lines[i - 1]).get("ID")
         except Exception:
             pass
 
@@ -145,12 +155,18 @@ class SchemaConverter:
             while hasattr(tree, "parent"):
                 tree = tree.parent
             comment_map = build_comment_map(tree)
-            meta = comment_map.get(node.lineno)
-            if not meta and (node.lineno - 1) in comment_map:
-                meta = comment_map.get(node.lineno - 1)
+            lines = getattr(tree, "_source_lines", [])
+            meta = resolve_metadata_for_line(comment_map, lines, node.lineno)
             if meta:
-                parsed = _parse_comment_data(meta)
-                class_id = parsed.get("ID")
+                class_id = meta.get("ID")
+            else:
+                i = node.lineno - 1
+                while (
+                    i > 0 and i - 1 < len(lines) and lines[i - 1].strip() == ""
+                ):
+                    i -= 1
+                if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
+                    class_id = _parse_comment_data(lines[i - 1]).get("ID")
         except Exception:
             pass
 
@@ -260,12 +276,18 @@ class SchemaConverter:
             while hasattr(tree, "parent"):
                 tree = tree.parent
             comment_map = build_comment_map(tree)
-            meta = comment_map.get(node.lineno)
-            if not meta and (node.lineno - 1) in comment_map:
-                meta = comment_map.get(node.lineno - 1)
+            lines = getattr(tree, "_source_lines", [])
+            meta = resolve_metadata_for_line(comment_map, lines, node.lineno)
             if meta:
-                parsed = _parse_comment_data(meta)
-                call_id = parsed.get("ID")
+                call_id = meta.get("ID")
+            else:
+                i = node.lineno - 1
+                while (
+                    i > 0 and i - 1 < len(lines) and lines[i - 1].strip() == ""
+                ):
+                    i -= 1
+                if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
+                    call_id = _parse_comment_data(lines[i - 1]).get("ID")
         except Exception:
             pass
 

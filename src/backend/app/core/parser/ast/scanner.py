@@ -18,6 +18,10 @@ Returns:
 """
     try:
         ast_tree = parse(content)
+        try:
+            ast_tree._source_lines = content.splitlines()
+        except Exception:
+            ast_tree._source_lines = []
 
         visitor = CodeStructureVisitor()
         visitor.visit(ast_tree)
