@@ -51,6 +51,10 @@ class FileNode(ContainerNode):
         ...,
         description="File path."
     )
+    hash: str = Field(
+        ...,
+        description="File hash."
+    )
 
 
 class FolderNode(ContainerNode):

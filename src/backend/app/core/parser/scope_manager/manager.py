@@ -70,7 +70,8 @@ class ScopeManager:
         """
 
         if not method_scope.parent or method_scope.parent.scope_type != ScopeType.CLASS:
-            raise ValueError("super() can only be resolved within a method of a class.")
+            raise ValueError(
+                "super() can only be resolved within a method of a class.")
 
         class_qname = method_scope.parent.qualified_name
         return self.method_resolver.resolve_super_call(class_qname, method_name)
@@ -283,7 +284,8 @@ class ScopeManager:
             raise NameError(f"Unknown class: {class_name}")
 
         # The class_instantiator does the work and returns the new instance symbol
-        instance_symbol = self.class_instantiator.instantiate_class(class_symbol_final)
+        instance_symbol = self.class_instantiator.instantiate_class(
+            class_symbol_final)
         return instance_symbol  # <-- RETURN THE INSTANCE SYMBOL
 
     def invoke(
