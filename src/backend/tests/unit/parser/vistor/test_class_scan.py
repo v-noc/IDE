@@ -28,7 +28,6 @@ class Foo:
 
 def test_simple_class_with_method():
     result = scan(simple_class_with_method)
-    print(result)
 
     assert len(result) == 1
     foo_class = result[0]
@@ -105,3 +104,17 @@ def test_class_position():
     assert isinstance(foo_class, ClassSchema)
     assert foo_class.position.line_no == 2
     assert foo_class.position.end_line_no == 3
+
+
+simple_class_with_id = """
+# ID: 1
+class Foo:
+    pass
+"""
+
+
+def test_class_id():
+    result = scan(simple_class_with_id)
+    assert len(result) == 1
+    foo_class = result[0]
+    assert foo_class.id == "1"

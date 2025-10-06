@@ -76,3 +76,16 @@ def test_chained_method_call():
     assert isinstance(call_schema.func.value, CallSchema)
     assert call_schema.func.value.func.name == "foo"
     assert call_schema.func.value.func.value.name == "obj"
+
+
+simple_call_with_id = """
+# ID: 1
+foo()
+"""
+
+
+def test_call_id():
+    result = scan(simple_call_with_id)
+    assert len(result) == 1
+    call_schema = result[0]
+    assert call_schema.id == "1"
