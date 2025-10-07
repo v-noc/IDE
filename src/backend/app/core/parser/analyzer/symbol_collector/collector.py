@@ -1,7 +1,12 @@
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.analyzer.symbol_collector.node_handlers import (
-    ImportHandler, CallHandler, AssignmentHandler, FunctionHandler, ClassHandler)
+    ImportHandler,
+    CallHandler,
+    AssignmentHandler,
+    FunctionHandler,
+    ClassHandler,
+)
 from app.core.parser.ast.models import BaseSchema, SchemaType
 from app.core.parser.scope_manager.core.scope import ScopeType
 
@@ -23,9 +28,12 @@ class SymbolCollector:
         for node in file_node.parsed_nodes:
             self._collect_symbols_recursive(node)
         # After collecting all top-level symbols, prune stale direct children
-        current_scope_qname = self.symbol_table.scope_manager.current_scope.qualified_name
+        current_scope_qname = (
+            self.symbol_table.scope_manager.current_scope.qualified_name
+        )
         self._prune_stale_direct_children(
-            current_scope_qname, file_node.parsed_nodes)
+            current_scope_qname, file_node.parsed_nodes
+        )
 
     def _collect_symbols_recursive(self, node: BaseSchema):
         if node.schema_type == SchemaType.FUNCTION:
@@ -36,9 +44,12 @@ class SymbolCollector:
             for child in node.children:
                 self._collect_symbols_recursive(child)
             # Prune stale direct children under this function scope
-            current_scope_qname = self.symbol_table.scope_manager.current_scope.qualified_name
+            current_scope_qname = (
+                self.symbol_table.scope_manager.current_scope.qualified_name
+            )
             self._prune_stale_direct_children(
-                current_scope_qname, node.children)
+                current_scope_qname, node.children
+            )
             self.symbol_table.scope_manager.exit_scope()
 
         elif node.schema_type == SchemaType.CLASS:
@@ -49,13 +60,18 @@ class SymbolCollector:
             for child in node.children:
                 self._collect_symbols_recursive(child)
             # Prune stale direct children under this class scope
-            current_scope_qname = self.symbol_table.scope_manager.current_scope.qualified_name
+            current_scope_qname = (
+                self.symbol_table.scope_manager.current_scope.qualified_name
+            )
             self._prune_stale_direct_children(
-                current_scope_qname, node.children)
+                current_scope_qname, node.children
+            )
             self.symbol_table.scope_manager.exit_scope()
 
     def context_analyze_symbols(self, file_node: FileContainer):
-        self.current_file_path = self.symbol_table.scope_manager.current_scope.qualified_name
+        self.current_file_path = (
+            self.symbol_table.scope_manager.current_scope.qualified_name
+        )
         if self.current_file_path in self.symbol_table.unprocessed_files:
             self.symbol_table.unprocessed_files.remove(self.current_file_path)
         else:
@@ -73,7 +89,8 @@ class SymbolCollector:
             for imported_module in imported_modules:
                 file_node = self.symbol_table.file_containers[imported_module]
                 scope = self.symbol_table.scope_manager.get_scope_by_qname(
-                    imported_module)
+                    imported_module
+                )
                 current_scope = self.symbol_table.scope_manager.current_scope
                 self.symbol_table.scope_manager.enter_scope_by_scope(
                     scope)
@@ -81,7 +98,8 @@ class SymbolCollector:
 
                 self.symbol_table.scope_manager.exit_scope()
                 self.symbol_table.scope_manager.enter_scope_by_scope(
-                    current_scope)
+                    current_scope
+                )
 
         elif node.schema_type == SchemaType.IMPORT_FROM:
             imported_modules = self.import_handler.handle_import_from_node(
@@ -92,21 +110,28 @@ class SymbolCollector:
                 file_node = self.symbol_table.file_containers[imported_module]
                 current_scope = self.symbol_table.scope_manager.current_scope
                 scope = self.symbol_table.scope_manager.get_scope_by_qname(
-                    imported_module)
+                    imported_module
+                )
                 self.symbol_table.scope_manager.enter_scope_by_scope(
                     scope)
                 self.context_analyze_symbols(file_node)
                 self.symbol_table.scope_manager.exit_scope()
                 self.symbol_table.scope_manager.enter_scope_by_scope(
-                    current_scope)
+                    current_scope
+                )
 
-        elif node.schema_type == SchemaType.FUNCTION or node.schema_type == SchemaType.CLASS:
-            qname = f"{self.symbol_table.scope_manager.current_scope.qualified_name}.{node.name}"
+        elif (
+            node.schema_type == SchemaType.FUNCTION
+            or node.schema_type == SchemaType.CLASS
+        ):
+            qname = (
+                f"{self.symbol_table.scope_manager.current_scope.qualified_name}."
+                f"{node.name}"
+            )
             scope = self.symbol_table.scope_manager.get_scope_by_qname(qname)
 
             if scope:
-                self.symbol_table.scope_manager.enter_scope_by_scope(
-                    scope)
+                self.symbol_table.scope_manager.enter_scope_by_scope(scope)
 
                 if node.schema_type == SchemaType.CLASS:
                     self.class_handler.handle_inherit_class_node(node)
@@ -116,9 +141,15 @@ class SymbolCollector:
                 self.symbol_table.scope_manager.exit_scope()
 
         elif node.schema_type == SchemaType.CALL:
-            current_frame = self.symbol_table.scope_manager.call_tracker.current_frame
+            current_frame = (
+                self.symbol_table.scope_manager.call_tracker.current_frame
+            )
 
-            if current_frame and current_frame.callee_symbol.qualified_name != self.symbol_table.scope_manager.current_scope.qualified_name:
+            if (
+                current_frame
+                and current_frame.callee_symbol.qualified_name
+                != self.symbol_table.scope_manager.current_scope.qualified_name
+            ):
                 return
 
             self.call_handler.handle_call(node)
@@ -128,8 +159,10 @@ class SymbolCollector:
             self.assignment_handler.handle_assign_node(
                 node)
 
-    def _prune_stale_direct_children(self, container_qname: str, parsed_children: list[BaseSchema]) -> None:
-        """Delete direct function/class children under the given container qname that are no longer present.
+    def _prune_stale_direct_children(
+        self, container_qname: str, parsed_children: list[BaseSchema]
+    ) -> None:
+        """Delete direct function/class children under the given container qname.
 
         Uses depth=1 containment queries to fetch only immediate children.
         """
@@ -155,7 +188,9 @@ class SymbolCollector:
         else:
             repo = self.symbol_table.node_service["function"].repos.function_repo
 
-        children = repo.get_containment_tree(container_node.id, depth=1) or []
+        children = repo.get_containment_tree(
+            container_node.id, depth=1
+        ) or []
 
         stale_keys: list[tuple[str, str]] = []
         for item in children:

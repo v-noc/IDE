@@ -7,7 +7,6 @@ from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.scope_manager.core import ScopeType
 from arango.database import StandardDatabase
 from app.core.model.nodes import BaseNode
-from app.core.parser.ast.models import SchemaType
 
 
 class SymbolAnalyzer:
@@ -29,16 +28,23 @@ class SymbolAnalyzer:
             qname = vertex.get('qname')
 
             if node_type and qname:
-                # This is a simplified way to create node instances.
-                # In a real scenario, you'd have a mapping from node_type to a model class.
+                # Simplified creation; in real code map
+                # node_type to model class.
                 node_instance = BaseNode(**vertex)
                 self.symbol_table.qname_to_node[qname] = node_instance
 
-    def create_project_node(self, project_name: str, project_description: str, project_path: str):
+    def create_project_node(
+        self, project_name: str, project_description: str, project_path: str
+    ):
         project_node = self.symbol_table.node_service["project"].create(
-            name=project_name, description=project_description, path=project_path)
+            name=project_name,
+            description=project_description,
+            path=project_path,
+        )
         self.symbol_table.project_node = project_node
-        self.symbol_table.qname_to_node[project_node.qname] = project_node
+        self.symbol_table.qname_to_node[
+            project_node.qname
+        ] = project_node
 
         self.symbol_table.scope_manager.create_root_scope(
             project_node.qname
@@ -51,10 +57,15 @@ class SymbolAnalyzer:
         relative_path = file_path.relative_to(project_root)
 
         all_parts = relative_path.parts
-        file_qname = self.symbol_table.project_node.qname + \
-            "." + ".".join(all_parts[:-1] + (relative_path.stem,))
+        file_qname = (
+            self.symbol_table.project_node.qname
+            + "."
+            + ".".join(all_parts[:-1] + (relative_path.stem,))
+        )
         print(
-            f"Adding file: {file_qname} to {self.symbol_table.unprocessed_files} {file_path}")
+            f"Adding file: {file_qname} to "
+            f"{self.symbol_table.unprocessed_files} {file_path}"
+        )
         self.symbol_table.file_containers[file_qname] = file_container
         self.symbol_table.unprocessed_files.append(file_qname)
 
@@ -66,17 +77,20 @@ class SymbolAnalyzer:
             print(f"Analyzing file: {unprocessed_file}")
 
             scope = self.symbol_table.scope_manager.get_scope_by_qname(
-                unprocessed_file)
+                unprocessed_file
+            )
 
             self.symbol_table.scope_manager.enter_scope_by_scope(scope)
             file_node = self.symbol_table.file_containers[unprocessed_file]
             self.symbol_collector.context_analyze_symbols(file_node)
             self.symbol_table.scope_manager.exit_scope()
 
-    def _build_hierarchy_with_tree_view(self, file_path: Path, file_container: FileContainer):
+    def _build_hierarchy_with_tree_view(
+        self, file_path: Path, file_container: FileContainer
+    ):
         """
-        Builds the file hierarchy using a unified recursive function
-        that correctly maintains nested scopes.
+        Builds the file hierarchy using a unified recursive function that
+        correctly maintains nested scopes.
         """
         print(f"\n🌳 Building hierarchy for: {file_path}")
         all_parts = file_path.parts
@@ -122,10 +136,13 @@ class SymbolAnalyzer:
 
                 # Calculate file hash
                 try:
-                    with open(file_container.file_path, 'r', encoding='utf-8') as f:
+                    with open(
+                        file_container.file_path, 'r', encoding='utf-8'
+                    ) as f:
                         file_content = f.read()
                     file_hash = hashlib.sha256(
-                        file_content.encode('utf-8')).hexdigest()
+                        file_content.encode('utf-8')
+                    ).hexdigest()
                 except (IOError, UnicodeDecodeError):
                     file_hash = ""  # Fallback for non-readable files
 
@@ -161,7 +178,9 @@ class SymbolAnalyzer:
         # --- THE CRITICAL SCOPE MANAGEMENT ---
         # 1. PUSH: Enter the scope for the current part (folder or file).
         self.symbol_table.scope_manager.enter_scope(
-            current_name, ScopeType.MODULE)
+            current_name,
+            ScopeType.MODULE,
+        )
 
         if is_last_part:
             # 2a. DEEPEST POINT: If this is the file, we are now in the fully
