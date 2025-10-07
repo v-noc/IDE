@@ -23,6 +23,10 @@ class FunctionTreeNode(FunctionNode):
 
 
 class FileTreeNode(FileNode):
+    hash: Optional[str] = Field(
+        default=None,
+        description="File hash."
+    )
     children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode"] = Field(
         default_factory=list, description="File children.")
 

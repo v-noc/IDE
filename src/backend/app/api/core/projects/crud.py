@@ -10,6 +10,7 @@ from arango.database import StandardDatabase
 from app.core.services.project_service import ProjectService
 from app.api.dependencies import get_project_service
 from pathlib import Path
+from app.core.watcher.service import WatcherService, get_watcher_service
 
 from app.core.model.nodes import ProjectNode
 
@@ -109,6 +110,7 @@ def get_project_children(
 def get_project(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service),
+    watcher_service: WatcherService = Depends(get_watcher_service),
 ) -> ProjectTreeNode:
     project_node = project_service.get(project_id)
     if project_node is None:
@@ -116,6 +118,8 @@ def get_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
         )
+
+    watcher_service.start_watching(project_node)
 
     children = project_service.get_children(project_node.id)
 

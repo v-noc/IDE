@@ -33,13 +33,16 @@ class NodeRepository(BaseRepository[T]):
         return list(cursor)
 
     def get_containment_tree(
-        self, start_node_id: str, max_depth: int = 10
+        self, start_node_id: str, depth: int | str = 10
     ) -> List[Dict[str, Any]]:
         """
         Executes a graph traversal to get a full descendant tree.
         Returns a list of dictionaries, each containing the vertex and its
         parent's ID, perfect for rebuilding a tree structure.
         """
+        # For MVP, use a large fixed depth for unbounded requests instead of '1..' syntax
+        max_depth = 50 if depth == "*" else depth
+
         # AQL's "p.vertices[-2]" is a clever way to get the parent in a path.
         query = """
         FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id 

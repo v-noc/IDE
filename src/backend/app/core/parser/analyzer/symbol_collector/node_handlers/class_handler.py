@@ -7,6 +7,7 @@ from app.core.parser.scope_manager.core.scope import ScopeType
 from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler \
     import FunctionHandler
 from app.core.parser.ast.node_tracking import add_comment
+from app.core.watcher.service import get_watcher_service
 
 
 class ClassHandler:
@@ -19,6 +20,7 @@ class ClassHandler:
     ):
         self.symbol_table = symbol_table
         self.function_handler = function_handler
+        self.watcher_service = get_watcher_service()
 
     def handle_inherit_class_node(self, node: ClassSchema):
         """Process a class node and set up inheritance"""
@@ -136,7 +138,9 @@ class ClassHandler:
             parent_service.add_class(parent_node.id, class_node.id)
 
             # Persist the created class id back into source as a comment
+            project_id = self.symbol_table.project_node.id
             try:
+                self.watcher_service.pause_watching(project_id)
                 # Ascend to module scope
                 scope = self.symbol_table.scope_manager.current_scope
                 while scope.parent and scope.scope_type != ScopeType.MODULE:
@@ -167,7 +171,10 @@ class ClassHandler:
                             class_service.update(class_node)
             except Exception:
                 # Best-effort; failures here should not break analysis
-                pass
+                print(f"Error persisting class id back into source: {e}")
+
+            finally:
+                self.watcher_service.resume_watching(project_id)
 
         print(f"Class node: {class_node}")
         self.symbol_table.qname_to_node[qname] = class_node

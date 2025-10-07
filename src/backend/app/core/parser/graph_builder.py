@@ -1,38 +1,52 @@
 from pathlib import Path
-from typing import Optional
-from .analyzer.file_navigator import FileNavigator
-from .analyzer.symbol_analyzer import SymbolAnalyzer
-from app.core.parser.ast.scanner import scan
-from app.core.parser.analyzer.file_navigator import FileContainer
 from arango.database import StandardDatabase
+from app.core.parser.analyzer.file_navigator import FileNavigator
+from app.core.parser.ast.scanner import scan
+from app.core.parser.analyzer.symbol_analyzer import SymbolAnalyzer
+from app.core.model.nodes import ProjectNode
+from app.core.parser.analyzer.file_navigator import FileContainer
 
 
 class GraphBuilder:
-    def __init__(self, project_path: str, ignore_file_name: str, db: StandardDatabase):
-        self.file_navigator = FileNavigator(project_path, ignore_file_name)
+    def __init__(self, project_path: str, project_node: ProjectNode | None, db: StandardDatabase):
+        self.project_path = Path(project_path)
+        self.db = db
         self.symbol_analyzer = SymbolAnalyzer(db)
-        self.file_containers = []
-        self.project_node = None
+        if project_node:
+            self.symbol_analyzer.symbol_table.project_node = project_node
+            self.project_node = project_node
+            self.symbol_analyzer.symbol_table.qname_to_node[project_node.qname] = project_node
+            self.symbol_analyzer.symbol_table.scope_manager.create_root_scope(
+                project_node.qname)
+            # Hydrate the symbol table with the existing project structure
+            project_service = self.symbol_analyzer.symbol_table.node_service["project"]
+            project_structure = project_service.get_project_structure(
+                project_node.id)
+            self.symbol_analyzer.hydrate_from_project_structure(
+                project_structure)
+        else:
+            self.project_node = None
 
     def build(self, project_name: str, project_description: str):
-        project_node = self.symbol_analyzer.create_project_node(
-            project_name, project_description, str(self.file_navigator.root_path))
-        self.project_node = project_node
-        py_files = self.file_navigator.find_files(extensions=[".py"])
+        if not self.project_node:
+            self.project_node = self.symbol_analyzer.create_project_node(
+                project_name, project_description, str(self.project_path)
+            )
 
-        for file_path in py_files:
+        file_navigator = FileNavigator(self.project_path, ".v-noc_ignore.toml")
+        python_files = file_navigator.find_files(extensions=[".py"])
+
+        for file_path in python_files:
             with open(file_path, "r") as file:
                 file_content = file.read()
-                ast_scanner = scan(file_content)
-                file_name = Path(file_path)
+            ast_scanner = scan(file_content)
+            file_name = Path(file_path)
 
-                relative_path = file_name.relative_to(
-                    self.file_navigator.root_path)
+            relative_path = file_name.relative_to(
+                self.project_path)
 
-                file_container = FileContainer(file_path=str(relative_path),
-                                               file_name=file_name.stem, parsed_nodes=ast_scanner)
+            file_container = FileContainer(file_path=str(file_path),
+                                           file_name=file_name.stem, parsed_nodes=ast_scanner)
 
-                self.symbol_analyzer.add_file(file_container)
-                self.file_containers.append(file_container)
-
+            self.symbol_analyzer.add_file(file_container)
         self.symbol_analyzer.build_symbol_table()

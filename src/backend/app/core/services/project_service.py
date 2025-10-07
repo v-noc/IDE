@@ -47,3 +47,6 @@ class ProjectService(ContainerService):
 
     def get_children(self, project_id: str):
         return self.repos.project_repo.get_containment_tree(project_id)
+
+    def get_project_structure(self, project_id: str):
+        return self.repos.project_repo.get_containment_tree(project_id, depth="*")

@@ -1,10 +1,12 @@
 from pathlib import Path
+import hashlib
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.analyzer.symbol_collector.collector import SymbolCollector
 from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.scope_manager.core import ScopeType
 from arango.database import StandardDatabase
+from app.core.model.nodes import BaseNode
 
 
 class SymbolAnalyzer:
@@ -12,6 +14,24 @@ class SymbolAnalyzer:
         self.symbol_table = SymbolTable(db)
         self.symbol_table.scope_manager = ScopeManager()
         self.symbol_collector = SymbolCollector(self.symbol_table)
+
+    def hydrate_from_project_structure(self, project_structure: list[dict]):
+        """
+        Populates the symbol table from an existing project structure.
+        """
+        for item in project_structure:
+            vertex = item.get('vertex')
+            if not vertex:
+                continue
+
+            node_type = vertex.get('node_type')
+            qname = vertex.get('qname')
+
+            if node_type and qname:
+                # This is a simplified way to create node instances.
+                # In a real scenario, you'd have a mapping from node_type to a model class.
+                node_instance = BaseNode(**vertex)
+                self.symbol_table.qname_to_node[qname] = node_instance
 
     def create_project_node(self, project_name: str, project_description: str, project_path: str):
         project_node = self.symbol_table.node_service["project"].create(
@@ -26,16 +46,19 @@ class SymbolAnalyzer:
 
     def add_file(self, file_container: FileContainer):
         file_path = Path(file_container.file_path)
-        all_parts = file_path.parts
+        project_root = Path(self.symbol_table.project_node.path)
+        relative_path = file_path.relative_to(project_root)
+
+        all_parts = relative_path.parts
         file_qname = self.symbol_table.project_node.qname + \
-            "." + ".".join(all_parts[:-1] + (file_path.stem,))
+            "." + ".".join(all_parts[:-1] + (relative_path.stem,))
         print(
             f"Adding file: {file_qname} to {self.symbol_table.unprocessed_files} {file_path}")
         self.symbol_table.file_containers[file_qname] = file_container
         self.symbol_table.unprocessed_files.append(file_qname)
 
         # Build and visualize hierarchy
-        self._build_hierarchy_with_tree_view(file_path, file_container)
+        self._build_hierarchy_with_tree_view(relative_path, file_container)
 
     def build_symbol_table(self):
         for unprocessed_file in list(self.symbol_table.unprocessed_files):
@@ -95,12 +118,22 @@ class SymbolAnalyzer:
                 # It's the file node
                 print(f"{indent}📄 {part} (qname: {current_qname})")
                 file_node_service = self.symbol_table.node_service["file"]
+
+                # Calculate file hash
+                try:
+                    with open(file_container.file_path, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                    file_hash = hashlib.sha256(
+                        file_content.encode('utf-8')).hexdigest()
+                except (IOError, UnicodeDecodeError):
+                    file_hash = ""  # Fallback for non-readable files
+
                 file_node = file_node_service.create(
                     part,
                     current_qname,
                     "file node",
                     path="/".join(path_parts),
-
+                    hash=file_hash
                 )
                 self.symbol_table.qname_to_node[current_qname] = file_node
                 parent_node_service.add_file(parent_node.id, file_node.id)

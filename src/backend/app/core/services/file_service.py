@@ -7,12 +7,13 @@ class FileService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(self, name: str, qname: str, description: str, path: str):
+    def create(self, name: str, qname: str, description: str, path: str, hash: str):
         file = FileNode(
             name=name,
             qname=qname,
             description=description,
             path=path,
+            hash=hash,
         )
         return self.repos.file_repo.create(file)
 
