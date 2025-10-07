@@ -18,6 +18,17 @@ def _find_node_by_name(nodes: List[AnyTreeNode], name: str):
     return next((node for node in nodes if getattr(node, "name", None) == name), None)
 
 
+def _find_node_by_name_recursive(nodes: List[AnyTreeNode], name: str) -> AnyTreeNode:
+    for node in nodes:
+        if getattr(node, "name", None) == name:
+            return node
+        if hasattr(node, "children") and node.children:
+            found = _find_node_by_name_recursive(node.children, name)
+            if found:
+                return found
+    return None
+
+
 def _read_file(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -120,10 +131,64 @@ def test_function_sync_add_and_remove(arangodb_client):
         assert "sync_added" not in names_after_remove, (
             "Removed function still present after resync"
         )
-    except e:
-        print(e)
+
     finally:
         # Restore original content
         _write_file(TARGET_FILE, original)
         # Final resync to leave DB in original state
+        _resync_and_get_tree(arangodb_client)
+
+
+def test_function_sync_add_and_remove_inside_function(arangodb_client):
+    # 1) Build once to ensure project is in the DB
+    tree = _build_and_get_tree(arangodb_client)
+    assert tree, "No tree nodes built"
+
+    # 2) Find the target function to modify
+    add_func_node = _find_node_by_name_recursive(tree, "add")
+    assert add_func_node is not None, "'add' function not found"
+    assert hasattr(add_func_node, "position"), "Node has no position attribute"
+
+    # Use the position to insert new code block
+    end_line = add_func_node.position.end_line_no
+    indent = add_func_node.position.col_offset + 4
+
+    def _insert_block(path: Path):
+        lines = _read_file(path).splitlines()
+        block = [
+            f"{' ' * indent}# SYNC_TEST_START\n\n",
+            f"{' ' * indent}def sync_added_inside(): pass",
+            f"{' ' * indent}# SYNC_TEST_END",
+        ]
+        # Insert before the last line of the function's body
+        lines[end_line - 1: end_line - 1] = block
+        _write_file(path, "\n".join(lines))
+
+    original_content = _read_file(TARGET_FILE)
+    try:
+        # 3) Insert new function and resync
+        _insert_block(TARGET_FILE)
+
+        tree_after_add = _resync_and_get_tree(arangodb_client)
+        add_func_after_add = _find_node_by_name_recursive(
+            tree_after_add, "add")
+        assert "sync_added_inside" in [
+            getattr(c, "name", None) for c in add_func_after_add.children
+        ], "New function not detected in 'add'"
+
+        # 4) Remove the new function and resync
+        content_with_block = _read_file(TARGET_FILE)
+        content_without_block = _remove_sync_block(content_with_block)
+        _write_file(TARGET_FILE, content_without_block)
+
+        tree_after_remove = _resync_and_get_tree(arangodb_client)
+        add_func_after_remove = _find_node_by_name_recursive(
+            tree_after_remove, "add")
+        assert "sync_added_inside" not in [
+            getattr(c, "name", None) for c in add_func_after_remove.children
+        ], "Removed function still present"
+
+    finally:
+        # 5) Restore original content and resync
+        _write_file(TARGET_FILE, original_content)
         _resync_and_get_tree(arangodb_client)

@@ -22,6 +22,10 @@ class SymbolCollector:
     def collect_symbols(self, file_node: FileContainer):
         for node in file_node.parsed_nodes:
             self._collect_symbols_recursive(node)
+        # After collecting all top-level symbols, prune stale direct children
+        current_scope_qname = self.symbol_table.scope_manager.current_scope.qualified_name
+        self._prune_stale_direct_children(
+            current_scope_qname, file_node.parsed_nodes)
 
     def _collect_symbols_recursive(self, node: BaseSchema):
         if node.schema_type == SchemaType.FUNCTION:
@@ -31,7 +35,10 @@ class SymbolCollector:
             self.function_handler.handle_function_node(node)
             for child in node.children:
                 self._collect_symbols_recursive(child)
-
+            # Prune stale direct children under this function scope
+            current_scope_qname = self.symbol_table.scope_manager.current_scope.qualified_name
+            self._prune_stale_direct_children(
+                current_scope_qname, node.children)
             self.symbol_table.scope_manager.exit_scope()
 
         elif node.schema_type == SchemaType.CLASS:
@@ -41,6 +48,10 @@ class SymbolCollector:
             self.class_handler.handle_class_node(node)
             for child in node.children:
                 self._collect_symbols_recursive(child)
+            # Prune stale direct children under this class scope
+            current_scope_qname = self.symbol_table.scope_manager.current_scope.qualified_name
+            self._prune_stale_direct_children(
+                current_scope_qname, node.children)
             self.symbol_table.scope_manager.exit_scope()
 
     def context_analyze_symbols(self, file_node: FileContainer):
@@ -116,3 +127,56 @@ class SymbolCollector:
 
             self.assignment_handler.handle_assign_node(
                 node)
+
+    def _prune_stale_direct_children(self, container_qname: str, parsed_children: list[BaseSchema]) -> None:
+        """Delete direct function/class children under the given container qname that are no longer present.
+
+        Uses depth=1 containment queries to fetch only immediate children.
+        """
+        container_node = self.symbol_table.qname_to_node.get(container_qname)
+        if not container_node:
+            return
+
+        # Build expected direct children qnames from parsed children
+        expected_qnames: set[str] = set()
+        for child in parsed_children:
+            if child.schema_type in (SchemaType.FUNCTION, SchemaType.CLASS):
+                expected_qnames.add(f"{container_qname}.{child.name}")
+
+        node_type = getattr(container_node, "node_type", None)
+        if node_type not in ("file", "class", "function"):
+            return
+
+        # Select proper repo through services so we can pass depth=1
+        if node_type == "file":
+            repo = self.symbol_table.node_service["file"].repos.file_repo
+        elif node_type == "class":
+            repo = self.symbol_table.node_service["class"].repos.class_repo
+        else:
+            repo = self.symbol_table.node_service["function"].repos.function_repo
+
+        children = repo.get_containment_tree(container_node.id, depth=1) or []
+
+        stale_keys: list[tuple[str, str]] = []
+        for item in children:
+            vertex = item.get("vertex") or {}
+            parent_id = item.get("parent_id")
+            if parent_id != container_node.id:
+                continue  # only immediate children
+            child_type = vertex.get("node_type")
+            if child_type not in ("function", "class"):
+                continue
+            qname = vertex.get("qname")
+            if qname and qname not in expected_qnames:
+                key = vertex.get("_key")
+                if key:
+                    stale_keys.append((child_type, key))
+
+        for child_type, key in stale_keys:
+            try:
+                if child_type == "function":
+                    self.symbol_table.node_service["function"].delete(key)
+                else:
+                    self.symbol_table.node_service["class"].delete(key)
+            except Exception:
+                continue
