@@ -75,11 +75,16 @@ class FunctionHandler:
         )
         function_node = None
         if node.id:
-            function_node = function_service.get(node.id)
-
-            if function_node:
-                function_node.position = code_position
-                function_service.update(function_node)
+            try:
+                fetched = function_service.get(node.id)
+                if fetched and getattr(fetched, "node_type", None) == "function":
+                    function_node = fetched
+                    function_node.position = code_position
+                    function_service.update(function_node)
+                else:
+                    function_node = None
+            except Exception:
+                function_node = None
 
         if function_node is None:
             function_node = function_service.create(
@@ -95,9 +100,7 @@ class FunctionHandler:
             parent_service.add_function(parent_node.id, function_node.id)
 
             # Persist the created function id back into source as a comment
-            project_id = self.symbol_table.project_node.id
             try:
-                self.watcher_service.pause_watching(project_id)
                 if abs_path:
                     adjusted_line = node.position.line_no + prior_inserts
                     result = add_comment(
@@ -126,8 +129,6 @@ class FunctionHandler:
             except Exception:
                 # Best-effort; failures here should not break analysis
                 pass
-            finally:
-                self.watcher_service.resume_watching(project_id)
 
         self.symbol_table.qname_to_node[current_scope] = function_node
 

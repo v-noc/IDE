@@ -120,10 +120,18 @@ class ClassHandler:
 
         class_node = None
         if node.id:
-            class_node = class_service.get(node.id)
-            if class_node:
-                class_node.position = code_position
-                class_service.update(class_node)
+            try:
+                fetched = class_service.get(node.id)
+                # Guard: ensure the fetched node is truly a class
+                if fetched and getattr(fetched, "node_type", None) == "class":
+                    class_node = fetched
+                    class_node.position = code_position
+                    class_service.update(class_node)
+                else:
+                    class_node = None
+            except Exception:
+                # If the stored ID is wrong or points to a different type, ignore it
+                class_node = None
 
         if class_node is None:
             class_node = class_service.create(
@@ -138,9 +146,7 @@ class ClassHandler:
             parent_service.add_class(parent_node.id, class_node.id)
 
             # Persist the created class id back into source as a comment
-            project_id = self.symbol_table.project_node.id
             try:
-                self.watcher_service.pause_watching(project_id)
                 # Ascend to module scope
                 scope = self.symbol_table.scope_manager.current_scope
                 while scope.parent and scope.scope_type != ScopeType.MODULE:
@@ -171,10 +177,7 @@ class ClassHandler:
                             class_service.update(class_node)
             except Exception:
                 # Best-effort; failures here should not break analysis
-                print(f"Error persisting class id back into source: {e}")
-
-            finally:
-                self.watcher_service.resume_watching(project_id)
+                pass
 
         print(f"Class node: {class_node}")
         self.symbol_table.qname_to_node[qname] = class_node

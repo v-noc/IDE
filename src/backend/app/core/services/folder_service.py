@@ -24,6 +24,16 @@ class FolderService(ContainerService):
         return self.repos.folder_repo.update(folder.key, folder)
 
     def delete(self, folder_key: str):
+        folder_id = f"nodes/{folder_key}"
+
+        descendants = self.repos.folder_repo.get_containment_tree(
+            folder_id, depth="*")
+
+        descendant_keys = [item["vertex"]["_key"] for item in descendants]
+
+        for key in reversed(descendant_keys):
+            self.repos.nodes.delete(key)
+
         return self.repos.folder_repo.delete(folder_key)
 
     def add_folder(self, parent_folder_id: str, folder_id: str):

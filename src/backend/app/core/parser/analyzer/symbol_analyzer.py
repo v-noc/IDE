@@ -7,6 +7,7 @@ from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.scope_manager.core import ScopeType
 from arango.database import StandardDatabase
 from app.core.model.nodes import BaseNode
+from app.core.parser.ast.models import SchemaType
 
 
 class SymbolAnalyzer:
@@ -166,6 +167,8 @@ class SymbolAnalyzer:
             # 2a. DEEPEST POINT: If this is the file, we are now in the fully
             # nested scope. This is the correct place to collect symbols.
             self.symbol_collector.collect_symbols(file_container)
+            # Prune stale top-level members (functions/classes) no longer present
+            self._prune_stale_top_level(current_qname, file_container)
         else:
             # 2b. RECURSIVE STEP: If it's a folder, process the next part of the path
             # *while still inside the current scope*.
@@ -175,3 +178,52 @@ class SymbolAnalyzer:
         # 3. POP: Exit the current scope. This happens on the way back up the
         # call stack, ensuring perfect pairing of enter/exit calls.
         self.symbol_table.scope_manager.exit_scope()
+
+    def _prune_stale_top_level(self, file_qname: str, file_container: FileContainer) -> None:
+        """Delete top-level functions/classes under a file that are no longer present.
+
+        Compares parsed top-level declarations in the file to the current DB
+        immediate children of the file, and deletes any missing ones.
+        """
+        file_node = self.symbol_table.qname_to_node.get(file_qname)
+        if not file_node:
+            return
+
+        print(f"_prune_stale_top_level-{file_node}")
+
+        # Build expected top-level qnames from the parsed nodes
+        expected_qnames: set[str] = set()
+        for node in file_container.parsed_nodes:
+            if node.schema_type in (SchemaType.FUNCTION, SchemaType.CLASS):
+                expected_qnames.add(f"{file_qname}.{node.name}")
+
+        # Fetch current immediate children under this file
+        file_service = self.symbol_table.node_service["file"]
+        children = file_service.get_children(file_node.id) or []
+
+        stale_keys: list[str] = []
+        # children is a list of dicts with vertex and parent_id
+        for item in children:
+            vertex = item.get("vertex") or {}
+            parent_id = item.get("parent_id")
+            if parent_id != file_node.id:
+                continue  # only immediate children
+            node_type = vertex.get("node_type")
+            if node_type not in ("function", "class"):
+                continue
+            qname = vertex.get("qname")
+            if qname and qname not in expected_qnames:
+                key = vertex.get("_key")
+                if key:
+                    stale_keys.append((node_type, key))
+        print(f"Stale keys: {stale_keys}")
+        # Delete stale ones via appropriate services
+        for node_type, key in stale_keys:
+            try:
+                if node_type == "function":
+                    self.symbol_table.node_service["function"].delete(key)
+                else:
+                    self.symbol_table.node_service["class"].delete(key)
+            except Exception:
+                # Best-effort; ignore failures
+                continue

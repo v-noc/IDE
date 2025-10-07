@@ -40,6 +40,15 @@ class CallService(ContainerService):
         return self.repos.call_repo.update(call.key, call)
 
     def delete(self, call_key: str):
+        call_id = f"nodes/{call_key}"
+        
+        descendants = self.repos.call_repo.get_containment_tree(call_id, depth="*")
+        
+        descendant_keys = [item["vertex"]["_key"] for item in descendants]
+        
+        for key in reversed(descendant_keys):
+            self.repos.nodes.delete(key)
+
         return self.repos.call_repo.delete(call_key)
 
     def add_call(self, parent_call_id: str, call_id: str):

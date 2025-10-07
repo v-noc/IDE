@@ -120,6 +120,10 @@ class BaseRepository(Generic[T]):
         except DocumentGetError:
             return None
 
+    def get_raw_by_key(self, key: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a document by its key without Pydantic validation."""
+        return self.collection.get(key)
+
     def get_by_id(self, doc_id: str) -> Optional[T]:
         """Get by full document ID (collection/key)."""
         key = doc_id.split("/")[-1] if "/" in doc_id else doc_id

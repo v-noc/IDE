@@ -1,6 +1,7 @@
 from app.core.services.container_service import ContainerService
 from app.core.repository import Repositories
 from app.core.model.nodes import FileNode
+from typing import Optional
 
 
 class FileService(ContainerService):
@@ -17,6 +18,97 @@ class FileService(ContainerService):
         )
         return self.repos.file_repo.create(file)
 
+    def write_code_by_id(self, node_key: str, code_block: str):
+        """Writes code for an element identified by its document key.
+
+        - For a file node: overwrite full file content with code_block
+        - For function/class/call nodes: replace the slice defined by position
+        """
+        # Fetch raw to determine type and full id
+        raw_node = self.repos.nodes.get_raw_by_key(node_key)
+        if not raw_node:
+            return {"success": False, "error": "Element not found"}
+
+        node_type = raw_node.get("node_type")
+        full_id = raw_node.get("_id")  # e.g., nodes/123
+        if not node_type or not full_id:
+            return {"success": False, "error": "Corrupted element data"}
+
+        # Resolve enclosing file and project for absolute path
+        file_doc, project_doc = self._resolve_file_and_project(full_id)
+        if node_type == "file":
+            # When targeting a file, file_doc may be None; use raw document
+            if not project_doc:
+                return {"success": False, "error": "Project not found for file"}
+            file_path = raw_node.get("path")
+            if not file_path:
+                return {"success": False, "error": "File path missing"}
+            abs_path = self._build_abs_file_path(
+                project_doc.get("path"), file_path)
+            try:
+                with open(abs_path, "w", encoding="utf-8") as f:
+                    f.write(code_block)
+                return {"success": True}
+            except IOError as e:
+                return {"success": False, "error": str(e)}
+
+        # Non-file nodes must have enclosing file and project
+        if not file_doc or not project_doc:
+            return {"success": False, "error": "Enclosing file or project not found"}
+
+        abs_path = self._build_abs_file_path(
+            project_doc.get("path"), file_doc.get("path"))
+
+        # Load typed node to obtain position
+        typed_node = self.repos.nodes.get_by_id(full_id)
+        position: Optional[object] = getattr(typed_node, "position", None)
+        if position is None:
+            # Fallback: overwrite full file if no position
+            try:
+                with open(abs_path, "w", encoding="utf-8") as f:
+                    f.write(code_block)
+                return {"success": True}
+            except IOError as e:
+                return {"success": False, "error": str(e)}
+
+        # Replace code slice defined by CodePosition
+        try:
+            with open(abs_path, "r+", encoding="utf-8") as f:
+                lines = f.readlines()
+
+                start_line = max(1, position.line_no) - 1
+                end_line = position.end_line_no
+                start_col = max(0, position.col_offset)
+                end_col = position.end_col_offset
+
+                # Build replacement lines with indentation preserved from start column
+                prefix = lines[start_line][:start_col] if 0 <= start_line < len(
+                    lines) else ""
+                new_lines = [
+                    (prefix + l if i > 0 else (prefix + l))
+                    for i, l in enumerate(code_block.splitlines(True))
+                ]
+
+                if end_line is None:
+                    # Replace from start_line to end of file
+                    lines[start_line:] = new_lines
+                else:
+                    # If selection ends mid-line, keep tail after end_col
+                    tail = ""
+                    if 0 <= (end_line - 1) < len(lines) and end_col is not None:
+                        original = lines[end_line - 1]
+                        tail = original[end_col:]
+                    lines[start_line:end_line] = new_lines
+                    if tail:
+                        lines.insert(start_line + len(new_lines), tail)
+
+                f.seek(0)
+                f.writelines(lines)
+                f.truncate()
+            return {"success": True}
+        except IOError as e:
+            return {"success": False, "error": str(e)}
+
     def get(self, file_id: str):
         return self.repos.file_repo.get_by_id(file_id)
 
@@ -24,6 +116,16 @@ class FileService(ContainerService):
         return self.repos.file_repo.update(file.key, file)
 
     def delete(self, file_key: str):
+        file_id = f"nodes/{file_key}"
+
+        descendants = self.repos.file_repo.get_containment_tree(
+            file_id, depth="*")
+
+        descendant_keys = [item["vertex"]["_key"] for item in descendants]
+
+        for key in reversed(descendant_keys):
+            self.repos.nodes.delete(key)
+
         return self.repos.file_repo.delete(file_key)
 
     def add_function(self, file_id: str, function_id: str):

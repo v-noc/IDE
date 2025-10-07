@@ -31,6 +31,16 @@ class FunctionService(ContainerService):
         return self.repos.function_repo.update(function.key, function)
 
     def delete(self, function_key: str):
+        function_id = f"nodes/{function_key}"
+
+        descendants = self.repos.function_repo.get_containment_tree(
+            function_id, depth="*")
+
+        descendant_keys = [item["vertex"]["_key"] for item in descendants]
+
+        for key in reversed(descendant_keys):
+            self.repos.nodes.delete(key)
+
         return self.repos.function_repo.delete(function_key)
 
     def add_function(self, parent_function_id: str, function_id: str):

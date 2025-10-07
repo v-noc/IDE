@@ -4,6 +4,7 @@ from app.core.model import AllNodes
 from .base_collection import BaseRepository
 from pydantic import BaseModel
 from typing import TypeVar
+from arango.exceptions import DocumentDeleteError, DocumentGetError
 
 
 T = TypeVar('T', bound=BaseModel)
@@ -11,6 +12,38 @@ T = TypeVar('T', bound=BaseModel)
 
 class NodeRepository(BaseRepository[T]):
     """Repository for node collections."""
+
+    def delete(self, key: str) -> bool:
+        """Deletes a node and all edges connected to it."""
+        node_id = f"{self.collection_name}/{key}"
+
+        try:
+            edge_collections = [
+                c["name"]
+                for c in self.db.collections()
+                if not c.get("system") and self.db.collection(c["name"]).properties().get("edge")
+            ]
+        except Exception as e:
+            print(f"Failed to retrieve edge collections: {e}")
+            return False
+
+        try:
+            for ec_name in edge_collections:
+                self.db.aql.execute(
+                    "FOR e IN @@collection FILTER e._from == @node_id OR e._to == @node_id REMOVE e IN @@collection",
+                    bind_vars={
+                        "@collection": ec_name,
+                        "node_id": node_id
+                    }
+                )
+
+            self.collection.delete(key)
+            return True
+        except (DocumentDeleteError, DocumentGetError):
+            return False
+        except Exception as e:
+            print(f"An unexpected error occurred during node deletion: {e}")
+            return False
 
     def get_parent(self, node_id: str) -> Optional[AllNodes]:
         """Finds the structural parent of a node via the 'contains' edge."""
