@@ -109,6 +109,7 @@ class FunctionSchema(ParentSchema):
     schema_type: SchemaType = SchemaType.FUNCTION
     name: str
     id: Optional[str] = None
+    is_virtual: bool = False
     args: List[ArgSchema] = Field(default_factory=list)
     return_annotation: Optional[
         Union[NameSchema, AttributeSchema, SubscriptSchema, str]

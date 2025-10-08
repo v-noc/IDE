@@ -28,53 +28,58 @@ class FunctionHandler:
             .qualified_name
         )
         parent_node = self.symbol_table.qname_to_node[parent_qname]
+        function_service = self.symbol_table.node_service["function"]
 
-        function_service = self.symbol_table.node_service['function']
-
-        # Resolve absolute path and current line-shift for the file
-        abs_path = None
-        prior_inserts = 0
-        try:
-            scope = self.symbol_table.scope_manager.current_scope
-            while scope.parent and scope.scope_type != ScopeType.MODULE:
-                scope = scope.parent
-            module_qname = scope.qualified_name
-            file_container = self.symbol_table.file_containers.get(
-                module_qname
+        if node.is_virtual:
+            code_position = CodePosition(
+                line_no=0, col_offset=0, end_line_no=0, end_col_offset=0
             )
-            if file_container:
-                project_root = self.symbol_table.project_node.path
-                file_path = file_container.file_path
-                abs_path = (
-                    file_path
-                    if os.path.isabs(file_path)
-                    else os.path.normpath(
-                        os.path.join(project_root, file_path)
-                    )
+        else:
+            # Resolve absolute path and current line-shift for the file
+            abs_path = None
+            prior_inserts = 0
+            try:
+                scope = self.symbol_table.scope_manager.current_scope
+                while scope.parent and scope.scope_type != ScopeType.MODULE:
+                    scope = scope.parent
+                module_qname = scope.qualified_name
+                file_container = self.symbol_table.file_containers.get(
+                    module_qname
                 )
-                prior_inserts = (
-                    self.symbol_table.file_path_to_line_inserts.get(
-                        abs_path, 0
+                if file_container:
+                    project_root = self.symbol_table.project_node.path
+                    file_path = file_container.file_path
+                    abs_path = (
+                        file_path
+                        if os.path.isabs(file_path)
+                        else os.path.normpath(
+                            os.path.join(project_root, file_path)
+                        )
                     )
-                )
-        except Exception:
-            print(f"Error resolving absolute path for function node: {e}")
+                    prior_inserts = (
+                        self.symbol_table.file_path_to_line_inserts.get(
+                            abs_path, 0
+                        )
+                    )
+            except Exception as e:
+                print(f"Error resolving absolute path for function node: {e}")
 
-        # Build code position adjusted by any prior inserted comment lines
-        adjusted_start = node.position.line_no + prior_inserts
-        adjusted_end = (
-            node.position.end_line_no + prior_inserts
-            if node.position.end_line_no is not None
-            else None
-        )
-        code_position = CodePosition(
-            line_no=adjusted_start,
-            col_offset=node.position.col_offset,
-            end_line_no=adjusted_end,
-            end_col_offset=node.position.end_col_offset,
-        )
+            # Build code position adjusted by any prior inserted comment lines
+            adjusted_start = node.position.line_no + prior_inserts
+            adjusted_end = (
+                node.position.end_line_no + prior_inserts
+                if node.position.end_line_no is not None
+                else None
+            )
+            code_position = CodePosition(
+                line_no=adjusted_start,
+                col_offset=node.position.col_offset,
+                end_line_no=adjusted_end,
+                end_col_offset=node.position.end_col_offset,
+            )
+
         function_node = None
-        if node.id:
+        if not node.is_virtual and node.id:
             try:
                 fetched = function_service.get(node.id)
                 if fetched and getattr(fetched, "node_type", None) == "function":
@@ -91,7 +96,7 @@ class FunctionHandler:
                 name=name_node,
                 qname=current_scope,
                 description=f"{name_node} function",
-                position=code_position
+                position=code_position,
             )
 
             parent_service = self.symbol_table.node_service[
@@ -100,35 +105,37 @@ class FunctionHandler:
             parent_service.add_function(parent_node.id, function_node.id)
 
             # Persist the created function id back into source as a comment
-            try:
-                if abs_path:
-                    adjusted_line = node.position.line_no + prior_inserts
-                    result = add_comment(
-                        filepath=abs_path,
-                        target_name=node.name,
-                        comment_text=f"ID: {function_node.id}",
-                        line_number=adjusted_line,
-                        position="above",
-                    )
-                    if result.get("success"):
-                        added = result.get("added_lines", 0)
-                        if added:
-                            self.symbol_table.file_path_to_line_inserts[
-                                abs_path
-                            ] = prior_inserts + added
-                            # Update stored position to reflect the
-                            # inserted line
-                            function_node.position.line_no = (
-                                function_node.position.line_no + added
-                            )
-                            if function_node.position.end_line_no is not None:
-                                function_node.position.end_line_no = (
-                                    function_node.position.end_line_no + added
+            if not node.is_virtual:
+                try:
+                    if abs_path:
+                        adjusted_line = node.position.line_no + prior_inserts
+                        result = add_comment(
+                            filepath=abs_path,
+                            target_name=node.name,
+                            comment_text=f"ID: {function_node.key}",
+                            line_number=adjusted_line,
+                            position="above",
+                        )
+                        if result.get("success"):
+                            added = result.get("added_lines", 0)
+                            if added:
+                                self.symbol_table.file_path_to_line_inserts[
+                                    abs_path
+                                ] = (prior_inserts + added)
+                                # Update stored position to reflect the
+                                # inserted line
+                                function_node.position.line_no = (
+                                    function_node.position.line_no + added
                                 )
-                            function_service.update(function_node)
-            except Exception:
-                # Best-effort; failures here should not break analysis
-                pass
+                                if function_node.position.end_line_no is not None:
+                                    function_node.position.end_line_no = (
+                                        function_node.position.end_line_no
+                                        + added
+                                    )
+                                function_service.update(function_node)
+                except Exception:
+                    # Best-effort; failures here should not break analysis
+                    pass
 
         self.symbol_table.qname_to_node[current_scope] = function_node
 

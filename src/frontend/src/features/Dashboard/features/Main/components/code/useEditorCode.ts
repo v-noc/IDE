@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import {
     useGetCodeForNode,
     useGetFileCode,
+    useWriteCode,
     type CodeResponse,
 } from "@/features/Dashboard/service/useCodeElement";
 import type { NodeType } from "@/types/project";
@@ -11,6 +12,8 @@ export interface EditorCodeResult {
     data: CodeResponse | undefined;
     isLoading: boolean;
     isError: boolean;
+    saveCode: (code: string) => void;
+    isSaving: boolean;
 }
 
 /**
@@ -30,6 +33,12 @@ export function useEditorCode(elementId: string, nodeType: NodeType): EditorCode
     const elementQuery = useGetCodeForNode(
         isCodeElement ? elementId : ""
     );
+
+    const { mutate: save, isPending: isSaving } = useWriteCode();
+
+    const saveCode = (code: string) => {
+        save({ elementId, code });
+    }
 
     const { data, isLoading, isError } = useMemo(() => {
         // File nodes
@@ -75,7 +84,7 @@ export function useEditorCode(elementId: string, nodeType: NodeType): EditorCode
         elementQuery.isError,
     ]);
 
-    return { data, isLoading, isError };
+    return { data, isLoading, isError, saveCode, isSaving };
 }
 
 

@@ -1,6 +1,10 @@
 import os
 from app.core.parser.analyzer.symbol_table import SymbolTable
-from app.core.parser.ast.models import ClassSchema, FunctionSchema
+from app.core.parser.ast.models import (
+    ClassSchema,
+    FunctionSchema,
+    SchemaPosition,
+)
 from app.core.model.properties import CodePosition
 from app.core.model.nodes import ClassNode
 from app.core.parser.scope_manager.core.scope import ScopeType
@@ -54,8 +58,17 @@ class ClassHandler:
         init_symbol = scope_manager.resolve_method(qname, "__init__")
         if init_symbol is None:
             scope_manager.enter_scope("__init__", ScopeType.FUNCTION)
+            position = SchemaPosition(
+                line_no=0,
+                col_offset=0,
+                end_line_no=0,
+                end_col_offset=0,
+            )
             function_schema = FunctionSchema(
-                name="__init__", args=[], position=node.position
+                name="__init__",
+                args=[],
+                position=position,
+                is_virtual=True,
             )
             self.function_handler.handle_function_node(function_schema)
             scope_manager.exit_scope()
@@ -157,7 +170,7 @@ class ClassHandler:
                     result = add_comment(
                         filepath=abs_path,
                         target_name=node.name,
-                        comment_text=f"ID: {class_node.id}",
+                        comment_text=f"ID: {class_node.key}",
                         line_number=adjusted_line,
                         position="above",
                     )

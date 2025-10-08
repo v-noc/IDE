@@ -1,35 +1,40 @@
-# ID: nodes/293d5161-04dc-403e-8267-6270f20dd8d2
+
+# ID: e2a7d54a-ab48-4ec8-bb17-4395f91aaea1
 def call_back():
     print("call_back")
 
 
-# ID: nodes/9dc8ac17-beab-4cc0-b3ad-4d8c422ae72b
+# ID: 1eda12a6-e828-4f3f-a47e-f25f469ab8af
 class GrandParent:
-    # ID: nodes/dec488ac-d319-4ef7-810a-029a7e25143b
+
+    # ID: c5cfc89d-09f7-4452-8816-33315ba47bd2
     def wake_up(self):
         pass
 
 
-# ID: nodes/f5c27b24-7caa-4b6a-9751-e1759a6914da
-# ID: nodes/8d66230e-fe21-4e4c-a6f7-861c582faac9
+# ID: d1df3488-10e8-4112-a8f3-de20ef8476d0
 class Parent(GrandParent):
-    # ID: nodes/3e69580e-6b7f-4b03-9348-ec646b62c31e
+
+    # ID: 9b2bb177-cc70-444f-ba32-49e7c84a636f
     def __init__(self, callback):
         self.callback = callback
         self.wake_up()
 
-    # ID: nodes/bb1d332c-252b-4725-ae5d-c7edecfe9822
+    # ID: c620ca26-a43f-42c4-a1b8-d6f3e048d91c
     def greet(self):
         pass
 
 
-# ID: nodes/b00ea966-2c91-4738-a9a3-597486644801
+# ID: 105dcea3-deda-4ba1-afcc-f55d381d7343
 class Child(Parent):
-    # ID: nodes/44725fae-bab0-4441-a532-40db8ce5b609
+
+    # ID: 7a1663ca-c1fd-4b66-9510-baa8108aa9f4
     def greet(self):
         self.callback()
+
         super().greet()
 
 
 child = Child(call_back)
+
 child.greet()

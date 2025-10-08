@@ -1,4 +1,4 @@
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 import type { ProjectNodeTree } from "@/types/project";
 import { useQuery } from "@tanstack/react-query";

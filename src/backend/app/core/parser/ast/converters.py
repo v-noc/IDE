@@ -44,6 +44,34 @@ from .metadata import (
 )
 
 
+def _extract_id_from_comments(node) -> Optional[str]:
+    """Extract an ID from comments near the node's line.
+
+    Looks up structured metadata first; if not found, scans the nearest
+    preceding line comment for a parsable ID field.
+    """
+    try:
+        tree = node
+        while hasattr(tree, "parent"):
+            tree = tree.parent
+        comment_map = build_comment_map(tree)
+        lines = getattr(tree, "_source_lines", [])
+        meta = resolve_metadata_for_line(comment_map, lines, node.lineno)
+        if meta:
+            found_id = meta.get("ID")
+            if found_id:
+                return found_id
+
+        i = node.lineno - 1
+        while i > 0 and i - 1 < len(lines) and lines[i - 1].strip() == "":
+            i -= 1
+        if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
+            return parse_comment_data(lines[i - 1]).get("ID")
+    except Exception:
+        return None
+    return None
+
+
 class SchemaConverter:
     """
     A stateless converter that translates ast.AST Schemas into Pydantic models.
@@ -90,27 +118,7 @@ class SchemaConverter:
         self, node: FunctionDef, returns: List[Return]
     ) -> FunctionSchema:
         args: List[ArgSchema] = []
-        # ID extraction removed in favor of comment-based metadata
-        func_id = None
-        try:
-            tree = node
-            while hasattr(tree, "parent"):
-                tree = tree.parent
-            comment_map = build_comment_map(tree)
-            lines = getattr(tree, "_source_lines", [])
-            meta = resolve_metadata_for_line(comment_map, lines, node.lineno)
-            if meta:
-                func_id = meta.get("ID")
-            else:
-                i = node.lineno - 1
-                while (
-                    i > 0 and i - 1 < len(lines) and lines[i - 1].strip() == ""
-                ):
-                    i -= 1
-                if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
-                    func_id = parse_comment_data(lines[i - 1]).get("ID")
-        except Exception:
-            pass
+        func_id = _extract_id_from_comments(node)
 
         if node.args:
             for arg in node.args.args:
@@ -148,27 +156,7 @@ class SchemaConverter:
 
     def convert_classdef(self, node: ClassDef) -> ClassSchema:
         implements = []
-        # ID extraction removed in favor of comment-based metadata
-        class_id = None
-        try:
-            tree = node
-            while hasattr(tree, "parent"):
-                tree = tree.parent
-            comment_map = build_comment_map(tree)
-            lines = getattr(tree, "_source_lines", [])
-            meta = resolve_metadata_for_line(comment_map, lines, node.lineno)
-            if meta:
-                class_id = meta.get("ID")
-            else:
-                i = node.lineno - 1
-                while (
-                    i > 0 and i - 1 < len(lines) and lines[i - 1].strip() == ""
-                ):
-                    i -= 1
-                if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
-                    class_id = parse_comment_data(lines[i - 1]).get("ID")
-        except Exception:
-            pass
+        class_id = _extract_id_from_comments(node)
 
         if node.bases:
             for base in node.bases:
@@ -270,26 +258,7 @@ class SchemaConverter:
                 )
             )
 
-        call_id = None
-        try:
-            tree = node
-            while hasattr(tree, "parent"):
-                tree = tree.parent
-            comment_map = build_comment_map(tree)
-            lines = getattr(tree, "_source_lines", [])
-            meta = resolve_metadata_for_line(comment_map, lines, node.lineno)
-            if meta:
-                call_id = meta.get("ID")
-            else:
-                i = node.lineno - 1
-                while (
-                    i > 0 and i - 1 < len(lines) and lines[i - 1].strip() == ""
-                ):
-                    i -= 1
-                if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
-                    call_id = parse_comment_data(lines[i - 1]).get("ID")
-        except Exception:
-            pass
+        call_id = _extract_id_from_comments(node)
 
         return CallSchema(
             id=call_id,

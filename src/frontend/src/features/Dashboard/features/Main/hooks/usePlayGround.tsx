@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 
 export interface RunCodeRequest {

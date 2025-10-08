@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/core';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 class ApiError extends Error {
   status: number;
@@ -51,4 +51,4 @@ async function apiClient<T>(
   return response.json();
 }
 
-export default apiClient;
+export { apiClient as api };
