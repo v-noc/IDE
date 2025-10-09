@@ -135,3 +135,14 @@ class SymbolTable:
         finally:
             # Clear expectations for this container
             self.parent_id_to_seen_call_targets.pop(container_id, None)
+
+    def prune_all_recorded_calls(self) -> None:
+        """Prune stale direct calls for all recorded parents.
+
+        Iterates over every parent_id that registered expected call targets
+        during this analysis pass and prunes its immediate call children.
+        """
+        # Copy keys to avoid mutation during iteration
+        parent_ids = list(self.parent_id_to_seen_call_targets.keys())
+        for parent_id in parent_ids:
+            self.prune_stale_direct_calls(parent_id)

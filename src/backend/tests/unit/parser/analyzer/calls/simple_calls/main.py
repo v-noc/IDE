@@ -1,16 +1,16 @@
-# ID: d4c65607-4566-4a04-a745-bacea7201b30
+# ID: 89ed3357-03c7-4ed7-a9fc-dd1c95b749a2
 def reader(doc):
     doc.read()
 
-# ID: ccbd31a5-2082-482a-bdd0-bb0c2d4f8fc0
+# ID: 97e0b2dd-c006-412e-943c-868163cb2597
 class Document:
-    # ID: c8f19195-6af5-41bf-8639-1362b0bf8d51
+    # ID: 3b716fdb-a994-4028-a1e1-ceaa86f8672a
     def read(self):
         pass
 
-# ID: 5a5cef08-8ae5-4ab7-a828-829870addfa7
+# ID: 7c3834bf-dd95-492d-9faa-5344e55ecbe7
 class FileReader:
-    # ID: 7a021a67-4baf-4fb4-a336-b235915f0e2e
+    # ID: 486c65da-5c55-429a-ac9a-163aff5879f8
     def read(self, file_name: str):
         pass
 

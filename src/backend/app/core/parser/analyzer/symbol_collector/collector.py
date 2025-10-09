@@ -79,12 +79,9 @@ class SymbolCollector:
             return
         for node in file_node.parsed_nodes:
             self._analyze_node_context_recursive(node)
-        # After analyzing the file context, prune stale direct calls
-        container_node = self.symbol_table.qname_to_node.get(
-            self.current_file_path
-        )
-        if container_node:
-            self.symbol_table.prune_stale_direct_calls(container_node.id)
+        # After analyzing the file context, prune stale direct calls across all
+        # recorded parents (file, functions/classes, nested call nodes)
+        self.symbol_table.prune_all_recorded_calls()
 
     def _analyze_node_context_recursive(self, node: BaseSchema):
         if node.schema_type == SchemaType.IMPORT:
@@ -143,7 +140,7 @@ class SymbolCollector:
                     self._analyze_node_context_recursive(child)
 
                 self.symbol_table.scope_manager.exit_scope()
-                # After analyzing function/class body, prune stale direct calls
+                # After analyzing this function/class body, prune stale calls
                 container_node = self.symbol_table.qname_to_node.get(qname)
                 if container_node:
                     self.symbol_table.prune_stale_direct_calls(

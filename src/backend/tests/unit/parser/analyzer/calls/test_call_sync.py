@@ -114,6 +114,15 @@ def _has_call_named(node: AnyTreeNode, name: str) -> bool:
     )
 
 
+def _get_call_child_by_name(
+    node: AnyTreeNode, name: str
+) -> AnyTreeNode | None:
+    for c in _get_call_children(node):
+        if getattr(c, "name", None) == name:
+            return c
+    return None
+
+
 def _has_nested_call_with_name(node: AnyTreeNode, name_pred: str) -> bool:
     for c in _get_call_children(node):
         for gc in getattr(c, "children", []) or []:
@@ -175,6 +184,26 @@ def test_call_sync_add_and_remove(arangodb_client, tmp_path):
             file_after_add, "(FileReader).read"
         ), "Expected nested call to FileReader.read not found"
 
+        # Reader call should have two nested calls now: Document.read and
+        # FileReader.read
+        reader_call = _get_call_child_by_name(file_after_add, "reader")
+        assert reader_call is not None, "reader call node not found"
+        reader_nested_calls = [
+            gc
+            for gc in getattr(reader_call, "children", []) or []
+            if getattr(gc, "node_type", None) == "call"
+        ]
+        assert len(reader_nested_calls) == 2, (
+            "reader should have two nested calls after adding FileReader"
+        )
+        nested_names = {getattr(n, "name", "") for n in reader_nested_calls}
+        assert "(Document).read" in nested_names, (
+            "Document.read not found under reader"
+        )
+        assert "(FileReader).read" in nested_names, (
+            "FileReader.read not found under reader"
+        )
+
         # 3) Remove the extra call and resync
         updated = _remove_reader_call(_read_file(TARGET_FILE))
         _write_file(TARGET_FILE, updated)
@@ -187,6 +216,11 @@ def test_call_sync_add_and_remove(arangodb_client, tmp_path):
             file_after_remove, "(FileReader).read"
         )
         assert not nested_exists, "Removed FileReader.read call still present"
+
+        # Document.read should still be present
+        assert _has_nested_call_with_name(
+            file_after_remove, "(Document).read"
+        ), "Document.read missing after removal"
 
         # Still exactly one top-level 'reader' call
         calls_after_remove = _get_call_children(file_after_remove)
