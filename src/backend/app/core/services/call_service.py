@@ -41,11 +41,12 @@ class CallService(ContainerService):
 
     def delete(self, call_key: str):
         call_id = f"nodes/{call_key}"
-        
-        descendants = self.repos.call_repo.get_containment_tree(call_id, depth="*")
-        
+
+        descendants = self.repos.call_repo.get_containment_tree(
+            call_id, depth="*")
+
         descendant_keys = [item["vertex"]["_key"] for item in descendants]
-        
+
         for key in reversed(descendant_keys):
             self.repos.nodes.delete(key)
 
@@ -89,3 +90,10 @@ class CallService(ContainerService):
             "position": call.position.model_dump(),
             "code": code,
         }
+
+    def get_call_with_parent_and_target(self, parent_id: str, target_id: str):
+        # Note: repository expects (target_id, parent_id)
+        return self.repos.call_repo.find_call_by_target_parent(
+            target_id,
+            parent_id,
+        )

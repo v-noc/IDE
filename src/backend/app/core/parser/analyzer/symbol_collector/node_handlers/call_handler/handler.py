@@ -131,6 +131,20 @@ class CallHandler:
         ]
         parent_service = self.symbol_table.node_service[parent_node.node_type]
 
+        # Try to reuse an existing call under this parent
+        # targeting the same callee
+        existing_call = call_service.get_call_with_parent_and_target(
+            parent_node.id,
+            callee_node.id,
+        )
+        if existing_call:
+            self.symbol_table.call_node_stack.append(existing_call)
+            try:
+                yield existing_call
+            finally:
+                self.symbol_table.call_node_stack.pop()
+            return
+
         # Adjust display name: prefix class for methods -> (ClassName).method
         display_name = callee_symbol.name
         try:

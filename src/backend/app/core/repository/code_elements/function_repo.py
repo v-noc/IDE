@@ -18,7 +18,7 @@ class FunctionRepo(NodeRepository[FunctionNode]):
         """
         bind_vars = {
             "start_node_id": function_id,
-            "@targets_collection": "targets",
+            "@targets_collection": "targets_edges",
         }
         # The core repo executes the query, but the LOGIC lives here.
         callers = self._nodes.aql(query, bind_vars)
