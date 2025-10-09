@@ -146,6 +146,9 @@ class CallHandler:
                 yield existing_call
             finally:
                 self.symbol_table.call_node_stack.pop()
+                # After finishing this call context, prune its stale call
+                # children
+                self.symbol_table.prune_stale_direct_calls(existing_call.id)
             return
 
         # Adjust display name: prefix class for methods -> (ClassName).method
@@ -180,3 +183,5 @@ class CallHandler:
             print(f"Error in call node context: {e}")
         finally:
             self.symbol_table.call_node_stack.pop()
+            # After finishing this call context, prune its stale call children
+            self.symbol_table.prune_stale_direct_calls(call_node.id)
