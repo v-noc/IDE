@@ -131,6 +131,9 @@ class CallHandler:
         ]
         parent_service = self.symbol_table.node_service[parent_node.node_type]
 
+        # Record the intent that this parent directly calls the target
+        self.symbol_table.register_direct_call(parent_node.id, callee_node.id)
+
         # Try to reuse an existing call under this parent
         # targeting the same callee
         existing_call = call_service.get_call_with_parent_and_target(

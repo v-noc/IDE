@@ -1,4 +1,3 @@
-from arango.exceptions import AQLQueryExecuteError
 from app.core.model.nodes import CallNode, ClassNode, FunctionNode
 from app.core.repository.base.node_repo import NodeRepository
 from arango.database import StandardDatabase
@@ -12,18 +11,29 @@ class CallRepo(NodeRepository[CallNode]):
     def get_target(
         self, call_node_id: str
     ) -> Optional[ClassNode | FunctionNode]:
-        """Finds the function or class that this CallNode targets."""
+        """Find the function or class that this CallNode targets.
+
+        Avoids truthiness/len checks on Arango Cursor to prevent
+        CursorCountError by consuming at most one document.
+        """
         query = """
-        FOR target IN 1..1 OUTBOUND @start_node_id @@targets_collection
+        FOR target IN 1..1 OUTBOUND @start_node_id targets_edges
             LIMIT 1
             RETURN target
         """
         bind_vars = {
             "start_node_id": call_node_id,
-            "@targets_collection": "targets_edges",
         }
-        results = self._nodes.aql(query, bind_vars)
-        return results[0] if results else None
+        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+        doc = next(cursor, None)
+        if not doc:
+            return None
+        node_type = doc.get("node_type")
+        if node_type == "function":
+            return FunctionNode.model_validate(doc)
+        if node_type == "class":
+            return ClassNode.model_validate(doc)
+        return None
 
     def find_call_by_target_parent(
         self,
@@ -33,7 +43,7 @@ class CallRepo(NodeRepository[CallNode]):
 
         query = """
         FOR c IN nodes
-            FILTER c.node_type == "call" 
+            FILTER c.node_type == "call"
             LET t = FIRST(
                 FOR target IN 1..1 OUTBOUND c targets_edges
                     RETURN target

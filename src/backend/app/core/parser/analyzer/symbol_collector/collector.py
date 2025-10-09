@@ -79,6 +79,12 @@ class SymbolCollector:
             return
         for node in file_node.parsed_nodes:
             self._analyze_node_context_recursive(node)
+        # After analyzing the file context, prune stale direct calls
+        container_node = self.symbol_table.qname_to_node.get(
+            self.current_file_path
+        )
+        if container_node:
+            self.symbol_table.prune_stale_direct_calls(container_node.id)
 
     def _analyze_node_context_recursive(self, node: BaseSchema):
         if node.schema_type == SchemaType.IMPORT:
@@ -124,10 +130,8 @@ class SymbolCollector:
             node.schema_type == SchemaType.FUNCTION
             or node.schema_type == SchemaType.CLASS
         ):
-            qname = (
-                f"{self.symbol_table.scope_manager.current_scope.qualified_name}."
-                f"{node.name}"
-            )
+            curr = self.symbol_table.scope_manager.current_scope.qualified_name
+            qname = f"{curr}.{node.name}"
             scope = self.symbol_table.scope_manager.get_scope_by_qname(qname)
 
             if scope:
@@ -139,6 +143,12 @@ class SymbolCollector:
                     self._analyze_node_context_recursive(child)
 
                 self.symbol_table.scope_manager.exit_scope()
+                # After analyzing function/class body, prune stale direct calls
+                container_node = self.symbol_table.qname_to_node.get(qname)
+                if container_node:
+                    self.symbol_table.prune_stale_direct_calls(
+                        container_node.id
+                    )
 
         elif node.schema_type == SchemaType.CALL:
             current_frame = (
@@ -154,7 +164,10 @@ class SymbolCollector:
 
             self.call_handler.handle_call(node)
 
-        elif node.schema_type == SchemaType.ASSIGN or node.schema_type == SchemaType.ANN_ASSIGN:
+        elif (
+            node.schema_type == SchemaType.ASSIGN
+            or node.schema_type == SchemaType.ANN_ASSIGN
+        ):
 
             self.assignment_handler.handle_assign_node(
                 node)
@@ -162,7 +175,8 @@ class SymbolCollector:
     def _prune_stale_direct_children(
         self, container_qname: str, parsed_children: list[BaseSchema]
     ) -> None:
-        """Delete direct function/class children under the given container qname.
+        """
+        Delete direct function/class children under the given container qname.
 
         Uses depth=1 containment queries to fetch only immediate children.
         """
@@ -186,10 +200,12 @@ class SymbolCollector:
         elif node_type == "class":
             repo = self.symbol_table.node_service["class"].repos.class_repo
         else:
-            repo = self.symbol_table.node_service["function"].repos.function_repo
+            service = self.symbol_table.node_service["function"]
+            repo = service.repos.function_repo
 
         children = repo.get_containment_tree(
-            container_node.id, depth=1
+            container_node.id,
+            depth=1,
         ) or []
 
         stale_keys: list[tuple[str, str]] = []
