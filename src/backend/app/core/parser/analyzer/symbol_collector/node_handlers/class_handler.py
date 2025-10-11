@@ -136,14 +136,15 @@ class ClassHandler:
             try:
                 fetched = class_service.get(node.id)
                 # Guard: ensure the fetched node is truly a class
-                if fetched and getattr(fetched, "node_type", None) == "class":
+                if fetched and getattr(fetched, "node_type", None) == \
+                        "class":
                     class_node = fetched
                     class_node.position = code_position
                     class_service.update(class_node)
                 else:
                     class_node = None
             except Exception:
-                # If the stored ID is wrong or points to a different type, ignore it
+                # If stored ID is wrong or different type, ignore it
                 class_node = None
 
         if class_node is None:
@@ -166,23 +167,29 @@ class ClassHandler:
                     scope = scope.parent
                 module_qname = scope.qualified_name
                 if abs_path:
-                    adjusted_line = node.position.line_no + prior_inserts
+                    # Build dot-separated path from current scope relative to module
+                    target_name = node.name
+                    scope = self.symbol_table.scope_manager.current_scope.parent
+                    while scope and scope.scope_type != ScopeType.MODULE:
+                        target_name = f"{scope.name}.{target_name}"
+                        scope = scope.parent
+
                     result = add_comment(
                         filepath=abs_path,
-                        target_name=node.name,
+                        target_name=target_name,
                         comment_text=f"ID: {class_node.key}",
-                        line_number=adjusted_line,
-                        position="above",
                     )
                     if result.get("success"):
                         added = result.get("added_lines", 0)
                         if added:
-                            self.symbol_table.file_path_to_line_inserts[
-                                abs_path
-                            ] = prior_inserts + added
-                            class_node.position.line_no = (
-                                class_node.position.line_no + added
-                            )
+                            inserts = self.symbol_table.\
+                                file_path_to_line_inserts
+                            inserts[abs_path] = prior_inserts + added
+                            # Only end_line_no shifts due to docstring
+                            if class_node.position.end_line_no is not None:
+                                class_node.position.end_line_no = (
+                                    class_node.position.end_line_no + added
+                                )
                             if class_node.position.end_line_no is not None:
                                 class_node.position.end_line_no = (
                                     class_node.position.end_line_no + added

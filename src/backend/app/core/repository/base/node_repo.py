@@ -66,7 +66,7 @@ class NodeRepository(BaseRepository[T]):
         return list(cursor)
 
     def get_containment_tree(
-        self, start_node_id: str, depth: int | str = 10
+        self, start_node_id: str, depth: int | str = 50
     ) -> List[Dict[str, Any]]:
         """
         Executes a graph traversal to get a full descendant tree.

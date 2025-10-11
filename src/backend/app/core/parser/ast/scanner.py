@@ -1,4 +1,4 @@
-from .ast_comment import parse
+from ast import parse
 from typing import List
 
 from .models import BaseSchema

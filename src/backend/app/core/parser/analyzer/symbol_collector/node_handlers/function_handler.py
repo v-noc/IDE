@@ -82,7 +82,8 @@ class FunctionHandler:
         if not node.is_virtual and node.id:
             try:
                 fetched = function_service.get(node.id)
-                if fetched and getattr(fetched, "node_type", None) == "function":
+                if fetched and getattr(fetched, "node_type", None) == \
+                        "function":
                     function_node = fetched
                     function_node.position = code_position
                     function_service.update(function_node)
@@ -108,26 +109,28 @@ class FunctionHandler:
             if not node.is_virtual:
                 try:
                     if abs_path:
-                        adjusted_line = node.position.line_no + prior_inserts
+                        # Build dot-separated path from current scope relative to module
+                        target_name = node.name
+                        scope = self.symbol_table.scope_manager.current_scope.parent
+                        while scope and scope.scope_type != ScopeType.MODULE:
+                            # Prepend parent scope name
+                            target_name = f"{scope.name}.{target_name}"
+                            scope = scope.parent
+
                         result = add_comment(
                             filepath=abs_path,
-                            target_name=node.name,
+                            target_name=target_name,
                             comment_text=f"ID: {function_node.key}",
-                            line_number=adjusted_line,
-                            position="above",
                         )
                         if result.get("success"):
                             added = result.get("added_lines", 0)
                             if added:
-                                self.symbol_table.file_path_to_line_inserts[
-                                    abs_path
-                                ] = (prior_inserts + added)
-                                # Update stored position to reflect the
-                                # inserted line
-                                function_node.position.line_no = (
-                                    function_node.position.line_no + added
-                                )
-                                if function_node.position.end_line_no is not None:
+                                inserts = self.symbol_table.\
+                                    file_path_to_line_inserts
+                                inserts[abs_path] = (prior_inserts + added)
+                                # Only end_line_no shifts due to docstring
+                                if function_node.position.end_line_no \
+                                        is not None:
                                     function_node.position.end_line_no = (
                                         function_node.position.end_line_no
                                         + added

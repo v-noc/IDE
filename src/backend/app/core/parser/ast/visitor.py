@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .ast_comment import NodeVisitor, AST, walk, Return, ClassDef, Import, ImportFrom, Assign, AnnAssign, Call, FunctionDef
+from ast import NodeVisitor, AST, walk, Return, ClassDef, Import, ImportFrom, Assign, AnnAssign, Call, FunctionDef
 from typing import List
 
 from .converters import SchemaConverter

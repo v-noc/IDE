@@ -112,14 +112,15 @@ def test_func_position():
 
 
 simple_func = """
-# ID: 1
 def foo():
+    \""" ID: 1 \"""
     pass
 """
 
 
 def test_func_id():
     result = scan(simple_func)
+    print(result)
     assert len(result) == 1
     schema = result[0]
     assert schema.id == "1"

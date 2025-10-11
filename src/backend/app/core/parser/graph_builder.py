@@ -1,3 +1,4 @@
+from typing import Optional
 from pathlib import Path
 from arango.database import StandardDatabase
 from app.core.parser.analyzer.file_navigator import FileNavigator
@@ -8,8 +9,9 @@ from app.core.parser.analyzer.file_navigator import FileContainer
 
 
 class GraphBuilder:
-    def __init__(self, project_path: str, project_node: ProjectNode | None, db: StandardDatabase):
+    def __init__(self, project_path: str, db: StandardDatabase, ignore_file_name: str = ".gitignore", project_node: Optional[ProjectNode] = None):
         self.project_path = Path(project_path)
+        self.ignore_file_name = ignore_file_name
         self.db = db
         self.symbol_analyzer = SymbolAnalyzer(db)
         if project_node:
@@ -33,7 +35,8 @@ class GraphBuilder:
                 project_name, project_description, str(self.project_path)
             )
 
-        file_navigator = FileNavigator(self.project_path, ".v-noc_ignore.toml")
+        file_navigator = FileNavigator(
+            self.project_path, self.ignore_file_name)
         python_files = file_navigator.find_files(extensions=[".py"])
 
         for file_path in python_files:

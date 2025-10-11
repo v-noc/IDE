@@ -1,8 +1,9 @@
-from .ast_comment import (
+from ast import (
     AST,
     Name,
     Attribute,
     Call,
+    Expr,
     List as AstList,
     Tuple as AstTuple,
     Constant,
@@ -15,6 +16,7 @@ from .ast_comment import (
     AnnAssign,
 )
 from typing import List, Optional, Union
+import re
 from .models import (
     AnnAssignSchema,
     ArgSchema,
@@ -37,36 +39,29 @@ from .utils import (
     extract_value,
 )
 
-from .metadata import (
-    build_comment_map,
-    resolve_metadata_for_line,
-    parse_comment_data,
-)
+# no metadata imports needed for simple docstring ID extraction
 
 
-def _extract_id_from_comments(node) -> Optional[str]:
-    """Extract an ID from comments near the node's line.
-
-    Looks up structured metadata first; if not found, scans the nearest
-    preceding line comment for a parsable ID field.
-    """
+def _extract_id_from_docstring(node) -> Optional[str]:
+    """Extract ID from a one-line docstring containing "ID: <value>"."""
     try:
-        tree = node
-        while hasattr(tree, "parent"):
-            tree = tree.parent
-        comment_map = build_comment_map(tree)
-        lines = getattr(tree, "_source_lines", [])
-        meta = resolve_metadata_for_line(comment_map, lines, node.lineno)
-        if meta:
-            found_id = meta.get("ID")
-            if found_id:
-                return found_id
-
-        i = node.lineno - 1
-        while i > 0 and i - 1 < len(lines) and lines[i - 1].strip() == "":
-            i -= 1
-        if i - 1 >= 0 and lines[i - 1].lstrip().startswith("#"):
-            return parse_comment_data(lines[i - 1]).get("ID")
+        # Works for FunctionDef and ClassDef
+        if not hasattr(node, "body") or not node.body:
+            return None
+        first_stmt = node.body[0]
+        # Docstring is a string constant as the first statement
+        if isinstance(first_stmt, Expr) and \
+                isinstance(first_stmt.value, Constant):
+            value = (
+                first_stmt.value.value
+                if hasattr(first_stmt.value, "value")
+                else None
+            )
+            if isinstance(value, str):
+                doc = value.strip()
+                match = re.search(r"\bID:\s*([^\s]+)", doc)
+                if match:
+                    return match.group(1).strip()
     except Exception:
         return None
     return None
@@ -118,7 +113,7 @@ class SchemaConverter:
         self, node: FunctionDef, returns: List[Return]
     ) -> FunctionSchema:
         args: List[ArgSchema] = []
-        func_id = _extract_id_from_comments(node)
+        func_id = _extract_id_from_docstring(node)
 
         if node.args:
             for arg in node.args.args:
@@ -156,7 +151,7 @@ class SchemaConverter:
 
     def convert_classdef(self, node: ClassDef) -> ClassSchema:
         implements = []
-        class_id = _extract_id_from_comments(node)
+        class_id = _extract_id_from_docstring(node)
 
         if node.bases:
             for base in node.bases:
@@ -258,7 +253,7 @@ class SchemaConverter:
                 )
             )
 
-        call_id = _extract_id_from_comments(node)
+        call_id = None
 
         return CallSchema(
             id=call_id,
