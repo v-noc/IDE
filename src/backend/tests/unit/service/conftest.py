@@ -37,7 +37,8 @@ def create_file(create_repos):
         "Test File",
         "test_project.test_file",
         "This is a test file",
-        "test_file"
+        "test_file",
+        "hash"
     )
 
 

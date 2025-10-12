@@ -107,10 +107,11 @@ def test_class_position():
 
 
 simple_class_with_id = """
-# ID: 1
+
 
 
 class Foo:
+    \"""ID: 1\"""
     pass
 """
 
