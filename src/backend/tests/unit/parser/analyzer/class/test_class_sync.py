@@ -45,11 +45,11 @@ def _append_sync_block(path: Path) -> None:
         f.write(block)
 
 
-def _remove_sync_block(content: str) -> str:
-    start = content.find("# SYNC_TEST_START")
+def _remove_sync_block(content: str, start_str: str, end_str: str) -> str:
+    start = content.find(start_str)
     if start == -1:
         return content
-    end = content.find("# SYNC_TEST_END", start)
+    end = content.find(end_str, start)
     if end == -1:
         return content
     end_line = content.find("\n", end)
@@ -122,7 +122,8 @@ def test_class_sync_add_and_remove(arangodb_client):
         )
 
         # 4) Remove the class and resync
-        updated = _remove_sync_block(_read_file(TARGET_FILE))
+        updated = _remove_sync_block(_read_file(
+            TARGET_FILE), start_str="class SyncAddedClass:", end_str="pass")
         _write_file(TARGET_FILE, updated)
 
         tree_after_remove = _resync_and_get_tree(arangodb_client)
@@ -172,18 +173,21 @@ def test_class_sync_add_and_remove_inside_class(arangodb_client):
         _insert_block(TARGET_FILE)
 
         tree_after_add = _resync_and_get_tree(arangodb_client)
-        parent_after_add = _find_node_by_name_recursive(tree_after_add, "Parent")
+        parent_after_add = _find_node_by_name_recursive(
+            tree_after_add, "Parent")
         assert "SyncAddedInner" in [
             getattr(c, "name", None) for c in parent_after_add.children
         ], "New inner class not detected in 'Parent'"
 
         # 4) Remove the inner class and resync
         content_with_block = _read_file(TARGET_FILE)
-        content_without_block = _remove_sync_block(content_with_block)
+        content_without_block = _remove_sync_block(
+            content_with_block, start_str="class SyncAddedInner:", end_str="pass")
         _write_file(TARGET_FILE, content_without_block)
 
         tree_after_remove = _resync_and_get_tree(arangodb_client)
-        parent_after_remove = _find_node_by_name_recursive(tree_after_remove, "Parent")
+        parent_after_remove = _find_node_by_name_recursive(
+            tree_after_remove, "Parent")
         assert "SyncAddedInner" not in [
             getattr(c, "name", None) for c in parent_after_remove.children
         ], "Removed inner class still present"
