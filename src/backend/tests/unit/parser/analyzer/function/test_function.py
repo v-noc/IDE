@@ -81,7 +81,7 @@ def test_function_collector(arangodb_client):
 
     builder = GraphBuilder(
         project_path=PROJECT_PATH.as_posix(),
-        ignore_file_name=None,
+        project_node=None,
         db=arangodb_client
     )
     builder.build(

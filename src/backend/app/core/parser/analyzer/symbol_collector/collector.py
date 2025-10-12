@@ -141,11 +141,12 @@ class SymbolCollector:
 
                 self.symbol_table.scope_manager.exit_scope()
                 # After analyzing this function/class body, prune stale calls
-                container_node = self.symbol_table.qname_to_node.get(qname)
-                if container_node:
-                    self.symbol_table.prune_stale_direct_calls(
-                        container_node.id
-                    )
+
+                # container_node = self.symbol_table.qname_to_node.get(qname)
+                # if container_node:
+                #     self.symbol_table.prune_stale_direct_calls(
+                #         container_node.id
+                #     )
 
         elif node.schema_type == SchemaType.CALL:
             current_frame = (

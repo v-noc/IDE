@@ -45,11 +45,11 @@ def _append_sync_block(path: Path) -> None:
         f.write(block)
 
 
-def _remove_sync_block(content: str) -> str:
-    start = content.find("# SYNC_TEST_START")
+def _remove_sync_block(content: str, start_str: str, end_str: str) -> str:
+    start = content.find(start_str)
     if start == -1:
         return content
-    end = content.find("# SYNC_TEST_END", start)
+    end = content.find(end_str, start)
     if end == -1:
         return content
     end_line = content.find("\n", end)
@@ -120,7 +120,8 @@ def test_function_sync_add_and_remove(arangodb_client):
         assert "sync_added" in names_after_add, "New function not detected after resync"
 
         # 4) Remove the function and resync
-        updated = _remove_sync_block(_read_file(TARGET_FILE))
+        updated = _remove_sync_block(_read_file(
+            TARGET_FILE), start_str="def sync_added():", end_str="return 42")
         _write_file(TARGET_FILE, updated)
 
         tree_after_remove = _resync_and_get_tree(arangodb_client)
@@ -178,7 +179,8 @@ def test_function_sync_add_and_remove_inside_function(arangodb_client):
 
         # 4) Remove the new function and resync
         content_with_block = _read_file(TARGET_FILE)
-        content_without_block = _remove_sync_block(content_with_block)
+        content_without_block = _remove_sync_block(
+            content_with_block, start_str="def sync_added_inside():", end_str="pass")
         _write_file(TARGET_FILE, content_without_block)
 
         tree_after_remove = _resync_and_get_tree(arangodb_client)
