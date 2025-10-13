@@ -1,16 +1,18 @@
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from app.core.repository import Repositories
 from app.core.model.logs import LogNode
 from app.core.model.edges import LogToFunctionEdge, LogToLogEdge
-from app.api.json_rpc.schemas import RegisterLogsParams
+
+if TYPE_CHECKING:
+    from app.api.json_rpc.schemas import RegisterLogsParams
 
 
 class LogService:
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(self, function_id: str, params: RegisterLogsParams, parent_function_id: Optional[str] = None):
+    def create(self, function_id: str, params: "RegisterLogsParams", parent_function_id: Optional[str] = None):
         log = LogNode(
             timestamp=params.timestamp,
             event_type=params.event_type.value if hasattr(
@@ -49,3 +51,6 @@ class LogService:
                 )
 
         return created
+
+    def get_parent_log(self, log_id: str):
+        return self.repos.log_repo.find_parent_log(log_id)

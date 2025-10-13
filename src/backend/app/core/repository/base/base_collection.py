@@ -194,6 +194,6 @@ class BaseRepository(Generic[T]):
     ) -> List[T]:
         cursor = self.db.aql.execute(
             query,
-            bind_vars or {},
+            bind_vars=bind_vars or {},
         )
         return [self._validate(doc) for doc in cursor]
