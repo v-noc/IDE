@@ -5,6 +5,8 @@ help:
 	@echo "  install          : Install all dependencies for backend and frontend."
 	@echo "  install-backend  : Install backend dependencies."
 	@echo "  run-backend      : Start backend development server on http://localhost:8000."
+	@echo "  run-rpc          : Start JSON-RPC server on http://localhost:8050/api/v1/jsonrpc."
+	@echo "  run-servers      : Start backend and JSON-RPC servers."
 	@echo "  install-frontend : Install frontend dependencies."
 	@echo "  run-frontend     : Start frontend development server on http://localhost:5173."
 	@echo "  dev              : Run 'make run-backend' and 'make run-frontend' in separate terminals to start development."
@@ -29,6 +31,10 @@ run-backend: start-db
 	@echo ">>> Starting backend development server..."
 	@cd src/backend && ../../.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
+run-rpc: start-db
+	@echo ">>> Starting JSON-RPC server..."
+	@cd src/backend && ../../.venv/bin/python -m uvicorn app.api.json_rpc.app:app --reload --host 0.0.0.0 --port 8050
+
 test-backend:
 	@echo ">>> Running backend tests..."
 	@.venv/bin/python -m pytest -s src/backend/tests
@@ -50,3 +56,7 @@ run-frontend:
 # ====================================================================================
 
 install: install-backend install-frontend
+
+run-servers:
+	@echo ">>> Starting backend (8000) and JSON-RPC (8050) servers..."
+	@$(MAKE) -j2 run-backend run-rpc

@@ -4,18 +4,11 @@ from loguru import logger
 import time
 import uuid
 
-from .register_log import register_log
 
 chain_id_var = ContextVar("chain_id", default=None)
 parent_function_id_var = ContextVar("parent_function_id", default=None)
 
 project_id_var = ContextVar("project_id", default=None)
-
-logger.add(register_log, serialize=True)
-
-
-def init_logger(project_id: str):
-    project_id_var.set(project_id)
 
 
 def context_logger(

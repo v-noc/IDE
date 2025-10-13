@@ -5,7 +5,7 @@ import time
 import requests  # or any other HTTP client
 import json
 import uuid
-
+from .logger import project_id_var
 
 log_queue = queue.Queue()
 worker_thread = None
@@ -112,10 +112,12 @@ def json_sink(message):
     log_queue.put(message)
 
 
-def configure_logger(jsonrpc_url: str):
+def configure_logger(jsonrpc_url: str, project_id: str):
     """
     Configures loguru to use our custom sink.
     """
+
+    project_id_var.set(project_id)
     logger.remove()  # Remove default handlers
     logger.add(
         json_sink,
