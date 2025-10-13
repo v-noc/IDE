@@ -19,7 +19,9 @@ class LogRepository(BaseRepository[LogNode]):
         FOR e IN @@log_to_function_edges
           FILTER e._to == @function_id
           FOR l IN @@logs
-            FILTER l._id == e._from AND l.chain_id == @chain_id AND l.event_type == "enter"
+            FILTER l._id == e._from
+              AND l.chain_id == @chain_id
+              AND l.event_type == "enter"
             LIMIT 1
             RETURN l
         """
@@ -49,7 +51,9 @@ class LogRepository(BaseRepository[LogNode]):
         results = self.aql(query, bind_vars=bind_vars)
         return results[0] if results else None
 
-    def find_logs_for_function_chain(self, function_ids: List[str]) -> List[Dict[str, Any]]:
+    def find_logs_for_function_chain(
+        self, function_ids: List[str]
+    ) -> List[Dict[str, Any]]:
         query = """
             LET chains_per_function = (
                 FOR func_id IN @function_ids
@@ -63,8 +67,27 @@ class LogRepository(BaseRepository[LogNode]):
                     RETURN chains
             )
             
-            LET common_chains_nested = CALL('INTERSECTION', chains_per_function)
-            LET common_chains = FLATTEN(common_chains_nested)
+            /*
+             Compute intersection of chain ids across all functions without
+             using CALL/INTERSECTION. Take the chain ids of the first function
+             as a candidate set, then keep only those present in every other.
+            */
+            LET candidate_chains = (
+                LENGTH(chains_per_function) > 0
+                ? FIRST(chains_per_function)
+                : []
+            )
+            LET common_chains = (
+                FOR chain_id IN candidate_chains
+                    LET missing_in_any = (
+                        FOR arr IN chains_per_function
+                            FILTER chain_id NOT IN arr
+                            LIMIT 1
+                            RETURN true
+                    )
+                    FILTER LENGTH(missing_in_any) == 0
+                    RETURN chain_id
+            )
 
             FOR chain_id IN common_chains
                 FOR l IN @@logs
@@ -75,7 +98,10 @@ class LogRepository(BaseRepository[LogNode]):
                             RETURN DOCUMENT(e._to)
                     )
                     SORT l.timestamp
-                    RETURN { "vertex": l, "parent_id": parent_doc._id }
+                    RETURN {
+                        "vertex": l,
+                        "parent_id": parent_doc._id
+                    }
         """
         bind_vars = {
             "function_ids": function_ids,

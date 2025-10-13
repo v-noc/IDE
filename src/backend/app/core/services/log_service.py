@@ -14,11 +14,17 @@ class LogService:
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(self, function_id: str, params: "RegisterLogsParams", parent_function_id: Optional[str] = None):
+    def create(
+        self,
+        function_id: str,
+        params: "RegisterLogsParams",
+        parent_function_id: Optional[str] = None,
+    ):
         log = LogNode(
             timestamp=params.timestamp,
-            event_type=params.event_type.value if hasattr(
-                params.event_type, "value") else params.event_type,
+            event_type=params.event_type.value
+            if hasattr(params.event_type, "value")
+            else params.event_type,
             message=params.message,
             duration_ms=params.duration_ms,
             chain_id=params.chain_id,
@@ -37,12 +43,19 @@ class LogService:
             )
         )
 
-        self._link_to_parent_log(created, function_id,
-                                 parent_function_id, params.chain_id)
+        self._link_to_parent_log(
+            created, function_id, parent_function_id, params.chain_id
+        )
 
         return created
 
-    def _link_to_parent_log(self, created_log: LogNode, function_id: str, parent_function_id: Optional[str], chain_id: Optional[str]):
+    def _link_to_parent_log(
+        self,
+        created_log: LogNode,
+        function_id: str,
+        parent_function_id: Optional[str],
+        chain_id: Optional[str],
+    ):
         if not chain_id:
             return
 
@@ -106,7 +119,9 @@ class LogService:
 
         # 2. Collect all relevant function/method IDs
         # The 'origin' is a function, and each 'call' has a 'target' which is a function
-        function_ids = [origin["_id"]]
+        function_ids = []
+        if origin["node_type"] == "function":
+            function_ids.append(origin["_id"])
         for call_item in calls:
             target = call_item.get("target")
             if target:

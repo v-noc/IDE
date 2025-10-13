@@ -9,7 +9,7 @@ from app.api.json_rpc.schemas import RegisterLogsParams, LogEventType
 
 
 def _find_node(nodes, name: str, node_type: str):
-    for n in nodes:
+    for n in reversed(nodes):
         if getattr(n, 'node_type', '') == node_type and n.name == name:
             return n
         res = _find_node(getattr(n, 'children', []) or [], name, node_type)
@@ -30,6 +30,7 @@ def test_get_logs_for_call_chain(create_sample_project, arangodb_client):
     # Find all the functions and calls needed for the test
     main_fn = _find_node(tree, 'main', 'function')
     factory_call_fn = _find_node(tree, 'factory_call', 'function')
+    call_back_fn = _find_node(tree, 'call_back', 'function')
     factory_fn = _find_node(tree, 'factory', 'function')
     add_fn = _find_node(tree, 'add', 'function')
     build_fn = _find_node(tree, 'build', 'function')
@@ -45,14 +46,21 @@ def test_get_logs_for_call_chain(create_sample_project, arangodb_client):
     # Chain that spans the whole call chain
     log_service.create(main_fn.id, RegisterLogsParams(
         chain_id="chain-A", timestamp=datetime.now(timezone.utc), event_type=LogEventType.ENTER, message="main enter"))
-    log_service.create(factory_call_fn.id, RegisterLogsParams(
-        chain_id="chain-A", timestamp=datetime.now(timezone.utc), event_type=LogEventType.ENTER, message="factory_call enter"))
-    log_service.create(factory_fn.id, RegisterLogsParams(
-        chain_id="chain-A", timestamp=datetime.now(timezone.utc), event_type=LogEventType.ENTER, message="factory enter"))
-    log_service.create(add_fn.id, RegisterLogsParams(
-        chain_id="chain-A", timestamp=datetime.now(timezone.utc), event_type=LogEventType.ENTER, message="add enter"))
-    log_service.create(build_fn.id, RegisterLogsParams(
-        chain_id="chain-A", timestamp=datetime.now(timezone.utc), event_type=LogEventType.ENTER, message="build enter"))
+    log_service.create(main_fn.id, RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc), event_type=LogEventType.LOG, message="main log"))
+    log_service.create(main_fn.id, RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc), event_type=LogEventType.EXIT, message="main exit"))
+    log_service.create(factory_call_fn.id, parent_function_id=main_fn.id, params=RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc),  event_type=LogEventType.ENTER, message="factory_call enter"))
+
+    log_service.create(call_back_fn.id, parent_function_id=main_fn.id, params=RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc),  event_type=LogEventType.ENTER, message="call_back enter"))
+    log_service.create(factory_fn.id, parent_function_id=main_fn.id, params=RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc),  event_type=LogEventType.ENTER, message="factory enter"))
+    log_service.create(add_fn.id, parent_function_id=call_back_fn.id, params=RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc),  event_type=LogEventType.ENTER, message="add enter"))
+    log_service.create(build_fn.id, parent_function_id=add_fn.id, params=RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc),  event_type=LogEventType.ENTER, message="build enter"))
 
     # Noise chain that only touches some functions
     log_service.create(main_fn.id, RegisterLogsParams(chain_id="chain-B", timestamp=datetime.now(
@@ -63,16 +71,36 @@ def test_get_logs_for_call_chain(create_sample_project, arangodb_client):
     # Get logs for the call chain ending at 'build_call'
     log_tree = log_service.get_call_log(build_call.id)
 
-    # The result should be a single tree for chain-A, with 5 logs
+    # The result should be a single tree for chain-A
     assert len(log_tree) == 1
 
     root = log_tree[0]
     assert root.message == "main enter"
+    assert len(root.children) == 5
 
-    # Follow the chain down
-    current = root
-    expected_messages = ["factory_call enter", "add enter", "build enter"]
-    for msg in expected_messages:
-        assert len(current.children) == 1
-        current = current.children[0]
-        assert current.message == msg
+    # Check immediate children of main
+    child_messages = {c.message for c in root.children}
+    expected_child_messages = {
+        "main log",
+        "main exit",
+        "factory_call enter",
+        "call_back enter",
+        "factory enter"
+    }
+    assert child_messages == expected_child_messages
+
+    # Find the 'call_back enter' node to traverse down
+    call_back_node = next(
+        (c for c in root.children if c.message == "call_back enter"), None)
+    assert call_back_node is not None
+
+    # Check children of 'call_back enter'
+    assert len(call_back_node.children) == 1
+    add_node = call_back_node.children[0]
+    assert add_node.message == "add enter"
+
+    # Check children of 'add enter'
+    assert len(add_node.children) == 1
+    build_node = add_node.children[0]
+    assert build_node.message == "build enter"
+    assert len(build_node.children) == 0
