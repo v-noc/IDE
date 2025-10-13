@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, status
 from arango.database import StandardDatabase
 from typing import Dict, Any
+from pydantic import BaseModel
+import os
 
+from app.core.sandbox.code_run import CodeResponse, CodeRunner
 from app.db.client import get_db
 from app.core.services.file_service import FileService
 from app.core.services.class_service import ClassService
@@ -13,6 +16,14 @@ from app.core.repository import Repositories
 
 
 router = APIRouter()
+
+
+class RunCode(BaseModel):
+    code: str
+    executable_path: str | None = None
+    examples_path: str | None = None
+    command_prefix: str | None = None
+    filename: str | None = None
 
 
 def _get_services(db: StandardDatabase):
@@ -102,3 +113,35 @@ def get_file_code(
         raise HTTPException(status_code=404, detail="Code not found for file")
 
     return code_details
+
+
+@router.post("/{project_id}/run-code")
+def run_code(
+    project_id: str,
+    run_code: RunCode,
+    project_service: ProjectService = Depends(get_project_service),
+) -> CodeResponse:
+    """Execute provided code using the project's absolute root path and
+    return stdout/stderr."""
+    project_node = project_service.get(project_id)
+    if project_node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    project_path = os.path.abspath(getattr(project_node, "path", ""))
+    if not project_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Project path is missing",
+        )
+
+    return CodeRunner().run_code(
+        project_root_path=project_path,
+        python_executable=run_code.executable_path,
+        code=run_code.code,
+        examples_path=run_code.examples_path,
+        command_prefix=run_code.command_prefix,
+        filename=run_code.filename,
+    )
