@@ -11,6 +11,7 @@ dependencies = [
   "pathspec>=0.12.1",
   "astpretty>=3.0.0",
   "loguru>=0.7.3",
+  "watchdog>=6.0.0",
 ]
 
 [project.optional-dependencies]

@@ -1,12 +1,16 @@
-import type { NodeType } from "../service/useProject";
-import type { ThemeConfig } from "../store/useThemeStore";
+import type { NodeType, ThemeConfig } from "@/types/project";
 
-const getNodeStyle = (node: { node_type: NodeType, theme?: ThemeConfig }) => {
+
+const getNodeStyle = (node: { node_type: NodeType, theme?: ThemeConfig, target?: { node_type: NodeType } }) => {
     // If node has theme overrides, prefer them
     const themed = node.theme || {};
+    let node_type = node.node_type;
+    if (node_type == "call" && node.target) {
+        node_type = node.target.node_type;
+    }
 
     const defaults = (() => {
-        switch (node.node_type) {
+        switch (node_type) {
             case "project":
                 return {
                     backgroundColor: "#F3EDF7",

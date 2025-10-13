@@ -2,10 +2,11 @@ import { ResizableHandle, ResizablePanel } from "@/components/ui/resizable";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
-import { useThemeStore, type ThemeConfig } from "../store/useThemeStore";
+import { useThemeStore } from "../store/useThemeStore";
+import type { ThemeConfig } from "@/types/project";
 
 import useProjectStore from "../store/useProjectStore";
-import type { ProjectTreeResponse } from "../service/useProject";
+import type { ProjectNodeTree, ContainerNodeTree } from "@/types/project";
 
 const hasEffectiveTheme = (t: ThemeConfig | undefined): boolean => {
   if (!t) return false;
@@ -85,13 +86,10 @@ const Layout = ({
 
   const selectedPath = useMemo(() => {
     // Returns path from root to selected node (inclusive)
-    const path: ProjectTreeResponse[] = [];
+    const path: ContainerNodeTree[] = [];
     if (!projectData || !selectedNode) return path;
 
-    const dfs = (
-      node: ProjectTreeResponse,
-      acc: ProjectTreeResponse[]
-    ): boolean => {
+    const dfs = (node: ContainerNodeTree, acc: ProjectNodeTree[]): boolean => {
       acc.push(node);
       if (node.id === selectedNode.id) return true;
       if (node.children) {
@@ -103,7 +101,7 @@ const Layout = ({
       return false;
     };
 
-    const tmp: ProjectTreeResponse[] = [];
+    const tmp: ContainerNodeTree[] = [];
     if (dfs(projectData, tmp)) return tmp;
     return [];
   }, [projectData, selectedNode]);
@@ -113,7 +111,7 @@ const Layout = ({
     if (selectedNode && selectedPath.length > 0) {
       let merged: ThemeConfig | undefined = undefined;
       for (const node of selectedPath) {
-        merged = mergeThemes(merged, normalizeTheme(node.theme));
+        merged = mergeThemes(merged, normalizeTheme(node.theme_config));
       }
       return hasEffectiveTheme(merged) ? merged : undefined;
     }
@@ -124,9 +122,9 @@ const Layout = ({
     }
 
     // No node selected → use project theme if available and non-empty
-    const projectTheme = normalizeTheme(projectData?.theme);
+    const projectTheme = normalizeTheme(projectData?.theme_config);
     return hasEffectiveTheme(projectTheme) ? projectTheme : undefined;
-  }, [selectedNode, selectedPath, projectData?.theme]);
+  }, [selectedNode, selectedPath, projectData?.theme_config]);
 
   useEffect(() => {
     if (resolvedTheme !== undefined) {
@@ -199,7 +197,7 @@ const Layout = ({
       </ResizablePanel>
 
       {/* Right Sidebar (collapsible) */}
-      {rightSidebar && isRightOpen && (
+      {/* {rightSidebar && isRightOpen && (
         <>
           <ResizableHandle withHandle />
           <ResizablePanel
@@ -211,7 +209,7 @@ const Layout = ({
             {rightSidebar}
           </ResizablePanel>
         </>
-      )}
+      )} */}
 
       {/* Re-open toggle button when right sidebar is hidden */}
       {rightSidebar && !isRightOpen && (

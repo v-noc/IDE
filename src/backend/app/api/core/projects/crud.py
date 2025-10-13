@@ -1,208 +1,175 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Dict, Any, Optional
-from app.core.manager import CodeGraphManager
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+from typing import Optional
 
-from pydantic import BaseModel
+from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
+from app.core.parser.graph_builder import GraphBuilder
+from app.core.builder.tree_builder import TreeBuilder
+from app.db.client import get_db
+from arango.database import StandardDatabase
+from app.core.services.project_service import ProjectService
+from app.api.dependencies import get_project_service
+from pathlib import Path
+from app.core.watcher.service import WatcherService, get_watcher_service
 
-from app.core.parser.project_scanner import ProjectScanner
-from app.api.core.folder.virtual_folders import VirtualFolderResponse
-from app.models.properties import ThemeConfig
-
-
-# Pydantic models for request and response
-class ProjectCreate(BaseModel):
-    name: str
-    path: str
-
-
-class ProjectUpdate(BaseModel):
-    name: str
-    path: str
+from app.core.model.nodes import ProjectNode
 
 
-class ProjectResponse(BaseModel):
-    key: str
-    name: str
-    path: str
+class CreateProjectRequest(BaseModel):
+    name: str = Field(required=True, min_length=3)
+    description: str
+    path: str = Field(required=True)
 
 
-class ProjectTreeResponse(BaseModel):
-    key: str
-    name: str
-    id: str
-    icon: Optional[str]
-    description: Optional[str]
-    node_type: str
-    qname: str
-    properties: dict
-    theme: Optional[ThemeConfig] = None
-    root_id: Optional[str] = None
-    children: List["ProjectTreeResponse"]
-    call_order: Optional[int] = None
-    imports: Optional[List[Dict[str, Any]]] = None
-    fields: Optional[List[Dict[str, Any]]] = None
-    inputs: Optional[List[Dict[str, Any]]] = None
-    outputs: Optional[List[Dict[str, Any]]] = None
-
-def map_tree_to_response(tree_data: Dict[str, Any]) -> ProjectTreeResponse:
-    """
-    Recursively maps tree data to ProjectTreeResponse.
-    """
-    children = []
-    if "children" in tree_data:
-        children = [
-            map_tree_to_response(child) for child in tree_data["children"]
-        ]
-    
-   
-    return ProjectTreeResponse(
-        key=tree_data.get("_key", tree_data.get("key", "")),
-        id=tree_data.get("tree_id", tree_data.get("id", "")),
-        name=tree_data.get("name", ""),
-        icon=tree_data.get("icon", ""),
-        description=tree_data.get("description", ""),
-        node_type=tree_data.get("node_type", ""),
-        qname=tree_data.get("qname", ""),
-        properties=tree_data.get("properties", {}),
-        theme=tree_data.get("theme", {}),
-        call_order=tree_data.get("call_order", None),
-        imports=tree_data.get("imports", []),
-        fields=tree_data.get("fields", []),
-        inputs=tree_data.get("inputs", []),
-        outputs=tree_data.get("outputs", []),
-        children=children,
-        root_id=tree_data.get("id", ""),
-    )
-
-
-def get_manager() -> CodeGraphManager:
-    """Dependency to get the CodeGraphManager."""
-    # In a real application, this could be a more complex dependency,
-    # e.g., creating a new manager instance per request or using a singleton.
-    return CodeGraphManager()
+class UpdateProjectRequest(BaseModel):
+    name: Optional[str] = Field(default=None)
+    description: Optional[str] = Field(default=None)
 
 
 router = APIRouter()
 
 
-@router.post("/", response_model=ProjectResponse, status_code=201)
+@router.post("/", response_model=ProjectTreeNode)
 def create_project(
-    project: ProjectCreate,
-    manager: CodeGraphManager = Depends(get_manager)
-):
+    project: CreateProjectRequest,
+    db: StandardDatabase = Depends(get_db),
+    project_service: ProjectService = Depends(get_project_service),
+) -> ProjectTreeNode:
+    """Create a project graph from a local path.
+
+    Returns a `ProjectTreeNode` built from the analyzed source code if
+    successful.
+    Raises 400 when the provided path does not exist.
     """
-    Create a new project.
-    """
+    project_root = Path(project.path)
+    if not project_root.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "field": "path",
+                "message": f"Project path {project.path} does not exist",
+            },
+        )
 
-    scanner = ProjectScanner(project.path, project.name)
-    scanner.scan()
-    new_project_node = scanner.get_project()
-    project_response = ProjectResponse(
-        key=new_project_node.key,
-        name=new_project_node.name,
-        path=new_project_node.path
-    )
+    try:
+        graph_builder = GraphBuilder(project.path,  db=db)
+        graph_builder.build(project.name, project.description)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "field": "path",
+                "message": str(exc),
+            },
+        )
+    except Exception as exc:
+        print(exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to build project graph",
+        )
 
-    return project_response
+    project_node = graph_builder.project_node
+    children = project_service.get_children(project_node.id)
+
+    tree_builder = TreeBuilder(children)
+    tree = tree_builder.build()
+
+    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
+    return project_tree
 
 
-@router.get("/{project_key}", response_model=ProjectResponse)
+@router.get("/", response_model=list[ProjectNode])
+def get_projects(
+    project_service: ProjectService = Depends(get_project_service),
+) -> list[AnyTreeNode]:
+    projects = project_service.get_all()
+
+    return projects
+
+
+@router.get("/{project_id}/children", response_model=list[AnyTreeNode])
+def get_project_children(
+    project_id: str,
+    project_service: ProjectService = Depends(get_project_service),
+) -> list[AnyTreeNode]:
+    project_node = project_service.get(project_id)
+    children = project_service.get_children(project_node.id)
+
+    tree_builder = TreeBuilder(children)
+    tree = tree_builder.build()
+
+    # project_tree = ProjectTreeNode(
+    #     **project_node.model_dump(),
+    #     children=tree
+    # )
+    return tree
+
+
+@router.get("/{project_id}", response_model=ProjectTreeNode)
 def get_project(
-    project_key: str,
-    manager: CodeGraphManager = Depends(get_manager)
-):
-    """
-    Retrieve a single project by its key.
-    """
-    project_node = manager.get_project(project_key)
-    if not project_node:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return ProjectResponse(
-        key=project_node.key,
-        name=project_node.name,
-        path=project_node.path
-    )
+    project_id: str,
+    project_service: ProjectService = Depends(get_project_service),
+    watcher_service: WatcherService = Depends(get_watcher_service),
+) -> ProjectTreeNode:
+    project_node = project_service.get(project_id)
+    if project_node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    watcher_service.start_watching(project_node)
+
+    children = project_service.get_children(project_node.id)
+
+    tree_builder = TreeBuilder(children)
+    tree = tree_builder.build()
+
+    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
+    return project_tree
 
 
-@router.get("/{project_key}/virtual-folders",
-            response_model=List[VirtualFolderResponse])
-def get_project_virtual_folders(
-    project_key: str,
-    manager: CodeGraphManager = Depends(get_manager)
-):
-    """
-    Retrieve all virtual folders for a project.
-    """
-    project_node = manager.get_project(project_key)
-    if not project_node:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return [
-        folder.get_descendant_tree()
-        for folder in project_node.get_virtual_folders()
-    ]
+@router.get("/", response_model=list[ProjectTreeNode])
+def get_all_projects(
+    project_service: ProjectService = Depends(get_project_service),
+) -> list[AnyTreeNode]:
+    projects = project_service.get_all()
+    return projects
 
 
-@router.get("/{project_key}/tree", response_model=ProjectTreeResponse)
-def get_project_tree(
-    project_key: str,
-    manager: CodeGraphManager = Depends(get_manager)
-):
-    """
-    Retrieve project tree structure.
-    """
-    
-    project_node = manager.get_project(project_key)
-    if not project_node:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    tree_data = project_node.get_descendant_tree(with_dependency_tree=True)
-    return map_tree_to_response(tree_data)
-
-
-@router.get("/", response_model=List[ProjectResponse])
-def get_all_projects(manager: CodeGraphManager = Depends(get_manager)):
-    """
-    Retrieve all projects.
-    """
-    project_nodes = manager.get_all_projects()
-    return [
-        ProjectResponse(
-            key=p.key,
-            name=p.name,
-            path=p.path
-        ) for p in project_nodes
-    ]
-
-
-@router.put("/{project_key}", response_model=ProjectResponse)
-def update_project(
-    project_key: str,
-    project: ProjectUpdate,
-    manager: CodeGraphManager = Depends(get_manager)
-):
-    """
-    Update a project's details.
-    """
-    updated_project_node = manager.get_project(project_key)
-    if not updated_project_node:
-        raise HTTPException(status_code=404, detail="Project not found")
-    updated_project_node.update(name=project.name, path=project.path)
-    return ProjectResponse(
-        key=updated_project_node.key,
-        name=updated_project_node.name,
-        path=updated_project_node.path
-    )
-
-
-@router.delete("/{project_key}", status_code=204)
+@router.delete("/{project_id}", response_model=bool)
 def delete_project(
-    project_key: str,
-    manager: CodeGraphManager = Depends(get_manager)
-):
-    """
-    Delete a project by its key.
-    """
-    success = manager.delete_project(project_key)
-    if not success:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return None
+    project_id: str,
+    project_service: ProjectService = Depends(get_project_service),
+) -> bool:
+    project = project_service.get(project_id=project_id)
+    if project:
+        result = project_service.delete(project_id)
+        if result is False:
+            return False
+        return True
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project with {project_id} not found"
+        )
+
+
+@router.put("/{project_id}", response_model=ProjectNode)
+def update_project(
+    project_id: str,
+    project: UpdateProjectRequest,
+    project_service: ProjectService = Depends(get_project_service),
+) -> ProjectNode:
+    project_node = project_service.get(project_id)
+    if project_node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+    if project.name is not None:
+        project_node.name = project.name
+    if project.description is not None:
+        project_node.description = project.description
+    return project_service.update(project_node)

@@ -18,19 +18,6 @@ export interface CodeElementResponse {
   };
 }
 
-export const useGetCodeFromElement = (elementId: string) => {
-  return useQuery<CodeElementResponse>({
-    queryKey: ["codeElement", elementId],
-    queryFn: async () => {
-      const response = await api(
-        `${API_ROUTES.CODE_ELEMENTS}${elementId}/code`
-      );
-      return response as CodeElementResponse;
-    },
-    enabled: !!elementId,
-  });
-};
-
 export interface FileCodeResponse {
   file_id: string;
   file_name: string;
@@ -40,6 +27,24 @@ export interface FileCodeResponse {
   code: string;
 }
 
+// Unified response type from backend's /code-elements/{id}/code
+export type CodeResponse = CodeElementResponse | FileCodeResponse;
+
+// Unified hook: backend decides based on node type (file/function/class/call)
+export const useGetCodeForNode = (elementId: string) => {
+  return useQuery<CodeResponse>({
+    queryKey: ["codeNode", elementId],
+    queryFn: async () => {
+      const response = await api(
+        `${API_ROUTES.CODE_ELEMENTS}${elementId}/code`
+      );
+      return response as CodeResponse;
+    },
+    enabled: !!elementId,
+  });
+};
+
+// Kept for compatibility where file-only path is preferred
 export const useGetFileCode = (fileId: string) => {
   return useQuery<FileCodeResponse>({
     queryKey: ["fileCode", fileId],

@@ -14,12 +14,12 @@ import {
 } from "@/components/ui/tooltip";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import getIcons from "@/features/Dashboard/utils/getIcons";
-import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
+import type { AnyNodeTree } from "@/types/project";
 import getNodeStyle from "@/features/Dashboard/utils/getNodeStyle";
 import { TreeNode } from ".";
 
-interface NodeContentProps {
-  node: ProjectTreeResponse;
+type NodeContentProps = {
+  node: AnyNodeTree;
   isOpen: boolean;
   isSelected: boolean;
   isActive: boolean;
@@ -27,7 +27,8 @@ interface NodeContentProps {
   nestingLevel: number;
   handleToggle: (e: React.MouseEvent) => void;
   handleSelectNode: () => void;
-}
+  childFilter?: (node: AnyNodeTree) => boolean;
+};
 
 export const NodeContent = ({
   node,
@@ -38,6 +39,7 @@ export const NodeContent = ({
   nestingLevel,
   handleToggle,
   handleSelectNode,
+  childFilter,
 }: NodeContentProps) => {
   const nodeStyle = getNodeStyle(node);
 
@@ -72,7 +74,12 @@ export const NodeContent = ({
         </CollapsibleTrigger>
       )}
       <DynamicIcon
-        iconName={node.icon || getIcons(node.node_type)}
+        iconName={
+          node.icon ||
+          getIcons(
+            node.node_type == "call" ? node.target.node_type : node.node_type
+          )
+        }
         className={cn("h-4 w-4 flex-shrink-0")}
         color={nodeStyle.iconColor}
       />
@@ -102,6 +109,7 @@ export const NodeContent = ({
           isActive && "ring-2 ring-blue-600"
         )}
         style={currentStyle}
+        data-node-key={node._key}
       >
         <TooltipProvider>
           <Tooltip>
@@ -116,13 +124,16 @@ export const NodeContent = ({
         {hasChildren && (
           <CollapsibleContent>
             <ul className="pl-2 pt-1 space-y-1">
-              {node.children?.map((child) => (
-                <TreeNode
-                  key={child.key}
-                  node={child}
-                  nestingLevel={nestingLevel + 1}
-                />
-              ))}
+              {(node.children as unknown as AnyNodeTree[])
+                ?.filter((n) => (childFilter ? childFilter(n) : true))
+                .map((child) => (
+                  <TreeNode
+                    key={child._key}
+                    node={child}
+                    nestingLevel={nestingLevel + 1}
+                    childFilter={childFilter}
+                  />
+                ))}
             </ul>
           </CollapsibleContent>
         )}

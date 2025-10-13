@@ -15,9 +15,11 @@ import { useState, useRef, useEffect } from "react";
 import CreateVirtualFolderDialog from "./VirtualFolders/CreateVirtualFolderDialog";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useQueryClient } from "@tanstack/react-query";
 
 const SideBar = () => {
   const { projectId } = useParams();
+  const queryClient = useQueryClient();
   const { data, isLoading } = useGetProjectTreeWithKeyProject({
     key: projectId || "",
   });
@@ -30,6 +32,16 @@ const SideBar = () => {
       setProjectData(data);
     }
   }, [data, setProjectData]);
+
+  // Listen for code saves to resync tree without resetting UI state
+  useEffect(() => {
+    const handler = () => {
+      if (!projectId) return;
+      queryClient.invalidateQueries({ queryKey: ["projectTree", projectId] });
+    };
+    window.addEventListener("code-saved", handler);
+    return () => window.removeEventListener("code-saved", handler);
+  }, [projectId, queryClient]);
 
   const [isProjectFilesCollapsed, setProjectFilesCollapsed] = useState(false);
   const [isVirtualFoldersCollapsed, setVirtualFoldersCollapsed] =

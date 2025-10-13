@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useParams } from "react-router";
-import Canvas from "@/features/Dashboard/features/Main/components/canvas";
+
 import useProjectStore from "../../store/useProjectStore";
 import Documents from "./components/docs";
 import EditorCode from "./components/code";
@@ -15,20 +14,19 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 const MainCanvas = () => {
-  const { projectId } = useParams();
   const { selectedNode } = useProjectStore();
-
-  const isCanvasActive = useMemo(() => {
-    return selectedNode?.type === "function" || selectedNode?.type === "class";
-  }, [selectedNode?.type]);
+  const selectedPath = useMemo(
+    () => selectedNode?.qname?.replace(/\./g, " / ") ?? "",
+    [selectedNode?.qname]
+  );
 
   const isCodeActive = useMemo(() => {
     return (
-      selectedNode?.type === "function" ||
-      selectedNode?.type === "class" ||
-      selectedNode?.type == "file"
+      selectedNode?.node_type === "function" ||
+      selectedNode?.node_type === "class" ||
+      selectedNode?.node_type == "file"
     );
-  }, [selectedNode?.type]);
+  }, [selectedNode?.node_type]);
 
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
   const bottomPanelRef = useRef<ImperativePanelHandle>(null);
@@ -51,48 +49,45 @@ const MainCanvas = () => {
         className="h-full min-h-0 relative"
       >
         <ResizablePanel defaultSize={70} minSize={40} className="flex flex-col">
-          <Tabs
-            defaultValue={isCodeActive ? "code" : "docs"}
-            className="flex h-full w-full flex-col bg-background rounded"
-          >
-            <TabsList>
-              {isCodeActive && <TabsTrigger value="code">Code</TabsTrigger>}
-              {isCanvasActive && (
-                <TabsTrigger value="canvas">Canvas</TabsTrigger>
-              )}
-              <TabsTrigger value="docs">Docs</TabsTrigger>
-            </TabsList>
-            {isCanvasActive && (
-              <TabsContent value="canvas" className="flex-1">
-                <div className="h-full w-full rounded-md border">
-                  <Canvas projectId={projectId} />
-                </div>
-              </TabsContent>
-            )}
-            {isCodeActive && (
-              <TabsContent
-                value="code"
-                className="flex-1 flex flex-col overflow-hidden"
-              >
-                <div className="h-full w-full overflow-auto py-4">
-                  <EditorCode />
-                </div>
-              </TabsContent>
-            )}
-
-            <TabsContent
-              value="docs"
-              className="flex-1 flex flex-col overflow-hidden"
+          <div className="px-2 pb-2 text-xs text-muted-foreground truncate">
+            {selectedPath || "No selection"}
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <Tabs
+              defaultValue={isCodeActive ? "code" : "docs"}
+              className="flex h-full w-full flex-col bg-background rounded"
             >
-              <div className="flex-1 rounded-md border overflow-hidden">
-                <div className="h-full w-full overflow-auto py-4">
-                  <Documents />
+              <TabsList>
+                {isCodeActive && <TabsTrigger value="code">Code</TabsTrigger>}
+
+                <TabsTrigger value="docs">Docs</TabsTrigger>
+              </TabsList>
+
+              {isCodeActive && (
+                <TabsContent
+                  value="code"
+                  className="flex-1 flex flex-col overflow-hidden"
+                >
+                  <div className="h-full w-full overflow-auto py-4">
+                    <EditorCode />
+                  </div>
+                </TabsContent>
+              )}
+
+              <TabsContent
+                value="docs"
+                className="flex flex-col overflow-hidden"
+              >
+                <div className="flex-1 rounded-md border overflow-hidden">
+                  <div className="h-full w-full overflow-auto py-4">
+                    <Documents />
+                  </div>
                 </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+              </TabsContent>
+            </Tabs>
+          </div>
         </ResizablePanel>
-        <ResizableHandle className="data-[panel-group-direction=vertical]:h-0.5 opacity-0 bg-transparent after:hidden" />
+        <ResizableHandle className="data-[panel-group-direction=vertical]:h-0.5 " />
         <ResizablePanel
           ref={bottomPanelRef}
           defaultSize={30}

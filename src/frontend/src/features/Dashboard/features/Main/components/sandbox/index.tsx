@@ -4,23 +4,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Sandbox() {
   return (
-    <div className="p-2">
-      <Tabs defaultValue="test" className="flex flex-col">
-        <TabsList>
-          <TabsTrigger value="test">Test</TabsTrigger>
-          <TabsTrigger value="playground">Playground</TabsTrigger>
-        </TabsList>
-        <TabsContent value="test" className="mt-2">
-          <div className="rounded border p-2">
-            <Test />
-          </div>
-        </TabsContent>
-        <TabsContent value="playground" className="mt-2">
-          <div className="rounded border p-2">
-            <PlayGround />
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+    <Tabs defaultValue="playground" className="flex flex-col h-full p-2">
+      <TabsList>
+        <TabsTrigger value="playground">Playground</TabsTrigger>
+        <TabsTrigger value="test">Test</TabsTrigger>
+      </TabsList>
+      <TabsContent value="test" className="mt-2 h-full w-full overflow-hidden">
+        <div className="rounded border p-2">
+          <Test />
+        </div>
+      </TabsContent>
+      <TabsContent value="playground" className="mt-2 overflow-hidden">
+        <PlayGround />
+      </TabsContent>
+    </Tabs>
   );
 }

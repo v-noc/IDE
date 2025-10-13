@@ -19,14 +19,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import {
-  useUpdateVirtualFolder,
-  type ProjectTreeResponse,
-  type VirtualFolderUpdateRequest,
-} from "@/features/Dashboard/service/useProject";
+// import {
+//   useUpdateVirtualFolder,
+//   type ProjectTreeResponse,
+//   type VirtualFolderUpdateRequest,
+// } from "@/features/Dashboard/service/useProject";
 import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+// import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { ContainerNodeTree } from "@/types/project";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -38,7 +39,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface EditVirtualFolderDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  node: ProjectTreeResponse | undefined;
+  node: ContainerNodeTree | undefined;
 }
 
 const EditVirtualFolderDialog = ({
@@ -47,7 +48,7 @@ const EditVirtualFolderDialog = ({
   node,
 }: EditVirtualFolderDialogProps) => {
   const { projectData } = useProjectStore();
-  const queryClient = useQueryClient();
+  // const queryClient = useQueryClient();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -57,10 +58,10 @@ const EditVirtualFolderDialog = ({
     },
   });
 
-  const updateVirtualFolderMutation = useUpdateVirtualFolder(
-    projectData?.key || "",
-    node?.key || ""
-  );
+  // const updateVirtualFolderMutation = useUpdateVirtualFolder(
+  //   projectData?.key || "",
+  //   node?.key || ""
+  // );
 
   // Reset form when node changes
   useEffect(() => {
@@ -76,25 +77,25 @@ const EditVirtualFolderDialog = ({
       return;
     }
 
-    try {
-      const updateData: VirtualFolderUpdateRequest = {
-        name: data.name,
-        description: data.description || undefined,
-      };
+    // try {
+    //   const updateData: VirtualFolderUpdateRequest = {
+    //     name: data.name,
+    //     description: data.description || undefined,
+    //   };
 
-      await updateVirtualFolderMutation.mutateAsync(updateData);
+    //   await updateVirtualFolderMutation.mutateAsync(updateData);
 
-      // Refresh virtual folders only to avoid selection reset
-      await queryClient.invalidateQueries({
-        queryKey: ["virtualFolders", projectData.key],
-      });
+    //   // Refresh virtual folders only to avoid selection reset
+    //   await queryClient.invalidateQueries({
+    //     queryKey: ["virtualFolders", projectData.key],
+    //   });
 
-      toast.success("Virtual folder updated successfully");
-      onClose();
-    } catch (error) {
-      console.error("Failed to update virtual folder:", error);
-      toast.error("Failed to update virtual folder");
-    }
+    //   toast.success("Virtual folder updated successfully");
+    //   onClose();
+    // } catch (error) {
+    //   console.error("Failed to update virtual folder:", error);
+    //   toast.error("Failed to update virtual folder");
+    // }
   };
 
   if (!node) {
@@ -145,11 +146,9 @@ const EditVirtualFolderDialog = ({
               </Button>
               <Button
                 type="submit"
-                disabled={updateVirtualFolderMutation.isPending}
+                // disabled={updateVirtualFolderMutation.isPending}
               >
-                {updateVirtualFolderMutation.isPending
-                  ? "Updating..."
-                  : "Update"}
+                Update
               </Button>
             </div>
           </form>

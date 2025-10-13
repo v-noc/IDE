@@ -14,11 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import * as z from "zod";
 import { useForm } from "react-hook-form";
 import FileAndFolderSelector from "@/components/FileAndFolderSelector";
-import { useCreateProject } from "@/services/projectService";
+import { useCreateProject } from "@/features/Home/hook/useProject";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router";
-import * as toml from "toml";
-import { useEffect } from "react";
+import { parse } from "toml";
+
+import { extractFieldErrors } from "@/utils/errorMessagextractor";
 
 interface CreateProjectDialogProps {
   trigger?: React.ReactNode;
@@ -29,7 +30,7 @@ interface CreateProjectDialogProps {
 
 const formSchema = z.object({
   path: z.string().min(1, "Path is required"),
-  name: z.string(),
+  name: z.string().min(3, "String should have at least 3 characters"),
   description: z.string(),
 });
 
@@ -41,9 +42,16 @@ const CreateProjectDialog = ({
   title,
   description,
 }: CreateProjectDialogProps) => {
-  const { mutate: createProject, isSuccess, isPending } = useCreateProject();
+  const { mutate: createProject, isPending } = useCreateProject();
   const navigate = useNavigate();
-  const { register, handleSubmit, setValue, reset } = useForm<FormValues>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+
+    setError,
+    formState: { errors },
+  } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       path: "",
@@ -52,15 +60,22 @@ const CreateProjectDialog = ({
     },
   });
 
-  useEffect(() => {
-    if (isSuccess) {
-      reset();
-      navigate("/");
-    }
-  }, [isSuccess, reset, navigate]);
-
   const onSubmit = (data: FormValues) => {
-    createProject(data);
+    createProject(data, {
+      onSuccess(data) {
+        const key = data._key;
+        console.log("project ket", key);
+        setTimeout(() => navigate(`/project/${key}`));
+      },
+      onError: (error) => {
+        const fieldErrors = extractFieldErrors(error);
+        if (fieldErrors.length === 0) return;
+        fieldErrors.forEach((fe) => {
+          const field = fe.field as keyof FormValues;
+          setError(field, { type: "server", message: fe.message });
+        });
+      },
+    });
   };
 
   const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,10 +124,11 @@ const CreateProjectDialog = ({
 
           console.log("TOML content:", tomlContent);
           try {
-            const tomlData = toml.parse(tomlContent);
+            const tomlData = parse(tomlContent);
             // Set the folder path in the form
             setValue("path", tomlData.pwd);
             setValue("name", tomlData.name);
+            setValue("description", tomlData.description);
             console.log("TOML data:", tomlData);
           } catch (error) {
             console.error("Failed to parse TOML:", error);
@@ -146,6 +162,9 @@ const CreateProjectDialog = ({
                   handleFolderSelect={handleFolderSelect}
                 />
               </div>
+              {errors.path?.message && (
+                <p className="text-xs text-red-500">{errors.path.message}</p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Click the folder icon to browse and select an existing project
                 folder or file
@@ -158,6 +177,9 @@ const CreateProjectDialog = ({
                 placeholder="My Existing Project"
                 {...register("name")}
               />
+              {errors.name?.message && (
+                <p className="text-xs text-red-500">{errors.name.message}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="import-description">Description</Label>

@@ -1,17 +1,22 @@
-import type { ProjectTreeResponse } from "@/features/Dashboard/service/useProject";
-import { useTreeNode } from "./useTreeNode";
+import type { AnyNodeTree } from "@/types/project";
+import { useTreeNode } from "../../hooks/useTreeNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeContent } from "./NodeContent";
 import CreateVirtualNodeDialog from "../VirtualFolders/CreateVirtualNodeDialog";
 import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
-import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
+// import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
 
 interface TreeNodeProps {
-  node: ProjectTreeResponse;
+  node: AnyNodeTree;
   nestingLevel?: number;
+  childFilter?: (node: AnyNodeTree) => boolean;
 }
 
-export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
+export const TreeNode = ({
+  node,
+  nestingLevel = 0,
+  childFilter,
+}: TreeNodeProps) => {
   const {
     isOpen,
     isSelected,
@@ -19,19 +24,19 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
     hasChildren,
     isCreateDialogOpen,
     isEditDialogOpen,
-    isCreatePathDialogOpen,
+    // isCreatePathDialogOpen,
     nodeTypeToCreate,
     handleToggle,
     handleSelectNode,
     handleFocus,
     handleExpand,
     handleRemove,
-    handleEdit,
+    // handleEdit,
     handleCreatePath,
     closeCreateDialog,
     closeEditDialog,
     closeCreatePathDialog,
-  } = useTreeNode(node);
+  } = useTreeNode(node, childFilter);
 
   return (
     <>
@@ -40,7 +45,7 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
         onFocus={handleFocus}
         onExpand={handleExpand}
         onRemove={handleRemove}
-        onEdit={node.isVirtual ? handleEdit : undefined}
+        onEdit={undefined}
         onCreatePath={handleCreatePath}
       >
         <NodeContent
@@ -52,24 +57,25 @@ export const TreeNode = ({ node, nestingLevel = 0 }: TreeNodeProps) => {
           nestingLevel={nestingLevel}
           handleToggle={handleToggle}
           handleSelectNode={handleSelectNode}
+          childFilter={childFilter}
         />
       </NodeContextMenu>
       <CreateVirtualNodeDialog
         isOpen={isCreateDialogOpen}
         onClose={closeCreateDialog}
-        parentId={node.key}
+        parentId={node._key}
         nodeType={nodeTypeToCreate}
       />
       <EditVirtualFolderDialog
-        isOpen={isEditDialogOpen && !!node.isVirtual}
+        isOpen={isEditDialogOpen}
         onClose={closeEditDialog}
         node={node}
       />
-      <CreatePathDialog
+      {/* <CreatePathDialog
         isOpen={isCreatePathDialogOpen}
         onClose={closeCreatePathDialog}
         node={node}
-      />
+      /> */}
     </>
   );
 };

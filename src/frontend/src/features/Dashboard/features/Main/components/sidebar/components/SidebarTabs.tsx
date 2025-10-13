@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import BasicInfoSection from "../sections/BasicInfoSection";
-import CustomizationSection from "../sections/CustomizationSection";
+import BasicInfoSection from "./sections/BasicInfoSection";
+import CustomizationSection from "./sections/CustomizationSection";
 import {
   useConfigSidebarForm,
   type BasicInfoData,

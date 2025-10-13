@@ -1,102 +1,43 @@
-# tests/conftest.py
-import os
+from arango import DatabaseDeleteError
+from arango.client import ArangoClient
+
 import pytest
-import time
-from pathlib import Path
 
-def pytest_configure(config):
-    """
-    This hook runs before pytest collects any tests.
-    It sets the necessary environment variables to ensure the application
-    loads the test configuration and clears any cached settings.
-    """
-    os.environ["APP_ENV"] = "test"
-    conftest_dir = Path(__file__).parent
-    env_file_path = conftest_dir / ".env.test"
-    os.environ["ENV_FILE"] = str(env_file_path)
-    
-    # Clear the lru_cache for get_settings to ensure the new env vars are used
-    from app.config.settings import get_settings
-    get_settings.cache_clear()
+from app.db.client import get_db
+from app.core.repository import Repositories
 
-# --- Fixtures ---
 
-@pytest.fixture(scope="session")
-def monkeypatch_session():
-    """Session-scoped monkeypatch."""
-    from _pytest.monkeypatch import MonkeyPatch
-    m = MonkeyPatch()
-    yield m
-    m.undo()
+TEST_DB_NAME = "test_db"
 
-@pytest.fixture(scope="session")
-def test_settings():
-    """
-    Returns the application settings for the test environment.
-    """
-    from app.config.settings import get_settings
-    return get_settings()
 
-@pytest.fixture(scope="session")
-def test_db_name():
-    """Generate a unique, session-scoped test database name."""
-    return f"test_db_{int(time.time())}"
+@pytest.fixture()
+def arangodb_client():
+    client = get_db()
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_database(test_settings, test_db_name, monkeypatch_session):
-    """
-    Set up the test database for the entire test session.
-    """
-    from arango import ArangoClient
+    # 2. Create a new database for the test session if it doesn't exist
+    if not client.has_database(TEST_DB_NAME):
+        client.create_database(TEST_DB_NAME)
 
-    monkeypatch_session.setattr(test_settings, "ARANGO_DB", test_db_name)
-
-    sys_client = ArangoClient(hosts=test_settings.ARANGO_HOST)
-    sys_db = sys_client.db(
-        "_system",
+    # 3. Yield a new client instance connected to the test database
+    # This is the object your tests will interact with.
+    _client = ArangoClient("http://localhost:8529")
+    test_db_client = _client.db(
+        TEST_DB_NAME,
         username="root",
-        password=test_settings.ARANGO_ROOT_PASSWORD
+        password="password"
     )
+    yield test_db_client
 
-    if not sys_db.has_user(test_settings.ARANGO_USER):
-        sys_db.create_user(
-            username=test_settings.ARANGO_USER,
-            password=test_settings.ARANGO_PASSWORD,
-            active=True
-        )
+    # 4. Teardown: after all tests are done, drop the test database
+    # The `sys_db` client is used again for its administrative privileges.
 
-    if not sys_db.has_database(test_db_name):
-        sys_db.create_database(test_db_name)
+    try:
+        client.delete_database(TEST_DB_NAME, ignore_missing=True)
+    except DatabaseDeleteError:
+        print(
+            f"Failed to delete the test database '{TEST_DB_NAME}'. It may require manual cleanup.")
 
-    sys_db.update_permission(
-        username=test_settings.ARANGO_USER,
-        database=test_db_name,
-        permission="rw"
-    )
-    
-    yield
-
-    if sys_db.has_database(test_db_name):
-        sys_db.delete_database(test_db_name, ignore_missing=True)
-
-@pytest.fixture(scope="function", autouse=True)
-def clean_collections():
-    """
-    Function-scoped fixture to ensure a clean state for each test.
-    """
-    from app.db import collections as db_collections
-    from app.db.node_orm import ArangoNodeCollection
-    from app.db.edge_orm import ArangoEdgeCollection
-
-    for collection in db_collections.__dict__.values():
-        if isinstance(collection, (ArangoNodeCollection, ArangoEdgeCollection)):
-            collection.truncate()
-    yield
 
 @pytest.fixture
-def temp_project_dir(tmp_path):
-    """Creates a temporary directory with a sample project structure."""
-    project_dir = tmp_path / "test_project"
-    project_dir.mkdir()
-    (project_dir / "main.py").write_text("print('hello from test project')")
-    yield str(project_dir)
+def create_repos(arangodb_client):
+    return Repositories(arangodb_client)
