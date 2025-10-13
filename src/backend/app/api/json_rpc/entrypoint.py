@@ -5,7 +5,7 @@ import fastapi_jsonrpc as jsonrpc
 from fastapi import Depends, Body
 
 from .schemas import RegisterLogsParams, RegisterLogsResult
-from .dependencies import get_function, get_project
+from .dependencies import get_function, get_project, get_parent_function
 from .error import CodeElementNotFoundError, ProjectNotFoundError, FunctionNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ api_v1_logs = jsonrpc.Entrypoint(
 def register_logs(
     params: RegisterLogsParams = Body(...),
     project=Depends(get_project),
+    parent_function=Depends(get_parent_function),
     function=Depends(get_function),
 ) -> RegisterLogsResult:
 

@@ -54,3 +54,20 @@ def get_function(
         print("Error getting function", e)
     finally:
         return func_node
+
+
+def get_parent_function(
+    parent_function_id: str = Body(..., embed=True,
+                                   alias="parent_function_id"),
+    services=Depends(get_function_services),
+):
+    parent_func_node = None
+    try:
+        function_service = services
+
+        parent_func_node = function_service.get(parent_function_id)
+
+    except Exception as e:
+        print("Error getting function", e)
+    finally:
+        return parent_func_node

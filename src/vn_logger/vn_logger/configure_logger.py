@@ -20,6 +20,7 @@ def log_worker(jsonrpc_url: str):
     while not stop_worker.is_set():
         try:
             log_message_str = log_queue.get(block=True, timeout=1)
+            project_id = project_id_var.get()
             record = json.loads(log_message_str)['record']
             extra = record['extra']
 
@@ -29,15 +30,18 @@ def log_worker(jsonrpc_url: str):
             # Construct the base params object
             params = {
                 "function_id": extra.get('function_id'),
-                "chain_id": extra.get('chain_id'),
+                "project_id": project_id,
                 "parent_function_id": extra.get('parent_function_id'),
-                "timestamp": record['time']["timestamp"],
-                "duration_ms": extra.get('duration_ms'),
-                "event_type": event_type,
-                "message": record['message'],
-                "payload": None,
-                "result": None,
-                "error": None
+                "params": {
+                    "chain_id": extra.get('chain_id'),
+                    "timestamp": record['time']["timestamp"],
+                    "duration_ms": extra.get('duration_ms'),
+                    "event_type": event_type,
+                    "message": record['message'],
+                    "payload": None,
+                    "result": None,
+                    "error": None
+                }
             }
 
             # Add event-specific fields based on the robust event_type
