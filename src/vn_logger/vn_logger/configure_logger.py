@@ -31,7 +31,7 @@ def log_worker(jsonrpc_url: str):
                 "function_id": extra.get('function_id'),
                 "chain_id": extra.get('chain_id'),
                 "parent_function_id": extra.get('parent_function_id'),
-                "timestamp": record['time']['isoformat'],
+                "timestamp": record['time']["timestamp"],
                 "duration_ms": extra.get('duration_ms'),
                 "event_type": event_type,
                 "message": record['message'],
@@ -59,7 +59,7 @@ def log_worker(jsonrpc_url: str):
 
             jsonrpc_request = {
                 "jsonrpc": "2.0",
-                "method": "log.write",
+                "method": "register_logs",
                 "params": params,
                 "id": str(uuid.uuid4())
             }

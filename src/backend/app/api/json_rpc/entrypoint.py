@@ -5,8 +5,8 @@ import fastapi_jsonrpc as jsonrpc
 from fastapi import Depends, Body
 
 from .schemas import RegisterLogsParams, RegisterLogsResult
-from .dependencies import get_project, get_element_services
-from .error import CodeElementNotFoundError
+from .dependencies import get_function, get_project
+from .error import CodeElementNotFoundError, ProjectNotFoundError, FunctionNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,8 @@ async def logging_middleware(ctx: jsonrpc.JsonRpcContext):
         logger.info("Response: %r", ctx.raw_response)
 
 
-common_errors = [CodeElementNotFoundError]
+common_errors = [CodeElementNotFoundError,
+                 ProjectNotFoundError, FunctionNotFoundError]
 common_errors.extend(jsonrpc.Entrypoint.default_errors)
 
 
@@ -35,27 +36,14 @@ api_v1_logs = jsonrpc.Entrypoint(
 def register_logs(
     params: RegisterLogsParams = Body(...),
     project=Depends(get_project),
-    element_services=Depends(get_element_services),
+    function=Depends(get_function),
 ) -> RegisterLogsResult:
-    file_service, class_service, function_service, call_service = element_services
 
-    element_id = params.element_id
+    # For now, simply acknowledge receipt. Integrations can be added later.
 
-    # Resolve by key across node types
-    node = (
-        file_service.repos.node_repo.get_raw_by_key(element_id)
-        if hasattr(file_service.repos, "node_repo")
-        else None
-    )
-    if not node:
-        # Fallback using existing API logic (code endpoint uses node_repo)
-        try:
-            node = file_service.repos.nodes.get_raw_by_key(element_id)
-        except Exception:
-            node = None
+    if project is None:
+        raise ProjectNotFoundError
+    if function is None:
+        raise FunctionNotFoundError
 
-    if not node:
-        raise CodeElementNotFoundError
-
-    # For now, just acknowledge; later we will record structured logs
     return RegisterLogsResult(ok=True)

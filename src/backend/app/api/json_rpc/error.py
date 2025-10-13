@@ -1,13 +1,16 @@
 from fastapi_jsonrpc import BaseError
 
 
-class CodeElementNotFoundError(BaseError):
-    code = -32001
-    message = "Code element not found"
-    data = None
-
-
 class ProjectNotFoundError(BaseError):
-    code = -32002
-    message = "Project not found"
-    data = None
+    CODE = -32000
+    MESSAGE = "Project not found"
+
+
+class CodeElementNotFoundError(BaseError):
+    CODE = -32001
+    MESSAGE = "Code element not found"
+
+
+class FunctionNotFoundError(BaseError):
+    CODE = -32002
+    MESSAGE = "Function not found"

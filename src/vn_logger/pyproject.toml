@@ -10,6 +10,5 @@ dependencies = ["loguru>=0.7.3"]
 requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["vn_logger*"]
+[tool.setuptools]
+packages = ["vn_logger"]

@@ -25,15 +25,32 @@ def get_project(
     project_id: str = Body(..., embed=True, alias="project_id"),
     services=Depends(get_services),
 ):
-    project_service, *_ = services
-    project = project_service.get(project_id)
-    if project is None:
-        from .error import ProjectNotFoundError
+    try:
+        project_service, *_ = services
+        project = project_service.get(project_id)
 
-        raise ProjectNotFoundError
-    return project
+        return project
+    except Exception as e:
+        print("Error getting project", e)
+        return None
 
 
-def get_element_services(services=Depends(get_services)):
-    _, file_service, class_service, function_service, call_service = services
-    return file_service, class_service, function_service, call_service
+def get_function_services(services=Depends(get_services)):
+    _, _, _, function_service, _ = services
+    return function_service
+
+
+def get_function(
+    function_id: str = Body(..., embed=True, alias="function_id"),
+    services=Depends(get_function_services),
+):
+    func_node = None
+    try:
+        function_service = services
+
+        func_node = function_service.get(function_id)
+
+    except Exception as e:
+        print("Error getting function", e)
+    finally:
+        return func_node
