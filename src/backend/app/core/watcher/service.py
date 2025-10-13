@@ -60,7 +60,7 @@ class WatcherService:
                 self.pause_watching(project_id)
 
                 graph_builder = GraphBuilder(
-                    project_node.path, project_node, self.db)
+                    project_node.path, project_node=project_node, db=self.db)
                 graph_builder.build(project_node.name,
                                     project_node.description)
                 logger.info(

@@ -1,3 +1,5 @@
+import ast
+import os
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.parser.analyzer.file_navigator import FileContainer
 from app.core.parser.analyzer.symbol_collector.node_handlers import (
@@ -9,6 +11,7 @@ from app.core.parser.analyzer.symbol_collector.node_handlers import (
 )
 from app.core.parser.ast.models import BaseSchema, SchemaType
 from app.core.parser.scope_manager.core.scope import ScopeType
+from app.core.model.properties import CodePosition
 
 
 class SymbolCollector:
@@ -34,6 +37,9 @@ class SymbolCollector:
         self._prune_stale_direct_children(
             current_scope_qname, file_node.parsed_nodes
         )
+        # After processing and potential source edits (docstrings), rescan AST
+        # and update stored positions to the ground truth from the file.
+        self._rescan_and_update_positions(file_node)
 
     def _collect_symbols_recursive(self, node: BaseSchema):
         if node.schema_type == SchemaType.FUNCTION:
@@ -227,5 +233,90 @@ class SymbolCollector:
                     self.symbol_table.node_service["function"].delete(key)
                 else:
                     self.symbol_table.node_service["class"].delete(key)
+            except Exception:
+                continue
+
+    def _rescan_and_update_positions(self, file_node: FileContainer) -> None:
+        """Re-parse the file and update function/class positions.
+
+        This avoids cumulative line shifting by using the AST as the
+        single source of truth after any in-place edits (e.g., docstrings).
+        """
+        try:
+            file_path = file_node.file_path
+            project_root = self.symbol_table.project_node.path
+            abs_path = (
+                file_path
+                if os.path.isabs(file_path)
+                else os.path.normpath(os.path.join(project_root, file_path))
+            )
+            with open(abs_path, "r") as f:
+                source = f.read()
+        except Exception:
+            return
+
+        try:
+            tree = ast.parse(source)
+        except Exception:
+            return
+
+        module_qname = (
+            self.symbol_table.scope_manager.current_scope.qualified_name
+        )
+
+        updates: list[tuple[str, CodePosition]] = []
+
+        def visit_body(body: list[ast.AST], parents: list[str]) -> None:
+            for n in body:
+                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    chain = parents + [getattr(n, "name", "")]
+                    qname = f"{module_qname}." + ".".join(chain)
+                    line_no = getattr(n, "lineno", 0) or 0
+                    col = getattr(n, "col_offset", 0) or 0
+                    end_line = getattr(n, "end_lineno", None)
+                    end_col = getattr(n, "end_col_offset", 0) or 0
+                    pos = CodePosition(
+                        line_no=line_no,
+                        col_offset=col,
+                        end_line_no=end_line,
+                        end_col_offset=end_col,
+                    )
+                    updates.append((qname, pos))
+                    # Recurse into nested defs/classes
+                    visit_body(getattr(n, "body", []), chain)
+                elif isinstance(n, ast.ClassDef):
+                    chain = parents + [getattr(n, "name", "")]
+                    qname = f"{module_qname}." + ".".join(chain)
+                    line_no = getattr(n, "lineno", 0) or 0
+                    col = getattr(n, "col_offset", 0) or 0
+                    end_line = getattr(n, "end_lineno", None)
+                    end_col = getattr(n, "end_col_offset", 0) or 0
+                    pos = CodePosition(
+                        line_no=line_no,
+                        col_offset=col,
+                        end_line_no=end_line,
+                        end_col_offset=end_col,
+                    )
+                    updates.append((qname, pos))
+                    visit_body(getattr(n, "body", []), chain)
+
+        visit_body(getattr(tree, "body", []), [])
+
+        for qname, pos in updates:
+            stored = self.symbol_table.qname_to_node.get(qname)
+            if not stored:
+                continue
+            try:
+                stored.position = pos
+                node_type = getattr(stored, "node_type", None)
+                if node_type == "function":
+                    svc = self.symbol_table.node_service["function"]
+                elif node_type == "class":
+                    svc = self.symbol_table.node_service["class"]
+                else:
+                    continue
+                svc.update(stored)
+                # refresh mapping
+                self.symbol_table.qname_to_node[qname] = stored
             except Exception:
                 continue

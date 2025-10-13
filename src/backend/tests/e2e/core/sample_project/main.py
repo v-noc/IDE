@@ -1,7 +1,7 @@
 from .core.utils.helper import create_child
 
 def main():
-    """ ID: ddc19d8c-bb31-4413-b264-8b28dd57deca """
+    """ ID: 81ffba39-2584-4438-bb14-c4d861f11417 """
     child = create_child()
     print(child.get_name())
 if __name__ == '__main__':

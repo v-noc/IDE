@@ -1,5 +1,3 @@
-
-
 def strip_dynamic_keys(data):
     if isinstance(data, dict):
         for key in ["_key", "_id", "created_at", "updated_at"]:
@@ -75,18 +73,22 @@ def test_create_project(client, sample_project_path):
     # 2a-i. Check parent.py contents
     assert len(parent_py['children']) == 1
     parent_class = parent_py['children'][0]
-    assert parent_class['name'] == 'Parent' and parent_class['node_type'] == 'class'
+    assert parent_class['name'] == 'Parent'
+    assert parent_class['node_type'] == 'class'
     parent_class['children'].sort(key=lambda x: x['name'])
     assert len(parent_class['children']) == 2
     parent_init = find_child(parent_class, '__init__')
     parent_get_name = find_child(parent_class, 'get_name')
-    assert parent_init is not None and parent_init['node_type'] == 'function'
-    assert parent_get_name is not None and parent_get_name['node_type'] == 'function'
+    assert parent_init is not None
+    assert parent_init['node_type'] == 'function'
+    assert parent_get_name is not None
+    assert parent_get_name['node_type'] == 'function'
 
     # 2a-ii. Check child.py contents
     assert len(child_py['children']) == 1
     child_class = child_py['children'][0]
-    assert child_class['name'] == 'Child' and child_class['node_type'] == 'class'
+    assert child_class['name'] == 'Child'
+    assert child_class['node_type'] == 'class'
     assert len(child_class['children']) == 1
     child_init = find_child(child_class, '__init__')
     assert child_init is not None and child_init['node_type'] == 'function'
@@ -99,10 +101,12 @@ def test_create_project(client, sample_project_path):
     # 2b-i. Check helper.py contents
     assert len(helper_py['children']) == 1
     create_child_func = helper_py['children'][0]
-    assert create_child_func['name'] == 'create_child' and create_child_func['node_type'] == 'function'
+    assert create_child_func['name'] == 'create_child'
+    assert create_child_func['node_type'] == 'function'
     assert len(create_child_func['children']) == 1
     init_call = create_child_func['children'][0]
-    assert init_call['name'] == '(Child).__init__' and init_call['node_type'] == 'call'
+    assert init_call['name'] == '(Child).__init__'
+    assert init_call['node_type'] == 'call'
 
 
 def test_get_project(client, sample_project_node):
@@ -189,3 +193,9 @@ def test_get_project_children(client, sample_project_path):
 
     assert response.json()[0]['name'] == 'main.py'
     assert response.json()[1]['name'] == 'core'
+
+
+def test_get_code_from_file(client, sample_project_node):
+    print(sample_project_node)
+    # response = client.get(
+    #     f'/api/v1/code-elements/{sample_project_node._key}/main.py')
