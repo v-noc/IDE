@@ -21,9 +21,6 @@ class RegisterLogsParams(BaseModel):
     chain_id: Optional[str] = Field(
         None, description="Chain ID"
     )
-    parent_function_id: Optional[str] = Field(
-        None, description="Parent Function ID"
-    )
     timestamp: datetime = Field(
         ..., description="Log timestamp (ISO 8601)"
     )

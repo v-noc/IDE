@@ -8,6 +8,7 @@ from app.core.services.file_service import FileService
 from app.core.services.class_service import ClassService
 from app.core.services.function_service import FunctionService
 from app.core.services.call_service import CallService
+from app.core.services.log_service import LogService
 
 
 def get_services(db: StandardDatabase = Depends(get_db)):
@@ -18,6 +19,7 @@ def get_services(db: StandardDatabase = Depends(get_db)):
         ClassService(repos),
         FunctionService(repos),
         CallService(repos),
+        LogService(repos),
     )
 
 
@@ -36,7 +38,7 @@ def get_project(
 
 
 def get_function_services(services=Depends(get_services)):
-    _, _, _, function_service, _ = services
+    _, _, _, function_service, _, _ = services
     return function_service
 
 
@@ -71,3 +73,8 @@ def get_parent_function(
         print("Error getting function", e)
     finally:
         return parent_func_node
+
+
+def get_log_service(services=Depends(get_services)):
+    *_, log_service = services
+    return log_service

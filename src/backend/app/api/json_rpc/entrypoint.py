@@ -5,7 +5,7 @@ import fastapi_jsonrpc as jsonrpc
 from fastapi import Depends, Body
 
 from .schemas import RegisterLogsParams, RegisterLogsResult
-from .dependencies import get_function, get_project, get_parent_function
+from .dependencies import get_function, get_project, get_parent_function, get_log_service
 from .error import CodeElementNotFoundError, ProjectNotFoundError, FunctionNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ def register_logs(
     project=Depends(get_project),
     parent_function=Depends(get_parent_function),
     function=Depends(get_function),
+    log_service=Depends(get_log_service),
 ) -> RegisterLogsResult:
 
     # For now, simply acknowledge receipt. Integrations can be added later.
@@ -46,5 +47,9 @@ def register_logs(
         raise ProjectNotFoundError
     if function is None:
         raise FunctionNotFoundError
+
+    # Persist log and edges (derive parent via parent_function + chain_id)
+    parent_function_id = parent_function.id if parent_function else None
+    log_service.create(function.id, params, parent_function_id)
 
     return RegisterLogsResult(ok=True)

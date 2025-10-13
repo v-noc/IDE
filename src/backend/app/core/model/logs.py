@@ -7,8 +7,6 @@ from .base import ArangoBase
 
 
 class LogNode(ArangoBase):
-    node_type: Literal["log"] = "log"
-
     timestamp: datetime = Field(
         ..., description="Event timestamp (UTC ISO 8601)"
     )
