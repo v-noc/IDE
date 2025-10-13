@@ -4,4 +4,6 @@ version = "0.1.0"
 description = "Event and data logging service"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "loguru>=0.7.3",
+]
