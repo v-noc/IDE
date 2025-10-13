@@ -5,7 +5,7 @@
     "request": "launch",
     "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
     "module": "pytest",
-    "args": ["-s", "tests/e2e/core/test_code_element.py"],
+    "args": ["-s", "tests/unit/service/logger/test_get_log_complex.py"],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
       "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"

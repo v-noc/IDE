@@ -87,7 +87,6 @@ def test_create_log_with_parent(create_sample_project, arangodb_client):
 
     # Create child log on child function with same chain, passing parent_function_id
     child_params = RegisterLogsParams(
-        function_id=add_fn.id,
         chain_id="chain-2",
         timestamp=datetime.now(timezone.utc),
         duration_ms=None,

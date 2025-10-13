@@ -15,9 +15,6 @@ class LogEventType(str, Enum):
 class RegisterLogsParams(BaseModel):
     """Params for register_logs JSON-RPC method."""
 
-    function_id: Optional[str] = Field(
-        None, description="Function ID"
-    )
     chain_id: Optional[str] = Field(
         None, description="Chain ID"
     )
