@@ -90,3 +90,31 @@ class LogService:
         flat_list.extend(flat_descendants)
 
         return LogTreeBuilder(flat_list).build()
+
+    def get_call_log(self, call_id: str):
+        # 1. Get the upward call chain, including the origin
+        chain_info = self.repos.call_repo.find_upward_call_chain(call_id)
+        if not chain_info:
+            return []
+
+        data = chain_info[0]
+        origin = data.get("origin")
+        calls = data.get("calls", [])
+
+        if not origin:
+            return []
+
+        # 2. Collect all relevant function/method IDs
+        # The 'origin' is a function, and each 'call' has a 'target' which is a function
+        function_ids = [origin["_id"]]
+        for call_item in calls:
+            target = call_item.get("target")
+            if target:
+                function_ids.append(target["_id"])
+
+        # 3. Find logs that share a chain_id across all these functions
+        flat_logs = self.repos.log_repo.find_logs_for_function_chain(
+            function_ids)
+
+        # 4. Build the tree from the flat list of logs
+        return LogTreeBuilder(flat_logs).build()

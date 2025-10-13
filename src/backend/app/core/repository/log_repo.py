@@ -49,6 +49,43 @@ class LogRepository(BaseRepository[LogNode]):
         results = self.aql(query, bind_vars=bind_vars)
         return results[0] if results else None
 
+    def find_logs_for_function_chain(self, function_ids: List[str]) -> List[Dict[str, Any]]:
+        query = """
+            LET chains_per_function = (
+                FOR func_id IN @function_ids
+                    LET chains = (
+                        FOR e IN @@log_to_function_edges
+                            FILTER e._to == func_id
+                            FOR l IN @@logs
+                                FILTER l._id == e._from
+                                RETURN DISTINCT l.chain_id
+                    )
+                    RETURN chains
+            )
+            
+            LET common_chains_nested = CALL('INTERSECTION', chains_per_function)
+            LET common_chains = FLATTEN(common_chains_nested)
+
+            FOR chain_id IN common_chains
+                FOR l IN @@logs
+                    FILTER l.chain_id == chain_id
+                    LET parent_doc = FIRST(
+                        FOR e IN @@log_to_log_edges
+                            FILTER e._from == l._id
+                            RETURN DOCUMENT(e._to)
+                    )
+                    SORT l.timestamp
+                    RETURN { "vertex": l, "parent_id": parent_doc._id }
+        """
+        bind_vars = {
+            "function_ids": function_ids,
+            "@logs": "logs",
+            "@log_to_function_edges": "log_to_function_edges",
+            "@log_to_log_edges": "log_to_log_edges",
+        }
+        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+        return list(cursor)
+
     def find_function_log(self, function_id: str) -> List[Dict[str, Any]]:
         query = """
         LET function_log_ids = (

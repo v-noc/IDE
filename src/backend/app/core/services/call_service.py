@@ -97,3 +97,6 @@ class CallService(ContainerService):
             target_id,
             parent_id,
         )
+
+    def get_call_parent_chain(self, call_id: str):
+        return self.repos.call_repo.find_upward_call_chain(call_id)
