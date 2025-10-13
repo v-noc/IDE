@@ -7,7 +7,7 @@
     "module": "pytest",
     "args": [
       "-s",
-      "tests/unit/parser/analyzer/class/test_class.py::test_class_analysis"
+      "tests/unit/parser/analyzer/function/test_function_sync.py::test_function_sync_add_and_remove_inside_function"
     ],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {

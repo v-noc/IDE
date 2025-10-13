@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from app.core.parser.scope_manager.manager import ScopeManager
 
 
+# TODO: Fix recursive check
 class CallGraphTracker:
     """
     Tracks the call graph and manages the call stack.
