@@ -102,7 +102,7 @@ def test_create_project(client, sample_project_path):
     assert create_child_func['name'] == 'create_child' and create_child_func['node_type'] == 'function'
     assert len(create_child_func['children']) == 1
     init_call = create_child_func['children'][0]
-    assert init_call['name'] == '__init__' and init_call['node_type'] == 'call'
+    assert init_call['name'] == '(Child).__init__' and init_call['node_type'] == 'call'
 
 
 def test_get_project(client, sample_project_node):

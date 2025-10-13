@@ -52,7 +52,7 @@ def create_project(
         )
 
     try:
-        graph_builder = GraphBuilder(project.path, None, db)
+        graph_builder = GraphBuilder(project.path,  db=db)
         graph_builder.build(project.name, project.description)
     except FileNotFoundError as exc:
         raise HTTPException(
