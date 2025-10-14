@@ -1,8 +1,9 @@
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, List
 
 from app.core.repository import Repositories
 from app.core.model.logs import LogNode
 from app.core.model.edges import LogToFunctionEdge, LogToLogEdge
+from app.core.schemas.log_tree import LogTreeNode
 
 if TYPE_CHECKING:
     from app.api.json_rpc.schemas import RegisterLogsParams
@@ -104,32 +105,37 @@ class LogService:
 
         return LogTreeBuilder(flat_list).build()
 
-    def get_call_log(self, call_id: str):
-        # 1. Get the upward call chain, including the origin
-        chain_info = self.repos.call_repo.find_upward_call_chain(call_id)
-        if not chain_info:
+    def get_call_log(self, call_id: str) -> List[LogTreeNode]:
+        # 1. Find the function that was called
+        callees = self.repos.call_repo.get_target(call_id)
+        if not callees:
+            return []
+        called_function_id = callees.id
+
+        # 2. Find the full function call chain
+        function_docs_result = self.repos.call_repo.find_upward_call_chain(
+            call_id)
+        if not function_docs_result:
             return []
 
-        data = chain_info[0]
-        origin = data.get("origin")
-        calls = data.get("calls", [])
+        chain_data = function_docs_result[0]
+        function_ids = [call['target']['_id']
+                        for call in chain_data.get('calls', [])]
 
-        if not origin:
-            return []
+        origin = chain_data.get('origin')
+        if origin and origin.get('node_type') == 'function':
+            function_ids.insert(0, origin['_id'])
 
-        # 2. Collect all relevant function/method IDs
-        # The 'origin' is a function, and each 'call' has a 'target' which is a function
-        function_ids = []
-        if origin["node_type"] == "function":
-            function_ids.append(origin["_id"])
-        for call_item in calls:
-            target = call_item.get("target")
-            if target:
-                function_ids.append(target["_id"])
-
-        # 3. Find logs that share a chain_id across all these functions
+        # 4. Find logs that share a chain_id across all these functions
         flat_logs = self.repos.log_repo.find_logs_for_function_chain(
-            function_ids)
+            function_ids,
+            start_function_id=called_function_id,
 
-        # 4. Build the tree from the flat list of logs
+        )
+
+        # 5. Build the tree from the flat list of logs
+        return LogTreeBuilder(flat_logs).build()
+
+    def find_function_log(self, function_id: str):
+        flat_logs = self.repos.log_repo.find_function_log(function_id)
         return LogTreeBuilder(flat_logs).build()

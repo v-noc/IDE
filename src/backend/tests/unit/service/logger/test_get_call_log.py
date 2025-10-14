@@ -62,10 +62,16 @@ def test_get_logs_for_call_chain(create_sample_project, arangodb_client):
     log_service.create(build_fn.id, parent_function_id=add_fn.id, params=RegisterLogsParams(
         chain_id="chain-A", timestamp=datetime.now(timezone.utc),  event_type=LogEventType.ENTER, message="build enter"))
 
+    log_service.create(build_fn.id, parent_function_id=build_fn.id, params=RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc),  event_type=LogEventType.LOG, message="build log"))
+
+    log_service.create(build_fn.id, parent_function_id=build_fn.id, params=RegisterLogsParams(
+        chain_id="chain-A", timestamp=datetime.now(timezone.utc),  event_type=LogEventType.EXIT, message="build exit"))
+
     # Noise chain that only touches some functions
     log_service.create(main_fn.id, RegisterLogsParams(chain_id="chain-B", timestamp=datetime.now(
         timezone.utc), event_type=LogEventType.LOG, message="some other log"))
-    log_service.create(add_fn.id, RegisterLogsParams(
+    log_service.create(build_fn.id, RegisterLogsParams(
         chain_id="chain-B", timestamp=datetime.now(timezone.utc), event_type=LogEventType.LOG, message="another log"))
 
     # Get logs for the call chain ending at 'build_call'
@@ -75,32 +81,14 @@ def test_get_logs_for_call_chain(create_sample_project, arangodb_client):
     assert len(log_tree) == 1
 
     root = log_tree[0]
-    assert root.message == "main enter"
-    assert len(root.children) == 5
+    assert root.message == "build enter"
+    assert len(root.children) == 2
 
     # Check immediate children of main
     child_messages = {c.message for c in root.children}
     expected_child_messages = {
-        "main log",
-        "main exit",
-        "factory_call enter",
-        "call_back enter",
-        "factory enter"
+        "build log",
+        "build exit",
+
     }
     assert child_messages == expected_child_messages
-
-    # Find the 'call_back enter' node to traverse down
-    call_back_node = next(
-        (c for c in root.children if c.message == "call_back enter"), None)
-    assert call_back_node is not None
-
-    # Check children of 'call_back enter'
-    assert len(call_back_node.children) == 1
-    add_node = call_back_node.children[0]
-    assert add_node.message == "add enter"
-
-    # Check children of 'add enter'
-    assert len(add_node.children) == 1
-    build_node = add_node.children[0]
-    assert build_node.message == "build enter"
-    assert len(build_node.children) == 0

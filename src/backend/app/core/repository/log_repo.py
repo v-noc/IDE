@@ -3,6 +3,7 @@ from typing import Any, Optional, List, Dict
 from app.core.model import LogNode
 from app.core.repository.base.base_collection import BaseRepository
 from arango.database import StandardDatabase
+from arango.cursor import Cursor
 
 
 class LogRepository(BaseRepository[LogNode]):
@@ -52,31 +53,30 @@ class LogRepository(BaseRepository[LogNode]):
         return results[0] if results else None
 
     def find_logs_for_function_chain(
-        self, function_ids: List[str]
+        self, function_ids: List[str], start_function_id: str
     ) -> List[Dict[str, Any]]:
+        bind_vars = {
+            "function_ids": function_ids,
+            "start_function_id": start_function_id,
+            "@log_to_function_edges": "log_to_function_edges",
+            "@log_to_log_edges": "log_to_log_edges",
+        }
+
         query = """
+            // Find chain ids for each function
             LET chains_per_function = (
                 FOR func_id IN @function_ids
                     LET chains = (
                         FOR e IN @@log_to_function_edges
                             FILTER e._to == func_id
-                            FOR l IN @@logs
-                                FILTER l._id == e._from
-                                RETURN DISTINCT l.chain_id
+                            LET l = DOCUMENT(e._from)
+                            RETURN DISTINCT l.chain_id
                     )
                     RETURN chains
             )
-            
-            /*
-             Compute intersection of chain ids across all functions without
-             using CALL/INTERSECTION. Take the chain ids of the first function
-             as a candidate set, then keep only those present in every other.
-            */
-            LET candidate_chains = (
-                LENGTH(chains_per_function) > 0
-                ? FIRST(chains_per_function)
-                : []
-            )
+
+            // Intersection of chain ids across all functions
+            LET candidate_chains = LENGTH(chains_per_function) > 0 ? FIRST(chains_per_function) : []
             LET common_chains = (
                 FOR chain_id IN candidate_chains
                     LET missing_in_any = (
@@ -89,26 +89,34 @@ class LogRepository(BaseRepository[LogNode]):
                     RETURN chain_id
             )
 
-            FOR chain_id IN common_chains
-                FOR l IN @@logs
-                    FILTER l.chain_id == chain_id
-                    LET parent_doc = FIRST(
-                        FOR e IN @@log_to_log_edges
-                            FILTER e._from == l._id
-                            RETURN DOCUMENT(e._to)
-                    )
-                    SORT l.timestamp
-                    RETURN {
-                        "vertex": l,
-                        "parent_id": parent_doc._id
-                    }
+            // Pick the ENTER log for the start function within the common chain
+            LET start_log = FIRST(
+                FOR chain_id IN common_chains
+                    FOR e IN @@log_to_function_edges
+                        FILTER e._to == @start_function_id
+                        LET l = DOCUMENT(e._from)
+                        FILTER l != null && l.chain_id == chain_id && l.event_type == 'enter'
+                        SORT l.timestamp ASC
+                        LIMIT 1
+                        RETURN l
+            )
+
+            FILTER start_log != null
+
+            // Traverse from the start log to collect its subtree (children, grandchildren, ...)
+            FOR v IN 0..100 INBOUND start_log._id @@log_to_log_edges
+                LET parent_doc = FIRST(
+                    FOR pe IN @@log_to_log_edges
+                        FILTER pe._from == v._id
+                        RETURN DOCUMENT(pe._to)
+                )
+                SORT v.timestamp
+                RETURN {
+                    "vertex": v,
+                    "parent_id": parent_doc._id
+                }
         """
-        bind_vars = {
-            "function_ids": function_ids,
-            "@logs": "logs",
-            "@log_to_function_edges": "log_to_function_edges",
-            "@log_to_log_edges": "log_to_log_edges",
-        }
+
         cursor = self.db.aql.execute(query, bind_vars=bind_vars)
         return list(cursor)
 
