@@ -61,7 +61,7 @@ def context_logger(
                             else {k: repr(v) for k, v in kwargs.items()}
                         )
                         logger.info(
-                            "Enter",
+                            f"Enter {func.__qualname__}",
                             event_type="enter",
                             args=serialized_args,
                             kwargs=serialized_kwargs,

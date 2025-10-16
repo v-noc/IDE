@@ -154,7 +154,6 @@ class LogService:
         # Try function first
         fn = self.repos.function_repo.get_by_id(node_id)
         if fn is not None:
-            print("Function found")
             return self.find_function_log(fn.id)
 
         # Then try call
