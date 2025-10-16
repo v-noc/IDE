@@ -4,12 +4,15 @@ import threading
 import requests  # or any other HTTP client
 import json
 import uuid
+import atexit
 from typing import Optional, Callable
 from .logger import project_id_var
 
 log_queue = queue.Queue()
 worker_thread = None
 stop_worker = threading.Event()
+_shutdown_registered = False
+_shutdown_lock = threading.Lock()
 
 
 def log_worker(
@@ -134,6 +137,19 @@ def json_sink(message):
     log_queue.put(message)
 
 
+def _register_shutdown_hook() -> None:
+    """
+    Register a process-exit hook to gracefully stop the background worker.
+    Idempotent: safe to call multiple times.
+    """
+    global _shutdown_registered
+    with _shutdown_lock:
+        if _shutdown_registered:
+            return
+        atexit.register(stop_worker_thread)
+        _shutdown_registered = True
+
+
 def configure_logger(
     jsonrpc_url: str,
     project_id: str,
@@ -151,3 +167,4 @@ def configure_logger(
         serialize=True  # IMPORTANT: This converts the record to JSON
     )
     start_worker_thread(jsonrpc_url, post)
+    _register_shutdown_hook()
