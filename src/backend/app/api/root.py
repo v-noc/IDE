@@ -3,6 +3,7 @@ from . import health
 from .core.projects import crud as project_crud
 from .core import container
 from .core import code_element
+from .core import logger as logger_api
 # from .core import base as core_base
 router = APIRouter()
 
@@ -27,4 +28,8 @@ router.include_router(
 
 router.include_router(
     code_element.router, prefix="/code-elements", tags=["code-elements"]
+)
+
+router.include_router(
+    logger_api.router, prefix="/logs", tags=["logs"]
 )

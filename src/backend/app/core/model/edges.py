@@ -33,3 +33,11 @@ class ContainsEdge(BaseEdge):
 
 class TargetsEdge(BaseEdge):
     edge_type: str = "targets_edges"
+
+
+class LogToFunctionEdge(BaseEdge):
+    edge_type: str = "log_to_function_edges"
+
+
+class LogToLogEdge(BaseEdge):
+    edge_type: str = "log_to_log_edges"

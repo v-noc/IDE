@@ -3,6 +3,7 @@ const API_ROUTES = {
     VIRTUAL_FOLDER: '/virtual-folders/',
     CODE_ELEMENTS: '/code-elements/',
     CONTAINER: '/containers/',
+    LOGS: '/logs/',
 };
 
 export default API_ROUTES; 

@@ -52,6 +52,7 @@ export interface ClassNode extends ContainerNode {
 
 export interface CallNode extends ContainerNode {
     node_type: "call"
+    target?: FunctionNode
     position: CodePosition
 }
 

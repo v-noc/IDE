@@ -1,7 +1,7 @@
 from app.core.model.nodes import CallNode, ClassNode, FunctionNode
 from app.core.repository.base.node_repo import NodeRepository
 from arango.database import StandardDatabase
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 
 class CallRepo(NodeRepository[CallNode]):
@@ -100,3 +100,41 @@ class CallRepo(NodeRepository[CallNode]):
 
             print(f"ERROR ANALYSIS: {error_info}")
             raise
+
+    def find_upward_call_chain(self, call_id: str) -> List[Dict[str, Any]]:
+        query = """
+        LET call_chain_path = (
+            FOR v IN 0..100 INBOUND @start_call_id @@contains
+                PRUNE v.node_type != "call"
+                RETURN v
+        )
+
+        LET call_chain = REVERSE(call_chain_path)
+
+        LET origin = FIRST(
+            call_chain
+        )
+
+        LET call_chain_with_targets = (
+            FOR call IN call_chain
+                LET target = FIRST(
+                    FOR t IN 1..1 OUTBOUND call._id @@targets
+                        RETURN t
+                )
+                FILTER target != null
+                RETURN { call: call, target: target }
+        )
+
+        RETURN {
+            origin: origin,
+            calls: call_chain_with_targets,
+           
+        }
+        """
+        bind_vars = {
+            "start_call_id": call_id,
+            "@contains": "contains_edges",
+            "@targets": "targets_edges",
+        }
+        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+        return list(cursor)

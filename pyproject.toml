@@ -7,4 +7,4 @@ requires-python = ">=3.12"
 dependencies = ["pydantic[email]>=2.11.7"]
 
 [tool.uv.workspace]
-members = ["src/backend"]
+members = ["src/backend", "src/vn_logger"]

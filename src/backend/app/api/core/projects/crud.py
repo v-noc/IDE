@@ -16,9 +16,9 @@ from app.core.model.nodes import ProjectNode
 
 
 class CreateProjectRequest(BaseModel):
-    name: str = Field(required=True, min_length=3)
-    description: str
-    path: str = Field(required=True)
+    name: str = Field(..., min_length=3)
+    description: Optional[str] = Field(default=None)
+    path: str = Field(...)
 
 
 class UpdateProjectRequest(BaseModel):

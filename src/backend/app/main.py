@@ -23,9 +23,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
         raise
-    
+
     yield
-    
+
     # Shutdown
     print("🔄 Shutting down database connections...")
 

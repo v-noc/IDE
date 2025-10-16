@@ -10,6 +10,7 @@ from .file_repo import FileRepo
 from .code_elements.function_repo import FunctionRepo
 from .code_elements.class_repo import ClassRepo
 from .code_elements.call_repo import CallRepo
+from .log_repo import LogRepository
 
 
 class Repositories:
@@ -26,6 +27,7 @@ class Repositories:
         self.function_repo = FunctionRepo(db)
         self.class_repo = ClassRepo(db)
         self.call_repo = CallRepo(db)
+        self.log_repo = LogRepository(db)
 
         # Edge Repositories - YES, you need these!
         self.contains_edges = BaseRepository(
@@ -33,6 +35,14 @@ class Repositories:
         )
         self.targets_edges = BaseRepository(
             db, "targets_edges", edges.TargetsEdge, is_edge=True
+        )
+
+        # Log edges
+        self.log_to_function_edges = BaseRepository(
+            db, "log_to_function_edges", edges.LogToFunctionEdge, is_edge=True
+        )
+        self.log_to_log_edges = BaseRepository(
+            db, "log_to_log_edges", edges.LogToLogEdge, is_edge=True
         )
         # self.imports_edges = BaseRepository(
         #     db, "imports_edges", edges.ImportsEdge, is_edge=True

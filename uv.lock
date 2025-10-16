@@ -5,6 +5,16 @@ requires-python = ">=3.12"
 members = [
     "backend",
     "v-noc",
+    "vn-logger",
+]
+
+[[package]]
+name = "aiojobs"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/54/751969398e2039b4dc458fa153dc066a0f7337a5b480d58944f59b7b38ae/aiojobs-1.4.0.tar.gz", hash = "sha256:463665c75d1fcc46c78d44375c1034abf5e3f087894b0fc5ec4dd16ef90fdc98", size = 139598 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ce/89/5a30b3c041712a8b2dadb5ccef2bae12a874469650c61c018705039699cd/aiojobs-1.4.0-py3-none-any.whl", hash = "sha256:e95eb0d10d1f6095aefb04d228d2b4b3747514503f26540de722c2228a8500ca", size = 9455 },
 ]
 
 [[package]]
@@ -46,6 +56,8 @@ source = { virtual = "src/backend" }
 dependencies = [
     { name = "astpretty" },
     { name = "fastapi" },
+    { name = "fastapi-jsonrpc" },
+    { name = "httpx" },
     { name = "loguru" },
     { name = "pathspec" },
     { name = "pydantic" },
@@ -53,6 +65,7 @@ dependencies = [
     { name = "pytest-mock" },
     { name = "python-arango" },
     { name = "uvicorn" },
+    { name = "vn-logger" },
     { name = "watchdog" },
 ]
 
@@ -67,6 +80,8 @@ test = [
 requires-dist = [
     { name = "astpretty", specifier = ">=3.0.0" },
     { name = "fastapi" },
+    { name = "fastapi-jsonrpc", specifier = ">=3.4.1" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "httpx", marker = "extra == 'test'" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "pathspec", specifier = ">=0.12.1" },
@@ -77,6 +92,7 @@ requires-dist = [
     { name = "pytest-mock", specifier = ">=3.14.1" },
     { name = "python-arango" },
     { name = "uvicorn" },
+    { name = "vn-logger", editable = "src/vn_logger" },
     { name = "watchdog", specifier = ">=6.0.0" },
 ]
 
@@ -179,6 +195,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/78/d7/6c8b3bfe33eeffa208183ec037fee0cce9f7f024089ab1c5d12ef04bd27c/fastapi-0.116.1.tar.gz", hash = "sha256:ed52cbf946abfd70c5a0dccb24673f0670deeb517a88b3544d03c2a6bf283143", size = 296485 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/47/d63c60f59a59467fda0f93f46335c9d18526d7071f025cb5b89d5353ea42/fastapi-0.116.1-py3-none-any.whl", hash = "sha256:c46ac7c312df840f0c9e220f7964bada936781bc4e2e6eb71f1c4d7553786565", size = 95631 },
+]
+
+[[package]]
+name = "fastapi-jsonrpc"
+version = "3.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiojobs" },
+    { name = "fastapi" },
+    { name = "pydantic" },
+    { name = "starlette" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7f/d8/95f0a6041ed4900b1b5e8a5edcdc79169711421359188a2c30b4c9d8762e/fastapi_jsonrpc-3.4.1.tar.gz", hash = "sha256:3a0933003ae1c8baaea957ef9963508f2b0a20fd0053291f94883aee2ee2718f", size = 19644 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/19/ebaf4486722822d1e21b64000ed0b1ccec8d56719174c4819c41d2b755b4/fastapi_jsonrpc-3.4.1-py3-none-any.whl", hash = "sha256:5c3466a342701863440928a3f7767a77fc7ee5eaa82b00c867465af3dc369eba", size = 20026 },
 ]
 
 [[package]]
@@ -560,6 +591,17 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "pydantic", extras = ["email"], specifier = ">=2.11.7" }]
+
+[[package]]
+name = "vn-logger"
+version = "0.1.0"
+source = { editable = "src/vn_logger" }
+dependencies = [
+    { name = "loguru" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "loguru", specifier = ">=0.7.3" }]
 
 [[package]]
 name = "watchdog"
