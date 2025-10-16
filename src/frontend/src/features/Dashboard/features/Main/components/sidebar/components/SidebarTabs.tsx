@@ -7,6 +7,7 @@ import {
   type BasicInfoData,
   type CustomizationData,
 } from "../hooks/useConfigSidebarForm";
+import LogsSection from "./sections/LogsSection";
 
 export type ConfigSidebarContentProps = {
   initialBasicInfo: Partial<BasicInfoData>;
@@ -45,6 +46,7 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
           <TabsList>
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="customization">Customization</TabsTrigger>
+            <TabsTrigger value="logs">Logs</TabsTrigger>
           </TabsList>
           <div className="mt-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
             <TabsContent value="basic">
@@ -58,6 +60,9 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
                 value={customization}
                 onChange={handleCustomizationChange}
               />
+            </TabsContent>
+            <TabsContent value="logs">
+              <LogsSection />
             </TabsContent>
           </div>
         </Tabs>

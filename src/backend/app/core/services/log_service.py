@@ -62,14 +62,16 @@ class LogService:
 
         parent_log = None
 
-        # If not an enter event, first try to find parent within the same function
+        # If not an enter event, first try to find parent within
+        # the same function
         if created_log.event_type != "enter":
             parent_log = self.repos.log_repo.find_enter_log(
                 function_id=function_id,
                 chain_id=chain_id,
             )
 
-        # If it's an enter event, or no parent was found in the same function, check the parent function
+        # If it's an enter event, or no parent was found in the same function,
+        # check the parent function
         if not parent_log and parent_function_id:
             parent_log = self.repos.log_repo.find_enter_log(
                 function_id=parent_function_id,
@@ -89,6 +91,7 @@ class LogService:
 
     def get_function_log(self, function_id: str):
         flat_logs = self.repos.log_repo.find_function_log(function_id)
+
         return LogTreeBuilder(flat_logs).build()
 
     def get_log_containment_tree(self, log_id: str):
@@ -114,7 +117,8 @@ class LogService:
 
         # 2. Find the full function call chain
         function_docs_result = self.repos.call_repo.find_upward_call_chain(
-            call_id)
+            call_id
+        )
         if not function_docs_result:
             return []
 
@@ -138,4 +142,24 @@ class LogService:
 
     def find_function_log(self, function_id: str):
         flat_logs = self.repos.log_repo.find_function_log(function_id)
+
         return LogTreeBuilder(flat_logs).build()
+
+    def get_unified_log_tree(self, node_id: str) -> List[LogTreeNode]:
+        """Return a log tree for either a function ID or a call ID.
+
+        If the ID matches a function, return its log tree. If it matches a
+        call, return the call log tree. Otherwise, return an empty list.
+        """
+        # Try function first
+        fn = self.repos.function_repo.get_by_id(node_id)
+        if fn is not None:
+            print("Function found")
+            return self.find_function_log(fn.id)
+
+        # Then try call
+        call = self.repos.call_repo.get_by_id(node_id)
+        if call is not None:
+            return self.get_call_log(call.id)
+
+        return []
