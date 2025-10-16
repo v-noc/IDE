@@ -1,10 +1,10 @@
 from loguru import logger
 import queue
 import threading
-import time
 import requests  # or any other HTTP client
 import json
 import uuid
+from typing import Optional, Callable
 from .logger import project_id_var
 
 log_queue = queue.Queue()
@@ -12,15 +12,25 @@ worker_thread = None
 stop_worker = threading.Event()
 
 
-def log_worker(jsonrpc_url: str):
+def log_worker(
+    jsonrpc_url: str,
+    initial_project_id: Optional[str] = None,
+    post: Optional[Callable[..., object]] = None,
+):
     """
     The worker function that runs in a background thread.
     """
 
+    # Ensure the worker thread has the same project_id in its own context
+    if initial_project_id is not None:
+        project_id_var.set(initial_project_id)
+
     while not stop_worker.is_set():
         try:
+
             log_message_str = log_queue.get(block=True, timeout=1)
             project_id = project_id_var.get()
+
             record = json.loads(log_message_str)['record']
             extra = record['extra']
 
@@ -31,7 +41,7 @@ def log_worker(jsonrpc_url: str):
             params = {
                 "function_id": extra.get('function_id'),
                 "project_id": project_id,
-                "parent_function_id": extra.get('parent_function_id'),
+
                 "params": {
                     "chain_id": extra.get('chain_id'),
                     "timestamp": record['time']["timestamp"],
@@ -44,21 +54,25 @@ def log_worker(jsonrpc_url: str):
                 }
             }
 
+            if extra.get('parent_function_id') is not None:
+                params["parent_function_id"] = extra.get('parent_function_id')
             # Add event-specific fields based on the robust event_type
+            inner = params["params"]
             if event_type == "enter":
-                params["payload"] = {
+                inner["payload"] = {
                     "args": extra.get("args"),
-                    "kwargs": extra.get("kwargs")
+                    "kwargs": extra.get("kwargs"),
                 }
+
             elif event_type == "exit":
-                params["result"] = extra.get("result")
+                inner["result"] = extra.get("result")
             elif event_type == "error":
                 if record.get('exception'):
                     exc = record['exception']
-                    params["error"] = {
+                    inner["error"] = {
                         "type": exc.get('type'),
                         "message": str(exc.get('value')),
-                        "stacktrace": exc.get('traceback', False)
+                        "stacktrace": exc.get('traceback', False),
                     }
 
             jsonrpc_request = {
@@ -69,9 +83,9 @@ def log_worker(jsonrpc_url: str):
             }
 
             try:
-                # (Request sending logic is unchanged)
-                requests.post(jsonrpc_url, json=jsonrpc_request,
-                              timeout=5).raise_for_status()
+                sender = post or requests.post
+                sender(jsonrpc_url, json=jsonrpc_request, timeout=5)
+
             except requests.RequestException as e:
                 print(f"WORKER: Failed to send log - {e}")
 
@@ -81,17 +95,21 @@ def log_worker(jsonrpc_url: str):
             continue
 
 
-def start_worker_thread(jsonrpc_url: str):
+def start_worker_thread(
+    jsonrpc_url: str,
+    post: Optional[Callable[..., object]] = None,
+):
     """
     Starts the background worker thread.
     """
     global worker_thread
+
     if worker_thread is None or not worker_thread.is_alive():
         stop_worker.clear()
         worker_thread = threading.Thread(
             target=log_worker,
-            args=(jsonrpc_url,),
-            daemon=True
+            args=(jsonrpc_url, project_id_var.get(), post),
+            daemon=True,
         )
         worker_thread.start()
 
@@ -116,7 +134,11 @@ def json_sink(message):
     log_queue.put(message)
 
 
-def configure_logger(jsonrpc_url: str, project_id: str):
+def configure_logger(
+    jsonrpc_url: str,
+    project_id: str,
+    post: Optional[Callable[..., object]] = None,
+):
     """
     Configures loguru to use our custom sink.
     """
@@ -128,4 +150,4 @@ def configure_logger(jsonrpc_url: str, project_id: str):
         level="INFO",
         serialize=True  # IMPORTANT: This converts the record to JSON
     )
-    start_worker_thread(jsonrpc_url)
+    start_worker_thread(jsonrpc_url, post)

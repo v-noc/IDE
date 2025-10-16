@@ -20,10 +20,9 @@ def context_logger(
         def wrapper(*args, **kwargs):
             chain_id_token = None
             parent_id_token = None
-            project_id = parent_function_id_var.get()
+            project_id = project_id_var.get()
 
             if project_id is None:
-                logger.error("Project ID is not set")
                 return None
 
             try:
@@ -35,8 +34,10 @@ def context_logger(
                 # Get the parent's static ID from the context
                 parent_function_id = parent_function_id_var.get()
 
-                # Set this function's ID as the parent context for any nested calls
-                parent_id_token = parent_function_id_var.set(function_id)
+                # Set this function's ID as the parent context
+                parent_id_token = parent_function_id_var.set(
+                    function_id
+                )
 
                 start_time = time.perf_counter()
 
@@ -85,11 +86,13 @@ def context_logger(
 
                         return result
 
-                    except Exception as e:
+                    except Exception:
                         duration_ms = (time.perf_counter() - start_time) * 1000
                         # Log error event with a dedicated event_type
                         logger.exception(
-                            "Error", event_type="error", duration_ms=duration_ms
+                            "Error",
+                            event_type="error",
+                            duration_ms=duration_ms,
                         )
                         raise
 
