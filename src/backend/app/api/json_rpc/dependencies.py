@@ -1,6 +1,6 @@
 from fastapi import Depends, Body
 from arango.database import StandardDatabase
-
+from typing import Optional
 from app.db.client import get_db
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
@@ -59,15 +59,17 @@ def get_function(
 
 
 def get_parent_function(
-    parent_function_id: str = Body(..., embed=True,
-                                   alias="parent_function_id"),
+    parent_function_id: Optional[str] = Body(
+        None, embed=True, alias="parent_function_id"
+    ),
     services=Depends(get_function_services),
 ):
     parent_func_node = None
     try:
         function_service = services
 
-        parent_func_node = function_service.get(parent_function_id)
+        if parent_function_id is not None:
+            parent_func_node = function_service.get(parent_function_id)
 
     except Exception as e:
         print("Error getting function", e)

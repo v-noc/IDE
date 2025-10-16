@@ -3,7 +3,7 @@ from typing import Any, Optional, List, Dict
 from app.core.model import LogNode
 from app.core.repository.base.base_collection import BaseRepository
 from arango.database import StandardDatabase
-from arango.cursor import Cursor
+# from arango.cursor import Cursor
 
 
 class LogRepository(BaseRepository[LogNode]):
@@ -76,7 +76,9 @@ class LogRepository(BaseRepository[LogNode]):
             )
 
             // Intersection of chain ids across all functions
-            LET candidate_chains = LENGTH(chains_per_function) > 0 ? FIRST(chains_per_function) : []
+            LET candidate_chains = LENGTH(chains_per_function) > 0
+                ? FIRST(chains_per_function)
+                : []
             LET common_chains = (
                 FOR chain_id IN candidate_chains
                     LET missing_in_any = (
@@ -89,13 +91,15 @@ class LogRepository(BaseRepository[LogNode]):
                     RETURN chain_id
             )
 
-            // Pick the ENTER log for the start function within the common chain
+            // Pick ENTER log for the start function within the common chain
             LET start_log = FIRST(
                 FOR chain_id IN common_chains
                     FOR e IN @@log_to_function_edges
                         FILTER e._to == @start_function_id
                         LET l = DOCUMENT(e._from)
-                        FILTER l != null && l.chain_id == chain_id && l.event_type == 'enter'
+                        FILTER l != null
+                            && l.chain_id == chain_id
+                            && l.event_type == 'enter'
                         SORT l.timestamp ASC
                         LIMIT 1
                         RETURN l
@@ -103,7 +107,7 @@ class LogRepository(BaseRepository[LogNode]):
 
             FILTER start_log != null
 
-            // Traverse from the start log to collect its subtree (children, grandchildren, ...)
+            // Traverse from the start to collect its subtree (children, ...)
             FOR v IN 0..100 INBOUND start_log._id @@log_to_log_edges
                 LET parent_doc = FIRST(
                     FOR pe IN @@log_to_log_edges
@@ -122,30 +126,39 @@ class LogRepository(BaseRepository[LogNode]):
 
     def find_function_log(self, function_id: str) -> List[Dict[str, Any]]:
         query = """
-        LET function_log_ids = (
+        // Collect ENTER logs for the function as starting points
+        LET start_logs = (
             FOR e IN @@log_to_function_edges
                 FILTER e._to == @function_id
-                RETURN e._from
+                LET l = DOCUMENT(e._from)
+                FILTER l != null && l.event_type == 'enter'
+                RETURN l
         )
 
-        FOR log_id IN function_log_ids
-            LET log_doc = DOCUMENT(log_id)
-            LET parent_doc = FIRST(
-                FOR e IN @@log_to_log_edges
-                    FILTER e._from == log_id
-                    RETURN DOCUMENT(e._to)
-            )
-            RETURN { "vertex": log_doc, "parent_id": parent_doc._id }
+        // For each start log, traverse INBOUND (child -> parent orientation)
+        // to collect the containment subtree including the start node
+        FOR start IN start_logs
+            FOR v, e, p IN 0..@max_depth INBOUND start._id @@log_to_log_edges
+                OPTIONS { order: "bfs" }
+                RETURN {
+                    "vertex": v,
+                    "parent_id": LENGTH(p.vertices) >= 2
+                        ? p.vertices[-2]._id
+                        : null
+                }
         """
         bind_vars = {
             "@log_to_function_edges": "log_to_function_edges",
             "@log_to_log_edges": "log_to_log_edges",
             "function_id": function_id,
+            "max_depth": 50,
         }
         cursor = self.db.aql.execute(query, bind_vars=bind_vars)
         return list(cursor)
 
-    def get_containment_tree(self, start_log_id: str, depth: int | str = 50) -> List[Dict[str, Any]]:
+    def get_containment_tree(
+        self, start_log_id: str, depth: int | str = 50
+    ) -> List[Dict[str, Any]]:
         max_depth = 50 if depth == "*" else depth
         query = """
         FOR v, e, p IN 1..@max_depth INBOUND @start_log_id @@log_edges

@@ -5,8 +5,17 @@ import fastapi_jsonrpc as jsonrpc
 from fastapi import Depends, Body
 
 from .schemas import RegisterLogsParams, RegisterLogsResult
-from .dependencies import get_function, get_project, get_parent_function, get_log_service
-from .error import CodeElementNotFoundError, ProjectNotFoundError, FunctionNotFoundError
+from .dependencies import (
+    get_function,
+    get_project,
+    get_parent_function,
+    get_log_service,
+)
+from .error import (
+    CodeElementNotFoundError,
+    ProjectNotFoundError,
+    FunctionNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +56,12 @@ def register_logs(
         raise ProjectNotFoundError
     if function is None:
         raise FunctionNotFoundError
-
-    # Persist log and edges (derive parent via parent_function + chain_id)
-    parent_function_id = parent_function.id if parent_function else None
-    log_service.create(function.id, params, parent_function_id)
+    try:
+        # Persist log and edges (derive parent via parent_function + chain_id)
+        parent_function_id = parent_function.id if parent_function else None
+        created_log = log_service.create(
+            function.id, params, parent_function_id)
+    except Exception as ex:
+        print(ex)
 
     return RegisterLogsResult(ok=True)
