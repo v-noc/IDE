@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/tooltip";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import getIcons from "@/features/Dashboard/utils/getIcons";
-import type { AnyNodeTree } from "@/types/project";
+import type { AnyNodeTree, CallNodeTree } from "@/types/project";
 import getNodeStyle from "@/features/Dashboard/utils/getNodeStyle";
 import { TreeNode } from ".";
 
@@ -28,6 +28,7 @@ type NodeContentProps = {
   handleToggle: (e: React.MouseEvent) => void;
   handleSelectNode: () => void;
   childFilter?: (node: AnyNodeTree) => boolean;
+  onSelect?: (node: AnyNodeTree) => void;
 };
 
 export const NodeContent = ({
@@ -40,6 +41,7 @@ export const NodeContent = ({
   handleToggle,
   handleSelectNode,
   childFilter,
+  onSelect,
 }: NodeContentProps) => {
   const nodeStyle = getNodeStyle(node);
 
@@ -77,7 +79,9 @@ export const NodeContent = ({
         iconName={
           node.icon ||
           getIcons(
-            node.node_type == "call" ? node.target.node_type : node.node_type
+            node.node_type === "call"
+              ? (node as CallNodeTree).target?.node_type ?? "call"
+              : node.node_type
           )
         }
         className={cn("h-4 w-4 flex-shrink-0")}
@@ -132,6 +136,7 @@ export const NodeContent = ({
                     node={child}
                     nestingLevel={nestingLevel + 1}
                     childFilter={childFilter}
+                    onSelect={onSelect}
                   />
                 ))}
             </ul>

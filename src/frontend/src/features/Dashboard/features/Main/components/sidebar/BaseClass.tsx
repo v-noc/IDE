@@ -31,7 +31,8 @@ const findNodeByQName = (
 };
 
 const BaseClass = () => {
-  const { selectedNode, projectData } = useProjectStore();
+  const { selectedNode, projectData, setSecondarySelectedNode } =
+    useProjectStore();
   const [showMethods, setShowMethods] = useState(false);
 
   const baseClassNodes = useMemo(() => {
@@ -107,7 +108,11 @@ const BaseClass = () => {
             </div>
           ) : (
             mergedMethods.map((method) => (
-              <TreeNode key={method._key} node={method} />
+              <TreeNode
+                key={method._key}
+                node={method}
+                onSelect={(n) => setSecondarySelectedNode(n)}
+              />
             ))
           )}
         </div>
@@ -119,7 +124,11 @@ const BaseClass = () => {
             </div>
           ) : (
             baseClassNodes.map((node) => (
-              <TreeNode key={node._key} node={node} />
+              <TreeNode
+                key={node._key}
+                node={node}
+                onSelect={(n) => setSecondarySelectedNode(n)}
+              />
             ))
           )}
         </div>

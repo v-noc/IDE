@@ -7,6 +7,8 @@ import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 interface ProjectState {
     selectedNode: AnyNodeTree | null;
     setSelectedNode: (node: AnyNodeTree) => void;
+    secondarySelectedNode: AnyNodeTree | null;
+    setSecondarySelectedNode: (node: AnyNodeTree | null) => void;
     activeNodeId: string | null;
     expandedNodeIds: string[];
     toggleNodeExpansion: (nodeId: string) => void;
@@ -39,6 +41,8 @@ const useProjectStore = create<ProjectState>()(
         immer((set) => ({
             selectedNode: null,
             setSelectedNode: (node) => set({ selectedNode: node }),
+            secondarySelectedNode: null,
+            setSecondarySelectedNode: (node) => set({ secondarySelectedNode: node }),
             activeNodeId: null,
             expandedNodeIds: [],
             toggleNodeExpansion: (nodeId) => {

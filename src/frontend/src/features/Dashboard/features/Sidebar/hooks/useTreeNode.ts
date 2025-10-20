@@ -12,6 +12,7 @@ export const useTreeNode = (
 ) => {
   const {
     selectedNode,
+    secondarySelectedNode,
     setSelectedNode,
     activeNodeId,
     expandedNodeIds,
@@ -33,10 +34,12 @@ export const useTreeNode = (
   >("file");
 
   const isOpen = expandedNodeIds.includes(node._key);
-  const isSelected = selectedNode?._key === node._key;
+  const isSelected =
+    selectedNode?._key === node._key || secondarySelectedNode?._key === node._key;
   const isActive = activeNodeId === node._key;
   const hasChildren = useMemo(() => {
-    return !!node.children?.some(childFilter);
+    const children = (node as unknown as { children?: AnyNodeTree[] }).children ?? [];
+    return children.some(childFilter);
   }, [node, childFilter]);
 
   const handleToggle = (e: React.MouseEvent) => {
