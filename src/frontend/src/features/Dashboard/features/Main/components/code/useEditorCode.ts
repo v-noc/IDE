@@ -5,7 +5,7 @@ import {
     useWriteCode,
     type CodeResponse,
 } from "@/features/Dashboard/service/useCodeElement";
-import type { NodeType } from "@/types/project";
+// nodeType intentionally unused now; we fetch both and pick best
 
 
 export interface EditorCodeResult {
@@ -21,18 +21,10 @@ export interface EditorCodeResult {
  * For virtual folders, it attempts file-code and element-code in parallel and prefers
  * whichever resolves successfully.
  */
-export function useEditorCode(elementId: string, nodeType: NodeType): EditorCodeResult {
-    const isFile = nodeType === "file";
-    const isCodeElement = nodeType === "function" || nodeType === "class" || nodeType === "call";
-    // const isVirtualFolder = nodeType === "virtual_folder";
-
-    // File nodes → only file-code
-    const fileQuery = useGetFileCode(isFile ? elementId : "");
-
-    // Code element nodes → use unified code endpoint
-    const elementQuery = useGetCodeForNode(
-        isCodeElement ? elementId : ""
-    );
+export function useEditorCode(elementId: string): EditorCodeResult {
+    // Try both endpoints defensively; prefer element code, fall back to file code
+    const fileQuery = useGetFileCode(elementId || "");
+    const elementQuery = useGetCodeForNode(elementId || "");
 
     const { mutate: save, isPending: isSaving } = useWriteCode();
 
@@ -41,47 +33,17 @@ export function useEditorCode(elementId: string, nodeType: NodeType): EditorCode
     }
 
     const { data, isLoading, isError } = useMemo(() => {
-        // File nodes
-        if (isFile) {
-            return {
-                data: fileQuery.data,
-                isLoading: fileQuery.isLoading,
-                isError: fileQuery.isError,
-            };
-        }
-
-        // Code element nodes (function/class/call)
-        if (isCodeElement) {
-            return {
-                data: elementQuery.data,
-                isLoading: elementQuery.isLoading,
-                isError: elementQuery.isError,
-            };
-        }
-
-        // Virtual folder: prefer whichever succeeded; otherwise wait until both settle
-        // if (isVirtualFolder) {
-        //     const data = fileQuery.data ?? elementQuery.data;
-        //     const isLoading = fileQuery.isLoading || elementQuery.isLoading;
-        //     const isError =
-        //         !isLoading &&
-        //         Boolean(fileQuery.error) &&
-        //         Boolean(elementQuery.error) &&
-        //         !data;
-        //     return { data, isLoading, isError };
-        // }
-
-        // Fallback
-        return { data: undefined, isLoading: false, isError: true };
+        const preferred = elementQuery.data ?? fileQuery.data;
+        const loading = elementQuery.isLoading || fileQuery.isLoading;
+        const error = !loading && !preferred && (Boolean(elementQuery.error) || Boolean(fileQuery.error));
+        return { data: preferred, isLoading: loading, isError: error };
     }, [
-        isFile,
-        isCodeElement,
-        fileQuery.data,
-        fileQuery.isLoading,
-        fileQuery.isError,
         elementQuery.data,
         elementQuery.isLoading,
-        elementQuery.isError,
+        elementQuery.error,
+        fileQuery.data,
+        fileQuery.isLoading,
+        fileQuery.error,
     ]);
 
     return { data, isLoading, isError, saveCode, isSaving };

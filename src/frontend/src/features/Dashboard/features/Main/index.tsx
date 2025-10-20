@@ -14,19 +14,29 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 const MainCanvas = () => {
-  const { selectedNode } = useProjectStore();
-  const selectedPath = useMemo(
-    () => selectedNode?.qname?.replace(/\./g, " / ") ?? "",
-    [selectedNode?.qname]
-  );
+  const {
+    selectedNode,
+    secondarySelectedNode,
+    setSelectedNode,
+    setSecondarySelectedNode,
+  } = useProjectStore();
+
+  const effectiveNode = secondarySelectedNode ?? selectedNode;
+
+  const { suffixName, displayPath } = useMemo(() => {
+    const base = selectedNode?.qname?.replace(/\./g, " / ") ?? "";
+    const hasSuffix = Boolean(
+      secondarySelectedNode && secondarySelectedNode._key !== selectedNode?._key
+    );
+    const suffix = hasSuffix ? secondarySelectedNode?.name ?? "" : "";
+    const display = hasSuffix ? (base ? `${base} / ${suffix}` : suffix) : base;
+    return { suffixName: suffix, displayPath: display };
+  }, [selectedNode?.qname, selectedNode?._key, secondarySelectedNode]);
 
   const isCodeActive = useMemo(() => {
-    return (
-      selectedNode?.node_type === "function" ||
-      selectedNode?.node_type === "class" ||
-      selectedNode?.node_type == "file"
-    );
-  }, [selectedNode?.node_type]);
+    const t = effectiveNode?.node_type;
+    return t === "function" || t === "class" || t === "file" || t === "call";
+  }, [effectiveNode?.node_type]);
 
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
   const bottomPanelRef = useRef<ImperativePanelHandle>(null);
@@ -50,7 +60,24 @@ const MainCanvas = () => {
       >
         <ResizablePanel defaultSize={70} minSize={40} className="flex flex-col">
           <div className="px-2 pb-2 text-xs text-muted-foreground truncate">
-            {selectedPath || "No selection"}
+            {displayPath || "No selection"}
+            {suffixName && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="underline hover:no-underline cursor-pointer"
+                  onClick={() => {
+                    if (secondarySelectedNode) {
+                      setSelectedNode(secondarySelectedNode);
+                      setSecondarySelectedNode(null);
+                    }
+                  }}
+                >
+                  (promote)
+                </button>
+              </>
+            )}
           </div>
           <div className="flex-1 overflow-hidden">
             <Tabs

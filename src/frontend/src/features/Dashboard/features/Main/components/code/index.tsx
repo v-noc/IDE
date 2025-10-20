@@ -7,14 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 
 const EditorCode = () => {
-  const { selectedNode } = useProjectStore();
-  const elementId = selectedNode?._key ?? "";
-  const nodeType = selectedNode?.node_type ?? "file";
+  const { selectedNode, secondarySelectedNode } = useProjectStore();
+  const effectiveNode = useMemo(() => {
+    if (secondarySelectedNode) {
+      if (secondarySelectedNode.target) {
+        return secondarySelectedNode.target;
+      }
+      return secondarySelectedNode;
+    }
+    return selectedNode;
+  }, [secondarySelectedNode, selectedNode]);
 
-  const { data, isLoading, isError, saveCode, isSaving } = useEditorCode(
-    elementId,
-    nodeType
-  );
+  const elementId = effectiveNode?._key ?? "";
+  const { data, isLoading, isError, saveCode, isSaving } =
+    useEditorCode(elementId);
 
   const [editorValue, setEditorValue] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);

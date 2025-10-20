@@ -79,7 +79,7 @@ export interface ContainerNodeTree extends ContainerNode {
 
 export interface CallNodeTree extends CallNode {
     children: CallNodeTree[]
-    target: FunctionNode | ClassNode
+
 }
 
 export interface FunctionNodeTree extends FunctionNode {

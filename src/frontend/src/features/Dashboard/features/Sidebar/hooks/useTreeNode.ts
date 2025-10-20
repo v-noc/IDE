@@ -12,7 +12,10 @@ export const useTreeNode = (
 ) => {
   const {
     selectedNode,
+    secondarySelectedNode,
     setSelectedNode,
+    setSecondarySelectedNode,
+    pushFocus,
     activeNodeId,
     expandedNodeIds,
     toggleNodeExpansion,
@@ -33,10 +36,12 @@ export const useTreeNode = (
   >("file");
 
   const isOpen = expandedNodeIds.includes(node._key);
-  const isSelected = selectedNode?._key === node._key;
+  const isSelected =
+    selectedNode?._key === node._key || secondarySelectedNode?._key === node._key;
   const isActive = activeNodeId === node._key;
   const hasChildren = useMemo(() => {
-    return !!node.children?.some(childFilter);
+    const children = (node as unknown as { children?: AnyNodeTree[] }).children ?? [];
+    return children.some(childFilter);
   }, [node, childFilter]);
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -47,12 +52,15 @@ export const useTreeNode = (
   const handleSelectNode = () => {
     if (selectedNode?._key === node._key) return;
     setSelectedNode(node);
+    // Clear any secondary selection when a primary selection is made
+    if (secondarySelectedNode)
+      setSecondarySelectedNode(null);
     // // Update global theme from the selected node if provided
     // setTheme(node.theme);
   };
 
   const handleFocus = () => {
-    console.log("Focus on:", node.name);
+    pushFocus(node);
   };
 
   const handleExpand = () => {
