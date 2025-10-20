@@ -16,7 +16,7 @@ const EditorCode = () => {
       return secondarySelectedNode;
     }
     return selectedNode;
-  }, [secondarySelectedNode]);
+  }, [secondarySelectedNode, selectedNode]);
 
   const elementId = effectiveNode?._key ?? "";
   const { data, isLoading, isError, saveCode, isSaving } =

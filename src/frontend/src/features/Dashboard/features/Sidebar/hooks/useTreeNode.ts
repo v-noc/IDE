@@ -14,6 +14,7 @@ export const useTreeNode = (
     selectedNode,
     secondarySelectedNode,
     setSelectedNode,
+    setSecondarySelectedNode,
     activeNodeId,
     expandedNodeIds,
     toggleNodeExpansion,
@@ -50,6 +51,9 @@ export const useTreeNode = (
   const handleSelectNode = () => {
     if (selectedNode?._key === node._key) return;
     setSelectedNode(node);
+    // Clear any secondary selection when a primary selection is made
+    if (secondarySelectedNode)
+      setSecondarySelectedNode(null);
     // // Update global theme from the selected node if provided
     // setTheme(node.theme);
   };
