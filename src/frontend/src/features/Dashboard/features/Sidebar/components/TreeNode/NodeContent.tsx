@@ -29,6 +29,7 @@ type NodeContentProps = {
   handleSelectNode: () => void;
   childFilter?: (node: AnyNodeTree) => boolean;
   onSelect?: (node: AnyNodeTree) => void;
+  rightAdornment?: React.ReactNode | ((node: AnyNodeTree) => React.ReactNode);
 };
 
 export const NodeContent = ({
@@ -42,6 +43,7 @@ export const NodeContent = ({
   handleSelectNode,
   childFilter,
   onSelect,
+  rightAdornment,
 }: NodeContentProps) => {
   const nodeStyle = getNodeStyle(node);
 
@@ -97,6 +99,13 @@ export const NodeContent = ({
           {node.name}
         </span>
       </div>
+      {rightAdornment && (
+        <div className="ml-2 flex-shrink-0">
+          {typeof rightAdornment === "function"
+            ? rightAdornment(node)
+            : rightAdornment}
+        </div>
+      )}
     </li>
   );
 
@@ -137,6 +146,7 @@ export const NodeContent = ({
                     nestingLevel={nestingLevel + 1}
                     childFilter={childFilter}
                     onSelect={onSelect}
+                    rightAdornment={rightAdornment}
                   />
                 ))}
             </ul>

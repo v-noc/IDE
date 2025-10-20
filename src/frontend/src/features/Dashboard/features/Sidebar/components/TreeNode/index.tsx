@@ -1,4 +1,5 @@
 import type { AnyNodeTree, ContainerNodeTree } from "@/types/project";
+import type React from "react";
 import { useTreeNode } from "../../hooks/useTreeNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeContent } from "./NodeContent";
@@ -11,6 +12,7 @@ interface TreeNodeProps {
   nestingLevel?: number;
   childFilter?: (node: AnyNodeTree) => boolean;
   onSelect?: (node: AnyNodeTree) => void;
+  rightAdornment?: React.ReactNode | ((node: AnyNodeTree) => React.ReactNode);
 }
 
 export const TreeNode = ({
@@ -18,6 +20,7 @@ export const TreeNode = ({
   nestingLevel = 0,
   childFilter,
   onSelect,
+  rightAdornment,
 }: TreeNodeProps) => {
   const {
     isOpen,
@@ -65,6 +68,7 @@ export const TreeNode = ({
           handleSelectNode={handleSelectOverride}
           childFilter={childFilter}
           onSelect={onSelect}
+          rightAdornment={rightAdornment}
         />
       </NodeContextMenu>
       <CreateVirtualNodeDialog
