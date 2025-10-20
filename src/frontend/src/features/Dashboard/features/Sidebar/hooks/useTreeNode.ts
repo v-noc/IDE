@@ -15,6 +15,7 @@ export const useTreeNode = (
     secondarySelectedNode,
     setSelectedNode,
     setSecondarySelectedNode,
+    pushFocus,
     activeNodeId,
     expandedNodeIds,
     toggleNodeExpansion,
@@ -59,7 +60,7 @@ export const useTreeNode = (
   };
 
   const handleFocus = () => {
-    console.log("Focus on:", node.name);
+    pushFocus(node);
   };
 
   const handleExpand = () => {

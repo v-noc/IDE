@@ -9,6 +9,12 @@ interface ProjectState {
     setSelectedNode: (node: AnyNodeTree) => void;
     secondarySelectedNode: AnyNodeTree | null;
     setSecondarySelectedNode: (node: AnyNodeTree | null) => void;
+    focusedNode: AnyNodeTree | null; // deprecated in favor of focusStack[focusStack.length-1]
+    setFocusedNode: (node: AnyNodeTree | null) => void; // keeps compatibility
+    focusStack: AnyNodeTree[];
+    pushFocus: (node: AnyNodeTree) => void;
+    popFocus: () => void;
+    clearFocus: () => void;
     activeNodeId: string | null;
     expandedNodeIds: string[];
     toggleNodeExpansion: (nodeId: string) => void;
@@ -43,6 +49,18 @@ const useProjectStore = create<ProjectState>()(
             setSelectedNode: (node) => set({ selectedNode: node }),
             secondarySelectedNode: null,
             setSecondarySelectedNode: (node) => set({ secondarySelectedNode: node }),
+            focusedNode: null,
+            setFocusedNode: (node) => set({ focusedNode: node }),
+            focusStack: [],
+            pushFocus: (node) => set((state) => {
+                state.focusStack.push(node);
+                state.focusedNode = node;
+            }),
+            popFocus: () => set((state) => {
+                state.focusStack.pop();
+                state.focusedNode = state.focusStack[state.focusStack.length - 1] ?? null;
+            }),
+            clearFocus: () => set({ focusStack: [], focusedNode: null }),
             activeNodeId: null,
             expandedNodeIds: [],
             toggleNodeExpansion: (nodeId) => {

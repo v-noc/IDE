@@ -26,6 +26,10 @@ const collectAncestorKeys = (root: AnyNodeTree, key: string): string[] => {
 const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
   const {
     selectedNode,
+    focusedNode,
+    focusStack,
+    popFocus,
+    clearFocus,
     expandedNodeIds,
     toggleNodeExpansion,
     setSelectedNode,
@@ -34,7 +38,8 @@ const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
   // When a call is selected, auto-select and scroll to its target; expand ancestors
   const targetKey = useMemo(() => {
     if (selectedNode?.node_type === "call") {
-      return (selectedNode as CallNodeTree).target._key;
+      const target = (selectedNode as CallNodeTree).target;
+      return target?._key ?? null;
     }
     return null;
   }, [selectedNode]);
@@ -80,13 +85,40 @@ const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
     setSelectedNode,
   ]);
 
+  const rootToRender = focusedNode ?? projectTree;
+
   return (
-    <ul className="space-y-1">
-      <TreeNode
-        node={projectTree}
-        childFilter={(node) => node.node_type !== "call"}
-      />
-    </ul>
+    <div className="space-y-1">
+      {focusedNode && (
+        <div className="flex items-center justify-between px-2 py-1 bg-muted/40 border rounded">
+          <div className="text-xs text-muted-foreground truncate">
+            Focus: {focusStack.map((n) => n.name).join(" / ")}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="text-xs px-2 py-0.5 rounded border hover:bg-accent"
+              onClick={popFocus}
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              className="text-xs px-2 py-0.5 rounded border hover:bg-accent"
+              onClick={clearFocus}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+      <ul className="space-y-1">
+        <TreeNode
+          node={rootToRender}
+          childFilter={(node) => node.node_type !== "call"}
+        />
+      </ul>
+    </div>
   );
 };
 
