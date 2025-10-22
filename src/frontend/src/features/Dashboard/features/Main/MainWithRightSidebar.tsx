@@ -6,7 +6,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { RightSidebar } from "./components/sidebar";
+import { RightSidebar } from "./components/RightSidebar";
 
 const MainWithRightSidebar: React.FC<{
   left: React.ReactNode;

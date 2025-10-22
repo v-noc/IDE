@@ -1,16 +1,13 @@
 import CodeEditor from "@/components/CodeEditor";
 import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
-import SelectableList, {
-  type SelectableItem,
-} from "../components/SelectableList";
+import SelectableList, { type SelectableItem } from "../SelectableList";
 import {
   ResizablePanel,
   ResizablePanelGroup,
   ResizableHandle,
 } from "@/components/ui/resizable";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
-import SettingsDialog from "../components/SettingsDialog";
-import { Separator } from "@/components/ui/separator";
+import SettingsDialog from "../SettingsDialog";
 import { PlusIcon } from "lucide-react";
 import { useRunCode } from "@/features/Dashboard/features/Main/hooks/usePlayGround";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";

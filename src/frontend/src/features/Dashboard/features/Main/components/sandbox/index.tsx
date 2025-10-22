@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import Test from "./test";
-import PlayGround, { type PlayGroundHandle } from "./playGround";
+import Test from "./components/Test";
+import PlayGround, { type PlayGroundHandle } from "./components/PlayGround";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Play, Settings } from "lucide-react";
@@ -17,10 +17,16 @@ export default function Sandbox() {
       className="flex flex-col h-full "
     >
       <TabsList className="p-0 w-full bg-[#f9f9f9] flex items-center">
-        <TabsTrigger value="playground" className="rounded-none">
+        <TabsTrigger
+          value="playground"
+          className="rounded-none shadow-sm  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+        >
           Playground
         </TabsTrigger>
-        <TabsTrigger value="test" className="rounded-none ">
+        <TabsTrigger
+          value="test"
+          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+        >
           Test
         </TabsTrigger>
         <div className="border bg-white justify-end flex items-center gap-2 pr-2 w-full h-full">

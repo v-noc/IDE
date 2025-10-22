@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import useProjectStore from "../../store/useProjectStore";
-import Documents from "./components/docs";
-import EditorCode from "./components/code";
-import Sandbox from "./components/sandbox";
+import Documents from "./components/Docs";
+import EditorCode from "./components/Code";
+import Sandbox from "./components/Sandbox";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -86,6 +86,7 @@ const MainCanvas = () => {
           <div className="flex-1 overflow-hidden">
             <Tabs
               defaultValue={isCodeActive ? "code" : "docs"}
+              value={isCodeActive ? undefined : "docs"}
               className="flex h-full w-full flex-col  "
             >
               <TabsList className="rounded-none p-0">

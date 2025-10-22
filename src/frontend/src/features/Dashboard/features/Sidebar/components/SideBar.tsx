@@ -26,7 +26,7 @@ const SideBar = () => {
     key: projectId || "",
   });
 
-  const { setProjectData } = useProjectStore();
+  const { setProjectData, projectData } = useProjectStore();
 
   // Update project data in store when data changes
   useEffect(() => {
@@ -125,7 +125,7 @@ const SideBar = () => {
                     <Skeleton className="h-8 w-full" />
                   </div>
                 ) : (
-                  data && <ProjectTree projectTree={data} />
+                  projectData && <ProjectTree projectTree={projectData} />
                 )}
               </div>
             )}

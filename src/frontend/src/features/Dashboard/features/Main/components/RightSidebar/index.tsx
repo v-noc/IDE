@@ -12,6 +12,13 @@ import ConfigSidebarContent from "./components/SidebarTabs";
 import { getIcons } from "@/features/Dashboard/utils";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type {
+  AnyNodeTree,
+  ProjectNodeTree,
+  ThemeConfig,
+} from "@/types/project";
+type NodeWithChildren = AnyNodeTree & { children?: AnyNodeTree[] };
+type NodeWithTheme = AnyNodeTree & { theme_config?: ThemeConfig };
+import type {
   BasicInfoData,
   CustomizationData,
 } from "./hooks/useConfigSidebarForm";
@@ -21,55 +28,118 @@ export const RightSidebar: React.FC<{
   className?: string;
   onToggle?: () => void;
 }> = ({ className, onToggle }) => {
-  const { selectedNode } = useProjectStore();
+  const { selectedNode, projectData, setProjectData, setSelectedNode } =
+    useProjectStore();
+
+  const updateNodeInTree = useCallback(
+    (
+      tree: ProjectNodeTree,
+      key: string,
+      updater: (node: AnyNodeTree) => AnyNodeTree
+    ): ProjectNodeTree => {
+      const walk = (node: AnyNodeTree): AnyNodeTree => {
+        if (node._key === key) {
+          return updater({ ...node });
+        }
+        const children = (node as NodeWithChildren).children;
+        if (Array.isArray(children) && children.length) {
+          return {
+            ...node,
+            children: children.map((c) => walk(c)),
+          } as AnyNodeTree;
+        }
+        return node;
+      };
+
+      return walk(tree) as ProjectNodeTree;
+    },
+    []
+  );
 
   const onChangeTheme = useCallback(
     (data: CustomizationData) => {
-      if (!selectedNode) return;
-      // const theme: ThemeConfig = {
-      //   iconColor: data.iconColor,
-      //   cardColor: data.cardColor,
-      //   navbarColor: data.navbarColor,
-      //   leftSidebarColor: data.leftSidebarColor,
-      //   rightSidebarColor: data.rightSidebarColor,
-      //   backgroundColor: data.backgroundColor,
-      //   textColor: data.textColor,
-      // };
-      // updateNodeThemeMutation.mutate({
-      //   elementId: selectedNode.id,
-      //   theme,
-      // });
+      if (!selectedNode || !projectData) return;
+      const theme: ThemeConfig = {
+        iconColor: data.iconColor,
+        cardColor: data.cardColor,
+        navbarColor: data.navbarColor,
+        leftSidebarColor: data.leftSidebarColor,
+        rightSidebarColor: data.rightSidebarColor,
+        backgroundColor: data.backgroundColor,
+        textColor: data.textColor,
+      };
+
+      const updatedSelected: AnyNodeTree = {
+        ...selectedNode,
+        theme_config: { ...selectedNode.theme_config, ...theme },
+      } as AnyNodeTree;
+
+      const updatedTree = updateNodeInTree(
+        projectData,
+        selectedNode._key,
+        (node) => ({
+          ...node,
+          theme_config: {
+            ...((node as NodeWithTheme).theme_config ?? {}),
+            ...theme,
+          },
+        })
+      );
+      console.log("updatedTree", updatedTree);
+      console.log("updatedSelected", updatedSelected);
+      setProjectData(updatedTree);
+      setSelectedNode(updatedSelected);
     },
-    [selectedNode]
+    [
+      projectData,
+      selectedNode,
+      setProjectData,
+      setSelectedNode,
+      updateNodeInTree,
+    ]
   );
 
   const onChangeBasicInfo = useCallback(
     (data: BasicInfoData) => {
-      if (!selectedNode) return;
+      if (!selectedNode || !projectData) return;
       const nextIcon =
         data.icon || getIcons(selectedNode?.node_type ?? "project");
 
-      if (selectedNode?._key && nextIcon !== selectedNode.icon) {
-        // updateIconMutation.mutate({
-        //   elementId: selectedNodeFromTree.id,
-        //   icon: nextIcon,
-        // });
-      }
-
-      if (
+      const shouldUpdate =
         selectedNode?.name !== data.name ||
-        (selectedNode?.description ?? "") !== (data.description ?? "")
-      ) {
-        // updateNodeBasicInfoMutation.mutate({
-        //   elementId: selectedNodeFromTree?.id ?? "",
-        //   basicInfo: {
-        //     name: data.name,
-        //     description: data.description,
-        //   },
-        // });
-      }
+        (selectedNode?.description ?? "") !== (data.description ?? "") ||
+        (selectedNode.icon ?? "") !== (nextIcon ?? "");
+
+      if (!shouldUpdate) return;
+
+      const updatedSelected: AnyNodeTree = {
+        ...selectedNode,
+        name: data.name,
+        description: data.description ?? "",
+        icon: nextIcon,
+      } as AnyNodeTree;
+
+      const updatedTree = updateNodeInTree(
+        projectData,
+        selectedNode._key,
+        (node) => ({
+          ...node,
+          name: data.name,
+          description: data.description ?? "",
+          icon: nextIcon,
+        })
+      );
+
+      setProjectData(updatedTree);
+      setSelectedNode(updatedSelected);
     },
-    [selectedNode]
+    [
+      projectData,
+      selectedNode,
+      setProjectData,
+      setSelectedNode,
+      updateNodeInTree,
+    ]
   );
 
   const sidebarProps = useMemo(() => {
@@ -122,11 +192,17 @@ export const RightSidebar: React.FC<{
         <ResizablePanel collapsible defaultSize={35} minSize={20}>
           <div className="h-full min-h-0 flex flex-col ">
             <Tabs defaultValue="calls" className="flex-1 min-h-0 flex flex-col">
-              <TabsList className="w-full p-0">
-                <TabsTrigger className="rounded-none" value="calls">
+              <TabsList className="w-full p-0 bg-[var(--right-sidebar-color)]">
+                <TabsTrigger
+                  className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+                  value="calls"
+                >
                   Calls
                 </TabsTrigger>
-                <TabsTrigger className="rounded-none" value="base">
+                <TabsTrigger
+                  className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+                  value="base"
+                >
                   Base Class
                 </TabsTrigger>
               </TabsList>
