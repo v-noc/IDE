@@ -24,7 +24,7 @@ const CustomizationSection: React.FC<CustomizationSectionProps> = ({
     <Accordion
       type="multiple"
       defaultValue={["appearance", "layout"]}
-      className="w-full space-y-3"
+      className="w-full space-y-3 bg-white"
     >
       <AccordionItem value="appearance" className="!border rounded-md">
         <AccordionTrigger className="px-3 py-2 text-sm font-medium">
@@ -50,11 +50,11 @@ const CustomizationSection: React.FC<CustomizationSectionProps> = ({
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="layout" className="!border rounded-md">
+      <AccordionItem value="layout" className="!border rounded-md bg-white">
         <AccordionTrigger className="px-3 py-2 text-sm font-medium">
           Layout
         </AccordionTrigger>
-        <AccordionContent className="space-y-3 p-3 bg-muted/20">
+        <AccordionContent className="space-y-3 p-3 ">
           <ColorRow
             label="Navbar color"
             value={value.navbarColor ?? "#ffffff"}

@@ -13,6 +13,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
     theme: {
         leftSidebarColor: "#f9f9f9",
         rightSidebarColor: "#f9f9f9",
+        backgroundColor: "#f9f9f9",
     },
     setTheme: (theme) => set({ theme }),
 }));

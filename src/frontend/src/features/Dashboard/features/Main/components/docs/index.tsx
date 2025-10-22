@@ -29,7 +29,7 @@ const Documents = () => {
   // Renders the editor instance using a React component.
   return (
     <BlockNoteView
-      className="h-full w-full"
+      className="h-full w-full rounded-none"
       theme="light"
       editor={editor}
       slashMenu={false}

@@ -137,7 +137,7 @@ const Layout = ({
         "--navbar-color": theme.navbarColor,
         "--left-sidebar-color": theme.leftSidebarColor,
         "--right-sidebar-color": theme.rightSidebarColor,
-        "--background-color": theme.cardColor,
+        "--background-color": theme.backgroundColor,
         "--text-color": theme.textColor,
         "--icon-color": theme.iconColor,
         "--card-color": theme.cardColor,
