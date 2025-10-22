@@ -125,13 +125,13 @@ const MainCanvas = () => {
             </Tabs>
           </div>
         </ResizablePanel>
-        <ResizableHandle className="bg-transparent" />
+        <ResizableHandle className="bg-transparent " />
         <ResizablePanel
           ref={bottomPanelRef}
           defaultSize={30}
           minSize={16}
           collapsible
-          className="relative ] rounded"
+          className="relative  rounded group"
         >
           <Sandbox />
           {/* Close button near the handle (bottom area, not side) */}
@@ -139,7 +139,7 @@ const MainCanvas = () => {
             type="button"
             aria-label="Close sandbox"
             onClick={() => setIsSandboxOpen(false)}
-            className="absolute -top-2 left-1/2 -translate-x-1/2 z-50 rounded-full border bg-background/90 px-1.5 py-1 text-xs shadow-sm hover:bg-accent"
+            className="absolute -top-2 group-hover:flex hidden left-1/2 -translate-x-1/2 z-50 rounded-full border bg-background/90 px-4 py-1 text-xs shadow-sm hover:bg-accent"
           >
             <ChevronDown className="h-3.5 w-3.5" />
           </button>

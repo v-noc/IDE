@@ -176,7 +176,7 @@ export const RightSidebar: React.FC<{
           onClick={onToggle}
           aria-label="Hide right sidebar"
           title="Hide right sidebar"
-          className="absolute -left-3 top-1/2 z-20 -translate-y-1/2 rounded-md border bg-background/80 p-1 py-2 shadow hover:bg-accent"
+          className="absolute group-hover:flex hidden  -left-3 top-1/2 z-20 -translate-y-1/2 rounded-md border bg-background/80 p-1 py-2 shadow hover:bg-accent"
         >
           <ChevronRight className="size-4" />
         </button>
