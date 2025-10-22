@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import type { NodeType, AnyNodeTree } from "@/types/project";
+import type { NodeType, AnyNodeTree, ContainerNodeTree } from "@/types/project";
 // import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
 // import { useQueryClient } from "@tanstack/react-query";
 // import { toast } from "sonner";
 // import { useThemeStore } from "@/features/Dashboard/store/useThemeStore";
 
 export const useTreeNode = (
-  node: AnyNodeTree,
-  childFilter: (node: AnyNodeTree) => boolean = () => true,
+  node: ContainerNodeTree,
+  childFilter: (node: ContainerNodeTree) => boolean = () => true,
 ) => {
   const {
     selectedNode,
@@ -40,7 +40,7 @@ export const useTreeNode = (
     selectedNode?._key === node._key || secondarySelectedNode?._key === node._key;
   const isActive = activeNodeId === node._key;
   const hasChildren = useMemo(() => {
-    const children = (node as unknown as { children?: AnyNodeTree[] }).children ?? [];
+    const children = node.children ?? [];
     return children.some(childFilter);
   }, [node, childFilter]);
 
@@ -64,7 +64,7 @@ export const useTreeNode = (
   };
 
   const handleExpand = () => {
-    console.log("Expand:", node.name);
+
     if (hasChildren) {
       toggleNodeExpansion(node._key);
     }

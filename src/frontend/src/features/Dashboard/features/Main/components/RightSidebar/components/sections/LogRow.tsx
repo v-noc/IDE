@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { type LogTreeNode } from "@/features/Dashboard/service/useLogs";
+import { type LogTreeNode } from "@/features/Dashboard/features/Main/service/useLogs";
 import LogDetails from "./LogDetails";
 import { TableRow, TableCell } from "@/components/ui/table";
 

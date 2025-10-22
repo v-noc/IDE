@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -14,12 +14,14 @@ import {
 } from "@/components/ui/tooltip";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import getIcons from "@/features/Dashboard/utils/getIcons";
-import type { AnyNodeTree, CallNodeTree } from "@/types/project";
+import type { CallNodeTree, ContainerNodeTree } from "@/types/project";
 import getNodeStyle from "@/features/Dashboard/utils/getNodeStyle";
 import { TreeNode } from ".";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 
 type NodeContentProps = {
-  node: AnyNodeTree;
+  node: ContainerNodeTree;
   isOpen: boolean;
   isSelected: boolean;
   isActive: boolean;
@@ -27,8 +29,8 @@ type NodeContentProps = {
   nestingLevel: number;
   handleToggle: (e: React.MouseEvent) => void;
   handleSelectNode: () => void;
-  childFilter?: (node: AnyNodeTree) => boolean;
-  onSelect?: (node: AnyNodeTree) => void;
+  childFilter?: (node: ContainerNodeTree) => boolean;
+  onSelect?: (node: ContainerNodeTree) => void;
 };
 
 export const NodeContent = ({
@@ -43,10 +45,21 @@ export const NodeContent = ({
   childFilter,
   onSelect,
 }: NodeContentProps) => {
-  const nodeStyle = getNodeStyle(node);
+  const { projectData } = useProjectStore();
+  const nodeStyle = useMemo(() => {
+    let currentNode = node;
+    if (node.target) {
+      const nodeByKey = findNodeByKey(projectData, node.target._key);
+      if (nodeByKey) {
+        currentNode = nodeByKey;
+      }
+    }
+    return getNodeStyle(currentNode);
+  }, []);
+  console.log("nodeStyle", node);
 
   const currentStyle = {
-    backgroundColor: nodeStyle.backgroundColor,
+    backgroundColor: nodeStyle.cardColor,
     color: nodeStyle.color,
     borderColor: nodeStyle.borderColor,
   };
@@ -127,7 +140,7 @@ export const NodeContent = ({
         {hasChildren && (
           <CollapsibleContent>
             <ul className="pl-2 pt-1 space-y-1">
-              {(node.children as unknown as AnyNodeTree[])
+              {node.children
                 ?.filter((n) => (childFilter ? childFilter(n) : true))
                 .map((child) => (
                   <TreeNode

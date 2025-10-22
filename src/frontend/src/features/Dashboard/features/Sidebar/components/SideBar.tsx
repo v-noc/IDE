@@ -114,8 +114,9 @@ const SideBar = () => {
                 }`}
                 size={16}
               />
-              <span>Project Files</span>
+              <span>Project Node</span>
             </div>
+            <Separator />
             {!isProjectFilesCollapsed && (
               <div className="py-2 flex-grow overflow-y-auto">
                 {isLoading ? (
@@ -158,7 +159,7 @@ const SideBar = () => {
                   }`}
                   size={16}
                 />
-                <span>Virtual Folders</span>
+                <span>Nodes Branch</span>
               </div>
               <CreateVirtualFolderDialog />
             </div>

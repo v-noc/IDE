@@ -3,7 +3,7 @@ import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import {
   useFunctionLogTree,
   useCallLogTree,
-} from "@/features/Dashboard/service/useLogs";
+} from "@/features/Dashboard/features/Main/service/useLogs";
 import { Card } from "@/components/ui/card";
 import LogRow from "./LogRow";
 

@@ -85,8 +85,7 @@ export const RightSidebar: React.FC<{
           },
         })
       );
-      console.log("updatedTree", updatedTree);
-      console.log("updatedSelected", updatedSelected);
+
       setProjectData(updatedTree);
       setSelectedNode(updatedSelected);
     },
@@ -165,6 +164,7 @@ export const RightSidebar: React.FC<{
       onChangeCustomization: onChangeTheme,
     };
   }, [selectedNode, onChangeBasicInfo, onChangeTheme]);
+
   return (
     <aside
       className={`relative h-full w-full bg-[var(--right-sidebar-color)] border-l shadow-sm flex flex-col ${

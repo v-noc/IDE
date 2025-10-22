@@ -1,12 +1,12 @@
-import type { NodeType, ThemeConfig } from "@/types/project";
+import type { CallNodeTree, ContainerNodeTree } from "@/types/project";
 
 
-const getNodeStyle = (node: { node_type: NodeType, theme?: ThemeConfig, target?: { node_type: NodeType } }) => {
+const getNodeStyle = (node: ContainerNodeTree) => {
     // If node has theme overrides, prefer them
-    const themed = node.theme || {};
+    const themed = node.theme_config || {};
     let node_type = node.node_type;
-    if (node_type == "call" && node.target) {
-        node_type = node.target.node_type;
+    if (node_type == "call" && (node as CallNodeTree).target) {
+        node_type = (node as CallNodeTree).target?.node_type || "function";
     }
 
     const defaults = (() => {
@@ -79,7 +79,7 @@ const getNodeStyle = (node: { node_type: NodeType, theme?: ThemeConfig, target?:
 
     return {
         cardColor: themed.cardColor || defaults.cardColor,
-        backgroundColor: themed.cardColor || defaults.backgroundColor,
+        backgroundColor: themed.backgroundColor || defaults.backgroundColor,
         color: themed.textColor || defaults.color,
         iconColor: themed.iconColor || defaults.iconColor,
         textColor: themed.textColor || defaults.textColor,
