@@ -90,8 +90,6 @@ export const RightSidebar: React.FC<{
         }
       );
 
-      console.log("updatedTree", updatedTree);
-      console.log("updatedSelected", updatedSelected);
       setProjectData(updatedTree);
       setSelectedNode(updatedSelected);
     },
@@ -194,7 +192,7 @@ export const RightSidebar: React.FC<{
             <ConfigSidebarContent {...sidebarProps} />
           </div>
         </ResizablePanel>
-        <ResizableHandle className="h-px bg-border shrink-0 " />
+        <ResizableHandle className="h-px bg-border shrink-0 " withHandle />
         <ResizablePanel collapsible defaultSize={35} minSize={20}>
           <div className="h-full min-h-0 flex flex-col ">
             <Tabs defaultValue="calls" className="flex-1 min-h-0 flex flex-col">

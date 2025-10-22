@@ -90,7 +90,7 @@ const MainCanvas = () => {
                 </div>
               </TabsList>
 
-              <div className="px-2 py-2 text-xs text-muted-foreground truncate">
+              <div className="px-2  text-xs text-muted-foreground truncate">
                 {displayPath || "No selection"}
                 {suffixName && (
                   <>
@@ -135,7 +135,7 @@ const MainCanvas = () => {
             </Tabs>
           </div>
         </ResizablePanel>
-        <ResizableHandle className="bg-transparent " />
+        <ResizableHandle className="bg-border " />
         <ResizablePanel
           ref={bottomPanelRef}
           defaultSize={30}
