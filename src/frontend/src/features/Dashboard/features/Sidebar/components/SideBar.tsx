@@ -30,7 +30,7 @@ const SideBar = () => {
 
   // Update project data in store when data changes
   useEffect(() => {
-    if (data) {
+    if (data && projectData == null) {
       setProjectData(data);
     }
   }, [data, setProjectData]);

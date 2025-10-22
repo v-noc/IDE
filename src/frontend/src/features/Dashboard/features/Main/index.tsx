@@ -61,45 +61,55 @@ const MainCanvas = () => {
         <ResizablePanel
           defaultSize={70}
           minSize={40}
-          className="flex flex-col  border-b "
+          className="flex flex-col  border-b bg-white "
         >
-          <div className="px-2 pb-2 text-xs text-muted-foreground truncate">
-            {displayPath || "No selection"}
-            {suffixName && (
-              <>
-                {" "}
-                <button
-                  type="button"
-                  className="underline hover:no-underline cursor-pointer"
-                  onClick={() => {
-                    if (secondarySelectedNode) {
-                      setSelectedNode(secondarySelectedNode);
-                      setSecondarySelectedNode(null);
-                    }
-                  }}
-                >
-                  (promote)
-                </button>
-              </>
-            )}
-          </div>
           <div className="flex-1 overflow-hidden">
             <Tabs
               defaultValue={isCodeActive ? "code" : "docs"}
               value={isCodeActive ? undefined : "docs"}
               className="flex h-full w-full flex-col  "
             >
-              <TabsList className="rounded-none p-0">
+              <TabsList className="rounded-none p-0 bg-white w-full">
                 {isCodeActive && (
-                  <TabsTrigger value="code" className="rounded-none">
+                  <TabsTrigger
+                    value="code"
+                    className="rounded-none bg-[var(--background-color)] border border-border  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                  >
                     Code
                   </TabsTrigger>
                 )}
 
-                <TabsTrigger value="docs" className="rounded-none">
+                <TabsTrigger
+                  value="docs"
+                  className="rounded-none bg-[var(--background-color)] border border-border border-r-0  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                >
                   Docs
                 </TabsTrigger>
+                <div className=" border-b border-border border-l h-full w-full">
+                  {" "}
+                </div>
               </TabsList>
+
+              <div className="px-2 py-2 text-xs text-muted-foreground truncate">
+                {displayPath || "No selection"}
+                {suffixName && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="underline hover:no-underline cursor-pointer"
+                      onClick={() => {
+                        if (secondarySelectedNode) {
+                          setSelectedNode(secondarySelectedNode);
+                          setSecondarySelectedNode(null);
+                        }
+                      }}
+                    >
+                      (promote)
+                    </button>
+                  </>
+                )}
+              </div>
 
               {isCodeActive && (
                 <TabsContent

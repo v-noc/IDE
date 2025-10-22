@@ -17,7 +17,7 @@ import type {
   ThemeConfig,
 } from "@/types/project";
 type NodeWithChildren = AnyNodeTree & { children?: AnyNodeTree[] };
-type NodeWithTheme = AnyNodeTree & { theme_config?: ThemeConfig };
+
 import type {
   BasicInfoData,
   CustomizationData,
@@ -59,33 +59,39 @@ export const RightSidebar: React.FC<{
   const onChangeTheme = useCallback(
     (data: CustomizationData) => {
       if (!selectedNode || !projectData) return;
+      // leftSidebarColor: "#f9f9f9",
+      // rightSidebarColor: "#f9f9f9",
+      // backgroundColor: "#f9f9f9",
       const theme: ThemeConfig = {
         iconColor: data.iconColor,
         cardColor: data.cardColor,
         navbarColor: data.navbarColor,
-        leftSidebarColor: data.leftSidebarColor,
-        rightSidebarColor: data.rightSidebarColor,
-        backgroundColor: data.backgroundColor,
+        leftSidebarColor: data.leftSidebarColor ?? "#f9f9f9",
+        rightSidebarColor: data.rightSidebarColor ?? "#f9f9f9",
+        backgroundColor: data.backgroundColor ?? "#f9f9f9",
         textColor: data.textColor,
       };
 
       const updatedSelected: AnyNodeTree = {
         ...selectedNode,
-        theme_config: { ...selectedNode.theme_config, ...theme },
+        theme_config: theme,
       } as AnyNodeTree;
 
       const updatedTree = updateNodeInTree(
         projectData,
         selectedNode._key,
-        (node) => ({
-          ...node,
-          theme_config: {
-            ...((node as NodeWithTheme).theme_config ?? {}),
-            ...theme,
-          },
-        })
+        (node) => {
+          console.log("node", node);
+          console.log("theme", theme);
+          return {
+            ...node,
+            theme_config: theme,
+          };
+        }
       );
 
+      console.log("updatedTree", updatedTree);
+      console.log("updatedSelected", updatedSelected);
       setProjectData(updatedTree);
       setSelectedNode(updatedSelected);
     },

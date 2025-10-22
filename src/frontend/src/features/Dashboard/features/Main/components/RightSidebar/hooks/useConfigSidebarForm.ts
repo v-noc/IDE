@@ -79,7 +79,9 @@ export const useConfigSidebarForm = ({
         (data: CustomizationData) => {
             setCustomization(data);
             clearTimeout(customTimeoutRef.current);
+
             customTimeoutRef.current = window.setTimeout(() => {
+
                 onChangeCustomization?.(data);
             }, DEBOUNCE_MS);
         },

@@ -46,6 +46,7 @@ export const NodeContent = ({
   onSelect,
 }: NodeContentProps) => {
   const { projectData } = useProjectStore();
+
   const nodeStyle = useMemo(() => {
     let currentNode = node;
     if (node.target) {
@@ -55,7 +56,7 @@ export const NodeContent = ({
       }
     }
     return getNodeStyle(currentNode);
-  }, []);
+  }, [node, projectData]);
   console.log("nodeStyle", node);
 
   const currentStyle = {

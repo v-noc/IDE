@@ -57,22 +57,22 @@ const CustomizationSection: React.FC<CustomizationSectionProps> = ({
         <AccordionContent className="space-y-3 p-3 ">
           <ColorRow
             label="Navbar color"
-            value={value.navbarColor ?? "#ffffff"}
+            value={value.navbarColor ?? "#f9f9f9"}
             onChange={(v) => update({ navbarColor: v })}
           />
           <ColorRow
             label="Background color"
-            value={value.backgroundColor ?? "#ffffff"}
+            value={value.backgroundColor ?? "#f9f9f9"}
             onChange={(v) => update({ backgroundColor: v })}
           />
           <ColorRow
             label="Left sidebar color"
-            value={value.leftSidebarColor ?? "#ffffff"}
+            value={value.leftSidebarColor ?? "#f9f9f9"}
             onChange={(v) => update({ leftSidebarColor: v })}
           />
           <ColorRow
             label="Right sidebar color"
-            value={value.rightSidebarColor ?? "#ffffff"}
+            value={value.rightSidebarColor ?? "#f9f9f9"}
             onChange={(v) => update({ rightSidebarColor: v })}
           />
         </AccordionContent>
