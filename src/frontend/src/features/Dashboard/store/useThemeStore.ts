@@ -10,6 +10,9 @@ interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set) => ({
-    theme: undefined,
+    theme: {
+        leftSidebarColor: "#f9f9f9",
+        rightSidebarColor: "#f9f9f9",
+    },
     setTheme: (theme) => set({ theme }),
 }));

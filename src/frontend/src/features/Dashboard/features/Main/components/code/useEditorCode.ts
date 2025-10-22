@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import {
     useGetCodeForNode,
-    useGetFileCode,
+
     useWriteCode,
     type CodeResponse,
 } from "@/features/Dashboard/service/useCodeElement";
@@ -23,8 +23,8 @@ export interface EditorCodeResult {
  */
 export function useEditorCode(elementId: string): EditorCodeResult {
     // Try both endpoints defensively; prefer element code, fall back to file code
-    const fileQuery = useGetFileCode(elementId || "");
-    const elementQuery = useGetCodeForNode(elementId || "");
+
+    const { data, isLoading, isError } = useGetCodeForNode(elementId || "");
 
     const { mutate: save, isPending: isSaving } = useWriteCode();
 
@@ -32,19 +32,7 @@ export function useEditorCode(elementId: string): EditorCodeResult {
         save({ elementId, code });
     }
 
-    const { data, isLoading, isError } = useMemo(() => {
-        const preferred = elementQuery.data ?? fileQuery.data;
-        const loading = elementQuery.isLoading || fileQuery.isLoading;
-        const error = !loading && !preferred && (Boolean(elementQuery.error) || Boolean(fileQuery.error));
-        return { data: preferred, isLoading: loading, isError: error };
-    }, [
-        elementQuery.data,
-        elementQuery.isLoading,
-        elementQuery.error,
-        fileQuery.data,
-        fileQuery.isLoading,
-        fileQuery.error,
-    ]);
+
 
     return { data, isLoading, isError, saveCode, isSaving };
 }

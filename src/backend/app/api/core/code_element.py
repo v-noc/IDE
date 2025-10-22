@@ -94,27 +94,6 @@ def get_code(
     return code_details
 
 
-@router.get("/{file_id}/file-code")
-def get_file_code(
-    file_id: str,
-    db: StandardDatabase = Depends(get_db),
-) -> Dict[str, Any]:
-    """
-    Deprecated alias: retrieve code for a file node by key.
-    """
-    file_service = get_file_service(db)
-    file_node = file_service.get(file_id)
-
-    if not file_node or getattr(file_node, "node_type", None) != "file":
-        raise HTTPException(status_code=404, detail="File element not found")
-
-    code_details = file_service.get_code(file_node.id)
-    if code_details is None:
-        raise HTTPException(status_code=404, detail="Code not found for file")
-
-    return code_details
-
-
 @router.post("/{project_id}/run-code")
 def run_code(
     project_id: str,

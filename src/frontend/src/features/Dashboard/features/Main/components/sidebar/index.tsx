@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import { ChevronRight } from "lucide-react";
 import CallSidebar from "./CallSidebar";
 import {
@@ -8,15 +8,96 @@ import {
 import { Panel as ResizablePanel } from "react-resizable-panels";
 import BaseClass from "./BaseClass";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ConfigSidebarContent from "./components/SidebarTabs";
+import { getIcons } from "@/features/Dashboard/utils";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import type {
+  BasicInfoData,
+  CustomizationData,
+} from "./hooks/useConfigSidebarForm";
 
 export const RightSidebar: React.FC<{
   children?: React.ReactNode;
   className?: string;
   onToggle?: () => void;
-}> = ({ children, className, onToggle }) => {
+}> = ({ className, onToggle }) => {
+  const { selectedNode } = useProjectStore();
+
+  const onChangeTheme = useCallback(
+    (data: CustomizationData) => {
+      if (!selectedNode) return;
+      // const theme: ThemeConfig = {
+      //   iconColor: data.iconColor,
+      //   cardColor: data.cardColor,
+      //   navbarColor: data.navbarColor,
+      //   leftSidebarColor: data.leftSidebarColor,
+      //   rightSidebarColor: data.rightSidebarColor,
+      //   backgroundColor: data.backgroundColor,
+      //   textColor: data.textColor,
+      // };
+      // updateNodeThemeMutation.mutate({
+      //   elementId: selectedNode.id,
+      //   theme,
+      // });
+    },
+    [selectedNode]
+  );
+
+  const onChangeBasicInfo = useCallback(
+    (data: BasicInfoData) => {
+      if (!selectedNode) return;
+      const nextIcon =
+        data.icon || getIcons(selectedNode?.node_type ?? "project");
+
+      if (selectedNode?._key && nextIcon !== selectedNode.icon) {
+        // updateIconMutation.mutate({
+        //   elementId: selectedNodeFromTree.id,
+        //   icon: nextIcon,
+        // });
+      }
+
+      if (
+        selectedNode?.name !== data.name ||
+        (selectedNode?.description ?? "") !== (data.description ?? "")
+      ) {
+        // updateNodeBasicInfoMutation.mutate({
+        //   elementId: selectedNodeFromTree?.id ?? "",
+        //   basicInfo: {
+        //     name: data.name,
+        //     description: data.description,
+        //   },
+        // });
+      }
+    },
+    [selectedNode]
+  );
+
+  const sidebarProps = useMemo(() => {
+    return {
+      initialBasicInfo: {
+        name: selectedNode?.name ?? "",
+        description: selectedNode?.description ?? "",
+        icon: selectedNode
+          ? selectedNode.icon || getIcons(selectedNode.node_type ?? "project")
+          : getIcons("project"),
+      },
+      initialCustomization: {
+        iconColor: selectedNode?.theme_config?.iconColor,
+
+        cardColor: selectedNode?.theme_config?.cardColor,
+        navbarColor: selectedNode?.theme_config?.navbarColor,
+        backgroundColor: selectedNode?.theme_config?.backgroundColor,
+        leftSidebarColor: selectedNode?.theme_config?.leftSidebarColor,
+        rightSidebarColor: selectedNode?.theme_config?.rightSidebarColor,
+        textColor: selectedNode?.theme_config?.textColor,
+      },
+      onChangeBasicInfo,
+      onChangeCustomization: onChangeTheme,
+    };
+  }, [selectedNode, onChangeBasicInfo, onChangeTheme]);
   return (
     <aside
-      className={`relative h-full w-full bg-white border-l shadow-sm flex flex-col ${
+      className={`relative h-full w-full bg-[var(--right-sidebar-color)] border-l shadow-sm flex flex-col ${
         className ?? ""
       }`}
     >
@@ -34,27 +115,27 @@ export const RightSidebar: React.FC<{
       <ResizablePanelGroup direction="vertical" className="h-full min-h-0">
         <ResizablePanel collapsible defaultSize={65} minSize={35}>
           <div className="h-full min-h-0 overflow-auto">
-            {children ?? (
-              <div className="p-2 text-sm text-muted-foreground">
-                Right sidebar placeholder
-              </div>
-            )}
+            <ConfigSidebarContent {...sidebarProps} />
           </div>
         </ResizablePanel>
-        <ResizableHandle withHandle />
+        <ResizableHandle className="h-px bg-border shrink-0 " />
         <ResizablePanel collapsible defaultSize={35} minSize={20}>
-          <div className="h-full min-h-0 flex flex-col px-2 pt-2">
+          <div className="h-full min-h-0 flex flex-col ">
             <Tabs defaultValue="calls" className="flex-1 min-h-0 flex flex-col">
-              <TabsList className="w-full">
-                <TabsTrigger value="calls">Calls</TabsTrigger>
-                <TabsTrigger value="base">Base Class</TabsTrigger>
+              <TabsList className="w-full p-0">
+                <TabsTrigger className="rounded-none" value="calls">
+                  Calls
+                </TabsTrigger>
+                <TabsTrigger className="rounded-none" value="base">
+                  Base Class
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="calls" className="flex-1 min-h-0">
                 <CallSidebar hideHeader />
               </TabsContent>
               <TabsContent
                 value="base"
-                className="flex-1 min-h-0 overflow-auto px-1 py-2"
+                className="flex-1 min-h-0 overflow-auto px-3 py-2"
               >
                 <BaseClass />
               </TabsContent>

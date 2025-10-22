@@ -13,7 +13,7 @@ const getNodeStyle = (node: { node_type: NodeType, theme?: ThemeConfig, target?:
         switch (node_type) {
             case "project":
                 return {
-                    backgroundColor: "#F3EDF7",
+                    backgroundColor: "#fff",
                     color: "#1C1B1F",
                     iconColor: "#6750A4",
                     cardColor: "#F3EDF7",

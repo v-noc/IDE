@@ -188,7 +188,7 @@ const Layout = ({
         className="flex-1 flex flex-col w-full bg-[var(--background-color)]"
       >
         {/* Navbar */}
-        <nav className="p-4 border-b shadow-sidebar bg-[var(--navbar-color)]">
+        <nav className="p-2 border-b shadow-sidebar bg-[var(--navbar-color)]">
           {navbar}
         </nav>
 

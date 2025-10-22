@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BasicInfoSection from "./sections/BasicInfoSection";
 import CustomizationSection from "./sections/CustomizationSection";
@@ -36,42 +36,40 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
     onChangeCustomization,
   });
 
-  const tabs = useMemo(
-    () => (
-      <div className="flex flex-col h-full p-3">
-        <Tabs
-          defaultValue={defaultTab}
-          className="flex flex-col flex-1 min-h-0"
-        >
-          <TabsList>
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="customization">Customization</TabsTrigger>
-            <TabsTrigger value="logs">Logs</TabsTrigger>
-          </TabsList>
-          <div className="mt-2 flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
-            <TabsContent value="basic">
-              <BasicInfoSection
-                value={basicInfo}
-                onChange={handleBasicInfoChange}
-              />
-            </TabsContent>
-            <TabsContent value="customization">
-              <CustomizationSection
-                value={customization}
-                onChange={handleCustomizationChange}
-              />
-            </TabsContent>
-            <TabsContent value="logs">
-              <LogsSection />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </div>
-    ),
-    [basicInfo, customization, defaultTab]
+  return (
+    <div className="flex flex-col h-full  ">
+      <Tabs defaultValue={defaultTab} className="flex flex-col flex-1 min-h-0">
+        <TabsList className="p-0">
+          <TabsTrigger className="rounded-none" value="basic">
+            Basic Info
+          </TabsTrigger>
+          <TabsTrigger className="rounded-none" value="customization">
+            Customization
+          </TabsTrigger>
+          <TabsTrigger className="rounded-none" value="logs">
+            Logs
+          </TabsTrigger>
+        </TabsList>
+        <div className="mt-2 flex-1 min-h-0 overflow-y-auto p-3 pr-1 pb-4">
+          <TabsContent value="basic">
+            <BasicInfoSection
+              value={basicInfo}
+              onChange={handleBasicInfoChange}
+            />
+          </TabsContent>
+          <TabsContent value="customization">
+            <CustomizationSection
+              value={customization}
+              onChange={handleCustomizationChange}
+            />
+          </TabsContent>
+          <TabsContent value="logs">
+            <LogsSection />
+          </TabsContent>
+        </div>
+      </Tabs>
+    </div>
   );
-
-  return tabs;
 };
 
 export default ConfigSidebarContent;

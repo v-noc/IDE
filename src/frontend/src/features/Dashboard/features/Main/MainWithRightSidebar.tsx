@@ -10,14 +10,14 @@ import { RightSidebar } from "./components/sidebar";
 
 const MainWithRightSidebar: React.FC<{
   left: React.ReactNode;
-  right: React.ReactNode;
+
   defaultOpen?: boolean;
   rightDefaultSize?: number; // percentage
   rightMinSize?: number; // percentage
   className?: string;
 }> = ({
   left,
-  right,
+
   defaultOpen = true,
   className,
   rightDefaultSize = 25,
@@ -47,9 +47,7 @@ const MainWithRightSidebar: React.FC<{
               minSize={rightMinSize}
               className="h-full min-h-0"
             >
-              <RightSidebar onToggle={() => setOpen(false)}>
-                {right}
-              </RightSidebar>
+              <RightSidebar onToggle={() => setOpen(false)} />
             </ResizablePanel>
           </>
         ) : null}

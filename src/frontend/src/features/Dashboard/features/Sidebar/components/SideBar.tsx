@@ -11,11 +11,13 @@ import {
   type ImperativePanelHandle,
 } from "react-resizable-panels";
 import { ChevronDownIcon } from "lucide-react";
+import { PiShareNetworkFill } from "react-icons/pi";
 import { useState, useRef, useEffect } from "react";
 import CreateVirtualFolderDialog from "./VirtualFolders/CreateVirtualFolderDialog";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
+import { Separator } from "@/components/ui/separator";
 
 const SideBar = () => {
   const { projectId } = useParams();
@@ -81,10 +83,12 @@ const SideBar = () => {
   return (
     <div className=" h-full w-full flex flex-col gap-2">
       <Link to="/">
-        <div className="text-2xl font-bold flex items-center  h-[57px] bg-sky-600 text-white">
-          <span className="pl-4 text-white  ">v-noc</span>
+        <div className="text-2xl font-bold flex items-center p-4 gap-2 h-[57px]  text-white">
+          <PiShareNetworkFill className="size-6  fill-green-600" />
+          <span className=" text-black  ">V-NOC</span>
         </div>
       </Link>
+      <Separator />
       <ResizablePanelGroup direction="vertical" className="p-2">
         <ResizablePanel
           ref={projectFilePanelRef}
