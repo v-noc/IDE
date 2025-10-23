@@ -11,6 +11,7 @@ from .code_elements.function_repo import FunctionRepo
 from .code_elements.class_repo import ClassRepo
 from .code_elements.call_repo import CallRepo
 from .log_repo import LogRepository
+from .document_repo import DocumentRepo
 
 
 class Repositories:
@@ -28,6 +29,7 @@ class Repositories:
         self.class_repo = ClassRepo(db)
         self.call_repo = CallRepo(db)
         self.log_repo = LogRepository(db)
+        self.document_repo = DocumentRepo(db)
 
         # Edge Repositories - YES, you need these!
         self.contains_edges = BaseRepository(

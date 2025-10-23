@@ -1,4 +1,5 @@
 
+
 from .base import BaseNode
 from .properties import TypeKeyValuesProperties, CodePosition, ThemeConfig
 from typing import List, Optional, Literal
@@ -14,6 +15,11 @@ class ContainerNode(BaseNode):
     icon: Optional[str] = Field(
         default=None,
         description="Container icon."
+    )
+
+    documents: List[str] = Field(
+        default_factory=list,
+        description="Documents held by the container."
     )
 
 
