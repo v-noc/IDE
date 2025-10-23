@@ -55,9 +55,7 @@ export const useWriteCode = () => {
             queryClient.invalidateQueries({
                 queryKey: ["code", variables.elementId],
             });
-            queryClient.invalidateQueries({
-                queryKey: ["file_code", variables.elementId],
-            });
+
             // Notify other parts of the app (e.g., Sidebar) to resync the tree
             window.dispatchEvent(new CustomEvent("code-saved"));
         },

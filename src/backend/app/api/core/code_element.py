@@ -6,11 +6,7 @@ import os
 
 from app.core.sandbox.code_run import CodeResponse, CodeRunner
 from app.db.client import get_db
-from app.core.services.file_service import FileService
-from app.core.services.class_service import ClassService
-from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
-from app.core.services.call_service import CallService
 from app.api.dependencies import get_project_service, get_file_service, get_class_service, get_function_service, get_call_service
 from app.core.repository import Repositories
 
