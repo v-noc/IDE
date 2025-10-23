@@ -19,6 +19,8 @@ export const useTreeNode = (
     activeNodeId,
     expandedNodeIds,
     toggleNodeExpansion,
+    projectData,
+    focusStack
     // addVirtualNode,
     // projectData,
   } = useProjectStore();
@@ -34,6 +36,7 @@ export const useTreeNode = (
   const [nodeTypeToCreate, setNodeTypeToCreate] = useState<
     NodeType
   >("file");
+
 
   const isOpen = expandedNodeIds.includes(node._key);
   const isSelected =
