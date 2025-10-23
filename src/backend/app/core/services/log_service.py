@@ -140,11 +140,6 @@ class LogService:
         # 5. Build the tree from the flat list of logs
         return LogTreeBuilder(flat_logs).build()
 
-    def find_function_log(self, function_id: str):
-        flat_logs = self.repos.log_repo.find_function_log(function_id)
-
-        return LogTreeBuilder(flat_logs).build()
-
     def get_unified_log_tree(self, node_id: str) -> List[LogTreeNode]:
         """Return a log tree for either a function ID or a call ID.
 
@@ -154,7 +149,7 @@ class LogService:
         # Try function first
         fn = self.repos.function_repo.get_by_id(node_id)
         if fn is not None:
-            return self.find_function_log(fn.id)
+            return self.get_function_log(fn.id)
 
         # Then try call
         call = self.repos.call_repo.get_by_id(node_id)
