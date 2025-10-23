@@ -18,7 +18,7 @@ export const useGetProjectTreeWithKeyProject = ({ key }: { key: string }) => {
   return useQuery({
     queryKey: ["projectTree", key],
     queryFn: () => getProjectTreeWithKey(key),
-    enabled: !!key,
+    enabled: key != null,
   });
 };
 

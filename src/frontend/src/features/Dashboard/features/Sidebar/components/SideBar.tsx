@@ -22,18 +22,19 @@ import { Separator } from "@/components/ui/separator";
 const SideBar = () => {
   const { projectId } = useParams();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useGetProjectTreeWithKeyProject({
-    key: projectId || "",
-  });
+  const { data, isLoading, isSuccess, dataUpdatedAt } =
+    useGetProjectTreeWithKeyProject({
+      key: projectId || "",
+    });
 
   const { setProjectData, projectData } = useProjectStore();
 
   // Update project data in store when data changes
   useEffect(() => {
-    if (data && projectData == null) {
+    if (data && isSuccess) {
       setProjectData(data);
     }
-  }, [data, setProjectData]);
+  }, [data, setProjectData, isSuccess, dataUpdatedAt]);
 
   // Listen for code saves to resync tree without resetting UI state
   useEffect(() => {

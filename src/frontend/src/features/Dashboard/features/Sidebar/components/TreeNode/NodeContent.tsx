@@ -57,7 +57,6 @@ export const NodeContent = ({
     }
     return getNodeStyle(currentNode);
   }, [node, projectData]);
-  console.log("nodeStyle", node);
 
   const currentStyle = {
     backgroundColor: nodeStyle.cardColor,

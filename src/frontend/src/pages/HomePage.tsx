@@ -10,7 +10,7 @@ const HomePage = () => {
   const [viewMode, setViewMode] = useState<"list" | "grid">("grid");
 
   return (
-    <div className="min-h-screen bg-background p-6 w-full">
+    <div className="min-h-screen bg-[#f9f9f9] p-6 w-full">
       <div className="max-w-screen w-full mx-auto">
         <Header />
         <SearchAndViewController
