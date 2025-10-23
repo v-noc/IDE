@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
+import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 // const uuidv4 = () => new Date().getTime().toString() + Math.random().toString(36).substr(2, 9);
 
 interface ProjectState {
@@ -74,7 +75,21 @@ const useProjectStore = create<ProjectState>()(
                 });
             },
             projectData: null,
-            setProjectData: (data) => set({ projectData: data }),
+            setProjectData: (data) => set((state) => {
+                state.projectData = data;
+                // Remap focus stack nodes to the new project tree by _key
+                if (state.focusStack.length > 0 && data) {
+                    const remapped = state.focusStack
+                        .map((n) => findNodeByKey(data, n._key))
+                        .filter((n): n is AnyNodeTree => n != null);
+                    state.focusStack = remapped;
+                    state.focusedNode = remapped.length > 0 ? remapped[remapped.length - 1] : null;
+                } else if (!data) {
+                    // If project data is cleared, also clear focus
+                    state.focusStack = [];
+                    state.focusedNode = null;
+                }
+            }),
             // virtualFolderStructures: []
             // addVirtualNode: (parentId, name, type) => {
             //     const newNode: AnyNodeTree & { parentId?: string } = {

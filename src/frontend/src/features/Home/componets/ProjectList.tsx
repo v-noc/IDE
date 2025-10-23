@@ -60,7 +60,9 @@ const ProjectList = ({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                    //   onClick={() => setEditingProject(project)}
+                      onClick={(e: React.MouseEvent) => {
+                        e.stopPropagation();
+                      }}
                     >
                       <Edit className="h-4 w-4 mr-2" />
                       Edit

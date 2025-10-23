@@ -11,27 +11,30 @@ import {
   type ImperativePanelHandle,
 } from "react-resizable-panels";
 import { ChevronDownIcon } from "lucide-react";
+import { PiShareNetworkFill } from "react-icons/pi";
 import { useState, useRef, useEffect } from "react";
 import CreateVirtualFolderDialog from "./VirtualFolders/CreateVirtualFolderDialog";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
+import { Separator } from "@/components/ui/separator";
 
 const SideBar = () => {
   const { projectId } = useParams();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useGetProjectTreeWithKeyProject({
-    key: projectId || "",
-  });
+  const { data, isLoading, isSuccess, dataUpdatedAt } =
+    useGetProjectTreeWithKeyProject({
+      key: projectId || "",
+    });
 
-  const { setProjectData } = useProjectStore();
+  const { setProjectData, projectData } = useProjectStore();
 
   // Update project data in store when data changes
   useEffect(() => {
-    if (data) {
+    if (data && isSuccess) {
       setProjectData(data);
     }
-  }, [data, setProjectData]);
+  }, [data, setProjectData, isSuccess, dataUpdatedAt]);
 
   // Listen for code saves to resync tree without resetting UI state
   useEffect(() => {
@@ -81,10 +84,12 @@ const SideBar = () => {
   return (
     <div className=" h-full w-full flex flex-col gap-2">
       <Link to="/">
-        <div className="text-2xl font-bold flex items-center  h-[57px] bg-sky-600 text-white">
-          <span className="pl-4 text-white  ">v-noc</span>
+        <div className="text-2xl font-bold flex items-center p-4 gap-2 h-[57px]  text-white">
+          <PiShareNetworkFill className="size-6  fill-green-600" />
+          <span className=" text-black  ">V-NOC</span>
         </div>
       </Link>
+      <Separator />
       <ResizablePanelGroup direction="vertical" className="p-2">
         <ResizablePanel
           ref={projectFilePanelRef}
@@ -110,8 +115,9 @@ const SideBar = () => {
                 }`}
                 size={16}
               />
-              <span>Project Files</span>
+              <span>Project Node</span>
             </div>
+            <Separator />
             {!isProjectFilesCollapsed && (
               <div className="py-2 flex-grow overflow-y-auto">
                 {isLoading ? (
@@ -121,7 +127,7 @@ const SideBar = () => {
                     <Skeleton className="h-8 w-full" />
                   </div>
                 ) : (
-                  data && <ProjectTree projectTree={data} />
+                  projectData && <ProjectTree projectTree={projectData} />
                 )}
               </div>
             )}
@@ -154,7 +160,7 @@ const SideBar = () => {
                   }`}
                   size={16}
                 />
-                <span>Virtual Folders</span>
+                <span>Nodes Branch</span>
               </div>
               <CreateVirtualFolderDialog />
             </div>

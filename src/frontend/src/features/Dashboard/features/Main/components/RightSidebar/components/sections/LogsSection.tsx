@@ -3,7 +3,7 @@ import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import {
   useFunctionLogTree,
   useCallLogTree,
-} from "@/features/Dashboard/service/useLogs";
+} from "@/features/Dashboard/features/Main/service/useLogs";
 import { Card } from "@/components/ui/card";
 import LogRow from "./LogRow";
 
@@ -39,13 +39,13 @@ const LogsSection: React.FC = () => {
 
   return (
     <div className="w-full space-y-4">
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden py-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-3 text-left font-semibold">ID</th>
-                <th className="px-4 py-3 text-left font-semibold">
+                <th className="px-4 py-3 text-left font-semibold ">
                   Event Type
                 </th>
                 <th className="px-4 py-3 text-left font-semibold">Message</th>

@@ -1,4 +1,4 @@
-import type { AnyNodeTree, ContainerNodeTree } from "@/types/project";
+import type { ContainerNodeTree } from "@/types/project";
 import { useTreeNode } from "../../hooks/useTreeNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeContent } from "./NodeContent";
@@ -7,10 +7,10 @@ import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
 // import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
 
 interface TreeNodeProps {
-  node: AnyNodeTree;
+  node: ContainerNodeTree;
   nestingLevel?: number;
-  childFilter?: (node: AnyNodeTree) => boolean;
-  onSelect?: (node: AnyNodeTree) => void;
+  childFilter?: (node: ContainerNodeTree) => boolean;
+  onSelect?: (node: ContainerNodeTree) => void;
 }
 
 export const TreeNode = ({

@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { type LogTreeNode } from "@/features/Dashboard/service/useLogs";
+import { type LogTreeNode } from "@/features/Dashboard/features/Main/service/useLogs";
 import LogDetails from "./LogDetails";
 import { TableRow, TableCell } from "@/components/ui/table";
+import { formatDistanceToNow } from "date-fns";
 
 export type RowProps = {
   node: LogTreeNode;
@@ -38,7 +39,7 @@ const LogRow: React.FC<RowProps> = ({ node, depth = 0 }) => {
       const seconds = durationMs / 1000;
       return `${formatSignificant(seconds)} s`;
     }
-    if (absMs >= 1) {
+    if (absMs >= 0.01) {
       return `${formatSignificant(durationMs)} ms`;
     }
     if (absMs === 0) {
@@ -56,22 +57,19 @@ const LogRow: React.FC<RowProps> = ({ node, depth = 0 }) => {
             style={{ paddingLeft: `${(depth ?? 0) * 24}px` }}
             className="flex items-center gap-2"
           >
-            {filteredChildren.length > 0 ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => setIsExpanded((v) => !v)}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </Button>
-            ) : (
-              <div className="h-6 w-6" />
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => setIsExpanded((v) => !v)}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </Button>
+
             <span className="font-mono text-sm text-muted-foreground">
               {node.id}
             </span>
@@ -86,7 +84,7 @@ const LogRow: React.FC<RowProps> = ({ node, depth = 0 }) => {
           {node.message}
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
-          {new Date(node.timestamp).toLocaleString()}
+          {formatDistanceToNow(node.timestamp)}
         </TableCell>
         <TableCell className="text-sm text-right">
           {formatDurationShort(effectiveDurationMs)}

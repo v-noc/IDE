@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import useProjectStore from "../../store/useProjectStore";
-import Documents from "./components/docs";
-import EditorCode from "./components/code";
-import Sandbox from "./components/sandbox";
+import Documents from "./components/Docs";
+import EditorCode from "./components/Code";
+import Sandbox from "./components/Sandbox";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -53,49 +53,70 @@ const MainCanvas = () => {
   }, [isSandboxOpen]);
 
   return (
-    <div className="relative h-full w-full p-2">
+    <div className="relative h-full w-full bg-[var(--background-color)]">
       <ResizablePanelGroup
         direction="vertical"
         className="h-full min-h-0 relative"
       >
-        <ResizablePanel defaultSize={70} minSize={40} className="flex flex-col">
-          <div className="px-2 pb-2 text-xs text-muted-foreground truncate">
-            {displayPath || "No selection"}
-            {suffixName && (
-              <>
-                {" "}
-                <button
-                  type="button"
-                  className="underline hover:no-underline cursor-pointer"
-                  onClick={() => {
-                    if (secondarySelectedNode) {
-                      setSelectedNode(secondarySelectedNode);
-                      setSecondarySelectedNode(null);
-                    }
-                  }}
-                >
-                  (promote)
-                </button>
-              </>
-            )}
-          </div>
+        <ResizablePanel
+          defaultSize={70}
+          minSize={40}
+          className="flex flex-col  border-b bg-white "
+        >
           <div className="flex-1 overflow-hidden">
             <Tabs
               defaultValue={isCodeActive ? "code" : "docs"}
-              className="flex h-full w-full flex-col bg-background rounded"
+              value={isCodeActive ? undefined : "docs"}
+              className="flex h-full w-full flex-col  "
             >
-              <TabsList>
-                {isCodeActive && <TabsTrigger value="code">Code</TabsTrigger>}
+              <TabsList className="rounded-none p-0 bg-white w-full">
+                {isCodeActive && (
+                  <TabsTrigger
+                    value="code"
+                    className="rounded-none bg-[var(--background-color)] border border-border  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                  >
+                    Code
+                  </TabsTrigger>
+                )}
 
-                <TabsTrigger value="docs">Docs</TabsTrigger>
+                <TabsTrigger
+                  value="docs"
+                  className="rounded-none bg-[var(--background-color)] border border-border border-r-0  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                >
+                  Docs
+                </TabsTrigger>
+                <div className=" border-b border-border border-l h-full w-full">
+                  {" "}
+                </div>
               </TabsList>
+
+              <div className="px-2  text-xs text-muted-foreground truncate">
+                {displayPath || "No selection"}
+                {suffixName && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="underline hover:no-underline cursor-pointer"
+                      onClick={() => {
+                        if (secondarySelectedNode) {
+                          setSelectedNode(secondarySelectedNode);
+                          setSecondarySelectedNode(null);
+                        }
+                      }}
+                    >
+                      (promote)
+                    </button>
+                  </>
+                )}
+              </div>
 
               {isCodeActive && (
                 <TabsContent
                   value="code"
-                  className="flex-1 flex flex-col overflow-hidden"
+                  className="flex-1 flex flex-col overflow-hidden bg-white border-t p-0"
                 >
-                  <div className="h-full w-full overflow-auto py-4">
+                  <div className="h-full w-full py-4 overflow-auto ">
                     <EditorCode />
                   </div>
                 </TabsContent>
@@ -103,10 +124,10 @@ const MainCanvas = () => {
 
               <TabsContent
                 value="docs"
-                className="flex flex-col overflow-hidden"
+                className="flex flex-col overflow-hidden bg-white border-t"
               >
-                <div className="flex-1 rounded-md border overflow-hidden">
-                  <div className="h-full w-full overflow-auto py-4">
+                <div className="flex-1  pl-8  overflow-hidden">
+                  <div className="h-full pt-2 w-full overflow-auto ">
                     <Documents />
                   </div>
                 </div>
@@ -114,13 +135,13 @@ const MainCanvas = () => {
             </Tabs>
           </div>
         </ResizablePanel>
-        <ResizableHandle className="data-[panel-group-direction=vertical]:h-0.5 " />
+        <ResizableHandle className="bg-border " />
         <ResizablePanel
           ref={bottomPanelRef}
           defaultSize={30}
           minSize={16}
           collapsible
-          className="relative bg-background rounded"
+          className="relative  rounded group"
         >
           <Sandbox />
           {/* Close button near the handle (bottom area, not side) */}
@@ -128,7 +149,7 @@ const MainCanvas = () => {
             type="button"
             aria-label="Close sandbox"
             onClick={() => setIsSandboxOpen(false)}
-            className="absolute -top-2 left-1/2 -translate-x-1/2 z-50 rounded-full border bg-background/90 px-1.5 py-1 text-xs shadow-sm hover:bg-accent"
+            className="absolute -top-2 group-hover:flex hidden left-1/2 -translate-x-1/2 z-50 rounded-full border bg-background/90 px-4 py-1 text-xs shadow-sm hover:bg-accent"
           >
             <ChevronDown className="h-3.5 w-3.5" />
           </button>

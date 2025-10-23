@@ -6,18 +6,18 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { RightSidebar } from "./components/sidebar";
+import { RightSidebar } from "./components/RightSidebar";
 
 const MainWithRightSidebar: React.FC<{
   left: React.ReactNode;
-  right: React.ReactNode;
+
   defaultOpen?: boolean;
   rightDefaultSize?: number; // percentage
   rightMinSize?: number; // percentage
   className?: string;
 }> = ({
   left,
-  right,
+
   defaultOpen = true,
   className,
   rightDefaultSize = 25,
@@ -26,7 +26,7 @@ const MainWithRightSidebar: React.FC<{
   const [open, setOpen] = useState<boolean>(Boolean(defaultOpen));
   return (
     <div
-      className={`relative h-full w-full min-h-0 overflow-hidden ${
+      className={`relative h-full w-full min-h-0 overflow-hidden  ${
         className ?? ""
       }`}
     >
@@ -41,15 +41,13 @@ const MainWithRightSidebar: React.FC<{
 
         {open ? (
           <>
-            <ResizableHandle className="hover:bg-border/70 transition-colors" />
+            <ResizableHandle className="hover:bg-border/70 transition-colors bg-transparent" />
             <ResizablePanel
               defaultSize={rightDefaultSize}
               minSize={rightMinSize}
-              className="h-full min-h-0"
+              className="h-full min-h-0 group"
             >
-              <RightSidebar onToggle={() => setOpen(false)}>
-                {right}
-              </RightSidebar>
+              <RightSidebar onToggle={() => setOpen(false)} />
             </ResizablePanel>
           </>
         ) : null}

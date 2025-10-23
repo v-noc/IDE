@@ -24,7 +24,7 @@ const CustomizationSection: React.FC<CustomizationSectionProps> = ({
     <Accordion
       type="multiple"
       defaultValue={["appearance", "layout"]}
-      className="w-full space-y-3"
+      className="w-full space-y-3 bg-white"
     >
       <AccordionItem value="appearance" className="!border rounded-md">
         <AccordionTrigger className="px-3 py-2 text-sm font-medium">
@@ -50,29 +50,29 @@ const CustomizationSection: React.FC<CustomizationSectionProps> = ({
         </AccordionContent>
       </AccordionItem>
 
-      <AccordionItem value="layout" className="!border rounded-md">
+      <AccordionItem value="layout" className="!border rounded-md bg-white">
         <AccordionTrigger className="px-3 py-2 text-sm font-medium">
           Layout
         </AccordionTrigger>
-        <AccordionContent className="space-y-3 p-3 bg-muted/20">
+        <AccordionContent className="space-y-3 p-3 ">
           <ColorRow
             label="Navbar color"
-            value={value.navbarColor ?? "#ffffff"}
+            value={value.navbarColor ?? "#f9f9f9"}
             onChange={(v) => update({ navbarColor: v })}
           />
           <ColorRow
             label="Background color"
-            value={value.backgroundColor ?? "#ffffff"}
+            value={value.backgroundColor ?? "#f9f9f9"}
             onChange={(v) => update({ backgroundColor: v })}
           />
           <ColorRow
             label="Left sidebar color"
-            value={value.leftSidebarColor ?? "#ffffff"}
+            value={value.leftSidebarColor ?? "#f9f9f9"}
             onChange={(v) => update({ leftSidebarColor: v })}
           />
           <ColorRow
             label="Right sidebar color"
-            value={value.rightSidebarColor ?? "#ffffff"}
+            value={value.rightSidebarColor ?? "#f9f9f9"}
             onChange={(v) => update({ rightSidebarColor: v })}
           />
         </AccordionContent>

@@ -26,9 +26,7 @@ const fetchCodeForNode = (elementId: string): Promise<CodeResponse> => {
     return api(`${API_ROUTES.CODE_ELEMENTS}${elementId}/code`);
 };
 
-const fetchFileCode = (fileId: string): Promise<CodeResponse> => {
-    return api(`${API_ROUTES.CODE_ELEMENTS}${fileId}/file-code`);
-};
+
 
 const writeCode = (payload: WriteCodePayload) => {
     const { elementId, code } = payload;
@@ -47,14 +45,6 @@ export const useGetCodeForNode = (elementId: string) => {
     });
 };
 
-export const useGetFileCode = (fileId: string) => {
-    return useQuery({
-        queryKey: ["file_code", fileId],
-        queryFn: () => fetchFileCode(fileId),
-        enabled: !!fileId,
-        retry: 1,
-    });
-};
 
 export const useWriteCode = () => {
     const queryClient = useQueryClient();

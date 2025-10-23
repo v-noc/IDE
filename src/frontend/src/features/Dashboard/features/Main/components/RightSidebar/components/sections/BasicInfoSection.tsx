@@ -30,7 +30,7 @@ const BasicInfoSection: React.FC<BasicInfoSectionProps> = ({
       type="single"
       collapsible
       defaultValue="basic"
-      className="w-full"
+      className="w-full bg-white"
     >
       <AccordionItem value="basic" className="!border rounded-md">
         <AccordionTrigger className="px-3 py-2 text-sm font-medium">
