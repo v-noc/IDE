@@ -185,7 +185,7 @@ def test_get_function_log_tree(create_sample_project, arangodb_client):
     ))
 
     # Log 2 for add, child of log 1
-    log_service.create(add_fn.id, RegisterLogsParams(
+    add_enter_log = log_service.create(add_fn.id, RegisterLogsParams(
         chain_id=chain_id, timestamp=base + timedelta(milliseconds=1), event_type=LogEventType.LOG, message="log in add"
     ), parent_function_id=factory_fn.id)
 
@@ -203,6 +203,6 @@ def test_get_function_log_tree(create_sample_project, arangodb_client):
     assert root.id == factory_enter_log.id
 
     # The 'exit' log should be a child of the 'enter' log from the same function.
-    assert len(root.children) == 1
-    child = root.children[0]
-    assert child.id == factory_exit_log.id
+    assert len(root.children) == 2
+    child_ids = {c.id for c in root.children}
+    assert child_ids == {factory_exit_log.id, add_enter_log.id}
