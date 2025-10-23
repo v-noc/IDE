@@ -4,6 +4,7 @@ const API_ROUTES = {
     CODE_ELEMENTS: '/code-elements/',
     CONTAINER: '/containers/',
     LOGS: '/logs/',
+    DOCUMENTS: '/documents/',
 };
 
 export default API_ROUTES; 

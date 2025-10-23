@@ -170,7 +170,7 @@ const Layout = ({
         {leftSidebar}
       </ResizablePanel>
       {/* Minimal handle: only color changes on hover */}
-      <ResizableHandle className="w-px px-0 border-l border-transparent hover:border-border hover:bg-border/20 transition-colors duration-150" />
+      <ResizableHandle className="w-px px-0 border-l border-l-2 border-transparent hover:border-border hover:bg-border/20 transition-colors duration-150" />
       {/* When left is closed, show open toggle */}
       {!isLeftOpen && (
         <button
