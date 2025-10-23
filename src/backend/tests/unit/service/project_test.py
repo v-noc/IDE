@@ -61,7 +61,7 @@ def test_delete_project(create_project, create_repos):
     projects = project_service.get_all()
 
     project_service.delete(
-        create_project.key
+        create_project
     )
 
     projects = project_service.get_all()

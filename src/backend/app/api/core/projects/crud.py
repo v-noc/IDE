@@ -145,7 +145,7 @@ def delete_project(
 ) -> bool:
     project = project_service.get(project_id=project_id)
     if project:
-        result = project_service.delete(project_id)
+        result = project_service.delete(project)
         if result is False:
             return False
         return True

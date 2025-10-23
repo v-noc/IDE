@@ -1,5 +1,5 @@
 from .data.user import User
 
 def create_user():
-    """ ID: 9bcb7dbe-5c02-4038-bba1-aeeee47b8f99 """
+    """ ID: c7c050ab-2724-4a86-8529-1a1e19b0765c """
     return User()

@@ -8,13 +8,14 @@ import {
   type CustomizationData,
 } from "../hooks/useConfigSidebarForm";
 import LogsSection from "./sections/LogsSection";
+import DocumentsList from "./sections/DocumentsList";
 
 export type ConfigSidebarContentProps = {
   initialBasicInfo: Partial<BasicInfoData>;
   initialCustomization: Partial<CustomizationData>;
   onChangeBasicInfo?: (data: BasicInfoData) => void;
   onChangeCustomization?: (data: CustomizationData) => void;
-  defaultTab?: "basic" | "customization";
+  defaultTab?: "documents" | "basic" | "customization";
 };
 
 const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
@@ -22,7 +23,7 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
   initialCustomization,
   onChangeBasicInfo,
   onChangeCustomization,
-  defaultTab = "basic",
+  defaultTab = "documents",
 }) => {
   const {
     basicInfo,
@@ -40,6 +41,12 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
     <div className="flex flex-col h-full  ">
       <Tabs defaultValue={defaultTab} className="flex flex-col flex-1 min-h-0">
         <TabsList className="p-0 bg-[var(--right-sidebar-color)]">
+          <TabsTrigger
+            className="rounded-none bg-white shadow-sm data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+            value="documents"
+          >
+            Documents
+          </TabsTrigger>
           <TabsTrigger
             className="rounded-none bg-white shadow-sm data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
             value="basic"
@@ -68,6 +75,10 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
 
           <TabsContent value="logs">
             <LogsSection />
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <DocumentsList />
           </TabsContent>
         </div>
       </Tabs>

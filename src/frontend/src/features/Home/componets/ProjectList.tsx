@@ -69,7 +69,6 @@ const ProjectList = ({
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={(e: React.MouseEvent) => {
-                        e.preventDefault();
                         e.stopPropagation();
                         deleteProject(project._key);
                       }}
@@ -151,7 +150,6 @@ const ProjectList = ({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={(e: React.MouseEvent) => {
-                      e.stopPropagation();
                       e.preventDefault();
                       deleteProject(project._key);
                     }}

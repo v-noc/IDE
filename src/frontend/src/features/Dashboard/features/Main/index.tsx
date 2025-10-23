@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useGetDocuments, useUpdateDocument } from "./service/useDocuments";
+import { debounce } from "remeda";
 
 const MainCanvas = () => {
   const {
@@ -39,6 +41,47 @@ const MainCanvas = () => {
   }, [effectiveNode?.node_type]);
 
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    null
+  );
+  const nodeKey = effectiveNode?._key || "";
+  const { data: documents = [] } = useGetDocuments(nodeKey);
+
+  useEffect(() => {
+    // Default to first document when available
+
+    if (!selectedDocumentId && documents.length > 0) {
+      setSelectedDocumentId(documents[0]._key);
+    }
+  }, [documents, selectedDocumentId]);
+
+  useEffect(() => {
+    // Listen to sidebar selection events
+    const onSelect = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { _key?: string } | undefined;
+      if (detail?._key) setSelectedDocumentId(detail._key);
+    };
+    window.addEventListener("select-document", onSelect as EventListener);
+    return () =>
+      window.removeEventListener("select-document", onSelect as EventListener);
+  }, []);
+
+  const selectedDocument = useMemo(
+    () => documents.find((d) => d._key === selectedDocumentId) || null,
+    [documents, selectedDocumentId]
+  );
+
+  const updateMutation = useUpdateDocument(selectedNode?._key || "");
+  const updateDocumentDebounced = useMemo(
+    () =>
+      debounce(
+        (payload: { id: string; data: string }) => {
+          updateMutation.mutate({ id: payload.id, data: payload.data });
+        },
+        { waitMs: 1000 }
+      ),
+    [updateMutation]
+  );
   const bottomPanelRef = useRef<ImperativePanelHandle>(null);
 
   // Sync panel collapsed state with our local boolean
@@ -128,7 +171,24 @@ const MainCanvas = () => {
               >
                 <div className="flex-1  pl-8  overflow-hidden">
                   <div className="h-full pt-2 w-full overflow-auto ">
-                    <Documents />
+                    <Documents
+                      document={
+                        selectedDocument
+                          ? {
+                              id: selectedDocument._key,
+                              data: selectedDocument.data,
+                            }
+                          : undefined
+                      }
+                      onChange={(data: string) => {
+                        if (selectedDocumentId) {
+                          updateDocumentDebounced.call({
+                            id: selectedDocument?._key || "",
+                            data,
+                          });
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               </TabsContent>

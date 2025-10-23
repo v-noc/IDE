@@ -7,17 +7,17 @@ class ProjectService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def delete(self, project_key: str):
+    def delete(self, project: ProjectNode):
         # The containment tree returns a list of dictionaries,
         # where the node is nested under the "vertex" key.
-        children = self.repos.project_repo.get_containment_tree(f"nodes/{project_key}")
+        children = self.repos.project_repo.get_containment_tree(project.id)
 
         for child_data in children:
             if "vertex" in child_data and "_key" in child_data["vertex"]:
                 child_key = child_data["vertex"]["_key"]
                 self.repos.nodes.delete(child_key)
 
-        return self.repos.project_repo.delete(project_key)
+        return self.repos.project_repo.delete(project.key)
 
     def update(self, project: ProjectNode):
         return self.repos.project_repo.update(project.key, project)

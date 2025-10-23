@@ -11,7 +11,6 @@ from app.core.parser.scope_manager.core.scope import ScopeType
 from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler \
     import FunctionHandler
 from app.core.parser.ast.node_tracking import add_comment
-from app.core.watcher.service import get_watcher_service
 
 
 class ClassHandler:
@@ -24,7 +23,6 @@ class ClassHandler:
     ):
         self.symbol_table = symbol_table
         self.function_handler = function_handler
-        self.watcher_service = get_watcher_service()
 
     def handle_inherit_class_node(self, node: ClassSchema):
         """Process a class node and set up inheritance"""

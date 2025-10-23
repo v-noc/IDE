@@ -13,6 +13,8 @@ import {
   SuggestionMenuController,
   getDefaultReactSlashMenuItems,
 } from "@blocknote/react";
+import { useEffect } from "react";
+import { FileText } from "lucide-react";
 
 // Creates a new editor instance with Mermaid block registered.
 // const customBlockSpecs = {
@@ -24,13 +26,55 @@ const schema = BlockNoteSchema.create({
     // ...customBlockSpecs,
   } as BlockSpecs,
 });
-const Documents = () => {
-  const editor = useCreateBlockNote({ schema });
+type DocumentsProps = {
+  document?: { id: string; data?: string };
+  onChange?: (data: string) => void;
+};
+
+const Documents = ({ document, onChange }: DocumentsProps) => {
+  const editor = useCreateBlockNote({ schema, initialContent: undefined });
+
+  // Load content when selected document changes
+  useEffect(() => {
+    if (!editor || !document) return;
+    // For simplicity, store raw string in a paragraph
+    const data = document?.data ?? "";
+
+    try {
+      const document = JSON.parse(data);
+
+      editor.replaceBlocks(editor.document, document);
+    } catch (error) {
+      editor.replaceBlocks(editor.document, []);
+      console.error("Error parsing document data:", error);
+    }
+  }, [document?.id]);
+
+  // If no document is selected, show an empty state instead of editor
+  if (!document) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border bg-background">
+            <FileText className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div className="text-sm font-medium">No document selected</div>
+          <div className="text-xs text-muted-foreground">
+            Create a document from the sidebar to start.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Renders the editor instance using a React component.
   return (
     <BlockNoteView
       className="h-full w-full rounded-none"
       theme="light"
+      onChange={(currentEditor) => {
+        onChange?.(JSON.stringify(currentEditor?.document));
+      }}
       editor={editor}
       slashMenu={false}
     >
@@ -38,38 +82,7 @@ const Documents = () => {
         triggerCharacter="/"
         getItems={async (query: string) => {
           const defaults = getDefaultReactSlashMenuItems(editor);
-          // const custom: Array<{
-          //   title: string;
-          //   subtext?: string;
-          //   aliases?: string[];
-          //   onItemClick: () => void;
-          // }> = [
-          //   {
-          //     title: "Mermaid diagram",
-          //     subtext: "Insert a Mermaid block",
-          //     aliases: ["mermaid", "diagram", "graph"],
-          //     onItemClick: () => {
-          //       const ref = editor.getTextCursorPosition().block;
-          //       editor.insertBlocks(
-          //         [
-          //           {
-          //             // The custom schema registers this block type
-          //             type: "mermaid" as unknown as keyof typeof editor.schema.blockSchema,
-          //             props: {
-          //               code: "flowchart TD\nA[Start] --> B[End]",
-          //               textAlignment: "center",
-          //               showPreview: true,
-          //             } as Record<string, unknown>,
-          //           } as unknown as Parameters<
-          //             typeof editor.insertBlocks
-          //           >[0][number],
-          //         ],
-          //         ref,
-          //         "after"
-          //       );
-          //     },
-          //   },
-          // ];
+
           return filterSuggestionItems([...defaults], query);
         }}
       />

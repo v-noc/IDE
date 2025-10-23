@@ -29,7 +29,11 @@ export const useCreateProject = () => {
 };
 
 export const useDeleteProject = () => {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteProject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
   });
 };

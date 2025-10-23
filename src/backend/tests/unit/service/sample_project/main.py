@@ -1,31 +1,31 @@
 def factory():
-    """ ID: 74958d87-fd80-463a-9c9a-4965a3395c0c """
+    """ ID: 8d59ff84-48e2-42da-ba55-4c13142bb68a """
 
     def add():
-        """ ID: 70b259c9-cbf1-4324-af43-53724beb1b23 """
+        """ ID: 38c65695-7809-495f-9c1f-725b392cff0e """
         build()
         pass
 
     def build():
-        """ ID: 388ab2c9-280c-4ee5-84e9-c1b03034032c """
+        """ ID: 1a8b16b0-eea4-420a-8deb-d4428b3ec179 """
         pass
     return add
 
 def call_back(call_back_func):
-    """ ID: 3232bee4-d4aa-4da1-b29d-69ef0f2f7938 """
+    """ ID: fe0a5343-48d7-4519-a7b8-21a5de398f7a """
     call_back_func()
 
 def factory_call():
-    """ ID: 6919c6f8-3e9c-42b0-86f1-d683e95c3794 """
+    """ ID: 2d7151a2-5756-4166-a041-9fd3491c2f2c """
     add = factory()
     add()
 
 def curry_call():
-    """ ID: c019b462-2f14-4627-8c21-c56eeba50784 """
+    """ ID: 26cd74e0-e3a8-4304-8faa-4dd85b17a15a """
     factory()()
 
 def main():
-    """ ID: 88194cd9-c111-4e1b-b2ec-a7ce71642d19 """
+    """ ID: 5e8af11f-7e83-4ca5-8573-6a25b4acd165 """
     factory_call()
     curry_call()
     builder = factory()

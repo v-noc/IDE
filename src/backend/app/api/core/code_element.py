@@ -6,12 +6,15 @@ import os
 
 from app.core.sandbox.code_run import CodeResponse, CodeRunner
 from app.db.client import get_db
-from app.core.services.file_service import FileService
-from app.core.services.class_service import ClassService
-from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
-from app.core.services.call_service import CallService
-from app.api.dependencies import get_project_service, get_file_service, get_class_service, get_function_service, get_call_service
+from app.api.dependencies import (
+    get_project_service,
+    get_file_service,
+    get_class_service,
+    get_function_service,
+    get_call_service,
+)
+from app.core.watcher.service import WatcherService, get_watcher_service
 from app.core.repository import Repositories
 
 
@@ -32,7 +35,13 @@ def _get_services(db: StandardDatabase):
     class_service = get_class_service(db)
     function_service = get_function_service(db)
     call_service = get_call_service(db)
-    return project_service, file_service, class_service, function_service, call_service
+    return (
+        project_service,
+        file_service,
+        class_service,
+        function_service,
+        call_service,
+    )
 
 
 @router.post("/{element_id}/write-code")
@@ -40,11 +49,38 @@ def write_code(
     element_id: str,
     code_block: str = Body(..., embed=True, alias="code"),
     db: StandardDatabase = Depends(get_db),
+    watcher_service: WatcherService = Depends(get_watcher_service),
 ) -> Dict[str, Any]:
     """
     Writes a block of code to the location of a given code element.
     """
-    _, file_service, _, _, _ = _get_services(db)
+    project_service, file_service, _, _, _ = _get_services(db)
+
+    # Ensure the project's watcher is running for this element
+    try:
+        node_repo = Repositories(db).nodes
+        raw_node = node_repo.get_raw_by_key(element_id)
+        if raw_node:
+            current_id = raw_node.get("_id")
+            # Walk up to find the project ancestor
+            for _ in range(50):
+                if not current_id:
+                    break
+                parents = node_repo.get_parent(current_id)
+                if not parents:
+                    break
+                parent_vertex = parents[0].get("vertex") or {}
+                if parent_vertex.get("node_type") == "project":
+                    project_id = parent_vertex.get("_id")
+                    if project_id:
+                        project_node = project_service.get(project_id)
+                        if project_node:
+                            watcher_service.start_watching(project_node)
+                    break
+                current_id = parent_vertex.get("_id")
+    except Exception:
+        # Non-fatal: failure to start watcher should not block write
+        pass
     result = file_service.write_code_by_id(element_id, code_block)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result.get("error"))
@@ -72,8 +108,13 @@ def get_code(
     if not node_type or not node_id:
         raise HTTPException(status_code=500, detail="Node data is corrupted")
 
-    _, file_service, class_service, function_service, call_service = _get_services(
-        db)
+    (
+        _,
+        file_service,
+        class_service,
+        function_service,
+        call_service,
+    ) = _get_services(db)
 
     if node_type == "file":
         code_details = file_service.get_code(node_id)

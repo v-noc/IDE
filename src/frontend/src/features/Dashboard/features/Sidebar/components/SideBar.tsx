@@ -133,7 +133,7 @@ const SideBar = () => {
             )}
           </div>
         </ResizablePanel>
-        <ResizableHandle withHandle />
+        <ResizableHandle withHandle className="border-t-2" />
         <ResizablePanel
           ref={virtualFoldersPanelRef}
           collapsible

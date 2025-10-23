@@ -4934,6 +4934,7 @@ __metadata:
     react-resizable-panels: "npm:^3.0.3"
     react-router: "npm:^7.7.1"
     react-router-dom: "npm:^7.7.1"
+    remeda: "npm:^2.32.0"
     sonner: "npm:^2.0.6"
     tailwind-merge: "npm:^3.3.1"
     tailwindcss: "npm:^4.1.11"
@@ -7557,6 +7558,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"remeda@npm:^2.32.0":
+  version: 2.32.0
+  resolution: "remeda@npm:2.32.0"
+  dependencies:
+    type-fest: "npm:^4.41.0"
+  checksum: 10c0/890ce245dac492eacffc657d6976680a6de8c9f96a5a1e86c37d91795e5209a62e6912dceeda20685f03d26bb5d54805c8c7a9ad0e91b16f1fcfacd70452ab00
+  languageName: node
+  linkType: hard
+
 "resolve-from@npm:^4.0.0":
   version: 4.0.0
   resolution: "resolve-from@npm:4.0.0"
@@ -8171,6 +8181,13 @@ __metadata:
   dependencies:
     prelude-ls: "npm:^1.2.1"
   checksum: 10c0/7b3fd0ed43891e2080bf0c5c504b418fbb3e5c7b9708d3d015037ba2e6323a28152ec163bcb65212741fa5d2022e3075ac3c76440dbd344c9035f818e8ecee58
+  languageName: node
+  linkType: hard
+
+"type-fest@npm:^4.41.0":
+  version: 4.41.0
+  resolution: "type-fest@npm:4.41.0"
+  checksum: 10c0/f5ca697797ed5e88d33ac8f1fec21921839871f808dc59345c9cf67345bfb958ce41bd821165dbf3ae591cedec2bf6fe8882098dfdd8dc54320b859711a2c1e4
   languageName: node
   linkType: hard
 

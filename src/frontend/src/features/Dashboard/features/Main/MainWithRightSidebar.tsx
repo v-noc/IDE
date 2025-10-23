@@ -41,7 +41,7 @@ const MainWithRightSidebar: React.FC<{
 
         {open ? (
           <>
-            <ResizableHandle className="hover:bg-border/70 transition-colors bg-transparent" />
+            <ResizableHandle className="hover:bg-border/70 transition-colors bg-transparent border-l-1" />
             <ResizablePanel
               defaultSize={rightDefaultSize}
               minSize={rightMinSize}
