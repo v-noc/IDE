@@ -1,10 +1,10 @@
 class Parent:
-    """ ID: a3ecd710-843c-479e-887b-8d391029d068 """
+    """ ID: eafcb450-3ccf-4fd7-98e7-10c0abb7f429 """
 
     def __init__(self, name: str):
-        """ ID: 56e66ed6-0a03-4759-9a60-2322bde99654 """
+        """ ID: fbea723d-0b37-4320-82b7-f5086aafb9c8 """
         self.name = name
 
     def get_name(self):
-        """ ID: 11879aff-28b7-4ad1-8ced-50dc25c194bc """
+        """ ID: 86f5a508-7ccc-4009-b62a-6a3989800e93 """
         return self.name

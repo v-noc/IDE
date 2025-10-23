@@ -1,31 +1,31 @@
 def call_back():
-    """ ID: b72d5d42-97dd-4ba2-9e45-bade488af627 """
+    """ ID: 563b52c8-bd86-4b4d-b570-8f3e2145989d """
     print('call_back')
 
 class GrandParent:
-    """ ID: 94ccfadf-f200-4410-93b7-717b783cf708 """
+    """ ID: 5612cddf-238d-4c98-bff0-4e07c8614e96 """
 
     def wake_up(self):
-        """ ID: 7fa9bd9e-a35c-4fff-8b55-59554120b664 """
+        """ ID: 17d2ec50-baa7-47bc-a10c-cadc4145c924 """
         pass
 
 class Parent(GrandParent):
-    """ ID: 463a185c-acde-4bb8-8cce-7a30f34916a0 """
+    """ ID: 4a7d7288-c3c7-4b1c-83c4-6541dbac5b84 """
 
     def __init__(self, callback):
-        """ ID: acbb9505-5e0a-4f09-92fe-587e748f3649 """
+        """ ID: 3149c14d-2814-4949-bf08-e501d7e2c639 """
         self.callback = callback
         self.wake_up()
 
     def greet(self):
-        """ ID: e6c150de-045f-49bc-855b-f806db9f9e67 """
+        """ ID: 4786e01a-2b6a-41f6-92a3-8af06ce615b2 """
         pass
 
 class Child(Parent):
-    """ ID: 0db48ae0-f65d-49fe-baba-353c83a07061 """
+    """ ID: f7fdc3bd-1728-4fd2-b75e-29236a24d0a1 """
 
     def greet(self):
-        """ ID: cd10e5c8-4ff5-49cf-9815-272edd284234 """
+        """ ID: 5d6fbb0b-d61e-4bac-92dd-8e3a23e01ab3 """
         self.callback()
         super().greet()
 child = Child(call_back)

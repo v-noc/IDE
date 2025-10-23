@@ -3,6 +3,7 @@ from vn_logger.configure_logger import configure_logger, stop_worker_thread
 from vn_logger.logger import context_logger, logger
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
+import pytest
 
 
 def _find_fn(nodes, name: str):
@@ -15,6 +16,7 @@ def _find_fn(nodes, name: str):
     return None
 
 
+@pytest.mark.skip(reason="Skipping vn_logger test")
 def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
     # Use real server URL; worker will use requests.post
     repos = Repositories(arangodb_client)

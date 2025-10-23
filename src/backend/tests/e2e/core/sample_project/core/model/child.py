@@ -1,8 +1,8 @@
 from .parent import Parent
 
 class Child(Parent):
-    """ ID: 11c74aaa-c29f-47a5-b19e-78b06cb0cb08 """
+    """ ID: e278aa7a-d358-4a4c-aa8e-d67668aefa96 """
 
     def __init__(self, name: str):
-        """ ID: 4688c2e0-76e7-467a-a665-8717f09bcf29 """
+        """ ID: 709db811-a10e-441b-8159-dc8427f60cdd """
         super().__init__(name)
