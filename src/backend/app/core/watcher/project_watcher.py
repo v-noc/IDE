@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import logging
-import time
 from pathlib import Path
 from typing import Callable
 
-from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent, FileDeletedEvent
+from watchdog.events import (
+    FileSystemEventHandler,
+    FileModifiedEvent,
+    FileCreatedEvent,
+    FileDeletedEvent,
+)
 from watchdog.observers import Observer
 
 
@@ -64,6 +68,7 @@ class ProjectWatcher:
         self.observer = Observer()
         self.event_handler = ChangeHandler(
             self.project_path, self.resync_callback)
+        self._started = False
 
     def start(self):
         """Starts watching the project directory."""
@@ -71,10 +76,16 @@ class ProjectWatcher:
             logger.error(f"Path is not a directory: {self.project_path}")
             return
 
-        self.observer.schedule(self.event_handler, str(
-            self.project_path), recursive=True)
-        self.observer.start()
-        logger.info(f"Started watching {self.project_path}")
+        # Recreate observer if it has been stopped previously
+        if not self.observer.is_alive():
+            self.observer = Observer()
+            self.observer.schedule(self.event_handler, str(
+                self.project_path), recursive=True)
+            self.observer.start()
+            self._started = True
+            logger.info(f"Started watching {self.project_path}")
+        else:
+            logger.info(f"Observer already running for {self.project_path}")
 
     def stop(self):
         """Stops watching the project directory."""
@@ -82,6 +93,7 @@ class ProjectWatcher:
             self.observer.stop()
             self.observer.join()
             logger.info(f"Stopped watching {self.project_path}")
+        self._started = False
 
     def pause(self):
         """Pause watching."""
@@ -90,3 +102,11 @@ class ProjectWatcher:
     def resume(self):
         """Resume watching."""
         self.event_handler.resume()
+
+    def is_running(self) -> bool:
+        """Return True if the underlying observer thread is running."""
+        return self.observer.is_alive()
+
+    def is_paused(self) -> bool:
+        """Return True if the handler is currently paused."""
+        return getattr(self.event_handler, "paused", False)

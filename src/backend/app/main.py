@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api import root
 from .db.client import get_db
+from .core.watcher.service import WatcherService
 from .utils.logging import setup_logging
 from .utils.exceptions import generic_exception_handler
 
@@ -24,10 +25,22 @@ async def lifespan(app: FastAPI):
         print(f"❌ Database connection failed: {e}")
         raise
 
+    # Initialize a process-wide watcher service singleton
+    watcher_service = WatcherService()
+    watcher_service.set_db(db)
+    app.state.watcher_service = watcher_service
+
     yield
 
     # Shutdown
     print("🔄 Shutting down database connections...")
+    # Stop file watchers gracefully
+    try:
+        service = getattr(app.state, "watcher_service", None)
+        if service:
+            service.stop_all()
+    except Exception as e:
+        print(f"⚠️ Failed to stop watchers cleanly: {e}")
 
 
 app = FastAPI(

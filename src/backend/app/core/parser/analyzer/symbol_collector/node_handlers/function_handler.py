@@ -5,7 +5,6 @@ from app.core.parser.scope_manager.core.symbol import SymbolType
 from app.core.model.properties import CodePosition
 from app.core.parser.scope_manager.core.scope import ScopeType
 from app.core.parser.ast.node_tracking import add_comment
-from app.core.watcher.service import get_watcher_service
 
 
 class FunctionHandler:
@@ -13,7 +12,6 @@ class FunctionHandler:
 
     def __init__(self, symbol_table: SymbolTable):
         self.symbol_table = symbol_table
-        self.watcher_service = get_watcher_service()
 
     def handle_function_node(self, node: FunctionSchema):
         """Register function schema and define argument symbols with

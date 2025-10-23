@@ -4,7 +4,7 @@ import logging
 from typing import Dict
 
 from arango.database import StandardDatabase
-from fastapi import Depends
+from fastapi import Depends, Request
 
 
 from app.core.model.nodes import ProjectNode
@@ -45,6 +45,20 @@ class WatcherService:
         """Starts watching a project if not already watched."""
         project_id = project_node.id
         if project_id in self.watchers:
+            watcher = self.watchers[project_id]
+            # If watcher exists but not running, start it
+            if hasattr(watcher, "is_running") and not watcher.is_running():
+                logger.info(
+                    f"Project {project_id} watcher exists but not running. "
+                    f"Starting...")
+                watcher.start()
+                return
+            # If paused, resume it
+            if hasattr(watcher, "is_paused") and watcher.is_paused():
+                logger.info(
+                    f"Project {project_id} watcher is paused. Resuming...")
+                watcher.resume()
+                return
             logger.info(f"Project {project_id} is already being watched.")
             return
 
@@ -56,19 +70,24 @@ class WatcherService:
                     logger.error("Database not set in WatcherService.")
                     return
 
-                # Temporarily pause the watcher to avoid loops from file modifications
+                # Temporarily pause the watcher to avoid loops
                 self.pause_watching(project_id)
 
                 graph_builder = GraphBuilder(
-                    project_node.path, project_node=project_node, db=self.db)
-                graph_builder.build(project_node.name,
-                                    project_node.description)
+                    project_node.path, project_node=project_node, db=self.db
+                )
+                graph_builder.build(
+                    project_node.name,
+                    project_node.description,
+                )
                 logger.info(
-                    f"Project {project_node.name} resynced successfully.")
+                    f"Project {project_node.name} resynced successfully."
+                )
 
             except Exception as e:
                 logger.error(
-                    f"Error resyncing project {project_node.name}: {e}")
+                    f"Error resyncing project {project_node.name}: {e}"
+                )
             finally:
                 # Always resume the watcher
                 self.resume_watching(project_id)
@@ -77,7 +96,8 @@ class WatcherService:
         watcher.start()
         self.watchers[project_id] = watcher
         logger.info(
-            f"Started watching project {project_id} at {project_node.path}")
+            f"Started watching project {project_id} at {project_node.path}"
+        )
 
     def stop_watching(self, project_id: str):
         """Stops watching a project."""
@@ -86,6 +106,17 @@ class WatcherService:
             watcher.stop()
             del self.watchers[project_id]
             logger.info(f"Stopped watching project {project_id}")
+
+    def stop_all(self):
+        """Stops all active watchers and clears registry."""
+        # Copy keys to avoid runtime mutation issues
+        for project_id in list(self.watchers.keys()):
+            try:
+                self.stop_watching(project_id)
+            except Exception as exc:
+                logger.error(
+                    f"Failed stopping watcher for project {project_id}: {exc}"
+                )
 
     def pause_watching(self, project_id: str):
         """Pause watching a project."""
@@ -102,8 +133,18 @@ class WatcherService:
             logger.info(f"Resumed watching project {project_id}")
 
 
-def get_watcher_service(db: StandardDatabase = Depends(get_db)) -> WatcherService:
-    """Factory for WatcherService."""
-    service = WatcherService()
+def get_watcher_service(
+    request: Request, db: StandardDatabase = Depends(get_db)
+) -> WatcherService:
+    """Provides a process-wide singleton WatcherService stored in app.state."""
+    service: WatcherService | None = getattr(
+        request.app.state, "watcher_service", None
+    )
+    if service is None:
+        service = WatcherService()
+        # attach to app state for subsequent requests
+        request.app.state.watcher_service = service
+
+    # Ensure DB is set once
     service.set_db(db)
     return service
