@@ -51,8 +51,13 @@ class DocumentService:
 
     def delete(self, document_id: str, node_id: str):
         node = self.repos.nodes.get_by_key(node_id)
+
         if not node:
             raise ValueError(f"Node {node_id} not found")
-        node.documents.remove(document_id)
+        document = self.repos.document_repo.get_by_key(document_id)
+        if not document:
+            raise ValueError(f"Document {document_id} not found")
+
+        node.documents.remove(document.id)
         self.repos.nodes.update(node.key, node)
         return self.repos.document_repo.delete(document_id)
