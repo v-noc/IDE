@@ -3,6 +3,7 @@
 
 **A code editor that shows you how your code *works*, not just where it's saved.**
 
+
 ![V-NOC](/assets/docs.png)
 
 ### The Problem: The Invisible Weight of Code
@@ -19,6 +20,7 @@ This "mental model" is powerful, but it's also fragile, invisible, and takes a h
 ### The Solution: A Living Map of Your Code
 
 **V-NOC** is designed to solve this problem by taking that complex mental model out of your head and putting it onto your screen.
+
 
 Instead of a file tree, the core of V-NOC is a **living, interactive graph**. It analyzes your code to understand its structure and simulates its execution paths to build a visual map of your entire project.
 
