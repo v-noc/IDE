@@ -33,7 +33,7 @@ const PlayGround = forwardRef<PlayGroundHandle, PlayGroundProps>(
     );
     const [output, setOutput] = useState<string>("");
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const [examplesPath, setExamplesPath] = useState("examples");
+    const [examplesPath, setExamplesPath] = useState("");
     const [commandPrefix, setCommandPrefix] = useState("python");
     const project = useProjectStore((s) => s.projectData);
     const runCode = useRunCode(project?._key);
