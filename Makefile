@@ -37,7 +37,7 @@ run-rpc: start-db
 
 test-backend:
 	@echo ">>> Running backend tests..."
-	@.venv/bin/python -m pytest -s src/backend/tests
+	@cd src/backend && ../../.venv/bin/python -m pytest -s tests
 
 # ====================================================================================
 #  FRONTEND

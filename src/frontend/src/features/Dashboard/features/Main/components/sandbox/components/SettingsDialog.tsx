@@ -39,7 +39,7 @@ export default function SettingsDialog({
             </Label>
             <Input
               id="examplesPath"
-              placeholder="e.g. examples or src/examples"
+              placeholder="e.g. examples,src/examples or leave it blank for root path"
               value={examplesPath}
               onChange={(e) => onChangeExamplesPath(e.target.value)}
             />
