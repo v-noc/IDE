@@ -4,7 +4,7 @@
 **A code editor that shows you how your code *works*, not just where it's saved.**
 
 
-![V-NOC](/assets/focus.png)
+![V-NOC](/assets/logs.png)
 
 ### The Problem: The Invisible Weight of Code
 
