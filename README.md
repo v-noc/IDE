@@ -3,6 +3,8 @@
 
 **A code editor that shows you how your code *works*, not just where it's saved.**
 
+![V-NOC](/assets/docs.png)
+
 ### The Problem: The Invisible Weight of Code
 
 Every developer knows the feeling. You're dropped into a large, unfamiliar codebase, and your first task is to build a map in your head. You trace function calls across dozens of files, trying to remember:
