@@ -37,15 +37,15 @@ The code graph is your single source of truth. You can instantly see the entire 
 **2. All Information, Where You Need It**  
 V-NOC aims to be a unified knowledge base for your code. Every node in the graph is a container for all the context related to it. You can attach everything you need directly to a function or class:
 *   **Documentation & Notes:** Keep explanations right next to the code they describe.
-*   **Logs & Traces:** See the execution history of a specific function.
+*   **[Logs](/src/vn_logger/) & Traces:** See the execution history of a specific function.
 *   **Test Results & Performance Metrics:** Understand its reliability and speed.
 
 This eliminates constant context-switching. All the information you need to understand, debug, or build upon a piece of code is available in one place.
 
-**3. Logs That Make Sense (Hierarchical Logs)**  
+**3. [Logs](/src/vn_logger/) That Make Sense (Hierarchical Logs)**  
 Traditional logs are a flat, scattered list of messages, making it difficult to trace the flow of a single request. V-NOC introduces **hierarchical logs**.
 
-Logs are organized into a **tree structure that perfectly mirrors the code's call graph**. When a request comes in, you see the top-level log. You can then unfold it to see the logs from every function it called, in the exact order they were executed. Finding the source of an error becomes as simple as navigating a tree, not searching through a messy text file.
+[Logs](/src/vn_logger/) are organized into a **tree structure that perfectly mirrors the code's call graph**. When a request comes in, you see the top-level log. You can then unfold it to see the logs from every function it called, in the exact order they were executed. Finding the source of an error becomes as simple as navigating a tree, not searching through a messy text file.
 
 **4. A Superpower for Humans and AI**  
 By structuring code and its context in a graph, V-NOC makes development more intuitive for programmers. It also makes codebases far easier for AI models (LLMs) to understand. An AI can query the graph to get a function, its complete call history, its documentation, and its recent logs, giving it all the context it needs to make intelligent, accurate changes without parsing thousands of files.
