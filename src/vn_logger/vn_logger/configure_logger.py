@@ -51,6 +51,7 @@ def log_worker(
                     "duration_ms": extra.get('duration_ms'),
                     "event_type": event_type,
                     "message": record['message'],
+                    "level_name": (record.get('level', {}) or {}).get('name'),
                     "payload": None,
                     "result": None,
                     "error": None

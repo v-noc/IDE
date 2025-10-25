@@ -16,11 +16,15 @@ class LogNode(ArangoBase):
     message: str = Field(
         ..., description="Event message"
     )
+    level_name: Optional[str] = Field(
+        default=None, description="Log level name (info, warning, error)"
+    )
     duration_ms: Optional[float] = Field(
         default=None, description="Duration in milliseconds (for exit events)"
     )
     chain_id: Optional[str] = Field(
-        default=None, description="Correlation/chain identifier for grouped logs"
+        default=None,
+        description="Correlation/chain identifier for grouped logs",
     )
     payload: Optional[Dict[str, Any]] = Field(
         default=None, description="Payload for 'enter' events (args/kwargs)"

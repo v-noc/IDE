@@ -27,6 +27,7 @@ class LogService:
             if hasattr(params.event_type, "value")
             else params.event_type,
             message=params.message,
+            level_name=getattr(params, "level_name", None),
             duration_ms=params.duration_ms,
             chain_id=params.chain_id,
             payload=params.payload,

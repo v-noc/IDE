@@ -30,6 +30,9 @@ class RegisterLogsParams(BaseModel):
     message: str = Field(
         ..., description="Message"
     )
+    level_name: Optional[str] = Field(
+        None, description="Log level name (e.g., info, warning, error)"
+    )
     payload: Optional[Dict[str, Any]] = Field(
         None, description="Payload for 'enter' events (args/kwargs)"
     )
