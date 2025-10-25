@@ -3,6 +3,8 @@ import React from "react";
 export type LogDetailsData = {
   created_at: string;
   chain_id: string | null;
+
+  level_name: string | null;
   payload: { [key: string]: unknown } | null;
   result: unknown | null;
   error: { [key: string]: unknown } | null;
@@ -20,14 +22,14 @@ const LogDetails: React.FC<LogDetailsProps> = ({ details }) => {
           <p className="text-xs font-semibold text-muted-foreground uppercase">
             Created At
           </p>
-          <p className="text-sm font-mono">{details.created_at}</p>
+          <p className="text-xs font-mono">{details.created_at}</p>
         </div>
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase">
             Chain ID
           </p>
           <p
-            className="text-sm font-mono truncate max-w-[360px]"
+            className="text-xs font-mono truncate max-w-[360px]"
             title={details.chain_id ?? undefined}
           >
             {details.chain_id || "-"}

@@ -38,23 +38,21 @@ const LogsSection: React.FC = () => {
   }
 
   return (
-    <div className="w-full space-y-4">
-      <Card className="overflow-hidden py-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+    <div className="w-full space-y-4 h-full">
+      <Card className="overflow-hidden py-0 h-full">
+        <div className="overflow-x-auto h-full">
+          <table className="w-full text-sm max-h-full overflow-hidden">
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-4 py-3 text-left font-semibold">ID</th>
-                <th className="px-4 py-3 text-left font-semibold ">
-                  Event Type
-                </th>
+
                 <th className="px-4 py-3 text-left font-semibold">Message</th>
                 <th className="px-4 py-3 text-left font-semibold">Timestamp</th>
                 <th className="px-4 py-3 text-right font-semibold">Duration</th>
                 <th className="px-4 py-3 text-left font-semibold">Status</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="h-full  overflow-y-auto">
               {loading && (
                 <tr>
                   <td

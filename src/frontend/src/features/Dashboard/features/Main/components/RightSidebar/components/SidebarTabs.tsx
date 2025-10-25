@@ -73,7 +73,7 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
             />
           </TabsContent>
 
-          <TabsContent value="logs">
+          <TabsContent value="logs" className="h-full">
             <LogsSection />
           </TabsContent>
 

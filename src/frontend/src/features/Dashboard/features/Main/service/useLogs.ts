@@ -13,6 +13,7 @@ export interface LogNode {
     payload: { [key: string]: unknown } | null;
     result: unknown | null;
     error: { [key: string]: unknown } | null;
+    level_name: string | null;
 }
 
 export interface LogTreeNode extends LogNode {

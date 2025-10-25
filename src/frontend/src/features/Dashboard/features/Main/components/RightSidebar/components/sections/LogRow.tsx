@@ -1,10 +1,16 @@
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  AlertTriangle,
+  CircleAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type LogTreeNode } from "@/features/Dashboard/features/Main/service/useLogs";
 import LogDetails from "./LogDetails";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { formatDistanceToNow } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 export type RowProps = {
   node: LogTreeNode;
@@ -75,11 +81,7 @@ const LogRow: React.FC<RowProps> = ({ node, depth = 0 }) => {
             </span>
           </div>
         </TableCell>
-        <TableCell>
-          <span className="inline-block bg-primary/10 text-primary px-2 py-1 rounded text-xs font-medium">
-            {node.event_type}
-          </span>
-        </TableCell>
+
         <TableCell className="max-w-xs truncate text-sm" title={node.message}>
           {node.message}
         </TableCell>
@@ -90,17 +92,39 @@ const LogRow: React.FC<RowProps> = ({ node, depth = 0 }) => {
           {formatDurationShort(effectiveDurationMs)}
         </TableCell>
         <TableCell>
-          {node.error ? (
-            <span className="inline-block bg-destructive/10 text-destructive px-2 py-1 rounded text-xs font-medium">
-              Error
-            </span>
-          ) : node.result ? (
-            <span className="inline-block bg-green-500/10 text-green-700 dark:text-green-400 px-2 py-1 rounded text-xs font-medium">
-              Success
-            </span>
-          ) : (
-            <span className="text-muted-foreground text-xs">-</span>
-          )}
+          {(() => {
+            const level = (node.level_name || "").toLowerCase();
+
+            if (level === "error" || node.error) {
+              return (
+                <Badge variant="destructive">
+                  <CircleAlert className="inline-block" /> Error
+                </Badge>
+              );
+            }
+
+            if (level === "warning" || level === "warn") {
+              return (
+                <Badge
+                  variant="secondary"
+                  className="bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-400/15 dark:text-amber-300 dark:border-amber-400/30"
+                >
+                  <AlertTriangle className="inline-block" /> Warning
+                </Badge>
+              );
+            }
+
+            if (node.result) {
+              return (
+                <span className="inline-block bg-green-500/10 text-green-700 dark:text-green-400 px-2 py-1 rounded text-xs font-medium">
+                  Success
+                </span>
+              );
+            }
+
+            // Info or unknown: no style
+            return <span className="text-muted-foreground text-xs">-</span>;
+          })()}
         </TableCell>
       </TableRow>
 
@@ -115,6 +139,7 @@ const LogRow: React.FC<RowProps> = ({ node, depth = 0 }) => {
                 details={{
                   created_at: node.created_at,
                   chain_id: node.chain_id,
+                  level_name: node.level_name,
                   payload: node.payload,
                   result: node.result,
                   error: node.error,
