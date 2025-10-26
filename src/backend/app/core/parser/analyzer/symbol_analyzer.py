@@ -20,12 +20,12 @@ class SymbolAnalyzer:
         Populates the symbol table from an existing project structure.
         """
         for item in project_structure:
-            vertex = item.get('vertex')
+            vertex = item.get("vertex")
             if not vertex:
                 continue
 
-            node_type = vertex.get('node_type')
-            qname = vertex.get('qname')
+            node_type = vertex.get("node_type")
+            qname = vertex.get("qname")
 
             if node_type and qname:
                 # Simplified creation; in real code map
@@ -42,13 +42,9 @@ class SymbolAnalyzer:
             path=project_path,
         )
         self.symbol_table.project_node = project_node
-        self.symbol_table.qname_to_node[
-            project_node.qname
-        ] = project_node
+        self.symbol_table.qname_to_node[project_node.qname] = project_node
 
-        self.symbol_table.scope_manager.create_root_scope(
-            project_node.qname
-        )
+        self.symbol_table.scope_manager.create_root_scope(project_node.qname)
         return project_node
 
     def add_file(self, file_container: FileContainer):
@@ -74,16 +70,20 @@ class SymbolAnalyzer:
 
     def build_symbol_table(self):
         for unprocessed_file in list(self.symbol_table.unprocessed_files):
-            print(f"Analyzing file: {unprocessed_file}")
+            try:
+                print(f"Analyzing file: {unprocessed_file}")
 
-            scope = self.symbol_table.scope_manager.get_scope_by_qname(
-                unprocessed_file
-            )
+                scope = self.symbol_table.scope_manager.get_scope_by_qname(
+                    unprocessed_file
+                )
 
-            self.symbol_table.scope_manager.enter_scope_by_scope(scope)
-            file_node = self.symbol_table.file_containers[unprocessed_file]
-            self.symbol_collector.context_analyze_symbols(file_node)
-            self.symbol_table.scope_manager.exit_scope()
+                self.symbol_table.scope_manager.enter_scope_by_scope(scope)
+                file_node = self.symbol_table.file_containers[unprocessed_file]
+                self.symbol_collector.context_analyze_symbols(file_node)
+                self.symbol_table.scope_manager.exit_scope()
+            except Exception as e:
+                print(f"Error analyzing file: {unprocessed_file} {e}")
+        print("Building finished")
 
     def _build_hierarchy_with_tree_view(
         self, file_path: Path, file_container: FileContainer
@@ -103,7 +103,11 @@ class SymbolAnalyzer:
         )
 
     def _build_path_recursive(
-        self, path_parts: tuple, index: int, parent_qname: str, file_container: FileContainer
+        self,
+        path_parts: tuple,
+        index: int,
+        parent_qname: str,
+        file_container: FileContainer,
     ):
         """
         Processes one part of the path, enters its scope, and recursively
@@ -136,13 +140,9 @@ class SymbolAnalyzer:
 
                 # Calculate file hash
                 try:
-                    with open(
-                        file_container.file_path, 'r', encoding='utf-8'
-                    ) as f:
+                    with open(file_container.file_path, "r", encoding="utf-8") as f:
                         file_content = f.read()
-                    file_hash = hashlib.sha256(
-                        file_content.encode('utf-8')
-                    ).hexdigest()
+                    file_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
                 except (IOError, UnicodeDecodeError):
                     file_hash = ""  # Fallback for non-readable files
 
@@ -151,7 +151,7 @@ class SymbolAnalyzer:
                     current_qname,
                     "file node",
                     path="/".join(path_parts),
-                    hash=file_hash
+                    hash=file_hash,
                 )
                 self.symbol_table.qname_to_node[current_qname] = file_node
                 parent_node_service.add_file(parent_node.id, file_node.id)
@@ -172,8 +172,28 @@ class SymbolAnalyzer:
 
         else:
             # Node already exists
-            icon = "📄" if is_last_part else "📁"
-            print(f"{indent}{icon} {part} (exists)")
+            existing_node = self.symbol_table.qname_to_node[current_qname]
+            # Handle collision: if we need a folder here but a file already
+            # occupies this qname, create a folder node for this qname and
+            # attach it to the real parent.
+            if not is_last_part and getattr(existing_node, "node_type", None) == "file":
+                print(
+                    f"{indent}📁 {part}/ (qname: {current_qname}) "
+                    "[created to resolve file/folder name collision]"
+                )
+                folder_node_service = self.symbol_table.node_service["folder"]
+                folder_node = folder_node_service.create(
+                    part,
+                    current_qname,
+                    "folder node",
+                    path="/".join(path_parts[: index + 1]) + "/",
+                )
+                # Point qname to folder for subsequent nesting
+                self.symbol_table.qname_to_node[current_qname] = folder_node
+                parent_node_service.add_folder(parent_node.id, folder_node.id)
+            else:
+                icon = "📄" if is_last_part else "📁"
+                print(f"{indent}{icon} {part} (exists)")
 
         # --- THE CRITICAL SCOPE MANAGEMENT ---
         # 1. PUSH: Enter the scope for the current part (folder or file).
@@ -187,10 +207,14 @@ class SymbolAnalyzer:
             # nested scope. This is the correct place to collect symbols.
             self.symbol_collector.collect_symbols(file_container)
         else:
-            # 2b. RECURSIVE STEP: If it's a folder, process the next part of the path
-            # *while still inside the current scope*.
+            # 2b. RECURSIVE STEP: If it's a folder, process the next part of
+            # the path while still inside the current scope.
             self._build_path_recursive(
-                path_parts, index + 1, current_qname, file_container)
+                path_parts,
+                index + 1,
+                current_qname,
+                file_container,
+            )
 
         # 3. POP: Exit the current scope. This happens on the way back up the
         # call stack, ensuring perfect pairing of enter/exit calls.

@@ -138,7 +138,7 @@ class ClassSchema(ParentSchema):
 
 class KeywordSchema(BaseSchema):
     schema_type: SchemaType = SchemaType.KEYWORD
-    name: str
+    name: Optional[str] = None
     value: Optional[Union[NameSchema, AttributeSchema,
                           BaseSchema, str, object]] = None
 

@@ -2,7 +2,7 @@ from typing import Optional
 
 from app.core.parser.analyzer.symbol_collector.node_handlers import CallHandler, SymbolResolver
 
-from app.core.parser.ast.models import AssignSchema, BaseSchema, CallSchema, NameSchema, AttributeSchema
+from app.core.parser.ast.models import AnnAssignSchema, AssignSchema, BaseSchema, CallSchema, NameSchema, AttributeSchema
 from app.core.parser.scope_manager.core.symbol import SymbolType, Symbol
 from app.core.parser.analyzer.symbol_table import SymbolTable
 
@@ -20,6 +20,23 @@ class AssignmentHandler:
         self.scope_manager = symbol_table.scope_manager
         self.resolver = SymbolResolver(self.scope_manager)
         self.call_handler = call_handler
+
+    def handle_ann_assign_node(self, node: AnnAssignSchema):
+        """
+        Processes an annotated assignment like `x: int = y`.
+        """
+        if not node.value:
+            return  # Assignment without a value, e.g., in stubs.
+
+        value_symbol = self._resolve_value_node_to_symbol(
+            node.value[0])
+
+        if isinstance(node.target, NameSchema):
+            self._handle_name_target(node.target, value_symbol)
+        elif isinstance(node.target, AttributeSchema):
+            self._handle_attribute_target(node.target, value_symbol)
+        else:
+            return
 
     def handle_assign_node(self, node: AssignSchema):
         """

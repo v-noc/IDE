@@ -1,6 +1,19 @@
 from __future__ import annotations
-from ast import NodeVisitor, AST, walk, Return, ClassDef, Import, ImportFrom, Assign, AnnAssign, Call, FunctionDef
-from typing import List
+from ast import (
+    NodeVisitor,
+    AST,
+    walk,
+    Return,
+    ClassDef,
+    Import,
+    ImportFrom,
+    Assign,
+    AnnAssign,
+    Call,
+    AsyncFunctionDef,
+    FunctionDef,
+)
+from typing import List, Any
 
 from .converters import SchemaConverter
 from .models import BaseSchema, ParentSchema
@@ -31,7 +44,9 @@ class CodeStructureVisitor(NodeVisitor):
             parent = self._context_stack[-1]
             parent.children.append(node)
 
-    def _visit_and_manage_context(self, pydantic_node: ParentSchema, ast_node: AST):
+    def _visit_and_manage_context(
+        self, pydantic_node: ParentSchema, ast_node: AST
+    ):
         """
         Helper to handle the common pattern for context-managing nodes
         (classes, functions).
@@ -40,6 +55,13 @@ class CodeStructureVisitor(NodeVisitor):
         self._context_stack.append(pydantic_node)
         self.generic_visit(ast_node)
         self._context_stack.pop()
+
+    def visit_AsyncFunctionDef(self, node: AsyncFunctionDef) -> Any:
+        # Pre-scan for return statements to pass to the converter
+        returns = [n for n in walk(node) if isinstance(n, Return)]
+
+        pydantic_node = self.converter.convert_functiondef(node, returns)
+        self._visit_and_manage_context(pydantic_node, node)
 
     def visit_FunctionDef(self, node: FunctionDef) -> None:
         # Pre-scan for return statements to pass to the converter
@@ -65,7 +87,9 @@ class CodeStructureVisitor(NodeVisitor):
     def visit_Assign(self, node: Assign) -> None:
         pydantic_node = self.converter.convert_assign(node)
         self._add_node(pydantic_node)
-        # We must visit the value side to find nested calls, e.g., x = my_func()
+
+        # We must visit the value side to find nested calls,
+        # e.g., x = my_func()
         # self.generic_visit(node)
 
     def visit_AnnAssign(self, node: AnnAssign) -> None:

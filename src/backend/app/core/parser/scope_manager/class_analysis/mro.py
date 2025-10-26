@@ -1,5 +1,6 @@
 from .model import InheritanceGraph
 from typing import List, Dict
+from loguru import logger
 
 
 class MROCalculator:
@@ -12,7 +13,10 @@ class MROCalculator:
         Calculates and caches the MRO for all classes in the graph.
         """
         for qname in self.inheritance_graph.classes:
-            self.get_mro(qname)
+            try:
+                self.get_mro(qname)
+            except Exception:
+                pass
 
     def get_mro(self, class_qname: str) -> List[str]:
         """
@@ -21,7 +25,16 @@ class MROCalculator:
         if class_qname in self._mro_cache:
             return self._mro_cache[class_qname]
 
-        class_node = self.inheritance_graph.get_class(class_qname)
+        try:
+            class_node = self.inheritance_graph.get_class(class_qname)
+        except Exception:
+            # Fail-safe: treat unknown/external classes as a simple leaf in MRO
+            logger.warning(
+                f"MRO: class '{class_qname}' not found; treating as external."
+            )
+            mro = [class_qname]
+            self._mro_cache[class_qname] = mro
+            return mro
 
         # The merge operation is the core of the C3 algorithm.
         mro = self._merge(
@@ -52,7 +65,9 @@ class MROCalculator:
             head = self._find_merge_head(sequences)
             if not head:
                 raise TypeError(
-                    "Cannot create a consistent method resolution order (MRO)")
+                    "Cannot create a consistent method resolution order "
+                    "(MRO)"
+                )
 
             result.append(head)
 
@@ -64,7 +79,8 @@ class MROCalculator:
     def _find_merge_head(self, sequences: List[List[str]]) -> str | None:
         """
         Finds a valid head for the merge operation.
-        A head is valid if it does not appear in the tail of any other sequence.
+        A head is valid if it does not appear in the tail of any other
+        sequence.
         """
         for seq in sequences:
             head = seq[0]

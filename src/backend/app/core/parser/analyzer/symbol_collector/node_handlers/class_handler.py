@@ -8,8 +8,9 @@ from app.core.parser.ast.models import (
 from app.core.model.properties import CodePosition
 from app.core.model.nodes import ClassNode
 from app.core.parser.scope_manager.core.scope import ScopeType
-from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler \
-    import FunctionHandler
+from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler import (
+    FunctionHandler,
+)
 from app.core.parser.ast.node_tracking import add_comment
 
 
@@ -28,6 +29,8 @@ class ClassHandler:
         """Process a class node and set up inheritance"""
         print(f"Processing class node: {node.name}")
 
+        if node.name == "LightRAG":
+            print(f"Class node: {node}")
         # Register class schema
         # Shortcuts
         qname = self.symbol_table.scope_manager.current_scope.qualified_name
@@ -41,18 +44,34 @@ class ClassHandler:
 
         classes = []
         for implemented_base in node.implements:
-            resolved_base_qname = scope_manager.resolve_symbol_in_context(
-                implemented_base.name
-            )
-            if not resolved_base_qname:
-                continue
-            classes.append(resolved_base_qname.resolve_final().qualified_name)
+            try:
+                resolved_base_qname = scope_manager.resolve_symbol_in_context(
+                    implemented_base.name
+                )
+                if not resolved_base_qname:
+                    continue
+
+                base_node = self.symbol_table.qname_to_node.get(resolved_base_qname)
+                if base_node is None or base_node.node_type != "class":
+                    continue
+                classes.append(resolved_base_qname.resolve_final().qualified_name)
+            except Exception:
+                pass
 
         scope_manager.register_class(classes)
 
-        # Populate inherited members
-        scope_manager.calculate_all_mro()
-        mro = scope_manager.get_mro(qname)
+        # Populate inherited members (fail-safe)
+        try:
+            scope_manager.calculate_all_mro()
+            mro = scope_manager.get_mro(qname)
+        except Exception as ex:
+            # Do not block; record minimal MRO and continue
+            from loguru import logger
+
+            logger.warning(
+                f"MRO resolution failed for '{qname}': {ex}. Using fallback."
+            )
+            mro = [qname]
         init_symbol = scope_manager.resolve_method(qname, "__init__")
         if init_symbol is None:
             scope_manager.enter_scope("__init__", ScopeType.FUNCTION)
@@ -78,6 +97,8 @@ class ClassHandler:
         """Process a class node and set up inheritance"""
         print(f"Processing class node: {node.name}")
 
+        if node.name == "LightRAG":
+            print(f"Class node: {node}")
         # Register class schema
         qname = self.symbol_table.scope_manager.current_scope.qualified_name
         parent_qname = (
@@ -95,23 +116,17 @@ class ClassHandler:
             while scope.parent and scope.scope_type != ScopeType.MODULE:
                 scope = scope.parent
             module_qname = scope.qualified_name
-            file_container = self.symbol_table.file_containers.get(
-                module_qname
-            )
+            file_container = self.symbol_table.file_containers.get(module_qname)
             if file_container:
                 project_root = self.symbol_table.project_node.path
                 file_path = file_container.file_path
                 abs_path = (
                     file_path
                     if os.path.isabs(file_path)
-                    else os.path.normpath(
-                        os.path.join(project_root, file_path)
-                    )
+                    else os.path.normpath(os.path.join(project_root, file_path))
                 )
-                prior_inserts = (
-                    self.symbol_table.file_path_to_line_inserts.get(
-                        abs_path, 0
-                    )
+                prior_inserts = self.symbol_table.file_path_to_line_inserts.get(
+                    abs_path, 0
                 )
         except Exception:
             pass
@@ -134,8 +149,7 @@ class ClassHandler:
             try:
                 fetched = class_service.get(node.id)
                 # Guard: ensure the fetched node is truly a class
-                if fetched and getattr(fetched, "node_type", None) == \
-                        "class":
+                if fetched and getattr(fetched, "node_type", None) == "class":
                     class_node = fetched
                     class_node.position = code_position
                     class_service.update(class_node)
@@ -150,11 +164,9 @@ class ClassHandler:
                 name=class_name,
                 qname=qname,
                 description=f"{class_name} class",
-                position=code_position
+                position=code_position,
             )
-            parent_service = self.symbol_table.node_service[
-                parent_node.node_type
-            ]
+            parent_service = self.symbol_table.node_service[parent_node.node_type]
             parent_service.add_class(parent_node.id, class_node.id)
 
             # Persist the created class id back into source as a comment
@@ -165,7 +177,8 @@ class ClassHandler:
                     scope = scope.parent
                 module_qname = scope.qualified_name
                 if abs_path:
-                    # Build dot-separated path from current scope relative to module
+                    # Build dot-separated path from current scope relative
+                    # to module
                     target_name = node.name
                     scope = self.symbol_table.scope_manager.current_scope.parent
                     while scope and scope.scope_type != ScopeType.MODULE:
@@ -180,8 +193,7 @@ class ClassHandler:
                     if result.get("success"):
                         added = result.get("added_lines", 0)
                         if added:
-                            inserts = self.symbol_table.\
-                                file_path_to_line_inserts
+                            inserts = self.symbol_table.file_path_to_line_inserts
                             inserts[abs_path] = prior_inserts + added
                             # Only end_line_no shifts due to docstring
                             if class_node.position.end_line_no is not None:

@@ -4,8 +4,6 @@ from ast import (
     Attribute,
     Call,
     Expr,
-    List as AstList,
-    Tuple as AstTuple,
     Constant,
     FunctionDef,
     Return,
@@ -50,12 +48,9 @@ def _extract_id_from_docstring(node) -> Optional[str]:
             return None
         first_stmt = node.body[0]
         # Docstring is a string constant as the first statement
-        if isinstance(first_stmt, Expr) and \
-                isinstance(first_stmt.value, Constant):
+        if isinstance(first_stmt, Expr) and isinstance(first_stmt.value, Constant):
             value = (
-                first_stmt.value.value
-                if hasattr(first_stmt.value, "value")
-                else None
+                first_stmt.value.value if hasattr(first_stmt.value, "value") else None
             )
             if isinstance(value, str):
                 doc = value.strip()
@@ -100,11 +95,14 @@ class SchemaConverter:
                 return super_node
 
             return self.convert_call(node)
-        if isinstance(node, (AstList, AstTuple)):
-            # Handle list/tuple literals: [a(), b]
-            return [self._convert_expression(elt) for elt in node.elts]
-        if isinstance(node, Constant):
-            return None
+
+        # Todo: Handle list/tuple literals: [a(), b]
+
+        # if isinstance(node, (AstList, AstTuple)):
+        #     # Handle list/tuple literals: [a(), b]
+        #     return [self._convert_expression(elt) for elt in node.elts]
+        # if isinstance(node, Constant):
+        #     return None
 
         # Return None for unhandled expression types
         return None
@@ -118,8 +116,7 @@ class SchemaConverter:
         if node.args:
             for arg in node.args.args:
                 annotation = (
-                    extract_annotation(
-                        arg.annotation) if arg.annotation else None
+                    extract_annotation(arg.annotation) if arg.annotation else None
                 )
                 args.append(
                     ArgSchema(
@@ -129,9 +126,7 @@ class SchemaConverter:
                     )
                 )
 
-        return_annotation = (
-            extract_annotation(node.returns) if node.returns else None
-        )
+        return_annotation = extract_annotation(node.returns) if node.returns else None
 
         return_values = []
         for return_Schema in returns:
@@ -245,9 +240,10 @@ class SchemaConverter:
         args = [self._convert_expression(arg) for arg in node.args]
         keywords = []
         for keyword in node.keywords:
+            kw_name = keyword.arg if isinstance(keyword.arg, str) else None
             keywords.append(
                 KeywordSchema(
-                    name=keyword.arg,
+                    name=kw_name,
                     value=self._convert_expression(keyword.value),
                     position=extract_position(keyword),
                 )
