@@ -86,7 +86,8 @@ class ImportHandler:
                 )
 
             if not is_external:
-                scope = self.symbol_table.scope_manager.get_scope_by_qname(module_path)
+                scope = self.symbol_table.scope_manager.get_scope_by_qname(
+                    module_path)
 
                 if scope:
                     if imported_name == "*":
@@ -111,7 +112,8 @@ class ImportHandler:
                         if imported_name == "*":
                             local_import_modules.append(module_path)
                         else:
-                            local_import_modules.append(f"{module_path}.{alias.name}")
+                            local_import_modules.append(
+                                f"{module_path}.{alias.name}")
                     else:
                         local_import_modules.append(module_path)
         return local_import_modules
@@ -175,7 +177,6 @@ class ImportHandler:
         else:
             target_module = module_name
 
-        print(f"Target qname: {target_module}")
         return target_module
 
     def _resolve_module_path(

@@ -27,10 +27,8 @@ class ClassHandler:
 
     def handle_inherit_class_node(self, node: ClassSchema):
         """Process a class node and set up inheritance"""
-        print(f"Processing class node: {node.name}")
+        print(f"Processing class node inheritance: {node.name}")
 
-        if node.name == "LightRAG":
-            print(f"Class node: {node}")
         # Register class schema
         # Shortcuts
         qname = self.symbol_table.scope_manager.current_scope.qualified_name
@@ -51,10 +49,12 @@ class ClassHandler:
                 if not resolved_base_qname:
                     continue
 
-                base_node = self.symbol_table.qname_to_node.get(resolved_base_qname)
+                base_node = self.symbol_table.qname_to_node.get(
+                    resolved_base_qname)
                 if base_node is None or base_node.node_type != "class":
                     continue
-                classes.append(resolved_base_qname.resolve_final().qualified_name)
+                classes.append(
+                    resolved_base_qname.resolve_final().qualified_name)
             except Exception:
                 pass
 
@@ -97,8 +97,6 @@ class ClassHandler:
         """Process a class node and set up inheritance"""
         print(f"Processing class node: {node.name}")
 
-        if node.name == "LightRAG":
-            print(f"Class node: {node}")
         # Register class schema
         qname = self.symbol_table.scope_manager.current_scope.qualified_name
         parent_qname = (
@@ -116,7 +114,8 @@ class ClassHandler:
             while scope.parent and scope.scope_type != ScopeType.MODULE:
                 scope = scope.parent
             module_qname = scope.qualified_name
-            file_container = self.symbol_table.file_containers.get(module_qname)
+            file_container = self.symbol_table.file_containers.get(
+                module_qname)
             if file_container:
                 project_root = self.symbol_table.project_node.path
                 file_path = file_container.file_path
@@ -209,5 +208,4 @@ class ClassHandler:
                 # Best-effort; failures here should not break analysis
                 pass
 
-        print(f"Class node: {class_node}")
         self.symbol_table.qname_to_node[qname] = class_node

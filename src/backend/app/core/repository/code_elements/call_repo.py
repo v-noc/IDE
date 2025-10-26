@@ -64,7 +64,6 @@ class CallRepo(NodeRepository[CallNode]):
         }
 
         # Add debug logging for bind variables
-        print(f"DEBUG: Bind Variables - {bind_vars}")
 
         try:
             # Try direct execution with maximum debug options

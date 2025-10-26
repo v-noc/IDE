@@ -108,15 +108,15 @@ class AssignmentHandler:
         if existing_symbol:
             # It exists, so we are re-assigning it.
             # We just update what it points to.
-            print(f"Re-assigning variable '{var_name}'")
+
             existing_symbol.assign_to(value_symbol)
         else:
             # It's a new variable definition in this scope.
-            print(f"Defining new variable '{var_name}'")
+
             new_symbol = self.scope_manager.define_symbol(
                 var_name, SymbolType.VARIABLE
             )
-            print(f"New symbol '{new_symbol.name}'")
+
             new_symbol.assign_to(value_symbol)
 
     def _handle_attribute_target(self, target_node: AttributeSchema, value_symbol: Symbol):

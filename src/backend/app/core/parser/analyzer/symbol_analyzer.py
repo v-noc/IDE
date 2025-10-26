@@ -58,10 +58,7 @@ class SymbolAnalyzer:
             + "."
             + ".".join(all_parts[:-1] + (relative_path.stem,))
         )
-        print(
-            f"Adding file: {file_qname} to "
-            f"{self.symbol_table.unprocessed_files} {file_path}"
-        )
+
         self.symbol_table.file_containers[file_qname] = file_container
         self.symbol_table.unprocessed_files.append(file_qname)
 
@@ -142,7 +139,8 @@ class SymbolAnalyzer:
                 try:
                     with open(file_container.file_path, "r", encoding="utf-8") as f:
                         file_content = f.read()
-                    file_hash = hashlib.sha256(file_content.encode("utf-8")).hexdigest()
+                    file_hash = hashlib.sha256(
+                        file_content.encode("utf-8")).hexdigest()
                 except (IOError, UnicodeDecodeError):
                     file_hash = ""  # Fallback for non-readable files
 
