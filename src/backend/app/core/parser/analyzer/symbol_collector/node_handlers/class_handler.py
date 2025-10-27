@@ -1,4 +1,4 @@
-import os
+
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.parser.ast.models import (
     ClassSchema,
@@ -11,7 +11,6 @@ from app.core.parser.scope_manager.core.scope import ScopeType
 from app.core.parser.analyzer.symbol_collector.node_handlers.function_handler import (
     FunctionHandler,
 )
-from app.core.parser.ast.node_tracking import add_comment
 
 
 class ClassHandler:
@@ -106,40 +105,10 @@ class ClassHandler:
         class_service = self.symbol_table.node_service["class"]
         class_name = node.name
 
-        # Resolve absolute path and current line-shift for the file
-        abs_path = None
-        prior_inserts = 0
-        try:
-            scope = self.symbol_table.scope_manager.current_scope
-            while scope.parent and scope.scope_type != ScopeType.MODULE:
-                scope = scope.parent
-            module_qname = scope.qualified_name
-            file_container = self.symbol_table.file_containers.get(
-                module_qname)
-            if file_container:
-                project_root = self.symbol_table.project_node.path
-                file_path = file_container.file_path
-                abs_path = (
-                    file_path
-                    if os.path.isabs(file_path)
-                    else os.path.normpath(os.path.join(project_root, file_path))
-                )
-                prior_inserts = self.symbol_table.file_path_to_line_inserts.get(
-                    abs_path, 0
-                )
-        except Exception:
-            pass
-
-        adjusted_start = node.position.line_no + prior_inserts
-        adjusted_end = (
-            node.position.end_line_no + prior_inserts
-            if node.position.end_line_no is not None
-            else None
-        )
         code_position = CodePosition(
-            line_no=adjusted_start,
+            line_no=node.position.line_no,
             col_offset=node.position.col_offset,
-            end_line_no=adjusted_end,
+            end_line_no=node.position.end_line_no,
             end_col_offset=node.position.end_col_offset,
         )
 
@@ -167,45 +136,5 @@ class ClassHandler:
             )
             parent_service = self.symbol_table.node_service[parent_node.node_type]
             parent_service.add_class(parent_node.id, class_node.id)
-
-            # Persist the created class id back into source as a comment
-            try:
-                # Ascend to module scope
-                scope = self.symbol_table.scope_manager.current_scope
-                while scope.parent and scope.scope_type != ScopeType.MODULE:
-                    scope = scope.parent
-                module_qname = scope.qualified_name
-                if abs_path:
-                    # Build dot-separated path from current scope relative
-                    # to module
-                    target_name = node.name
-                    scope = self.symbol_table.scope_manager.current_scope.parent
-                    while scope and scope.scope_type != ScopeType.MODULE:
-                        target_name = f"{scope.name}.{target_name}"
-                        scope = scope.parent
-
-                    result = add_comment(
-                        filepath=abs_path,
-                        target_name=target_name,
-                        comment_text=f"ID: {class_node.key}",
-                    )
-                    if result.get("success"):
-                        added = result.get("added_lines", 0)
-                        if added:
-                            inserts = self.symbol_table.file_path_to_line_inserts
-                            inserts[abs_path] = prior_inserts + added
-                            # Only end_line_no shifts due to docstring
-                            if class_node.position.end_line_no is not None:
-                                class_node.position.end_line_no = (
-                                    class_node.position.end_line_no + added
-                                )
-                            if class_node.position.end_line_no is not None:
-                                class_node.position.end_line_no = (
-                                    class_node.position.end_line_no + added
-                                )
-                            class_service.update(class_node)
-            except Exception:
-                # Best-effort; failures here should not break analysis
-                pass
 
         self.symbol_table.qname_to_node[qname] = class_node
