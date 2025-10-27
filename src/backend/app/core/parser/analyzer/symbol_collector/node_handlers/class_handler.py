@@ -122,19 +122,17 @@ class ClassHandler:
                     class_node.position = code_position
                     class_service.update(class_node)
                 else:
-                    class_node = None
+                    class_node = class_service.create(
+                        _key=node.id,
+                        name=class_name,
+                        qname=qname,
+                        description=f"{class_name} class",
+                        position=code_position,
+                    )
+                    parent_service = self.symbol_table.node_service[parent_node.node_type]
+                    parent_service.add_class(parent_node.id, class_node.id)
             except Exception:
                 # If stored ID is wrong or different type, ignore it
                 class_node = None
-
-        if class_node is None:
-            class_node = class_service.create(
-                name=class_name,
-                qname=qname,
-                description=f"{class_name} class",
-                position=code_position,
-            )
-            parent_service = self.symbol_table.node_service[parent_node.node_type]
-            parent_service.add_class(parent_node.id, class_node.id)
 
         self.symbol_table.qname_to_node[qname] = class_node

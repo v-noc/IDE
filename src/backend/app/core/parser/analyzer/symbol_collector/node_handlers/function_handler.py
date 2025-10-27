@@ -48,7 +48,21 @@ class FunctionHandler:
                     function_node.position = code_position
                     function_service.update(function_node)
                 else:
-                    function_node = None
+                    _key = node.id
+                    function_node = function_service.create(
+                        _key=_key,
+                        name=name_node,
+                        qname=current_scope,
+                        description=f"{name_node} function",
+                        position=code_position,
+                    )
+
+                    parent_function_service = self.symbol_table.node_service[
+                        parent_node.node_type
+                    ]
+                    parent_function_service.add_function(
+                        parent_node.id, function_node.id)
+
             except Exception:
                 function_node = None
 

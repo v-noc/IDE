@@ -158,7 +158,8 @@ def test_function_sync_add_and_remove_inside_function(arangodb_client):
         lines = _read_file(path).splitlines()
         block = [
             f"{' ' * indent}# SYNC_TEST_START\n\n",
-            f"{' ' * indent}def sync_added_inside(): pass",
+            f"{' ' * indent}def sync_added_inside():",
+            f"{' ' * indent}    pass\n",
             f"{' ' * indent}# SYNC_TEST_END",
         ]
         # Insert before the last line of the function's body

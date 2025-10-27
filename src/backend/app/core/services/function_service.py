@@ -2,6 +2,7 @@ from app.core.services.container_service import ContainerService
 from app.core.repository import Repositories
 from app.core.model.nodes import FunctionNode
 from app.core.model.properties import CodePosition
+from typing import Optional
 
 
 class FunctionService(ContainerService):
@@ -14,14 +15,16 @@ class FunctionService(ContainerService):
         qname: str,
         description: str,
         position: CodePosition,
+        _key: Optional[str] = None,
     ):
         function = FunctionNode(
             name=name,
             qname=qname,
             description=description,
-
             position=position,
         )
+        if _key:
+            function.key = _key
         return self.repos.function_repo.create(function)
 
     def get(self, function_id: str):

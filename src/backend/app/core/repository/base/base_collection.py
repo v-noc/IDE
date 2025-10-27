@@ -50,7 +50,7 @@ class BaseRepository(Generic[T]):
             or {
 
                 "key_generator": "uuid",
-                "user_keys": False,
+                "user_keys": True,
 
             }
         )
