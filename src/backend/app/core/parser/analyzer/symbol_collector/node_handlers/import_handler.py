@@ -63,7 +63,7 @@ class ImportHandler:
             if next_scope.scope_type == ScopeType.MODULE:
                 parent_file_scope = next_scope
                 break
-            next_scope = current_scope.parent
+            next_scope = next_scope.parent
 
         for alias in node.names:
             imported_name = alias.asname if alias.asname else alias.name
@@ -86,8 +86,7 @@ class ImportHandler:
                 )
 
             if not is_external:
-                scope = self.symbol_table.scope_manager.get_scope_by_qname(
-                    module_path)
+                scope = self.symbol_table.scope_manager.get_scope_by_qname(module_path)
 
                 if scope:
                     if imported_name == "*":
@@ -112,8 +111,7 @@ class ImportHandler:
                         if imported_name == "*":
                             local_import_modules.append(module_path)
                         else:
-                            local_import_modules.append(
-                                f"{module_path}.{alias.name}")
+                            local_import_modules.append(f"{module_path}.{alias.name}")
                     else:
                         local_import_modules.append(module_path)
         return local_import_modules
