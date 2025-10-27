@@ -81,7 +81,6 @@ class CallRepo(NodeRepository[CallNode]):
             for doc in cursor:
                 results.append(doc)
 
-            print(f"DEBUG: Query returned {(results)} results")
             if not results:
                 return None
             return CallNode(**results[0])

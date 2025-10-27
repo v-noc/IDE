@@ -33,7 +33,7 @@ class ClassHandler:
         # Shortcuts
         qname = self.symbol_table.scope_manager.current_scope.qualified_name
         class_service = self.symbol_table.node_service["class"]
-        class_node: ClassNode = class_service.get_by_qname(qname)
+        class_node: ClassNode = self.symbol_table.qname_to_node.get(qname)
 
         if class_node is None:
             return

@@ -75,7 +75,7 @@ export const NodeContent = ({
         "hover:bg-black/5"
       )}
     >
-      {hasChildren && (
+      {hasChildren ? (
         <CollapsibleTrigger
           onClick={handleToggle}
           className="p-0.5 rounded-md hover:bg-black/10 "
@@ -87,7 +87,10 @@ export const NodeContent = ({
             )}
           />
         </CollapsibleTrigger>
+      ) : (
+        <div className="w-4 h-4 "> </div>
       )}
+
       <DynamicIcon
         iconName={
           node.icon ||
@@ -142,6 +145,17 @@ export const NodeContent = ({
             <ul className="pl-2 pt-1 space-y-1">
               {node.children
                 ?.filter((n) => (childFilter ? childFilter(n) : true))
+                .sort((a, b) => {
+                  const getRank = (n: ContainerNodeTree) =>
+                    n.node_type === "folder"
+                      ? 0
+                      : n.node_type === "file"
+                      ? 1
+                      : 2;
+                  const rankDiff = getRank(a) - getRank(b);
+                  if (rankDiff !== 0) return rankDiff;
+                  return a.name.localeCompare(b.name);
+                })
                 .map((child) => (
                   <TreeNode
                     key={child._key}
