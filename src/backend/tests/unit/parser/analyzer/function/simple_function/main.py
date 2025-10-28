@@ -1,33 +1,44 @@
 def factory():
-    """ ID: 0135b0ba-9209-4180-a722-e30591b1cff0 """
-
+    """ID: 4443bd2b-bcdc-4135-a8d3-16705dc8da11"""
     def add():
-        """ ID: b5689b2a-9ca9-449f-8154-0401dfb47779 """
+        """ID: 6cfe906e-80c1-4f9a-a984-e7154c91a767"""
+        # SYNC_TEST_START
+
+        def sync_added_inside():
+            """ID: 95c2670d-b150-4ee5-ade0-79d715a05f1e"""
+            pass
+
+        # SYNC_TEST_END
         build()
-        pass
 
     def build():
-        """ ID: f73533d5-f805-4250-a1f1-d2e8f261bd0f """
+        """ID: 0af37d95-b990-4aa8-a6d8-f227f080aa11"""
         pass
     return add
 
+
 def call_back(call_back_func):
-    """ ID: 92b9ac6d-507f-4590-8954-69a664bf1c2f """
-    call_back_func()
+    """ID: 3c2f627c-520f-4b52-8690-bc7f5dc36e09"""
+    call_back_func()  # lalal
+
 
 def factory_call():
-    """ ID: 05246666-c580-4716-a33e-d40bac84bfd0 """
+    """ID: bf998f1a-d36e-49d8-bd98-2bc279c4428b"""
     add = factory()
     add()
 
+
 def curry_call():
-    """ ID: dd699658-c56f-41cb-bc1e-bc54d18be1ca """
+    """ID: e7398873-f663-4c80-9b20-ff8bbb7b4967"""
     factory()()
 
+
 def main():
-    """ ID: 741369e2-a0b9-4d9d-8a7f-30fa966a89d5 """
+    """ID: 4b20776e-824a-45ce-9644-897fac77af54"""
     factory_call()
     curry_call()
     builder = factory()
     call_back(builder)
+
+
 main()

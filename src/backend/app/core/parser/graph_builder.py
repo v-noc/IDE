@@ -31,8 +31,10 @@ class GraphBuilder:
             )
             # Hydrate the symbol table with the existing project structure
             project_service = self.symbol_analyzer.symbol_table.node_service["project"]
-            project_structure = project_service.get_project_structure(project_node.id)
-            self.symbol_analyzer.hydrate_from_project_structure(project_structure)
+            project_structure = project_service.get_project_structure(
+                project_node.id)
+            self.symbol_analyzer.hydrate_from_project_structure(
+                project_structure)
         else:
             self.project_node = None
 
@@ -42,13 +44,14 @@ class GraphBuilder:
                 project_name, project_description, str(self.project_path)
             )
 
-        file_navigator = FileNavigator(self.project_path, self.ignore_file_name)
+        file_navigator = FileNavigator(
+            self.project_path, self.ignore_file_name)
         python_files = file_navigator.find_files(extensions=[".py"])
 
         for file_path in python_files:
             with open(file_path, "r") as file:
                 file_content = file.read()
-            ast_scanner = scan(file_content)
+            ast_scanner = scan(file_content, file_path)
             file_name = Path(file_path)
 
             relative_path = file_name.relative_to(self.project_path)

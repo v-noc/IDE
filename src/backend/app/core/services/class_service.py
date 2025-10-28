@@ -1,3 +1,4 @@
+from typing import Optional
 from app.core.services.container_service import ContainerService
 from app.core.repository import Repositories
 from app.core.model.nodes import ClassNode
@@ -14,6 +15,7 @@ class ClassService(ContainerService):
         qname: str,
         description: str,
         position: CodePosition,
+        _key: Optional[str] = None,
     ):
         class_node = ClassNode(
             name=name,
@@ -22,6 +24,8 @@ class ClassService(ContainerService):
             implements=[qname],
             position=position,
         )
+        if _key:
+            class_node.key = _key
         return self.repos.class_repo.create(class_node)
 
     def get(self, class_id: str):
