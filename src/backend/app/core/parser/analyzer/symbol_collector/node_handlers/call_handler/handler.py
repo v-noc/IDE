@@ -13,6 +13,10 @@ from .function_executor import FunctionExecutor
 from .symbol_resolver import ResolutionResult, SymbolResolver
 
 
+class CallCycleDetected(Exception):
+    pass
+
+
 class CallHandler:
     """Handles call-related nodes"""
 
@@ -47,12 +51,15 @@ class CallHandler:
                     SymbolType.FUNCTION,
                     SymbolType.CAPTURED_CLOSURE,
                 ):
-                    with self._call_node_context(final_inner, position):
-                        return self.executor.execute(
-                            callee_result,
-                            node.args,
-                            node.keywords,
-                        )
+                    try:
+                        with self._call_node_context(final_inner, position):
+                            return self.executor.execute(
+                                callee_result,
+                                node.args,
+                                node.keywords,
+                            )
+                    except CallCycleDetected:
+                        return None
 
                 if final_inner.symbol_type == SymbolType.CLASS:
                     return self.executor.instantiate_class(
@@ -81,10 +88,13 @@ class CallHandler:
                     end_line_no=node.position.end_line_no,
                     end_col_offset=node.position.end_col_offset,
                 )
-                with self._call_node_context(init_symbol, position):
-                    return self.executor.instantiate_class(
-                        callee_result.symbol, node.args, node.keywords
-                    )
+                try:
+                    with self._call_node_context(init_symbol, position):
+                        return self.executor.instantiate_class(
+                            callee_result.symbol, node.args, node.keywords
+                        )
+                except CallCycleDetected:
+                    return None
 
         # Regular function or closure execution
         if final_callee.symbol_type in (
@@ -97,12 +107,15 @@ class CallHandler:
                 end_line_no=node.position.end_line_no,
                 end_col_offset=node.position.end_col_offset,
             )
-            with self._call_node_context(final_callee, position):
-                return self.executor.execute(
-                    callee_result,
-                    node.args,
-                    node.keywords,
-                )
+            try:
+                with self._call_node_context(final_callee, position):
+                    return self.executor.execute(
+                        callee_result,
+                        node.args,
+                        node.keywords,
+                    )
+            except CallCycleDetected:
+                return None
 
         return None
 
@@ -130,6 +143,30 @@ class CallHandler:
             callee_symbol.qualified_name
         ]
         parent_service = self.symbol_table.node_service[parent_node.node_type]
+
+        # Detect recursive/cyclic calls
+        # and repeated qnames in the current stack
+        candidate_qname = (
+            f"{callee_symbol.qualified_name}L{position.line_no}"
+            f"C{position.col_offset}"
+        )
+        # 1) Exact same call site qname appears in the stack
+        if any(
+            getattr(stack_node, "qname", None) == candidate_qname
+            for stack_node in self.symbol_table.call_node_stack
+        ):
+            raise CallCycleDetected(
+                f"Repeated call qname detected: {candidate_qname}"
+            )
+        # 2) The same target is already somewhere up the stack -> recursion
+        if any(
+            getattr(stack_node, "target_id", None) == callee_node.id
+            for stack_node in self.symbol_table.call_node_stack
+        ):
+            raise CallCycleDetected(
+                "Recursive call target detected: "
+                f"{callee_symbol.qualified_name}"
+            )
 
         # Record the intent that this parent directly calls the target
         self.symbol_table.register_direct_call(parent_node.id, callee_node.id)

@@ -99,7 +99,11 @@ class CodeStructureVisitor(NodeVisitor):
 
     def visit_Call(self, node: Call) -> None:
         pydantic_node = self.converter.convert_call(node)
-        self._add_node(pydantic_node)
+        if pydantic_node:
+            self._add_node(pydantic_node)
+        else:
+            print(f"Error converting call node: {node}")
+            return
 
         # Do not call generic_visit to avoid processing children twice.
         # The converter handles recursion into function calls.

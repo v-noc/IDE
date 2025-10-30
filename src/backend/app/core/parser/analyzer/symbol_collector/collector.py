@@ -71,9 +71,11 @@ class SymbolCollector:
             self.symbol_table.scope_manager.exit_scope()
 
     def context_analyze_symbols(self, file_node: FileContainer):
-        self.current_file_path = (
-            self.symbol_table.scope_manager.current_scope.qualified_name
-        )
+        # Normalize current file path so __init__.py uses the parent package scope
+        curr = self.symbol_table.scope_manager.current_scope.qualified_name
+        if self.symbol_table.scope_manager.current_scope.scope_type == ScopeType.MODULE and curr.endswith(".__init__"):
+            curr = curr[: -len(".__init__")]
+        self.current_file_path = curr
         if self.current_file_path in self.symbol_table.unprocessed_files:
             self.symbol_table.unprocessed_files.remove(self.current_file_path)
         else:
@@ -92,7 +94,11 @@ class SymbolCollector:
                 imported_modules = self.import_handler.handle_import_node(node)
 
                 for imported_module in imported_modules:
-                    file_node = self.symbol_table.file_containers[imported_module]
+                    file_node = self.symbol_table.file_containers.get(
+                        imported_module)
+                    if file_node is None:
+                        file_node = self.symbol_table.file_containers.get(
+                            f"{imported_module}.__init__")
                     scope = self.symbol_table.scope_manager.get_scope_by_qname(
                         imported_module
                     )
@@ -107,18 +113,28 @@ class SymbolCollector:
             elif node.schema_type == SchemaType.IMPORT_FROM:
                 imported_modules = self.import_handler.handle_import_from_node(
                     node)
+                try:
+                    for imported_module in imported_modules:
+                        file_node = self.symbol_table.file_containers.get(
+                            imported_module)
+                        if file_node is None:
+                            file_node = self.symbol_table.file_containers.get(
+                                f"{imported_module}.__init__")
+                        current_scope = self.symbol_table.scope_manager.current_scope
+                        scope = self.symbol_table.scope_manager.get_scope_by_qname(
+                            imported_module
+                        )
+                        self.symbol_table.scope_manager.enter_scope_by_scope(
+                            scope)
+                        self.context_analyze_symbols(file_node)
+                        self.symbol_table.scope_manager.exit_scope()
+                        self.symbol_table.scope_manager.enter_scope_by_scope(
+                            current_scope)
+                    self.import_handler.process_import_from(node)
 
-                for imported_module in imported_modules:
-                    file_node = self.symbol_table.file_containers[imported_module]
-                    current_scope = self.symbol_table.scope_manager.current_scope
-                    scope = self.symbol_table.scope_manager.get_scope_by_qname(
-                        imported_module
-                    )
-                    self.symbol_table.scope_manager.enter_scope_by_scope(scope)
-                    self.context_analyze_symbols(file_node)
-                    self.symbol_table.scope_manager.exit_scope()
-                    self.symbol_table.scope_manager.enter_scope_by_scope(
-                        current_scope)
+                except Exception as e:
+                    print(f"Error analyzing import from node: {e}")
+                    return
 
             elif (
                 node.schema_type == SchemaType.FUNCTION

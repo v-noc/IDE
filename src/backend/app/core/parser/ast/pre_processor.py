@@ -76,6 +76,8 @@ class DocstringPreProcessor(cst.CSTTransformer):
         if current_doc is not None:
             extracted_metadata = extract_metadata(current_doc)
             if extracted_metadata.get("ID") is not None:
+                id = extracted_metadata.get("ID")
+
                 return body
             else:
                 new_doc_content = build_docstring(
@@ -122,16 +124,24 @@ class DocstringPreProcessor(cst.CSTTransformer):
     def leave_ClassDef(
         self, original_node: cst.ClassDef, updated_node: cst.ClassDef
     ) -> cst.ClassDef:
-        current_doc = original_node.get_docstring(clean=True)
-        new_body = self._add_id_to_docstring(
-            updated_node.body, current_doc)
+        try:
+            current_doc = original_node.get_docstring(clean=True)
+            new_body = self._add_id_to_docstring(
+                updated_node.body, current_doc)
 
-        return updated_node.with_changes(body=new_body)
+            return updated_node.with_changes(body=new_body)
+        except Exception as e:
+            print(f"Error adding ID to docstring: {e}")
+            return updated_node
 
     def leave_FunctionDef(
         self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef
     ) -> cst.FunctionDef:
-        current_doc = original_node.get_docstring(clean=True)
-        new_body = self._add_id_to_docstring(
-            updated_node.body, current_doc)
-        return updated_node.with_changes(body=new_body)
+        try:
+            current_doc = original_node.get_docstring(clean=True)
+            new_body = self._add_id_to_docstring(
+                updated_node.body, current_doc)
+            return updated_node.with_changes(body=new_body)
+        except Exception as e:
+            print(f"Error adding ID to docstring: {e}")
+            return updated_node

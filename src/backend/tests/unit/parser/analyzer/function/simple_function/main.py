@@ -2,13 +2,7 @@ def factory():
     """ID: 4443bd2b-bcdc-4135-a8d3-16705dc8da11"""
     def add():
         """ID: 6cfe906e-80c1-4f9a-a984-e7154c91a767"""
-        # SYNC_TEST_START
 
-        def sync_added_inside():
-            """ID: 95c2670d-b150-4ee5-ade0-79d715a05f1e"""
-            pass
-
-        # SYNC_TEST_END
         build()
 
     def build():
