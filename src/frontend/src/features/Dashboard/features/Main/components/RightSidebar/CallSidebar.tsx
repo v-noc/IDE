@@ -7,14 +7,21 @@ type CallSidebarProps = {
 };
 
 const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
-  const { selectedNode, setSecondarySelectedNode } = useProjectStore();
+  const { focusStack, selectedNode, setSecondarySelectedNode } =
+    useProjectStore();
 
   const callChildren = useMemo(() => {
     if (selectedNode) {
       return selectedNode.children.filter((node) => node.node_type == "call");
     }
+    if (focusStack.length > 0) {
+      return focusStack[focusStack.length - 1].children.filter(
+        (node) => node.node_type == "call"
+      );
+    }
+
     return [];
-  }, [selectedNode]);
+  }, [selectedNode, focusStack]);
 
   return (
     <div className="h-full flex flex-col">

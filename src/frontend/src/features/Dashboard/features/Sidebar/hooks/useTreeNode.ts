@@ -54,6 +54,7 @@ export const useTreeNode = (
   };
 
   const handleSelectNode = () => {
+
     if (selectedNode?._key === node._key) return;
     setSelectedNode(node);
     // Clear any secondary selection when a primary selection is made
@@ -64,14 +65,17 @@ export const useTreeNode = (
   };
 
   const handleFocus = () => {
+    if (focusStack.length > 0) {
+      if (focusStack[focusStack.length - 1]._key === node._key) {
+        return;
+      }
+    }
     pushFocus(node);
   };
 
   const handleExpand = () => {
+    toggleNodeExpansion(node._key);
 
-    if (hasChildren) {
-      toggleNodeExpansion(node._key);
-    }
   };
 
   const handleRemove = async () => {

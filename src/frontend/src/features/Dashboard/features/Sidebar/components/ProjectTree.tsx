@@ -55,21 +55,6 @@ const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
       }
     }
 
-    // Select the target node
-    const selectTarget = (node: AnyNodeTree): AnyNodeTree | null => {
-      if (node._key === targetKey) return node;
-      if (node.children) {
-        for (const child of node.children as AnyNodeTree[]) {
-          const found = selectTarget(child);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    const foundTarget = selectTarget(projectTree);
-    if (foundTarget) setSelectedNode(foundTarget);
-
-    // Scroll it into view after next paint
     const el = document.querySelector(`[data-node-key="${targetKey}"]`);
     if (el && "scrollIntoView" in el) {
       (el as HTMLElement).scrollIntoView({
@@ -87,6 +72,7 @@ const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
 
   const rootToRender = focusedNode ?? projectTree;
 
+  console.log("focusedNode", focusedNode);
   return (
     <div className="space-y-1">
       {focusedNode && (
