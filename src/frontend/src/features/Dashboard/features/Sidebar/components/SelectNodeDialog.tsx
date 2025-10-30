@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import type { AnyNodeTree, NodeType } from "@/types/project";
 import { TreeView, type TreeDataItem } from "@/components/ui/tree-view";
+import { DynamicIcon } from "@/components/DynamicIcon";
+import getIcons from "@/features/Dashboard/utils/getIcons";
 
 interface SelectNodeDialogProps {
   isOpen?: boolean;
@@ -37,9 +39,17 @@ const SelectNodeDialog = ({
             .map((child) => toTreeDataItem(child as AnyNodeTree))
         : undefined;
 
+      const IconComp = () => (
+        <DynamicIcon
+          iconName={getIcons(node.node_type)}
+          className="h-4 w-4 shrink-0 mr-2"
+        />
+      );
+
       return {
         id: node._key,
-        name: node.name,
+        name: `${node.name} (${node.node_type})`,
+        icon: IconComp,
         children,
         onClick: () => {
           if (selectNodeType.includes(node.node_type)) {
@@ -66,16 +76,24 @@ const SelectNodeDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Select {selectNodeType.join(", ")}</DialogTitle>
         </DialogHeader>
         <div className="mt-2 max-h-72 overflow-auto rounded-md border p-1">
           <TreeView data={treeData} className="text-sm" />
         </div>
+        <div className="mt-2 text-xs text-muted-foreground">
+          {selectedNode
+            ? `Selected: ${selectedNode.name} (${selectedNode.node_type})`
+            : `Pick a ${selectNodeType.join(" or ")} from the list.`}
+        </div>
         <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button disabled={!selectedNode} type="submit" onClick={handleSubmit}>
-            submit
+            Submit
           </Button>
         </DialogFooter>
       </DialogContent>
