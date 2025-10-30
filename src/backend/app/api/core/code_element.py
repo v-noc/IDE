@@ -66,10 +66,10 @@ def write_code(
             for _ in range(50):
                 if not current_id:
                     break
-                parents = node_repo.get_parent(current_id)
-                if not parents:
+                parent = node_repo.get_parent(current_id)
+                if not parent:
                     break
-                parent_vertex = parents[0].get("vertex") or {}
+                parent_vertex = parent.get("vertex") or {}
                 if parent_vertex.get("node_type") == "project":
                     project_id = parent_vertex.get("_id")
                     if project_id:

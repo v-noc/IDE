@@ -108,10 +108,10 @@ class ContainerService:
 
         # Limit the ascent to avoid infinite loops
         for _ in range(50):
-            parents = self.repos.nodes.get_parent(current_id)
-            if not parents:
+            parent_info = self.repos.nodes.get_parent(current_id)
+            if not parent_info:
                 break
-            parent_info = parents[0]
+
             parent_vertex = parent_info.get("vertex") or {}
             parent_id = parent_vertex.get("_id")
             node_type = parent_vertex.get("node_type")
