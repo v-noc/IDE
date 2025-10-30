@@ -7,7 +7,7 @@ from typing import TypeVar
 from arango.exceptions import DocumentDeleteError, DocumentGetError
 
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 class NodeRepository(BaseRepository[T]):
@@ -62,12 +62,14 @@ class NodeRepository(BaseRepository[T]):
         bind_vars = {
             "start_node_id": node_id,
             "@contains_collection": "contains_edges",
-
         }
         # Note: This returns raw dicts, not Pydantic models directly,
         # because the structure is custom ("vertex", "parent_id").
         cursor = self.db.aql.execute(query, bind_vars=bind_vars)
-        return list(cursor)
+        results = list(cursor)
+        if results:
+            return results[0]
+        return None
 
     def get_containment_tree(
         self,
