@@ -1,9 +1,10 @@
 
 from typing import Dict, List, Any
-from app.core.schemas.tree import AnyTreeNode, FolderTreeNode, ProjectTreeNode, FileTreeNode, ClassTreeNode, FunctionTreeNode, CallTreeNode
+from app.core.schemas.tree import AnyTreeNode, FolderTreeNode, ProjectTreeNode, FileTreeNode, ClassTreeNode, FunctionTreeNode, CallTreeNode, GroupTreeNode
 
 # Maps a node_type string to the correct Pydantic Tree model
 NODE_TYPE_TO_TREE_MODEL_MAP = {
+    "group": GroupTreeNode,
     "project": ProjectTreeNode,
     "folder": FolderTreeNode,
     "file": FileTreeNode,

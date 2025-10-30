@@ -3,7 +3,7 @@
 from typing import List, Optional, Union
 from pydantic import Field
 
-from app.core.model.nodes import CallNode, ClassNode, FunctionNode, FileNode, FolderNode, ProjectNode
+from app.core.model.nodes import CallNode, ClassNode, FunctionNode, FileNode, FolderNode, ProjectNode, GroupNode
 
 
 class CallTreeNode(CallNode):
@@ -41,8 +41,15 @@ class ProjectTreeNode(ProjectNode):
         default_factory=list, description="Project children.")
 
 
+class GroupTreeNode(GroupNode):
+    children: List[
+        "GroupTreeNode | FolderTreeNode | FileTreeNode | ClassTreeNode | FunctionTreeNode | CallTreeNode"
+    ] = Field(default_factory=list, description="Group children.")
+
+
 # A Union of all possible nodes in our tree response
 AnyTreeNode = Union[
+    GroupTreeNode,
     FolderTreeNode,
     ProjectTreeNode,
     FileTreeNode,
@@ -58,3 +65,4 @@ ProjectTreeNode.model_rebuild()
 FileTreeNode.model_rebuild()
 ClassTreeNode.model_rebuild()
 FunctionTreeNode.model_rebuild()
+GroupTreeNode.model_rebuild()

@@ -23,6 +23,10 @@ class ContainerNode(BaseNode):
     )
 
 
+class GroupNode(ContainerNode):
+    node_type: Literal["group"] = "group"
+
+
 class FunctionNode(ContainerNode):
     node_type: Literal["function"] = "function"
     position: CodePosition = Field(

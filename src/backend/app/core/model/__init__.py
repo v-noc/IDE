@@ -1,13 +1,13 @@
 from typing import Annotated, Union
 from pydantic import Field
-from .nodes import FunctionNode, ClassNode, ProjectNode, FolderNode, FileNode, CallNode
+from .nodes import FunctionNode, ClassNode, ProjectNode, FolderNode, FileNode, CallNode, GroupNode
 from .logs import LogNode
 
 CodeNode = Union[FunctionNode, ClassNode, CallNode]
 
 AllNodes = Annotated[
     Union[
-
+        GroupNode,
         ProjectNode,
         FolderNode,
         FileNode,

@@ -23,7 +23,7 @@ class ContainerService:
         self,
         container_id: str,
         child_id: str,
-        contain_type: str,
+        contain_type: Optional[str] = None,
 
     ):
         container = self.repos.nodes.get_by_id(container_id)
@@ -33,6 +33,9 @@ class ContainerService:
         child = self.repos.nodes.get_by_id(child_id)
         if not child:
             raise ValueError(f"Child {child_id} not found")
+
+        if contain_type is None:
+            contain_type = f"{container.node_type.lower()}_to_{child.node_type.lower()}"
 
         contains_edge = ContainsEdge(
             from_id=container_id,

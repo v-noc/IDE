@@ -21,7 +21,8 @@ class NodeRepository(BaseRepository[T]):
             edge_collections = [
                 c["name"]
                 for c in self.db.collections()
-                if not c.get("system") and self.db.collection(c["name"]).properties().get("edge")
+                if not c.get("system")
+                and self.db.collection(c["name"]).properties().get("edge")
             ]
         except Exception as e:
             print(f"Failed to retrieve edge collections: {e}")
@@ -30,11 +31,14 @@ class NodeRepository(BaseRepository[T]):
         try:
             for ec_name in edge_collections:
                 self.db.aql.execute(
-                    "FOR e IN @@collection FILTER e._from == @node_id OR e._to == @node_id REMOVE e IN @@collection",
-                    bind_vars={
-                        "@collection": ec_name,
-                        "node_id": node_id
-                    }
+                    (
+                        """
+                        FOR e IN @@collection
+                            FILTER e._from == @node_id OR e._to == @node_id
+                            REMOVE e IN @@collection
+                        """
+                    ),
+                    bind_vars={"@collection": ec_name, "node_id": node_id},
                 )
 
             self.collection.delete(key)
@@ -66,19 +70,25 @@ class NodeRepository(BaseRepository[T]):
         return list(cursor)
 
     def get_containment_tree(
-        self, start_node_id: str, depth: int | str = 50
+        self,
+        start_node_id: str,
+        depth: int | str = 50,
+        exclude_types: List[str] | None = None,
     ) -> List[Dict[str, Any]]:
         """
         Executes a graph traversal to get a full descendant tree.
         Returns a list of dictionaries, each containing the vertex and its
         parent's ID, perfect for rebuilding a tree structure.
         """
-        # For MVP, use a large fixed depth for unbounded requests instead of '1..' syntax
+        # For MVP, use a large fixed depth for unbounded requests instead of
+        # '1..' syntax
         max_depth = 50 if depth == "*" else depth
 
-        # AQL's "p.vertices[-2]" is a clever way to get the parent in a path.
+        # AQL's "p.vertices[-2]" gets the direct parent. We sometimes need to
+        # skip virtual nodes (e.g., group) and attach children to the nearest
+        # non-excluded ancestor while still traversing through excluded nodes.
         query = """
-        FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id 
+        FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id
             @@contains_collection
             OPTIONS { order: "bfs" }
             // Use a LET statement to conditionally find the target
@@ -88,9 +98,21 @@ class NodeRepository(BaseRepository[T]):
                     LIMIT 1
                     RETURN target
             )
+            // Determine effective parent by walking ancestors until a
+            // non-excluded node_type is found
+            LET parent_candidates = (
+                FOR i IN 2..LENGTH(p.vertices)
+                    LET candidate = p.vertices[LENGTH(p.vertices) - i]
+                    FILTER candidate.node_type NOT IN @exclude_types
+                    LIMIT 1
+                    RETURN candidate._id
+            )
+            // Optionally skip returning excluded node types while preserving
+            // traversal
+            FILTER v.node_type NOT IN @exclude_types
             RETURN {
                 "vertex": v,
-                "parent_id": p.vertices[-2]._id,
+                "parent_id": FIRST(parent_candidates),
                 "target": FIRST(target_node)
             }
         """
@@ -99,6 +121,7 @@ class NodeRepository(BaseRepository[T]):
             "@contains_collection": "contains_edges",
             "@targets_collection": "targets_edges",
             "max_depth": max_depth,
+            "exclude_types": exclude_types or [],
         }
         # Note: This returns raw dicts, not Pydantic models directly,
         # because the structure is custom ("vertex", "parent_id").
