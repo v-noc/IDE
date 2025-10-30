@@ -108,7 +108,7 @@ def test_func_position():
     schema = result[0]
     assert isinstance(schema, FunctionSchema)
     assert schema.position.line_no == 2
-    assert schema.position.end_line_no == 3
+    assert schema.position.end_line_no == 4
 
 
 simple_func = """

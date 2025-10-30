@@ -103,7 +103,7 @@ def test_class_position():
     foo_class = result[0]
     assert isinstance(foo_class, ClassSchema)
     assert foo_class.position.line_no == 2
-    assert foo_class.position.end_line_no == 3
+    assert foo_class.position.end_line_no == 4
 
 
 simple_class_with_id = """
