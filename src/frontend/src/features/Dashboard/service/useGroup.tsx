@@ -28,3 +28,39 @@ export const useCreateGroup = (parent_node_id: string, project_key: string) => {
     },
   });
 };
+
+const addChildToGroup = async (group_id: string, child_id: string) => {
+  return api(`${API_ROUTES.GROUPS}${group_id}/add-child`, {
+    method: "POST",
+    body: { child_id },
+  });
+};
+
+const removeChildFromGroup = async (group_id: string, child_id: string) => {
+  return api(`${API_ROUTES.GROUPS}${group_id}/remove-child`, {
+    method: "DELETE",
+    body: { child_id },
+  });
+};
+
+export const useGroupUpdate = (group_id: string, project_key: string) => {
+  const queryClient = useQueryClient();
+  const addChildToGroupMutation = useMutation({
+    mutationFn: (child_id: string) => addChildToGroup(group_id, child_id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+    },
+  });
+
+  const removeChildFromGroupMutation = useMutation({
+    mutationFn: (child_id: string) => removeChildFromGroup(group_id, child_id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+    },
+  });
+
+  return {
+    addChildToGroupMutation,
+    removeChildFromGroupMutation,
+  };
+};

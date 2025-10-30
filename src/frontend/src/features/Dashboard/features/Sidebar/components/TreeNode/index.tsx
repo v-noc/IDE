@@ -7,6 +7,8 @@ import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
 import { useState } from "react";
 import SelectNodeDialog from "../SelectNodeDialog";
 import CreateGroupsDialog from "@/features/Dashboard/components/CreateGroupsDialog";
+import type { GroupNodeTree } from "@/types/project";
+import ManageGroupsDialog from "@/features/Dashboard/components/ManageGroupsDialog";
 // import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
 
 interface TreeNodeProps {
@@ -52,6 +54,8 @@ export const TreeNode = ({
 
   const [isCreateGroupsDialogOpen, setIsCreateGroupsDialogOpen] =
     useState(false);
+  const [isManageGroupsDialogOpen, setIsManageGroupsDialogOpen] =
+    useState(false);
 
   const closeAddCallDialog = () => {
     setIsAddCallDialogOpen(null);
@@ -71,6 +75,15 @@ export const TreeNode = ({
     return null;
   };
 
+  const getSiblings = (node: ContainerNodeTree): ContainerNodeTree[] => {
+    const parentNode = getParentNode(node);
+    if (!parentNode) return [];
+    const children = parentNode.children ?? [];
+    return children.filter(
+      (child) => child._key !== node._key
+    ) as ContainerNodeTree[];
+  };
+
   const handleSelectOverride = onSelect
     ? () => onSelect(node)
     : handleSelectNode;
@@ -86,6 +99,7 @@ export const TreeNode = ({
           handleRemoveCall(node);
         }}
         onRemove={handleRemove}
+        onManageGroup={() => setIsManageGroupsDialogOpen(true)}
         onEdit={undefined}
         onAddCall={() =>
           setIsAddCallDialogOpen({
@@ -133,6 +147,14 @@ export const TreeNode = ({
         initialChildren={node ? [node] : []}
         project_key={projectData?._key ?? ""}
         parent_node_id={getParentNode(node)?._key ?? ""}
+      />
+
+      <ManageGroupsDialog
+        isOpen={isManageGroupsDialogOpen}
+        onClose={() => setIsManageGroupsDialogOpen(false)}
+        group={node as unknown as GroupNodeTree}
+        siblings={getSiblings(node)}
+        project_key={projectData?._key ?? ""}
       />
     </>
   );

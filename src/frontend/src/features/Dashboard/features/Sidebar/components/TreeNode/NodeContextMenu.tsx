@@ -18,6 +18,7 @@ interface NodeContextMenuProps {
   onAddCall: () => void;
   onEdit?: () => void;
   onCreateGroup: () => void;
+  onManageGroup?: () => void;
 }
 
 export const NodeContextMenu = ({
@@ -28,6 +29,7 @@ export const NodeContextMenu = ({
   onAddCall,
   onRemoveCall,
   onCreateGroup,
+  onManageGroup,
 }: NodeContextMenuProps) => {
   return (
     <ContextMenu>
@@ -57,6 +59,12 @@ export const NodeContextMenu = ({
           <ContextMenuItem onClick={() => onRemoveCall()}>
             <Trash />
             Remove Call
+          </ContextMenuItem>
+        )}
+        {node.node_type === "group" && onManageGroup && (
+          <ContextMenuItem onClick={onManageGroup}>
+            <Group />
+            Edit Group
           </ContextMenuItem>
         )}
         {node.node_type !== "project" && (

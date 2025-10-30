@@ -54,12 +54,22 @@ class GroupService(ContainerService):
         return True
 
     def add_child_to_group(self, group_id: str, child_id: str):
-        parent = self.repos.nodes.get_parent(child_id)
+
+        child = self.repos.nodes.get_by_key(child_id)
+        if not child:
+            raise ValueError(f"Child {child_id} not found")
+
+        group = self.repos.nodes.get_by_key(group_id)
+        if not group:
+            raise ValueError(f"Group {group_id} not found")
+
+        parent = self.repos.nodes.get_parent(child.id)
         if not parent:
             raise ValueError(f"Parent {child_id} not found")
 
-        self._remove_child_from_group(parent.get("vertex").get("_id"), child_id)
-        return self.add_child_to_container(group_id, child_id)
+        self._remove_child_from_group(
+            parent.get("vertex").get("_id"), child.id)
+        return self.add_child_to_container(group.id, child.id)
 
     def delete(self, group_id: str, remove_children: bool = False):
         group = self.repos.group_repo.get_by_id(group_id)
@@ -69,7 +79,8 @@ class GroupService(ContainerService):
         children = self.repos.group_repo.get_containment_tree(group_id)
         if remove_children:
             for child in children:
-                self._remove_child_from_group(group_id, child.get("vertex").get("_id"))
+                self._remove_child_from_group(
+                    group_id, child.get("vertex").get("_id"))
                 parent = self.repos.nodes.get_parent(group_id)
                 if parent:
                     self.add_child_to_container(

@@ -111,4 +111,4 @@ export interface ProjectNodeTree extends ProjectNode {
     children: (FolderNode | FileNodeTree | GroupNodeTree)[]
 }
 
-export type AnyNodeTree = ProjectNodeTree | FolderNodeTree | FileNodeTree | FunctionNodeTree | ClassNodeTree | CallNodeTree
+export type AnyNodeTree = ProjectNodeTree | FolderNodeTree | FileNodeTree | FunctionNodeTree | ClassNodeTree | CallNodeTree | GroupNodeTree
