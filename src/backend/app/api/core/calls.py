@@ -60,3 +60,15 @@ def add_call(
         parent_node.id, call.id, f"{parent_node.node_type}_to_call")
 
     return call
+
+
+@router.delete("/{call_key}/remove-call")
+def remove_call(
+    call_key: str,
+    call_service: CallService = Depends(get_call_service),
+):
+    call = call_service.get(call_key)
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+    call_service.delete(call_key)
+    return {"message": "Call removed successfully"}

@@ -7,5 +7,5 @@ def main():
     print(child.get_name())
 
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()
