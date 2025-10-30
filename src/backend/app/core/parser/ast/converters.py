@@ -50,7 +50,8 @@ def _extract_id_from_docstring(node) -> Optional[str]:
         # Docstring is a string constant as the first statement
         if isinstance(first_stmt, Expr) and isinstance(first_stmt.value, Constant):
             value = (
-                first_stmt.value.value if hasattr(first_stmt.value, "value") else None
+                first_stmt.value.value if hasattr(
+                    first_stmt.value, "value") else None
             )
             if isinstance(value, str):
                 doc = value.strip()
@@ -116,7 +117,8 @@ class SchemaConverter:
         if node.args:
             for arg in node.args.args:
                 annotation = (
-                    extract_annotation(arg.annotation) if arg.annotation else None
+                    extract_annotation(
+                        arg.annotation) if arg.annotation else None
                 )
                 args.append(
                     ArgSchema(
@@ -126,7 +128,8 @@ class SchemaConverter:
                     )
                 )
 
-        return_annotation = extract_annotation(node.returns) if node.returns else None
+        return_annotation = extract_annotation(
+            node.returns) if node.returns else None
 
         return_values = []
         for return_Schema in returns:
@@ -233,28 +236,33 @@ class SchemaConverter:
         return items
 
     def convert_call(self, node: Call) -> CallSchema:
-        # Use the powerful _convert_expression to handle the function part
-        func = self._convert_expression(node.func)
+        try:
+            # Use the powerful _convert_expression to handle the function part
+            func = self._convert_expression(node.func)
 
-        # Convert args and keywords using the same recursive logic
-        args = [self._convert_expression(arg) for arg in node.args]
-        keywords = []
-        for keyword in node.keywords:
-            kw_name = keyword.arg if isinstance(keyword.arg, str) else None
-            keywords.append(
-                KeywordSchema(
-                    name=kw_name,
-                    value=self._convert_expression(keyword.value),
-                    position=extract_position(keyword),
+            # Convert args and keywords using the same recursive logic
+            args = [self._convert_expression(arg) for arg in node.args]
+            keywords = []
+            for keyword in node.keywords:
+                kw_name = keyword.arg if isinstance(keyword.arg, str) else None
+                keywords.append(
+                    KeywordSchema(
+                        name=kw_name,
+                        value=self._convert_expression(keyword.value),
+                        position=extract_position(keyword),
+                    )
                 )
+
+            call_id = None
+
+            return CallSchema(
+                id=call_id,
+                func=func,
+                args=args,
+                keywords=keywords,
+                position=extract_position(node),
             )
 
-        call_id = None
-
-        return CallSchema(
-            id=call_id,
-            func=func,
-            args=args,
-            keywords=keywords,
-            position=extract_position(node),
-        )
+        except Exception as e:
+            print(f"Error converting call node: {e}")
+            return None

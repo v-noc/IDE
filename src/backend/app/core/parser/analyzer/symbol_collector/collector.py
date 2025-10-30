@@ -73,7 +73,7 @@ class SymbolCollector:
     def context_analyze_symbols(self, file_node: FileContainer):
         # Normalize current file path so __init__.py uses the parent package scope
         curr = self.symbol_table.scope_manager.current_scope.qualified_name
-        if curr.endswith(".__init__"):
+        if self.symbol_table.scope_manager.current_scope.scope_type == ScopeType.MODULE and curr.endswith(".__init__"):
             curr = curr[: -len(".__init__")]
         self.current_file_path = curr
         if self.current_file_path in self.symbol_table.unprocessed_files:
