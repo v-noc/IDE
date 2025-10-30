@@ -17,7 +17,7 @@ class ImportHandler:
 
     def process_import(self, node: ImportSchema):
         """Process a import node"""
-        local_import_modules = []
+        local_import_modules = set()
 
         for alias in node.names:
             imported_name = alias.asname if alias.asname else alias.name
@@ -29,7 +29,7 @@ class ImportHandler:
                 )
                 node = self.symbol_table.qname_to_node.get(imported_qname)
                 if isinstance(node, FileNode):
-                    local_import_modules.append(imported_qname)
+                    local_import_modules.add(imported_qname)
 
                 scope = self.symbol_table.scope_manager.get_scope_by_qname(
                     imported_qname
@@ -50,11 +50,15 @@ class ImportHandler:
 
     def handle_import_from_node(self, node: ImportFromSchema):
         """Process a import from node"""
-        imported_modules = self.process_import_from(node)
-        return imported_modules
+        try:
+            imported_modules = self.process_import_from(node)
+            return imported_modules
+        except Exception as e:
+            print("error from import from node", e)
+        return []
 
     def process_import_from(self, node: ImportFromSchema):
-        local_import_modules = []
+        local_import_modules = set()
         current_scope = self.symbol_table.scope_manager.current_scope
         parent_file_scope = None
 
@@ -86,7 +90,8 @@ class ImportHandler:
                 )
 
             if not is_external:
-                scope = self.symbol_table.scope_manager.get_scope_by_qname(module_path)
+                scope = self.symbol_table.scope_manager.get_scope_by_qname(
+                    module_path)
 
                 if scope:
                     if imported_name == "*":
@@ -109,11 +114,12 @@ class ImportHandler:
                 if module_node:
                     if isinstance(module_node, FolderNode):
                         if imported_name == "*":
-                            local_import_modules.append(module_path)
+                            local_import_modules.add(module_path)
                         else:
-                            local_import_modules.append(f"{module_path}.{alias.name}")
+                            local_import_modules.add(
+                                f"{module_path}.{alias.name}")
                     else:
-                        local_import_modules.append(module_path)
+                        local_import_modules.add(module_path)
         return local_import_modules
 
     def _is_external_module(self, module_path: Optional[str]) -> bool:

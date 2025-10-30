@@ -53,11 +53,21 @@ class SymbolAnalyzer:
         relative_path = file_path.relative_to(project_root)
 
         all_parts = relative_path.parts
-        file_qname = (
-            self.symbol_table.project_node.qname
-            + "."
-            + ".".join(all_parts[:-1] + (relative_path.stem,))
-        )
+        # Treat __init__.py as the parent package/module scope
+        if relative_path.stem == "__init__":
+            # Use only the directory parts for the module qname
+            joined = ".".join(all_parts[:-1])
+            file_qname = (
+                self.symbol_table.project_node.qname
+                if not joined
+                else f"{self.symbol_table.project_node.qname}.{joined}"
+            )
+        else:
+            file_qname = (
+                self.symbol_table.project_node.qname
+                + "."
+                + ".".join(all_parts[:-1] + (relative_path.stem,))
+            )
 
         self.symbol_table.file_containers[file_qname] = file_container
         self.symbol_table.unprocessed_files.append(file_qname)
@@ -195,10 +205,15 @@ class SymbolAnalyzer:
 
         # --- THE CRITICAL SCOPE MANAGEMENT ---
         # 1. PUSH: Enter the scope for the current part (folder or file).
-        self.symbol_table.scope_manager.enter_scope(
-            current_name,
-            ScopeType.MODULE,
-        )
+        # For __init__.py, do not create a nested scope; use the parent package scope.
+        is_pkg_init = is_last_part and current_name == "__init__"
+        entered_scope = False
+        if not is_pkg_init:
+            self.symbol_table.scope_manager.enter_scope(
+                current_name,
+                ScopeType.MODULE,
+            )
+            entered_scope = True
 
         if is_last_part:
             # 2a. DEEPEST POINT: If this is the file, we are now in the fully
@@ -214,6 +229,7 @@ class SymbolAnalyzer:
                 file_container,
             )
 
-        # 3. POP: Exit the current scope. This happens on the way back up the
-        # call stack, ensuring perfect pairing of enter/exit calls.
-        self.symbol_table.scope_manager.exit_scope()
+        # 3. POP: Exit the current scope (if we entered one). This happens on the
+        # way back up the call stack, ensuring perfect pairing of enter/exit calls.
+        if entered_scope:
+            self.symbol_table.scope_manager.exit_scope()

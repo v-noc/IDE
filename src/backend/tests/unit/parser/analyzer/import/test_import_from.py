@@ -81,3 +81,21 @@ def test_import_from_with_alias(project_tree: ProjectNode):
     assert call_node.name == "create_user"
     assert call_node.target is not None
     assert call_node.target.qname == "sample_import.utils.helper.create_user"
+
+
+def test_import_from_init(project_tree: ProjectNode):
+    file_node = find_file_node(project_tree.children, "init_import.py")
+    print("File Node", file_node)
+
+    assert len(file_node.children) == 2
+
+    names = set()
+    targets = set()
+    for child in file_node.children:
+        assert isinstance(child, CallTreeNode)
+        names.add(child.name)
+        targets.add(child.target.qname)
+
+    assert names == {"create_user", "(User).__init__"}
+    assert targets == {"sample_import.utils.helper.create_user",
+                       "sample_import.utils.data.user.User.__init__"}
