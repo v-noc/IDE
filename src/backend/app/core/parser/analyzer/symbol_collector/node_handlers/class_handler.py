@@ -1,4 +1,3 @@
-
 from app.core.parser.analyzer.symbol_table import SymbolTable
 from app.core.parser.ast.models import (
     ClassSchema,
@@ -42,18 +41,17 @@ class ClassHandler:
         classes = []
         for implemented_base in node.implements:
             try:
-                resolved_base_qname = scope_manager.resolve_symbol_in_context(
+                resolved_base = scope_manager.resolve_symbol_in_context(
                     implemented_base.name
                 )
-                if not resolved_base_qname:
+                if not resolved_base:
                     continue
+                resolved_base_qname = resolved_base.qualified_name
 
-                base_node = self.symbol_table.qname_to_node.get(
-                    resolved_base_qname)
+                base_node = self.symbol_table.qname_to_node.get(resolved_base_qname)
                 if base_node is None or base_node.node_type != "class":
                     continue
-                classes.append(
-                    resolved_base_qname.resolve_final().qualified_name)
+                classes.append(resolved_base_qname)
             except Exception:
                 pass
 
@@ -122,6 +120,7 @@ class ClassHandler:
                     class_node.position = code_position
                     class_service.update(class_node)
                 else:
+                    print(f"Creating class node: {node.id}")
                     class_node = class_service.create(
                         _key=node.id,
                         name=class_name,
@@ -129,9 +128,13 @@ class ClassHandler:
                         description=f"{class_name} class",
                         position=code_position,
                     )
-                    parent_service = self.symbol_table.node_service[parent_node.node_type]
+                    print(f"Created class node: {class_node.id}")
+                    parent_service = self.symbol_table.node_service[
+                        parent_node.node_type
+                    ]
                     parent_service.add_class(parent_node.id, class_node.id)
-            except Exception:
+            except Exception as e:
+                print(f"Error creating class node: {e} - {fetched}")
                 # If stored ID is wrong or different type, ignore it
                 class_node = None
 
