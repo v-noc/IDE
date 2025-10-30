@@ -29,7 +29,9 @@ export const NodeContextMenu = ({
 }: NodeContextMenuProps) => {
   return (
     <ContextMenu>
-      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger>
+        <div>{children}</div>
+      </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem onClick={onFocus}>
           <Crosshair />

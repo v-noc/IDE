@@ -20,6 +20,23 @@ export const useAddCall = (caller_node_id: string, project_key: string) => {
   });
 };
 
+export const useRemoveCall = (call_key: string, project_key: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => removeCall(call_key),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+    },
+  });
+};
+
+const removeCall = async (call_key: string): Promise<void> => {
+  await api(`${API_ROUTES.CALLS}${call_key}/remove-call`, {
+    method: "DELETE",
+  });
+};
+
 const addCall = async (
   caller_node_id: string,
   add_call: AddCallRequest

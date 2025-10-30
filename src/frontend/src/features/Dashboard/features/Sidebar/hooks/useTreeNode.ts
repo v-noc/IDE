@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { NodeType, AnyNodeTree, ContainerNodeTree } from "@/types/project";
-import { useAddCall } from "@/features/Dashboard/service/useCall";
+import { useAddCall, useRemoveCall } from "@/features/Dashboard/service/useCall";
 // import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
 // import { useQueryClient } from "@tanstack/react-query";
 // import { toast } from "sonner";
@@ -26,7 +26,7 @@ export const useTreeNode = (
     // projectData,
   } = useProjectStore();
   const addCallMutation = useAddCall(node._key, projectData?._key || "");
-  // const { setTheme } = useThemeStore();
+  const removeCallMutation = useRemoveCall(node._key, projectData?._key || "");
 
   // const queryClient = useQueryClient();
   // const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.id || "");
@@ -129,6 +129,10 @@ export const useTreeNode = (
     setCreatePathDialogOpen(false);
   };
 
+  const handleRemoveCall = (node: AnyNodeTree) => {
+    removeCallMutation.mutate(node._key);
+  };
+
   const closeEditDialog = () => {
     setEditDialogOpen(false);
   };
@@ -156,6 +160,7 @@ export const useTreeNode = (
     closeCreateDialog,
     closeEditDialog,
     closeCreatePathDialog,
+    handleRemoveCall
     // addVirtualNode,
   };
 };

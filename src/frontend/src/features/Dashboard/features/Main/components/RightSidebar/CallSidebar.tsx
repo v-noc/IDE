@@ -8,6 +8,7 @@ type CallSidebarProps = {
 
 const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
   const { selectedNode, setSecondarySelectedNode } = useProjectStore();
+
   const callChildren = useMemo(() => {
     if (selectedNode) {
       return selectedNode.children.filter((node) => node.node_type == "call");

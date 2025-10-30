@@ -89,6 +89,14 @@ const useProjectStore = create<ProjectState>()(
                     state.focusStack = [];
                     state.focusedNode = null;
                 }
+                // Remap or clear selected node to keep it in sync with the latest project tree
+                if (data) {
+                    state.selectedNode = state.selectedNode
+                        ? (findNodeByKey(data, state.selectedNode._key) ?? null)
+                        : null;
+                } else {
+                    state.selectedNode = null;
+                }
             }),
             // virtualFolderStructures: []
             // addVirtualNode: (parentId, name, type) => {

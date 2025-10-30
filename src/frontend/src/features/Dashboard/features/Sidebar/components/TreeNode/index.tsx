@@ -39,6 +39,7 @@ export const TreeNode = ({
     // handleEdit,
     handleAddCall,
     closeCreateDialog,
+    handleRemoveCall,
     closeEditDialog,
     // closeCreatePathDialog,
   } = useTreeNode(node, childFilter);
@@ -63,7 +64,7 @@ export const TreeNode = ({
         onFocus={handleFocus}
         onExpand={handleExpand}
         onRemoveCall={() => {
-          console.log("remove call", node);
+          handleRemoveCall(node);
         }}
         onRemove={handleRemove}
         onEdit={undefined}
