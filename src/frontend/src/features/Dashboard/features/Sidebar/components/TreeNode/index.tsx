@@ -6,6 +6,7 @@ import CreateVirtualNodeDialog from "../VirtualFolders/CreateVirtualNodeDialog";
 import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
 import { useState } from "react";
 import SelectNodeDialog from "../SelectNodeDialog";
+import CreateGroupsDialog from "@/features/Dashboard/components/CreateGroupsDialog";
 // import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
 
 interface TreeNodeProps {
@@ -49,8 +50,25 @@ export const TreeNode = ({
     node_type: NodeType;
   } | null>(null);
 
+  const [isCreateGroupsDialogOpen, setIsCreateGroupsDialogOpen] =
+    useState(false);
+
   const closeAddCallDialog = () => {
     setIsAddCallDialogOpen(null);
+  };
+
+  const getParentNode = (node: ContainerNodeTree): ContainerNodeTree | null => {
+    let currentNode: ContainerNodeTree | null = projectData;
+
+    while (currentNode) {
+      if (currentNode.children?.some((child) => child._key === node._key)) {
+        return currentNode;
+      }
+      currentNode = currentNode.children?.find(
+        (child) => child._key === node._key
+      );
+    }
+    return null;
   };
 
   const handleSelectOverride = onSelect
@@ -63,6 +81,7 @@ export const TreeNode = ({
         node={node}
         onFocus={handleFocus}
         onExpand={handleExpand}
+        onCreateGroup={() => setIsCreateGroupsDialogOpen(true)}
         onRemoveCall={() => {
           handleRemoveCall(node);
         }}
@@ -106,6 +125,14 @@ export const TreeNode = ({
         list={projectData?.children ?? []}
         selectNodeType={["function"]}
         onSelect={(node) => handleAddCall(node)}
+      />
+
+      <CreateGroupsDialog
+        isOpen={isCreateGroupsDialogOpen}
+        onClose={() => setIsCreateGroupsDialogOpen(false)}
+        initialChildren={node ? [node] : []}
+        project_key={projectData?._key ?? ""}
+        parent_node_id={getParentNode(node)?._key ?? ""}
       />
     </>
   );

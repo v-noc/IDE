@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Separator } from "@/components/ui/separator";
 import type { AnyNodeTree } from "@/types/project";
-import { Crosshair, Expand, Link, Trash } from "lucide-react";
+import { Crosshair, Expand, Group, Link, Trash } from "lucide-react";
 
 interface NodeContextMenuProps {
   children: React.ReactNode;
@@ -17,6 +17,7 @@ interface NodeContextMenuProps {
   onRemoveCall: () => void;
   onAddCall: () => void;
   onEdit?: () => void;
+  onCreateGroup: () => void;
 }
 
 export const NodeContextMenu = ({
@@ -26,6 +27,7 @@ export const NodeContextMenu = ({
   onExpand,
   onAddCall,
   onRemoveCall,
+  onCreateGroup,
 }: NodeContextMenuProps) => {
   return (
     <ContextMenu>
@@ -55,6 +57,12 @@ export const NodeContextMenu = ({
           <ContextMenuItem onClick={() => onRemoveCall()}>
             <Trash />
             Remove Call
+          </ContextMenuItem>
+        )}
+        {node.node_type !== "project" && (
+          <ContextMenuItem onClick={onCreateGroup}>
+            <Group />
+            Create Group
           </ContextMenuItem>
         )}
       </ContextMenuContent>

@@ -1,6 +1,6 @@
 import BaseNode from "@/features/Dashboard/features/Main/components/canvas/nodes/BaseNode";
 
-export type NodeType = "container" | "function" | "class" | "call" | "file" | "folder" | "project"
+export type NodeType = "container" | "function" | "class" | "call" | "file" | "folder" | "project" | "group"
 
 
 export interface BaseNode {
@@ -73,6 +73,10 @@ export interface ProjectNode extends ContainerNode {
     path: string
 }
 
+export interface GroupNode extends ContainerNode {
+    node_type: "group"
+}
+
 // Tree
 
 export interface ContainerNodeTree extends ContainerNode {
@@ -84,24 +88,27 @@ export interface CallNodeTree extends CallNode {
 
 }
 
+export interface GroupNodeTree extends GroupNode {
+    children: (FunctionNodeTree | ClassNodeTree | CallNodeTree | GroupNodeTree | FileNodeTree | FolderNodeTree)[]
+}
 export interface FunctionNodeTree extends FunctionNode {
-    children: (FunctionNodeTree | CallNodeTree | ClassNodeTree)[]
+    children: (FunctionNodeTree | CallNodeTree | ClassNodeTree | GroupNodeTree)[]
 }
 
 export interface ClassNodeTree extends ClassNode {
-    children: (FunctionNodeTree | ClassNodeTree | CallNodeTree)[]
+    children: (FunctionNodeTree | ClassNodeTree | CallNodeTree | GroupNodeTree)[]
 }
 
 export interface FileNodeTree extends FileNode {
-    children: (FunctionNodeTree | ClassNodeTree | CallNodeTree)[]
+    children: (FunctionNodeTree | ClassNodeTree | CallNodeTree | GroupNodeTree)[]
 }
 
 export interface FolderNodeTree extends FolderNode {
-    children: (FileNodeTree | FolderNodeTree)[]
+    children: (FileNodeTree | FolderNodeTree | GroupNodeTree)[]
 }
 
 export interface ProjectNodeTree extends ProjectNode {
-    children: (FolderNode | FileNodeTree)[]
+    children: (FolderNode | FileNodeTree | GroupNodeTree)[]
 }
 
 export type AnyNodeTree = ProjectNodeTree | FolderNodeTree | FileNodeTree | FunctionNodeTree | ClassNodeTree | CallNodeTree

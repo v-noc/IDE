@@ -7,18 +7,18 @@ from app.core.model.nodes import CallNode, ClassNode, FunctionNode, FileNode, Fo
 
 
 class CallTreeNode(CallNode):
-    children: List["CallTreeNode"] = Field(
+    children: List["CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Call children.")
     target: Optional["ClassTreeNode | FunctionTreeNode"] = None
 
 
 class ClassTreeNode(ClassNode):
-    children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode"] = Field(
+    children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Class children.")
 
 
 class FunctionTreeNode(FunctionNode):
-    children: List["FunctionTreeNode | ClassTreeNode | CallTreeNode"] = Field(
+    children: List["FunctionTreeNode | ClassTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Function children.")
 
 
@@ -27,17 +27,17 @@ class FileTreeNode(FileNode):
         default=None,
         description="File hash."
     )
-    children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode"] = Field(
+    children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="File children.")
 
 
 class FolderTreeNode(FolderNode):
-    children: List["FolderTreeNode | FileTreeNode"] = Field(
+    children: List["FolderTreeNode | FileTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Folder children.")
 
 
 class ProjectTreeNode(ProjectNode):
-    children: List["FolderTreeNode | FileTreeNode"] = Field(
+    children: List["FolderTreeNode | FileTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Project children.")
 
 
