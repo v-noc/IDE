@@ -45,3 +45,13 @@ def sample_project_node(create_repos):
         "A sample project for E2E tests",
         "sample/path"
     )
+
+
+@pytest.fixture
+def created_sample_project(create_repos):
+    project_service = ProjectService(create_repos)
+    return project_service.create(
+        "sample_project",
+        "A sample project for E2E tests",
+        "sample/path"
+    )

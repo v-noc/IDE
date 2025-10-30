@@ -18,11 +18,11 @@ def test_simple_class():
 
 
 simple_class_with_method = """
-class Foo:
-    def __init__(self):
-        pass
-    def sleep(self):
-        pass
+    class Foo:
+        def __init__(self):
+            pass
+        def sleep(self):
+            pass
 """
 
 

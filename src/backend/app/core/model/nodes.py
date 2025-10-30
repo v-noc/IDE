@@ -49,6 +49,10 @@ class CallNode(ContainerNode):
         ...,
         description="Function position"
     )
+    manually_created: bool = Field(
+        default=False,
+        description="Whether the call was manually created."
+    )
 
 
 class FileNode(ContainerNode):
