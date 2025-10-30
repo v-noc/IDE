@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { NodeType, AnyNodeTree, ContainerNodeTree } from "@/types/project";
+import { useAddCall } from "@/features/Dashboard/service/useCall";
 // import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
 // import { useQueryClient } from "@tanstack/react-query";
 // import { toast } from "sonner";
@@ -24,7 +25,7 @@ export const useTreeNode = (
     // addVirtualNode,
     // projectData,
   } = useProjectStore();
-
+  const addCallMutation = useAddCall(node._key, projectData?._key || "");
   // const { setTheme } = useThemeStore();
 
   // const queryClient = useQueryClient();
@@ -97,6 +98,15 @@ export const useTreeNode = (
     setEditDialogOpen(true);
   };
 
+  const handleAddCall = (node: AnyNodeTree) => {
+    console.log("handleAddCall");
+    addCallMutation.mutate({
+      callee_target_id: node._key,
+      name: node.name,
+      description: node.description,
+    });
+  };
+
   const handleCreateFile = () => {
     setNodeTypeToCreate("file");
     setCreateDialogOpen(true);
@@ -125,6 +135,7 @@ export const useTreeNode = (
 
   return {
     isOpen,
+    projectData,
     isSelected,
     isActive,
     hasChildren,
@@ -132,12 +143,13 @@ export const useTreeNode = (
     isEditDialogOpen,
     isCreatePathDialogOpen,
     nodeTypeToCreate,
+    handleEdit,
     handleToggle,
     handleSelectNode,
     handleFocus,
     handleExpand,
     handleRemove,
-    handleEdit,
+    handleAddCall,
     handleCreateFile,
     handleCreateFolder,
     handleCreatePath,

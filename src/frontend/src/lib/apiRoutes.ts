@@ -5,6 +5,7 @@ const API_ROUTES = {
     CONTAINER: '/containers/',
     LOGS: '/logs/',
     DOCUMENTS: '/documents/',
+    CALLS: '/calls/',
 };
 
 export default API_ROUTES; 

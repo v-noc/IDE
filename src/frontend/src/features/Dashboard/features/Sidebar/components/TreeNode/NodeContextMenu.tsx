@@ -4,7 +4,9 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Separator } from "@/components/ui/separator";
 import type { AnyNodeTree } from "@/types/project";
+import { Crosshair, Expand, Link, Trash } from "lucide-react";
 
 interface NodeContextMenuProps {
   children: React.ReactNode;
@@ -12,8 +14,8 @@ interface NodeContextMenuProps {
   onFocus: () => void;
   onExpand: () => void;
   onRemove: () => void;
-
-  onCreatePath: () => void;
+  onRemoveCall: () => void;
+  onAddCall: () => void;
   onEdit?: () => void;
 }
 
@@ -22,26 +24,36 @@ export const NodeContextMenu = ({
   node,
   onFocus,
   onExpand,
-  onRemove,
-  onCreatePath,
-  onEdit,
+  onAddCall,
+  onRemoveCall,
 }: NodeContextMenuProps) => {
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onClick={onFocus}>Focus</ContextMenuItem>
-        <ContextMenuItem onClick={onExpand}>Expand</ContextMenuItem>
-        {onEdit && <ContextMenuItem onClick={onEdit}>Edit</ContextMenuItem>}
+        <ContextMenuItem onClick={onFocus}>
+          <Crosshair />
+          Focus
+        </ContextMenuItem>
+        <ContextMenuItem onClick={onExpand}>
+          <Expand />
+          Expand
+        </ContextMenuItem>
+        <Separator />
         {(node.node_type == "function" ||
           node.node_type == "class" ||
-          node.node_type == "file" ||
-          node.node_type == "folder") && (
-          <ContextMenuItem onClick={onCreatePath}>Create Path</ContextMenuItem>
+          node.node_type == "call" ||
+          node.node_type == "file") && (
+          <ContextMenuItem onClick={onAddCall}>
+            <Link />
+            Add Call
+          </ContextMenuItem>
         )}
-
-        {node.node_type == "folder" && (
-          <ContextMenuItem onClick={onRemove}>Remove</ContextMenuItem>
+        {node.node_type === "call" && node?.manually_created && (
+          <ContextMenuItem onClick={() => onRemoveCall()}>
+            <Trash />
+            Remove Call
+          </ContextMenuItem>
         )}
       </ContextMenuContent>
     </ContextMenu>

@@ -1,9 +1,11 @@
-import type { ContainerNodeTree } from "@/types/project";
+import { type NodeType, type ContainerNodeTree } from "@/types/project";
 import { useTreeNode } from "../../hooks/useTreeNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeContent } from "./NodeContent";
 import CreateVirtualNodeDialog from "../VirtualFolders/CreateVirtualNodeDialog";
 import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
+import { useState } from "react";
+import SelectNodeDialog from "../SelectNodeDialog";
 // import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
 
 interface TreeNodeProps {
@@ -24,6 +26,7 @@ export const TreeNode = ({
     isSelected,
     isActive,
     hasChildren,
+    projectData,
     isCreateDialogOpen,
     isEditDialogOpen,
     // isCreatePathDialogOpen,
@@ -34,11 +37,20 @@ export const TreeNode = ({
     handleExpand,
     handleRemove,
     // handleEdit,
-    handleCreatePath,
+    handleAddCall,
     closeCreateDialog,
     closeEditDialog,
     // closeCreatePathDialog,
   } = useTreeNode(node, childFilter);
+
+  const [isAddCallDialogOpen, setIsAddCallDialogOpen] = useState<{
+    node_id: string;
+    node_type: NodeType;
+  } | null>(null);
+
+  const closeAddCallDialog = () => {
+    setIsAddCallDialogOpen(null);
+  };
 
   const handleSelectOverride = onSelect
     ? () => onSelect(node)
@@ -50,9 +62,17 @@ export const TreeNode = ({
         node={node}
         onFocus={handleFocus}
         onExpand={handleExpand}
+        onRemoveCall={() => {
+          console.log("remove call", node);
+        }}
         onRemove={handleRemove}
         onEdit={undefined}
-        onCreatePath={handleCreatePath}
+        onAddCall={() =>
+          setIsAddCallDialogOpen({
+            node_id: node._key,
+            node_type: node.node_type,
+          })
+        }
       >
         <NodeContent
           node={node}
@@ -78,11 +98,14 @@ export const TreeNode = ({
         onClose={closeEditDialog}
         node={node as unknown as ContainerNodeTree}
       />
-      {/* <CreatePathDialog
-        isOpen={isCreatePathDialogOpen}
-        onClose={closeCreatePathDialog}
-        node={node}
-      /> */}
+
+      <SelectNodeDialog
+        isOpen={isAddCallDialogOpen !== null}
+        onClose={closeAddCallDialog}
+        list={projectData?.children ?? []}
+        selectNodeType={["function"]}
+        onSelect={(node) => handleAddCall(node)}
+      />
     </>
   );
 };
