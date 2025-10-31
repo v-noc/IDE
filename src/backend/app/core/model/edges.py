@@ -34,7 +34,7 @@ class ContainsEdge(BaseEdge):
         "file_to_call",
         "class_to_call",
         "function_to_call",
-        "call_to_call",
+        "call_to_project",
         "call_to_call",  # For nested calls e.g. foo(bar())
 
         # Custom relationships
