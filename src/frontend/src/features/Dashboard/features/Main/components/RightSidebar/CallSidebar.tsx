@@ -1,6 +1,7 @@
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { useMemo } from "react";
 import { TreeNode } from "../../../Sidebar/components/TreeNode";
+import { type GroupNode } from "@/types/project";
 
 type CallSidebarProps = {
   hideHeader?: boolean;
@@ -12,11 +13,19 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
 
   const callChildren = useMemo(() => {
     if (selectedNode) {
-      return selectedNode.children.filter((node) => node.node_type == "call");
+      return selectedNode.children.filter(
+        (node) =>
+          node.node_type == "call" ||
+          (node.node_type == "group" &&
+            (node as GroupNode).group_type == "call")
+      );
     }
     if (focusStack.length > 0) {
       return focusStack[focusStack.length - 1].children.filter(
-        (node) => node.node_type == "call"
+        (node) =>
+          node.node_type == "call" ||
+          (node.node_type == "group" &&
+            (node as GroupNode).group_type == "call")
       );
     }
 
@@ -42,7 +51,11 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
             <TreeNode
               key={call_node._key}
               node={call_node}
-              childFilter={(node) => node.node_type === "call"}
+              childFilter={(node) =>
+                node.node_type === "call" ||
+                (node.node_type == "group" &&
+                  (node as unknown as GroupNode).group_type == "call")
+              }
               onSelect={(n) => setSecondarySelectedNode(n)}
             />
           ))

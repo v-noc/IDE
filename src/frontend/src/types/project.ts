@@ -75,6 +75,7 @@ export interface ProjectNode extends ContainerNode {
 
 export interface GroupNode extends ContainerNode {
     node_type: "group"
+    group_type: "call" | "code" | "folder_file" | "empty"
 }
 
 // Tree

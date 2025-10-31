@@ -66,7 +66,8 @@ class GroupService(ContainerService):
         if not parent:
             raise ValueError(f"Parent {child_id} not found")
 
-        self._remove_child_from_group(parent.get("vertex").get("_id"), child.id)
+        self._remove_child_from_group(
+            parent.get("vertex").get("_id"), child.id)
         return self.add_child_to_container(group.id, child.id)
 
     def delete(self, group_id: str, remove_children: bool = False):
@@ -74,10 +75,12 @@ class GroupService(ContainerService):
         if not group:
             raise ValueError(f"Group {group_id} not found")
 
-        children = self.repos.group_repo.get_containment_tree(group.id, depth=1)
+        children = self.repos.group_repo.get_containment_tree(
+            group.id, depth=1)
 
         for child in children:
-            self._remove_child_from_group(group.id, child.get("vertex").get("_id"))
+            self._remove_child_from_group(
+                group.id, child.get("vertex").get("_id"))
             parent = self.repos.nodes.get_parent(group.id)
             if parent:
                 self.add_child_to_container(
@@ -101,12 +104,26 @@ class GroupService(ContainerService):
             raise ValueError(f"Parent {parent_id} not found")
 
         children = []
+        group_type = "empty"
+
+        # ToDO Add More checks for the group type
         for child_id in children_ids:
             child = self.repos.nodes.get_by_key(child_id)
+
             if not child:
                 print(f"Child {child_id} not found")
 
                 continue
+
+            if child.node_type == "function" or child.node_type == "class":
+                group_type = "code"
+            elif child.node_type == "folder" or child.node_type == "file":
+                group_type = "folder_file"
+            elif child.node_type == "call":
+                group_type = "call"
+            else:
+                group_type = "empty"
+
             children.append(child)
 
         if qname is None:
@@ -116,6 +133,7 @@ class GroupService(ContainerService):
             name=name,
             qname=qname,
             description=description,
+            group_type=group_type,
         )
         created_group = self.repos.group_repo.create(group)
 
