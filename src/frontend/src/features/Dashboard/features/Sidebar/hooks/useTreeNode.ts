@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { NodeType, AnyNodeTree, ContainerNodeTree } from "@/types/project";
 import { useAddCall, useRemoveCall } from "@/features/Dashboard/service/useCall";
+import { useDeleteGroup } from "@/features/Dashboard/service/useGroup";
 // import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
 // import { useQueryClient } from "@tanstack/react-query";
 // import { toast } from "sonner";
@@ -27,7 +28,7 @@ export const useTreeNode = (
   } = useProjectStore();
   const addCallMutation = useAddCall(node._key, projectData?._key || "");
   const removeCallMutation = useRemoveCall(node._key, projectData?._key || "");
-
+  const deleteGroupMutation = useDeleteGroup(node._key, projectData?._key || "");
   // const queryClient = useQueryClient();
   // const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.id || "");
 
@@ -141,6 +142,11 @@ export const useTreeNode = (
     setEditDialogOpen(false);
   };
 
+  const handleDeleteGroup = () => {
+    if (node.node_type !== "group") return;
+    deleteGroupMutation.mutate();
+  };
+
   return {
     isOpen,
     projectData,
@@ -151,6 +157,7 @@ export const useTreeNode = (
     isEditDialogOpen,
     isCreatePathDialogOpen,
     nodeTypeToCreate,
+    handleDeleteGroup,
     handleEdit,
     handleToggle,
     handleSelectNode,

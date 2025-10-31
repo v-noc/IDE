@@ -64,3 +64,19 @@ export const useGroupUpdate = (group_id: string, project_key: string) => {
     removeChildFromGroupMutation,
   };
 };
+
+const deleteGroup = async (group_id: string) => {
+  return api(`${API_ROUTES.GROUPS}${group_id}/delete-group`, {
+    method: "DELETE",
+  });
+};
+
+export const useDeleteGroup = (group_id: string, project_key: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => deleteGroup(group_id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+    },
+  });
+};

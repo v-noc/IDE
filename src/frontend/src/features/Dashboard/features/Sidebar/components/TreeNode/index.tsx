@@ -44,6 +44,7 @@ export const TreeNode = ({
     closeCreateDialog,
     handleRemoveCall,
     closeEditDialog,
+    handleDeleteGroup,
     // closeCreatePathDialog,
   } = useTreeNode(node, childFilter);
 
@@ -61,22 +62,25 @@ export const TreeNode = ({
     setIsAddCallDialogOpen(null);
   };
 
-  const getParentNode = (node: ContainerNodeTree): ContainerNodeTree | null => {
-    let currentNode: ContainerNodeTree | null = projectData;
-
-    while (currentNode) {
-      if (currentNode.children?.some((child) => child._key === node._key)) {
-        return currentNode;
-      }
-      currentNode = currentNode.children?.find(
-        (child) => child._key === node._key
-      );
+  const getParentNode = (
+    node: ContainerNodeTree,
+    currentNode: ContainerNodeTree
+  ): ContainerNodeTree | null => {
+    if (currentNode.children?.some((child) => child._key === node._key)) {
+      return currentNode;
     }
+    for (const child of currentNode.children ?? []) {
+      const parent = getParentNode(node, child);
+      if (parent) {
+        return parent;
+      }
+    }
+
     return null;
   };
 
   const getSiblings = (node: ContainerNodeTree): ContainerNodeTree[] => {
-    const parentNode = getParentNode(node);
+    const parentNode = getParentNode(node, projectData);
     if (!parentNode) return [];
     const children = parentNode.children ?? [];
     return children.filter(
@@ -95,6 +99,7 @@ export const TreeNode = ({
         onFocus={handleFocus}
         onExpand={handleExpand}
         onCreateGroup={() => setIsCreateGroupsDialogOpen(true)}
+        onDeleteGroup={() => handleDeleteGroup()}
         onRemoveCall={() => {
           handleRemoveCall(node);
         }}
@@ -146,7 +151,7 @@ export const TreeNode = ({
         onClose={() => setIsCreateGroupsDialogOpen(false)}
         initialChildren={node ? [node] : []}
         project_key={projectData?._key ?? ""}
-        parent_node_id={getParentNode(node)?._key ?? ""}
+        parent_node_id={getParentNode(node, projectData)?._key ?? ""}
       />
 
       <ManageGroupsDialog

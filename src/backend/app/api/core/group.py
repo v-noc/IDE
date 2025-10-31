@@ -27,13 +27,12 @@ def create_group(
     parent_node_id: str,
     create_group: CreateGroupRequest,
     group_service: GroupService = Depends(get_group_service),
-
 ):
     return group_service.create(
         create_group.name,
         create_group.description,
         parent_node_id,
-        children_ids=create_group.children_ids
+        children_ids=create_group.children_ids,
     )
 
 
@@ -42,7 +41,7 @@ def delete_group(
     group_id: str,
     group_service: GroupService = Depends(get_group_service),
 ):
-    return group_service.delete(group_id)
+    return group_service.delete(group_id, remove_children=True)
 
 
 @router.post("/{group_id}/add-child")

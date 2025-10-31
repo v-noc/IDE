@@ -1,5 +1,17 @@
 [
   {
+    "label": "debug server",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
+    "module": "uvicorn",
+    "args": ["app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+    "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
+    "env": {
+      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"
+    }
+  },
+  {
     "label": "debug test",
     "adapter": "Debugpy",
     "request": "launch",
@@ -7,20 +19,8 @@
     "module": "pytest",
     "args": [
       "-s",
-      "tests/unit/service/logger/test_get_log_complex.py::test_get_function_log_tree"
+      "tests/unit/service/group/test_group_deletion.py::test_group_deletion_with_children"
     ],
-    "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
-    "env": {
-      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"
-    }
-  },
-  {
-    "label": "debug server",
-    "adapter": "Debugpy",
-    "request": "launch",
-    "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
-    "module": "uvicorn",
-    "args": ["app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
       "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"

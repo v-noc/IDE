@@ -54,7 +54,6 @@ class GroupService(ContainerService):
         return True
 
     def add_child_to_group(self, group_id: str, child_id: str):
-
         child = self.repos.nodes.get_by_key(child_id)
         if not child:
             raise ValueError(f"Child {child_id} not found")
@@ -67,8 +66,7 @@ class GroupService(ContainerService):
         if not parent:
             raise ValueError(f"Parent {child_id} not found")
 
-        self._remove_child_from_group(
-            parent.get("vertex").get("_id"), child.id)
+        self._remove_child_from_group(parent.get("vertex").get("_id"), child.id)
         return self.add_child_to_container(group.id, child.id)
 
     def delete(self, group_id: str, remove_children: bool = False):
@@ -76,18 +74,17 @@ class GroupService(ContainerService):
         if not group:
             raise ValueError(f"Group {group_id} not found")
 
-        children = self.repos.group_repo.get_containment_tree(group_id)
-        if remove_children:
-            for child in children:
-                self._remove_child_from_group(
-                    group_id, child.get("vertex").get("_id"))
-                parent = self.repos.nodes.get_parent(group_id)
-                if parent:
-                    self.add_child_to_container(
-                        parent.get("vertex").get("_id"),
-                        group_id,
-                        f"{parent.get('vertex').get('node_type').lower()}_to_{child.get('vertex').get('node_type')}",
-                    )
+        children = self.repos.group_repo.get_containment_tree(group.id, depth=1)
+
+        for child in children:
+            self._remove_child_from_group(group.id, child.get("vertex").get("_id"))
+            parent = self.repos.nodes.get_parent(group.id)
+            if parent:
+                self.add_child_to_container(
+                    parent.get("vertex").get("_id"),
+                    child.get("vertex").get("_id"),
+                    f"{parent.get('vertex').get('node_type').lower()}_to_{child.get('vertex').get('node_type')}",
+                )
 
         return self.repos.group_repo.delete(group.key)
 
