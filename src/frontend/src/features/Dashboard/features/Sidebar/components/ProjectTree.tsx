@@ -1,5 +1,9 @@
 import { useEffect, useMemo } from "react";
-import type { AnyNodeTree, CallNodeTree } from "@/types/project";
+import type {
+  AnyNodeTree,
+  CallNodeTree,
+  ContainerNodeTree,
+} from "@/types/project";
 import { TreeNode } from "./TreeNode";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 
@@ -21,6 +25,26 @@ const collectAncestorKeys = (root: AnyNodeTree, key: string): string[] => {
   // drop self; we only need ancestors to expand
   path.pop();
   return path;
+};
+
+// Determines whether a child node should be rendered in the tree.
+// Rules:
+// 1) Exclude all nodes whose node_type is "call".
+// 2) If the node is a "group", exclude it only when its group_type is "call".
+// 3) Allow all other node types.
+const shouldRenderChild = (node: ContainerNodeTree): boolean => {
+  // Exclude direct call nodes
+  if (node.node_type === "call") return false;
+  // For group nodes, exclude only if the group's type is "call"
+  if (node.node_type === "group") {
+    if ("group_type" in node) {
+      return (node as { group_type: string }).group_type !== "call";
+    }
+    // If group_type is absent, treat it as renderable
+    return true;
+  }
+  // Allow all other node types
+  return true;
 };
 
 const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
@@ -70,8 +94,6 @@ const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
     setSelectedNode,
   ]);
 
-  const rootToRender = focusedNode ?? projectTree;
-
   console.log("focusedNode", focusedNode);
   return (
     <div className="space-y-1">
@@ -100,8 +122,8 @@ const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
       )}
       <ul className="space-y-1">
         <TreeNode
-          node={rootToRender}
-          childFilter={(node) => node.node_type !== "call"}
+          node={(focusedNode ?? projectTree) as unknown as ContainerNodeTree}
+          childFilter={shouldRenderChild}
         />
       </ul>
     </div>
