@@ -104,6 +104,9 @@ class CallGraphTracker:
         # 3. Store return value on the frame
         completed_frame.return_value = processed_return
 
+        # if processed_return is None or processed_return.symbol_type != SymbolType.CAPTURED_CLOSURE and processed_return.symbol_type != SymbolType.OBJECT_INSTANCE:
+        # completed_frame.execution_scope.symbols.clear()
+
         return processed_return
 
     def _create_execution_scope(self, calle_symbol: Symbol) -> Scope:

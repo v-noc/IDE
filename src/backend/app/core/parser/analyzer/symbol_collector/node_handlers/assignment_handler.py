@@ -30,7 +30,8 @@ class AssignmentHandler:
 
         value_symbol = self._resolve_value_node_to_symbol(
             node.value[0])
-
+        if not value_symbol:
+            return
         if isinstance(node.target, NameSchema):
             self._handle_name_target(node.target, value_symbol)
         elif isinstance(node.target, AttributeSchema):
@@ -163,7 +164,8 @@ class AssignmentHandler:
                 )
                 runtime_sym.assign_to(value_symbol)
                 return
-            except Exception:
+            except Exception as e:
+                print(f"Error defining runtime variable: {e}")
                 # No active frame; nothing to do safely
                 return
 
@@ -245,6 +247,6 @@ class AssignmentHandler:
                     symbol_type=SymbolType.VARIABLE,
                     defining_scope=defining_scope,
                 )
-                defining_scope.add_symbol(new_attr)
                 new_attr.assign_to(value_symbol)
+                defining_scope.add_symbol(new_attr)
         # Otherwise do nothing

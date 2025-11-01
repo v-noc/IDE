@@ -32,10 +32,6 @@ class SymbolTable:
 
         self.qname_to_function_node: Dict[str, FunctionSchema] = {}
 
-        # Track how many lines we've inserted per file when writing comments,
-        # so later writes can adjust line numbers accordingly.
-        self.file_path_to_line_inserts: Dict[str, int] = {}
-
         repos = Repositories(db)
         self.node_service = {
             "project": ProjectService(repos),

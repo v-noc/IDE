@@ -2,8 +2,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Dict, Any, Set
 from pydantic import BaseModel, Field
-from app.core.model.properties import CodePosition
-
+å
 if TYPE_CHECKING:
     from .scope import Scope
 
@@ -20,7 +19,7 @@ class SymbolType(str, Enum):
     MODULE = "module"
     IMPORT = "import"
     PARAMETER = "parameter"
-
+    PROJECT = "project"
     # -- Add ONLY essential dynamic types --
     # Instantiated object (obj = MyClass())
     OBJECT_INSTANCE = "object_instance"

@@ -5,7 +5,6 @@ from typing import Optional, Dict, TYPE_CHECKING, Any, List
 
 from pydantic import BaseModel, Field
 
-from app.core.model.properties import CodePosition
 
 if TYPE_CHECKING:
     from .symbol import Symbol
@@ -19,6 +18,7 @@ class ScopeType(str, Enum):
     FUNCTION = "function"
     CLASS = "class"
     COMPREHENSION = "comprehension"
+    PROJECT = "project"
 
     # --- Execution context types ---
     OBJECT = "object"           # Object instance attributes (obj.attr = value)
@@ -31,7 +31,7 @@ class Scope(BaseModel):
     It holds symbols defined directly within it and links to
     parent/child scopes.
     """
-
+    qname_cache: Optional[str] = Field(default=None, exclude=True)
     # --- Core Identification ---
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -73,9 +73,15 @@ class Scope(BaseModel):
     @property
     def qualified_name(self) -> str:
         """Computes the fully qualified name on the fly."""
-        if self.parent:
-            return f"{self.parent.qualified_name}.{self.name}"
-        return self.name
+        if self.qname_cache:
+            return self.qname_cache
+        parts = []
+        current = self
+        while current:
+            parts.append(current.name)
+            current = current.parent
+        self.qname_cache = '.'.join(reversed(parts))
+        return self.qname_cache
 
     def __repr__(self):
         return f"<Scope(name='{self.qualified_name}', type='{self.scope_type.value}')>"

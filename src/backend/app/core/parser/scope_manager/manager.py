@@ -24,14 +24,16 @@ class ScopeManager:
         self.current_scope: Optional[Scope] = None
         self._scope_index: Dict[str, Scope] = {}
 
+        self._root_symbols: Optional[Symbol] = None
+
         # --- Class Analysis Components ---
         self.inheritance_graph = InheritanceGraph()
         self.mro_calculator = MROCalculator(self.inheritance_graph)
         self.method_resolver = MethodResolver(self.inheritance_graph)
 
         # A map to track what symbol an alias points to.
-        self._assignment_map: Dict[Symbol, Symbol] = {}
-        self.current_frame_stack = []
+
+        # self.current_frame_stack = []
 
     # Class Analysis Methods
 
@@ -92,8 +94,6 @@ class ScopeManager:
         This uses the enhanced Symbol assignment tracking.
         """
         alias.assign_to(target)
-        # Keep the old mapping for backward compatibility if needed
-        self._assignment_map[alias] = target
 
     def resolve_final_symbol(self, name: str) -> Optional[Symbol]:
         """
@@ -180,7 +180,9 @@ class ScopeManager:
         if self.root_scope:
             raise ValueError("Root scope has already been created.")
 
-        root = Scope(name=name, scope_type=ScopeType.MODULE)
+        root = Scope(name=name, scope_type=ScopeType.PROJECT)
+        self._root_symbols = Symbol(
+            name=name, symbol_type=SymbolType.PROJECT, defining_scope=root)
         self.root_scope = root
         self.current_scope = root
         self._scope_index[name] = root
@@ -310,13 +312,13 @@ class ScopeManager:
 
         # Now invoke is ONLY for function/method calls
         frame = self.call_tracker.start_call(callee_symbol, args)
-        if len(self.current_frame_stack) == 0:
-            self.current_scope.children[frame.id] = frame.execution_scope
-        else:
-            self.current_frame_stack[-1].execution_scope.children[frame.id] = (
-                frame.execution_scope
-            )
-        self.current_frame_stack.append(frame)
+        # if len(self.current_frame_stack) == 0:
+        #     self.current_scope.children[frame.id] = frame.execution_scope
+        # else:
+        #     self.current_frame_stack[-1].execution_scope.children[frame.id] = (
+        #         frame.execution_scope
+        #     )
+        # self.current_frame_stack.append(frame)
         return frame
 
     def resolve_symbol_in_context(self, name: str) -> Optional[Symbol]:
@@ -331,7 +333,7 @@ class ScopeManager:
         """
         End the current function call.
         """
-        self.current_frame_stack.pop()
+        # self.current_frame_stack.pop()
         return self.call_tracker.end_call(return_value)
 
     def get_call_graph(self) -> CallGraph:
