@@ -2,7 +2,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING, Optional, Dict, Any, Set
 from pydantic import BaseModel, Field
-å
+
 if TYPE_CHECKING:
     from .scope import Scope
 
