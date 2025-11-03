@@ -94,7 +94,7 @@ class CallGraphTracker:
 
         # 1. Pop the completed frame
         completed_frame = self.call_graph.active_frames.pop()
-        print("completed_frame-->", return_value)
+
         if return_value:
             return_value = Symbol(**return_value.model_dump())
             return_value.bind_table(self.scope_manager.table)

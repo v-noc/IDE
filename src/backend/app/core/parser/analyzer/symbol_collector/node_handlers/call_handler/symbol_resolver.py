@@ -69,7 +69,7 @@ class SymbolResolver:
                     return ResolutionResult(
                         symbol=instance_obj, instance_context=instance_obj
                     )
-                except Exception:
+                except Exception as e:
                     return ResolutionResult(symbol=sym)
             return ResolutionResult(
                 symbol=sym,

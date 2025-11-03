@@ -36,11 +36,13 @@ class SymbolCollector:
         current_scope_qname = (
             self.symbol_table.scope_manager.current_scope.qualified_name
         )
-        self._prune_stale_direct_children(current_scope_qname, file_node.parsed_nodes)
+        self._prune_stale_direct_children(
+            current_scope_qname, file_node.parsed_nodes)
 
     def _collect_symbols_recursive(self, node: BaseSchema):
         if node.schema_type == SchemaType.FUNCTION:
-            self.symbol_table.scope_manager.enter_scope(node.name, ScopeType.FUNCTION)
+            self.symbol_table.scope_manager.enter_scope(
+                node.name, ScopeType.FUNCTION)
 
             self.function_handler.handle_function_node(node)
             for child in node.children:
@@ -49,11 +51,13 @@ class SymbolCollector:
             current_scope_qname = (
                 self.symbol_table.scope_manager.current_scope.qualified_name
             )
-            self._prune_stale_direct_children(current_scope_qname, node.children)
+            self._prune_stale_direct_children(
+                current_scope_qname, node.children)
             self.symbol_table.scope_manager.exit_scope()
 
         elif node.schema_type == SchemaType.CLASS:
-            self.symbol_table.scope_manager.enter_scope(node.name, ScopeType.CLASS)
+            self.symbol_table.scope_manager.enter_scope(
+                node.name, ScopeType.CLASS)
 
             self.class_handler.handle_class_node(node)
             for child in node.children:
@@ -62,7 +66,8 @@ class SymbolCollector:
             current_scope_qname = (
                 self.symbol_table.scope_manager.current_scope.qualified_name
             )
-            self._prune_stale_direct_children(current_scope_qname, node.children)
+            self._prune_stale_direct_children(
+                current_scope_qname, node.children)
             self.symbol_table.scope_manager.exit_scope()
 
     def context_analyze_symbols(self, file_node: FileContainer):
@@ -84,12 +89,14 @@ class SymbolCollector:
 
     def _analyze_node_context_recursive(self, node: BaseSchema):
         try:
-            print(f"Analyzing node: {node.schema_type}")
+            print(
+                f"Analyzing node: {node.schema_type} - {self.current_file_path} - {self.symbol_table.scope_manager.current_scope.qualified_name}")
             if node.schema_type == SchemaType.IMPORT:
                 imported_modules = self.import_handler.handle_import_node(node)
 
                 for imported_module in imported_modules:
-                    file_node = self.symbol_table.file_containers.get(imported_module)
+                    file_node = self.symbol_table.file_containers.get(
+                        imported_module)
                     if file_node is None:
                         imported_module = f"{imported_module}.__init__"
                         file_node = self.symbol_table.file_containers.get(
@@ -109,10 +116,12 @@ class SymbolCollector:
                     self.context_analyze_symbols(file_node)
 
                     self.symbol_table.scope_manager.exit_scope()
-                    self.symbol_table.scope_manager.enter_scope_by_scope(current_scope)
+                    self.symbol_table.scope_manager.enter_scope_by_scope(
+                        current_scope)
 
             elif node.schema_type == SchemaType.IMPORT_FROM:
-                imported_modules = self.import_handler.handle_import_from_node(node)
+                imported_modules = self.import_handler.handle_import_from_node(
+                    node)
                 try:
                     for imported_module in imported_modules:
                         file_node = self.symbol_table.file_containers.get(
@@ -134,7 +143,8 @@ class SymbolCollector:
                         scope = self.symbol_table.scope_manager.get_scope_by_qname(
                             imported_module
                         )
-                        self.symbol_table.scope_manager.enter_scope_by_scope(scope)
+                        self.symbol_table.scope_manager.enter_scope_by_scope(
+                            scope)
                         self.context_analyze_symbols(file_node)
                         self.symbol_table.scope_manager.exit_scope()
                         self.symbol_table.scope_manager.enter_scope_by_scope(
@@ -152,7 +162,8 @@ class SymbolCollector:
             ):
                 curr = self.symbol_table.scope_manager.current_scope.qualified_name
                 qname = f"{curr}.{node.name}"
-                scope = self.symbol_table.scope_manager.get_scope_by_qname(qname)
+                scope = self.symbol_table.scope_manager.get_scope_by_qname(
+                    qname)
 
                 if scope:
                     self.symbol_table.scope_manager.enter_scope_by_scope(scope)

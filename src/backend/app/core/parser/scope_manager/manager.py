@@ -32,8 +32,7 @@ class ScopeManager:
         # --- Class Analysis Components ---
         self.inheritance_graph = InheritanceGraph()
         self.mro_calculator = MROCalculator(self.inheritance_graph)
-        self.method_resolver = MethodResolver(
-            self.inheritance_graph, self.table)
+        self.method_resolver = MethodResolver(self.inheritance_graph, self.table)
 
         # A map to track what symbol an alias points to.
 
@@ -76,8 +75,7 @@ class ScopeManager:
         """
 
         if not method_scope.parent or method_scope.parent.scope_type != ScopeType.CLASS:
-            raise ValueError(
-                "super() can only be resolved within a method of a class.")
+            raise ValueError("super() can only be resolved within a method of a class.")
 
         class_qname = method_scope.parent.qualified_name
         return self.method_resolver.resolve_super_call(class_qname, method_name)
@@ -302,13 +300,15 @@ class ScopeManager:
         """
         class_symbol = self.lookup_symbol(class_name)
         class_symbol_final = class_symbol.resolve_final()
+
+        if class_symbol_final.symbol_type == SymbolType.OBJECT_INSTANCE:
+            return class_symbol_final
         # class_symbol = class_symbol.resolve_final()
         if not class_symbol_final or class_symbol_final.symbol_type != SymbolType.CLASS:
             raise NameError(f"Unknown class: {class_name}")
 
         # The class_instantiator does the work and returns the new instance symbol
-        instance_symbol = self.class_instantiator.instantiate_class(
-            class_symbol_final)
+        instance_symbol = self.class_instantiator.instantiate_class(class_symbol_final)
         return instance_symbol  # <-- RETURN THE INSTANCE SYMBOL
 
     def invoke(
