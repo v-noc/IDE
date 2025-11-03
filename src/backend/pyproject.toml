@@ -16,6 +16,8 @@ dependencies = [
   "vn-logger",
   "httpx>=0.28.1",
   "libcst>=1.7.0",
+  "platformdirs>=4.5.0",
+  "sqlalchemy>=2.0.44",
 ]
 
 [project.optional-dependencies]

@@ -3,13 +3,15 @@ from .model import InheritanceGraph
 from typing import List, Dict, Optional
 
 from app.core.parser.scope_manager.core.symbol import Symbol
+from app.core.parser.scope_manager.storage.symbol_table import SymbolTable
 
 
 class MethodResolver:
-    def __init__(self, inheritance_graph: InheritanceGraph):
+    def __init__(self, inheritance_graph: InheritanceGraph, symbol_table: SymbolTable):
         self.inheritance_graph = inheritance_graph
+        self.symbol_table = symbol_table
 
-    def resolve_method(self, class_qname: str, method_name: str) -> str:
+    def resolve_method(self, class_qname: str, method_name: str) -> Optional[Symbol]:
         """
         Finds the symbol for a method by searching the MRO of a given class.
 
@@ -26,7 +28,6 @@ class MethodResolver:
 
             if method_name in base_node.scope.symbols:
                 symbol = base_node.scope.symbols[method_name]
-                # You might want to add a check here to ensure it's a function/method symbol
                 return symbol
 
         return None

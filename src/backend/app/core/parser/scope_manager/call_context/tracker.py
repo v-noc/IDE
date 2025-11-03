@@ -94,8 +94,12 @@ class CallGraphTracker:
 
         # 1. Pop the completed frame
         completed_frame = self.call_graph.active_frames.pop()
+        print("completed_frame-->", return_value)
+        if return_value:
+            return_value = Symbol(**return_value.model_dump())
+            return_value.bind_table(self.scope_manager.table)
+            self.scope_manager.table.save_symbol(return_value)
 
-        return_value = deepcopy(return_value)
         # 2. CRITICAL CLOSURE LOGIC:
         # If returning a function, stamp it with the captured frame
         processed_return = self._process_return_value(
@@ -117,8 +121,11 @@ class CallGraphTracker:
         execution_scope = Scope(
             name=scope_name,
             scope_type=ScopeType.EXECUTION,
-            parent=calle_symbol.defining_scope
+            parent_id=calle_symbol.defining_scope.id
         )
+
+        execution_scope.bind_table(self.scope_manager.table)
+        self.scope_manager.table.save_scope(execution_scope)
 
         return execution_scope
 
@@ -135,8 +142,10 @@ class CallGraphTracker:
             param_symbol = Symbol(
                 name=param_name,
                 symbol_type=SymbolType.PARAMETER,
-                defining_scope=frame.execution_scope
+                defining_scope_id=frame.execution_scope.id
             )
+            param_symbol.bind_table(self.scope_manager.table)
+            self.scope_manager.table.save_symbol(param_symbol)
             frame.execution_scope.add_symbol(param_symbol)
 
             # If the provided argument is a symbol, link it; otherwise

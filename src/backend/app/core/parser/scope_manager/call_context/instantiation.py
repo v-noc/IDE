@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 import uuid
 from app.core.parser.scope_manager.core.scope import Scope, ScopeType
 from app.core.parser.scope_manager.core.symbol import Symbol, SymbolType
+from app.core.parser.scope_manager.storage.symbol_table import SymbolTable
 
 
 class ClassInstantiationHandler:
@@ -12,8 +13,9 @@ class ClassInstantiationHandler:
     Focuses ONLY on creating the instance and its scope.
     """
 
-    def __init__(self, scope_manager: "ScopeManager"):
+    def __init__(self, scope_manager: "ScopeManager", table: SymbolTable):
         self.scope_manager = scope_manager
+        self.table = table
 
     def instantiate_class(self, class_symbol: Symbol):
         """
@@ -29,16 +31,19 @@ class ClassInstantiationHandler:
 
         # 1. Create unique instance scope
         instance_scope = self._create_instance_scope(class_symbol)
-
+        instance_scope.bind_table(self.table)
+        self.table.save_scope(instance_scope)
         # 2. Create instance symbol
 
         instance_symbol = Symbol(
             name=f"{class_symbol.name}",
             symbol_type=SymbolType.OBJECT_INSTANCE,
-            defining_scope=self.scope_manager.current_scope,
-            instance_scope=instance_scope  # CRITICAL: Link symbol to its scope
+            defining_scope_id=self.scope_manager.current_scope.id,
+            instance_scope_id=instance_scope.id  # CRITICAL: Link symbol to its scope
         )
 
+        instance_symbol.bind_table(self.table)
+        self.table.save_symbol(instance_symbol)
         # __init__ is not invoked here. Call it explicitly via the call API.
 
         return instance_symbol
@@ -54,8 +59,11 @@ class ClassInstantiationHandler:
         instance_scope = Scope(
             name=f"{class_symbol.name}",
             scope_type=ScopeType.OBJECT,
-            parent=class_symbol.defining_scope
+            parent_id=class_symbol.defining_scope.id
         )
+
+        instance_scope.bind_table(self.table)
+        self.table.save_scope(instance_scope)
 
         return instance_scope
 
