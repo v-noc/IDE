@@ -1,8 +1,8 @@
 # app/core/parser/scope_manager/storage/database.py
 
 import os
-from typing import Optional, TYPE_CHECKING, List
-from sqlalchemy import create_engine, event
+from typing import Optional, TYPE_CHECKING, List, Dict
+from sqlalchemy import create_engine, event, and_
 from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.pool import StaticPool
 import platformdirs as pl
@@ -31,15 +31,19 @@ Base = declarative_base()
 class DatabaseManager:
     """Manages SQLAlchemy engine and sessions."""
 
-    _instance = None
-    _engine = None
-    _session_factory = None
+    # Multiton: one instance per db_name
+    _instances: Dict[str, "DatabaseManager"] = {}
 
     def __new__(cls, db_name: str = "scope_manager"):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialize(db_name)
-        return cls._instance
+        if db_name not in cls._instances:
+            instance = super().__new__(cls)
+            # Bind instance-specific attributes
+            instance._db_name = db_name
+            instance._engine = None
+            instance._session_factory = None
+            instance._initialize(db_name)
+            cls._instances[db_name] = instance
+        return cls._instances[db_name]
 
     def _initialize(self, db_name: str):
         """Initialize the database engine and session factory."""
@@ -104,13 +108,17 @@ class DatabaseManager:
 
         return [ScopeAdapter.from_orm(s) for s in scope_orms]
 
-    def resolve_symbol_chain(self, symbol_id: str, max_depth: int = 100) -> Optional["Symbol"]:
+    def resolve_symbol_chain(
+        self,
+        symbol_id: str,
+        max_depth: int = 100
+    ) -> Optional["Symbol"]:
         """
         Efficiently resolve an assignment chain using a single recursive query.
-        This is much faster than calling resolve_final() with multiple round trips.
+        This is much faster than calling resolve_final() with multiple round
+        trips.
         """
         from .adapters import SymbolAdapter
-        from sqlalchemy import and_
 
         # Start with the initial symbol
         current_id = symbol_id

@@ -10,9 +10,12 @@ from app.core.model.nodes import BaseNode
 
 
 class SymbolAnalyzer:
-    def __init__(self, db: StandardDatabase):
+    def __init__(self, db: StandardDatabase, project_name: str | None = None):
         self.symbol_table = SymbolTable(db)
-        self.symbol_table.scope_manager = ScopeManager()
+        # Ensure ScopeManager uses the project_name as db_name when provided
+        self.symbol_table.scope_manager = ScopeManager(
+            project_name if project_name else "scope_manager"
+        )
         self.symbol_collector = SymbolCollector(self.symbol_table)
 
     def hydrate_from_project_structure(self, project_structure: list[dict]):
@@ -44,6 +47,10 @@ class SymbolAnalyzer:
         self.symbol_table.project_node = project_node
         self.symbol_table.qname_to_node[project_node.qname] = project_node
 
+        # Rebind ScopeManager to use the project's qname as db name,
+        # and rebuild the collector so handlers reference the new manager
+        self.symbol_table.scope_manager = ScopeManager(project_node.qname)
+        self.symbol_collector = SymbolCollector(self.symbol_table)
         self.symbol_table.scope_manager.create_root_scope(project_node.qname)
         return project_node
 
@@ -136,7 +143,9 @@ class SymbolAnalyzer:
         current_qname = f"{parent_qname}.{current_name}"
 
         parent_node = self.symbol_table.qname_to_node[parent_qname]
-        parent_node_service = self.symbol_table.node_service[parent_node.node_type]
+        parent_node_service = self.symbol_table.node_service[
+            parent_node.node_type
+        ]
         # --- Node Creation ---
         # This logic handles both folders and the final file.
         if current_qname not in self.symbol_table.qname_to_node:
@@ -147,7 +156,11 @@ class SymbolAnalyzer:
 
                 # Calculate file hash
                 try:
-                    with open(file_container.file_path, "r", encoding="utf-8") as f:
+                    with open(
+                        file_container.file_path,
+                        "r",
+                        encoding="utf-8",
+                    ) as f:
                         file_content = f.read()
                     file_hash = hashlib.sha256(
                         file_content.encode("utf-8")).hexdigest()
@@ -184,7 +197,10 @@ class SymbolAnalyzer:
             # Handle collision: if we need a folder here but a file already
             # occupies this qname, create a folder node for this qname and
             # attach it to the real parent.
-            if not is_last_part and getattr(existing_node, "node_type", None) == "file":
+            if (
+                not is_last_part
+                and getattr(existing_node, "node_type", None) == "file"
+            ):
                 print(
                     f"{indent}📁 {part}/ (qname: {current_qname}) "
                     "[created to resolve file/folder name collision]"
@@ -205,7 +221,8 @@ class SymbolAnalyzer:
 
         # --- THE CRITICAL SCOPE MANAGEMENT ---
         # 1. PUSH: Enter the scope for the current part (folder or file).
-        # For __init__.py, do not create a nested scope; use the parent package scope.
+        # For __init__.py, do not create a nested scope; use the parent
+        # package scope.
 
         self.symbol_table.scope_manager.enter_scope(
             current_name,
@@ -226,7 +243,8 @@ class SymbolAnalyzer:
                 file_container,
             )
 
-        # 3. POP: Exit the current scope (if we entered one). This happens on the
-        # way back up the call stack, ensuring perfect pairing of enter/exit calls.
+        # 3. POP: Exit the current scope (if we entered one). This happens on
+        # the way back up the call stack, ensuring perfect pairing of
+        # enter/exit calls.
 
         self.symbol_table.scope_manager.exit_scope()

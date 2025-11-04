@@ -90,7 +90,9 @@ class SymbolCollector:
     def _analyze_node_context_recursive(self, node: BaseSchema):
         try:
             print(
-                f"Analyzing node: {node.schema_type} - {self.current_file_path} - {self.symbol_table.scope_manager.current_scope.qualified_name}")
+                f"Analyzing node: {node.schema_type} - {self.current_file_path} - {self.symbol_table.scope_manager.current_scope.qualified_name}"
+            )
+
             if node.schema_type == SchemaType.IMPORT:
                 imported_modules = self.import_handler.handle_import_node(node)
 

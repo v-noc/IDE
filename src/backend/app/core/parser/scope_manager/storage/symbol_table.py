@@ -1,6 +1,6 @@
 # app/core/parser/scope_manager/storage/symbol_table.py
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import delete, insert
 from .database import DatabaseManager
@@ -18,13 +18,18 @@ class SymbolTable:
     API remains compatible with the prior RocksDict-based implementation.
     """
 
-    _instance = None
+    # Multiton: one SymbolTable per db_name
+    _instances: Dict[str, "SymbolTable"] = {}
 
     def __new__(cls, db_name: str = "scope_manager"):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialize(db_name)
-        return cls._instance
+        if db_name not in cls._instances:
+            instance = super().__new__(cls)
+            instance._initialized = False
+            instance._db_name = db_name
+            instance._session = None
+            instance._initialize(db_name)
+            cls._instances[db_name] = instance
+        return cls._instances[db_name]
 
     def _initialize(self, db_name: str):
         """Initialize the database connection."""
