@@ -122,7 +122,8 @@ def get_project(
             detail="Project not found",
         )
 
-    watcher_service.start_watching(project_node)
+    # TODO: reimplment
+    # watcher_service.start_watching(project_node)
 
     children = project_service.get_children(
         project_node.id, exclude_groups=exclude_groups)

@@ -74,8 +74,9 @@ def write_code(
                     project_id = parent_vertex.get("_id")
                     if project_id:
                         project_node = project_service.get(project_id)
-                        if project_node:
-                            watcher_service.start_watching(project_node)
+                        # TODO: do a syncer
+                        # if project_node:
+                        #     watcher_service.start_watching(project_node)
                     break
                 current_id = parent_vertex.get("_id")
     except Exception:
