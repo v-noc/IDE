@@ -1,4 +1,3 @@
-import BaseNode from "@/features/Dashboard/features/Main/components/canvas/nodes/BaseNode";
 
 export type NodeType = "container" | "function" | "class" | "call" | "file" | "folder" | "project" | "group"
 
