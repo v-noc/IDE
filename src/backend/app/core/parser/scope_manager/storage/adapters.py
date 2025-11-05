@@ -56,7 +56,8 @@ class SymbolAdapter:
             defining_scope_id=symbol.defining_scope_id,
             assigned_to_id=symbol.assigned_to_id,
             instance_scope_id=symbol.instance_scope_id,
-            metadata_json=symbol.metadata
+            metadata_json=symbol.metadata,
+            is_runtime=symbol.is_runtime
         )
 
     @staticmethod
@@ -70,5 +71,6 @@ class SymbolAdapter:
             defining_scope_id=symbol_orm.defining_scope_id,
             assigned_to_id=symbol_orm.assigned_to_id,
             instance_scope_id=symbol_orm.instance_scope_id,
-            metadata=symbol_orm.metadata_json or {}
+            metadata=symbol_orm.metadata_json or {},
+            is_runtime=symbol_orm.is_runtime
         )

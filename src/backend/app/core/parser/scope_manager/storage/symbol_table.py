@@ -142,7 +142,7 @@ class SymbolTable:
     def get_symbols_by_scope(self, scope_id: str) -> list["Symbol"]:
         """Get all symbols in a scope efficiently (single query)."""
         symbol_orms = self.session.query(SymbolORM).filter(
-            SymbolORM.defining_scope_id == scope_id
+            SymbolORM.defining_scope_id == scope_id, SymbolORM.is_runtime == False
         ).all()
 
         return [SymbolAdapter.from_orm(s) for s in symbol_orms]
@@ -150,7 +150,7 @@ class SymbolTable:
     def find_symbols_by_name(self, name: str) -> list["Symbol"]:
         """Find all symbols with a specific name across all scopes."""
         symbol_orms = self.session.query(SymbolORM).filter(
-            SymbolORM.name == name
+            SymbolORM.name == name, SymbolORM.is_runtime == False
         ).all()
 
         return [SymbolAdapter.from_orm(s) for s in symbol_orms]

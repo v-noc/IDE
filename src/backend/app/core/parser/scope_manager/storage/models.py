@@ -1,6 +1,6 @@
 # app/core/parser/scope_manager/storage/models.py
 
-from sqlalchemy import Column, String, Integer, JSON, ForeignKey, Table
+from sqlalchemy import Column, String, Integer, JSON, ForeignKey, Table, Boolean
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -80,6 +80,8 @@ class SymbolORM(Base):
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
     symbol_type = Column(String, nullable=False, index=True)
+
+    is_runtime = Column(Boolean, default=False)
 
     # Foreign keys
     defining_scope_id = Column(

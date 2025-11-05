@@ -14,6 +14,7 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useGetDocuments, useUpdateDocument } from "./service/useDocuments";
 import { debounce } from "remeda";
+import Canvas from "./components/Canvas";
 
 const MainCanvas = () => {
   const {
@@ -22,7 +23,7 @@ const MainCanvas = () => {
     setSelectedNode,
     setSecondarySelectedNode,
   } = useProjectStore();
-
+  const [tabValue, setTabValue] = useState("docs");
   const effectiveNode = secondarySelectedNode ?? selectedNode;
 
   const { suffixName, displayPath } = useMemo(() => {
@@ -46,6 +47,12 @@ const MainCanvas = () => {
   );
   const nodeKey = effectiveNode?._key || "";
   const { data: documents = [] } = useGetDocuments(nodeKey);
+
+  useEffect(() => {
+    if (isCodeActive == false && tabValue == "code") {
+      setTabValue("docs");
+    }
+  }, [effectiveNode, isCodeActive]);
 
   useEffect(() => {
     // Default to first document when available
@@ -109,7 +116,8 @@ const MainCanvas = () => {
           <div className="flex-1 overflow-hidden">
             <Tabs
               defaultValue={isCodeActive ? "code" : "docs"}
-              value={isCodeActive ? undefined : "docs"}
+              value={tabValue}
+              onValueChange={setTabValue}
               className="flex h-full w-full flex-col  "
             >
               <TabsList className="rounded-none p-0 bg-white w-full">
@@ -124,9 +132,15 @@ const MainCanvas = () => {
 
                 <TabsTrigger
                   value="docs"
-                  className="rounded-none bg-[var(--background-color)] border border-border border-r-0  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                  className="rounded-none bg-[var(--background-color)] border border-border   data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
                 >
                   Docs
+                </TabsTrigger>
+                <TabsTrigger
+                  value="canvas"
+                  className="rounded-none bg-[var(--background-color)] border border-border border-r-0  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+                >
+                  Canvas
                 </TabsTrigger>
                 <div className=" border-b border-border border-l h-full w-full">
                   {" "}
@@ -189,6 +203,16 @@ const MainCanvas = () => {
                         }
                       }}
                     />
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent
+                value="canvas"
+                className="flex flex-col overflow-hidden bg-white border-t"
+              >
+                <div className="flex-1  pl-8  overflow-hidden">
+                  <div className="h-full pt-2 w-full overflow-auto ">
+                    <Canvas />
                   </div>
                 </div>
               </TabsContent>

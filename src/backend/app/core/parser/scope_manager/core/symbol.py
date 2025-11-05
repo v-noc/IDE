@@ -42,6 +42,7 @@ class Symbol(BaseModel):
     # --- Core Identification ---
     name: str  # The name of the symbol, e.g., "my_variable"
     symbol_type: SymbolType
+    is_runtime: bool = Field(default=False)
 
     # --- Definitional Context ---
     # A reference to the scope object where this symbol is defined.

@@ -142,7 +142,8 @@ class CallHandler:
 
         # Detect recursive/cyclic calls using callee symbol identity (id/qname)
         # Prefer runtime call stack from the call tracker if available
-        call_tracker = getattr(self.symbol_table.scope_manager, "call_tracker", None)
+        call_tracker = getattr(
+            self.symbol_table.scope_manager, "call_tracker", None)
 
         if call_tracker and getattr(call_tracker, "call_stack", None):
             if any(

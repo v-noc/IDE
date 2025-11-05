@@ -36,6 +36,8 @@ class ClassInstantiationHandler:
         # 2. Create instance symbol
 
         instance_symbol = Symbol(
+
+            is_runtime=True,
             name=f"{class_symbol.name}",
             symbol_type=SymbolType.OBJECT_INSTANCE,
             defining_scope_id=self.scope_manager.current_scope.id,
@@ -57,6 +59,7 @@ class ClassInstantiationHandler:
         """
 
         instance_scope = Scope(
+
             name=f"{class_symbol.name}",
             scope_type=ScopeType.OBJECT,
             parent_id=class_symbol.defining_scope.id

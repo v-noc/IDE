@@ -96,7 +96,10 @@ class CallGraphTracker:
         completed_frame = self.call_graph.active_frames.pop()
 
         if return_value:
-            return_value = Symbol(**return_value.model_dump())
+            return_value = Symbol(
+                is_runtime=True,
+                **return_value.model_dump(exclude={"is_runtime"})
+            )
             return_value.bind_table(self.scope_manager.table)
             self.scope_manager.table.save_symbol(return_value)
 
@@ -119,6 +122,7 @@ class CallGraphTracker:
         scope_name = f'exec_{calle_symbol.name}_{uuid.uuid4().hex[:8]}'
 
         execution_scope = Scope(
+            id=str(uuid.uuid4()),
             name=scope_name,
             scope_type=ScopeType.EXECUTION,
             parent_id=calle_symbol.defining_scope.id
@@ -141,6 +145,7 @@ class CallGraphTracker:
             # Create a parameter symbol local to the execution scope
             param_symbol = Symbol(
                 name=param_name,
+                is_runtime=True,
                 symbol_type=SymbolType.PARAMETER,
                 defining_scope_id=frame.execution_scope.id
             )
