@@ -132,41 +132,29 @@ class CallHandler:
         """
         call_service = self.symbol_table.node_service["call"]
 
-        parent_qname = (
-            self.symbol_table.scope_manager.current_scope.qualified_name
-        )
+        parent_qname = self.symbol_table.scope_manager.current_scope.qualified_name
         parent_node = self.symbol_table.qname_to_node[parent_qname]
         if len(self.symbol_table.call_node_stack) > 0:
             parent_node = self.symbol_table.call_node_stack[-1]
 
-        callee_node = self.symbol_table.qname_to_node[
-            callee_symbol.qualified_name
-        ]
+        callee_node = self.symbol_table.qname_to_node[callee_symbol.qualified_name]
         parent_service = self.symbol_table.node_service[parent_node.node_type]
 
-        # Detect recursive/cyclic calls
-        # and repeated qnames in the current stack
-        candidate_qname = (
-            f"{callee_symbol.qualified_name}L{position.line_no}"
-            f"C{position.col_offset}"
-        )
-        # 1) Exact same call site qname appears in the stack
-        if any(
-            getattr(stack_node, "qname", None) == candidate_qname
-            for stack_node in self.symbol_table.call_node_stack
-        ):
-            raise CallCycleDetected(
-                f"Repeated call qname detected: {candidate_qname}"
-            )
-        # 2) The same target is already somewhere up the stack -> recursion
-        if any(
-            getattr(stack_node, "target_id", None) == callee_node.id
-            for stack_node in self.symbol_table.call_node_stack
-        ):
-            raise CallCycleDetected(
-                "Recursive call target detected: "
-                f"{callee_symbol.qualified_name}"
-            )
+        # Detect recursive/cyclic calls using callee symbol identity (id/qname)
+        # Prefer runtime call stack from the call tracker if available
+        call_tracker = getattr(
+            self.symbol_table.scope_manager, "call_tracker", None)
+
+        if call_tracker and getattr(call_tracker, "call_stack", None):
+            if any(
+                getattr(frame.callee_symbol, "id", None) == callee_symbol.id
+                or getattr(frame.callee_symbol, "qualified_name", None)
+                == callee_symbol.qualified_name
+                for frame in call_tracker.call_stack
+            ):
+                raise CallCycleDetected(
+                    f"Call cycle detected: {callee_symbol.qualified_name}"
+                )
 
         # Record the intent that this parent directly calls the target
         self.symbol_table.register_direct_call(parent_node.id, callee_node.id)
@@ -191,8 +179,7 @@ class CallHandler:
             defining_scope = getattr(callee_symbol, "defining_scope", None)
             if (
                 defining_scope
-                and getattr(defining_scope, "scope_type", None)
-                == ScopeType.CLASS
+                and getattr(defining_scope, "scope_type", None) == ScopeType.CLASS
             ):
                 display_name = f"({defining_scope.name}).{callee_symbol.name}"
         except Exception:

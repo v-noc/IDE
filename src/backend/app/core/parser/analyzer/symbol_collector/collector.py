@@ -73,8 +73,8 @@ class SymbolCollector:
     def context_analyze_symbols(self, file_node: FileContainer):
         # Normalize current file path so __init__.py uses the parent package scope
         curr = self.symbol_table.scope_manager.current_scope.qualified_name
-        if self.symbol_table.scope_manager.current_scope.scope_type == ScopeType.MODULE and curr.endswith(".__init__"):
-            curr = curr[: -len(".__init__")]
+        # if self.symbol_table.scope_manager.current_scope.scope_type == ScopeType.MODULE and curr.endswith(".__init__"):
+        #     curr = curr[: -len(".__init__")]
         self.current_file_path = curr
         if self.current_file_path in self.symbol_table.unprocessed_files:
             self.symbol_table.unprocessed_files.remove(self.current_file_path)
@@ -82,7 +82,6 @@ class SymbolCollector:
             print(f"File {self.current_file_path} already processed")
             return
         for node in file_node.parsed_nodes:
-
             self._analyze_node_context_recursive(node)
         # After analyzing the file context, prune stale direct calls across all
         # recorded parents (file, functions/classes, nested call nodes)
@@ -90,6 +89,10 @@ class SymbolCollector:
 
     def _analyze_node_context_recursive(self, node: BaseSchema):
         try:
+            print(
+                f"Analyzing node: {node.schema_type} - {self.current_file_path} - {self.symbol_table.scope_manager.current_scope.qualified_name}"
+            )
+
             if node.schema_type == SchemaType.IMPORT:
                 imported_modules = self.import_handler.handle_import_node(node)
 
@@ -97,8 +100,16 @@ class SymbolCollector:
                     file_node = self.symbol_table.file_containers.get(
                         imported_module)
                     if file_node is None:
+                        imported_module = f"{imported_module}.__init__"
                         file_node = self.symbol_table.file_containers.get(
-                            f"{imported_module}.__init__")
+                            imported_module
+                        )
+                    if (
+                        file_node is None
+                        or imported_module not in self.symbol_table.unprocessed_files
+                    ):
+                        continue
+
                     scope = self.symbol_table.scope_manager.get_scope_by_qname(
                         imported_module
                     )
@@ -116,10 +127,20 @@ class SymbolCollector:
                 try:
                     for imported_module in imported_modules:
                         file_node = self.symbol_table.file_containers.get(
-                            imported_module)
+                            imported_module
+                        )
                         if file_node is None:
+                            imported_module = f"{imported_module}.__init__"
                             file_node = self.symbol_table.file_containers.get(
-                                f"{imported_module}.__init__")
+                                imported_module
+                            )
+
+                        if (
+                            file_node is None
+                            or imported_module
+                            not in self.symbol_table.unprocessed_files
+                        ):
+                            continue
                         current_scope = self.symbol_table.scope_manager.current_scope
                         scope = self.symbol_table.scope_manager.get_scope_by_qname(
                             imported_module
@@ -129,7 +150,8 @@ class SymbolCollector:
                         self.context_analyze_symbols(file_node)
                         self.symbol_table.scope_manager.exit_scope()
                         self.symbol_table.scope_manager.enter_scope_by_scope(
-                            current_scope)
+                            current_scope
+                        )
                     self.import_handler.process_import_from(node)
 
                 except Exception as e:
@@ -154,16 +176,11 @@ class SymbolCollector:
                         self._analyze_node_context_recursive(child)
 
                     self.symbol_table.scope_manager.exit_scope()
-                    # After analyzing this function/class body, prune stale calls
-
-                    # container_node = self.symbol_table.qname_to_node.get(qname)
-                    # if container_node:
-                    #     self.symbol_table.prune_stale_direct_calls(
-                    #         container_node.id
-                    #     )
 
             elif node.schema_type == SchemaType.CALL:
-                current_frame = self.symbol_table.scope_manager.call_tracker.current_frame
+                current_frame = (
+                    self.symbol_table.scope_manager.call_tracker.current_frame
+                )
 
                 if (
                     current_frame
@@ -175,8 +192,10 @@ class SymbolCollector:
                 self.call_handler.handle_call(node)
 
             elif node.schema_type == SchemaType.ASSIGN:
+                pass
                 self.assignment_handler.handle_assign_node(node)
             elif node.schema_type == SchemaType.ANN_ASSIGN:
+                pass
                 self.assignment_handler.handle_ann_assign_node(node)
         except Exception as e:
             print(f"Error analyzing node: {node.schema_type} {e}")

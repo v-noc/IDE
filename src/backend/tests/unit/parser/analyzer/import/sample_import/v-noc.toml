@@ -1,0 +1,8 @@
+name = "sample_project"
+version = "0.1.0"
+authors = ["v-noc"]
+description = "this is a sample project."
+
+
+[ignore]
+patterns = []

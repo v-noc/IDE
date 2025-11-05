@@ -8,15 +8,6 @@ class ProjectService(ContainerService):
         self.repos = repos
 
     def delete(self, project: ProjectNode):
-        # The containment tree returns a list of dictionaries,
-        # where the node is nested under the "vertex" key.
-        children = self.repos.project_repo.get_containment_tree(project.id)
-
-        for child_data in children:
-            if "vertex" in child_data and "_key" in child_data["vertex"]:
-                child_key = child_data["vertex"]["_key"]
-                self.repos.nodes.delete(child_key)
-
         return self.repos.project_repo.delete(project.key)
 
     def update(self, project: ProjectNode):
@@ -39,13 +30,35 @@ class ProjectService(ContainerService):
         return self.repos.project_repo.get_all_projects()
 
     def add_folder(self, project_id: str, folder_id: str):
-        return self.add_child_to_container(project_id, folder_id, "project_to_folder")
+        return self.add_child_to_container(
+            project_id,
+            folder_id,
+            "project_to_folder",
+        )
 
     def add_file(self, project_id: str, file_id: str):
-        return self.add_child_to_container(project_id, file_id, "project_to_file")
+        return self.add_child_to_container(
+            project_id,
+            file_id,
+            "project_to_file",
+        )
 
-    def get_children(self, project_id: str):
-        return self.repos.project_repo.get_containment_tree(project_id, 50)
+    def get_children(self, project_id: str, exclude_groups: bool = False):
+        exclude_types = ["group"] if exclude_groups else None
+        return self.repos.project_repo.get_containment_tree(
+            project_id,
+            50,
+            exclude_types=exclude_types,
+        )
 
-    def get_project_structure(self, project_id: str):
-        return self.repos.project_repo.get_containment_tree(project_id, depth="*")
+    def get_project_structure(
+        self,
+        project_id: str,
+        exclude_groups: bool = False,
+    ):
+        exclude_types = ["group"] if exclude_groups else None
+        return self.repos.project_repo.get_containment_tree(
+            project_id,
+            depth="*",
+            exclude_types=exclude_types,
+        )

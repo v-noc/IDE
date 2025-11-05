@@ -16,6 +16,8 @@ const getIcons = (nodeType: NodeType): string => {
       return "FaTable";
     case "package":
       return "FiPackage";
+    case "group":
+      return "HiMiniRectangleGroup";
     default:
       return "FaFile";
   }

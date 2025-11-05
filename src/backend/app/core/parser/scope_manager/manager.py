@@ -11,6 +11,7 @@ from app.core.parser.scope_manager.call_context.instantiation import (
 )
 from app.core.parser.scope_manager.core import SymbolType, Scope, ScopeType, Symbol
 from app.core.parser.scope_manager.call_context.models import CallFrame, CallGraph
+from app.core.parser.scope_manager.storage.symbol_table import SymbolTable
 
 
 class ScopeManager:
@@ -19,19 +20,24 @@ class ScopeManager:
     class analysis and context-sensitive analysis capabilities.
     """
 
-    def __init__(self):
-        self.root_scope: Optional[Scope] = None
+    def __init__(self, db_name: str = "scope_manager"):
+        self.table = SymbolTable(db_name)
         self.current_scope: Optional[Scope] = None
-        self._scope_index: Dict[str, Scope] = {}
+        self.root_scope: Optional[Scope] = None
+
+        self._scope_index: Dict[str, str] = {}
+
+        self._root_symbols: Optional[Symbol] = None
 
         # --- Class Analysis Components ---
         self.inheritance_graph = InheritanceGraph()
         self.mro_calculator = MROCalculator(self.inheritance_graph)
-        self.method_resolver = MethodResolver(self.inheritance_graph)
+        self.method_resolver = MethodResolver(
+            self.inheritance_graph, self.table)
 
         # A map to track what symbol an alias points to.
-        self._assignment_map: Dict[Symbol, Symbol] = {}
-        self.current_frame_stack = []
+
+        # self.current_frame_stack = []
 
     # Class Analysis Methods
 
@@ -92,8 +98,6 @@ class ScopeManager:
         This uses the enhanced Symbol assignment tracking.
         """
         alias.assign_to(target)
-        # Keep the old mapping for backward compatibility if needed
-        self._assignment_map[alias] = target
 
     def resolve_final_symbol(self, name: str) -> Optional[Symbol]:
         """
@@ -119,9 +123,12 @@ class ScopeManager:
         symbol = Symbol(
             name=name,
             symbol_type=symbol_type,
-            defining_scope=self.current_scope,
+            defining_scope_id=self.current_scope.id,
             **kwargs,
         )
+        symbol.bind_table(self.table)
+        self.table.save_symbol(symbol)
+
         self.current_scope.add_symbol(symbol)
         return symbol
 
@@ -143,9 +150,13 @@ class ScopeManager:
         symbol = Symbol(
             name=name,
             symbol_type=symbol_type,
-            defining_scope=execution_scope,  # CRITICAL: Defined in the execution scope
+            # CRITICAL: Defined in the execution scope
+            defining_scope_id=execution_scope.id,
             **kwargs,
         )
+        symbol.bind_table(self.table)
+        self.table.save_symbol(symbol)
+
         execution_scope.add_symbol(symbol)
         return symbol
 
@@ -156,7 +167,8 @@ class ScopeManager:
 
         Note: Built-in scope is not checked here.
         """
-        scope = self.current_scope
+        scope = self.table.get_scope(self.current_scope.id)
+        scope.bind_table(self.table)
         while scope:
             # Direct symbol in scope
             if name in scope.symbols:
@@ -180,17 +192,24 @@ class ScopeManager:
         if self.root_scope:
             raise ValueError("Root scope has already been created.")
 
-        root = Scope(name=name, scope_type=ScopeType.MODULE)
+        root = Scope(name=name, scope_type=ScopeType.PROJECT)
+        root.bind_table(self.table)
+        self._root_symbols = Symbol(
+            name=name, symbol_type=SymbolType.PROJECT, defining_scope_id=root.id
+        )
+        self.table.save_scope(root)
+        self._root_symbols.bind_table(self.table)
+
         self.root_scope = root
         self.current_scope = root
-        self._scope_index[name] = root
+        self._scope_index[name] = root.id
 
         # --- Initialize Dynamic Analysis Components ---
         # Now that we have a root scope, we can initialize the components.
 
         self.call_tracker = CallGraphTracker(self)
         self.context_resolver = ExecutionContextResolver(self)
-        self.class_instantiator = ClassInstantiationHandler(self)
+        self.class_instantiator = ClassInstantiationHandler(self, self.table)
 
         return root
 
@@ -217,9 +236,11 @@ class ScopeManager:
         # --- END KEY CHANGE ---
 
         new_scope = Scope(name=name, scope_type=scope_type)
+        new_scope.bind_table(self.table)
+        self.table.save_scope(new_scope)
         self.current_scope.add_child_scope(new_scope)
         self.current_scope = new_scope
-        self._scope_index[new_scope.qualified_name] = new_scope
+        self._scope_index[new_scope.qualified_name] = new_scope.id
         return new_scope
 
     def exit_scope(self) -> Optional[Scope]:
@@ -239,7 +260,9 @@ class ScopeManager:
         Retrieves a scope directly by its qualified name.
         """
 
-        return self._scope_index.get(qualified_name)
+        scope = self.table.get_scope(self._scope_index.get(qualified_name))
+        scope.bind_table(self.table)
+        return scope
 
     def register_wildcard_import(
         self, target_scope_qname: Optional[str], module_qname: str
@@ -279,6 +302,9 @@ class ScopeManager:
         """
         class_symbol = self.lookup_symbol(class_name)
         class_symbol_final = class_symbol.resolve_final()
+
+        if class_symbol_final.symbol_type == SymbolType.OBJECT_INSTANCE:
+            return class_symbol_final
         # class_symbol = class_symbol.resolve_final()
         if not class_symbol_final or class_symbol_final.symbol_type != SymbolType.CLASS:
             raise NameError(f"Unknown class: {class_name}")
@@ -310,20 +336,23 @@ class ScopeManager:
 
         # Now invoke is ONLY for function/method calls
         frame = self.call_tracker.start_call(callee_symbol, args)
-        if len(self.current_frame_stack) == 0:
-            self.current_scope.children[frame.id] = frame.execution_scope
-        else:
-            self.current_frame_stack[-1].execution_scope.children[frame.id] = (
-                frame.execution_scope
-            )
-        self.current_frame_stack.append(frame)
+        # if len(self.current_frame_stack) == 0:
+        #     self.current_scope.children[frame.id] = frame.execution_scope
+        # else:
+        #     self.current_frame_stack[-1].execution_scope.children[frame.id] = (
+        #         frame.execution_scope
+        #     )
+        # self.current_frame_stack.append(frame)
         return frame
 
     def resolve_symbol_in_context(self, name: str) -> Optional[Symbol]:
         """
         Context-aware symbol resolution.
         """
-        return self.context_resolver.resolve(name)
+        resolver = getattr(self, "context_resolver", None)
+        if resolver is None:
+            return None
+        return resolver.resolve(name)
 
     def end_current_call(
         self, return_value: Optional[Symbol] = None
@@ -331,7 +360,7 @@ class ScopeManager:
         """
         End the current function call.
         """
-        self.current_frame_stack.pop()
+        # self.current_frame_stack.pop()
         return self.call_tracker.end_call(return_value)
 
     def get_call_graph(self) -> CallGraph:

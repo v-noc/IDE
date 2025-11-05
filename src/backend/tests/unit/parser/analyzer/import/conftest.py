@@ -18,7 +18,7 @@ def project_path() -> Path:
 @pytest.fixture
 def project_tree(arangodb_client, project_path) -> ProjectNode:
     graph_builder = GraphBuilder(
-        project_path=project_path.as_posix(), ignore_file_name=None, db=arangodb_client
+        project_path=project_path.as_posix(), ignore_file_name="v-noc.toml", db=arangodb_client
     )
     graph_builder.build("sample_import", "A test project for imports.")
 

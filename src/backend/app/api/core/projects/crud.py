@@ -91,10 +91,12 @@ def get_projects(
 @router.get("/{project_id}/children", response_model=list[AnyTreeNode])
 def get_project_children(
     project_id: str,
+    exclude_groups: bool = False,
     project_service: ProjectService = Depends(get_project_service),
 ) -> list[AnyTreeNode]:
     project_node = project_service.get(project_id)
-    children = project_service.get_children(project_node.id)
+    children = project_service.get_children(
+        project_node.id, exclude_groups=exclude_groups)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -109,6 +111,7 @@ def get_project_children(
 @router.get("/{project_id}", response_model=ProjectTreeNode)
 def get_project(
     project_id: str,
+    exclude_groups: bool = False,
     project_service: ProjectService = Depends(get_project_service),
     watcher_service: WatcherService = Depends(get_watcher_service),
 ) -> ProjectTreeNode:
@@ -119,9 +122,11 @@ def get_project(
             detail="Project not found",
         )
 
-    watcher_service.start_watching(project_node)
+    # TODO: reimplment
+    # watcher_service.start_watching(project_node)
 
-    children = project_service.get_children(project_node.id)
+    children = project_service.get_children(
+        project_node.id, exclude_groups=exclude_groups)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()

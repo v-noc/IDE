@@ -95,7 +95,14 @@ class CallGraphTracker:
         # 1. Pop the completed frame
         completed_frame = self.call_graph.active_frames.pop()
 
-        return_value = deepcopy(return_value)
+        if return_value:
+            return_value = Symbol(
+                is_runtime=True,
+                **return_value.model_dump(exclude={"is_runtime"})
+            )
+            return_value.bind_table(self.scope_manager.table)
+            self.scope_manager.table.save_symbol(return_value)
+
         # 2. CRITICAL CLOSURE LOGIC:
         # If returning a function, stamp it with the captured frame
         processed_return = self._process_return_value(
@@ -103,6 +110,9 @@ class CallGraphTracker:
 
         # 3. Store return value on the frame
         completed_frame.return_value = processed_return
+
+        # if processed_return is None or processed_return.symbol_type != SymbolType.CAPTURED_CLOSURE and processed_return.symbol_type != SymbolType.OBJECT_INSTANCE:
+        # completed_frame.execution_scope.symbols.clear()
 
         return processed_return
 
@@ -112,10 +122,14 @@ class CallGraphTracker:
         scope_name = f'exec_{calle_symbol.name}_{uuid.uuid4().hex[:8]}'
 
         execution_scope = Scope(
+            id=str(uuid.uuid4()),
             name=scope_name,
             scope_type=ScopeType.EXECUTION,
-            parent=calle_symbol.defining_scope
+            parent_id=calle_symbol.defining_scope.id
         )
+
+        execution_scope.bind_table(self.scope_manager.table)
+        self.scope_manager.table.save_scope(execution_scope)
 
         return execution_scope
 
@@ -131,9 +145,12 @@ class CallGraphTracker:
             # Create a parameter symbol local to the execution scope
             param_symbol = Symbol(
                 name=param_name,
+                is_runtime=True,
                 symbol_type=SymbolType.PARAMETER,
-                defining_scope=frame.execution_scope
+                defining_scope_id=frame.execution_scope.id
             )
+            param_symbol.bind_table(self.scope_manager.table)
+            self.scope_manager.table.save_symbol(param_symbol)
             frame.execution_scope.add_symbol(param_symbol)
 
             # If the provided argument is a symbol, link it; otherwise

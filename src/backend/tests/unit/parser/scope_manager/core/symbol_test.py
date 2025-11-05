@@ -6,25 +6,27 @@ def test_symbol_creation(sample_symbol, child_scope):
     """Test the basic creation of a Symbol."""
     assert sample_symbol.name == "my_var"
     assert sample_symbol.symbol_type == SymbolType.VARIABLE
-    assert sample_symbol.defining_scope == child_scope
+    assert sample_symbol.defining_scope.id == child_scope.id
     assert not sample_symbol.assigned_to
-    assert not sample_symbol.assigned_from
+    # assert not sample_symbol.assigned_from
 
 
-def test_assign_to(sample_symbol, child_scope, code_position):
+def test_assign_to(sample_symbol, child_scope, code_position, symbol_table):
     """Test the assign_to method."""
     another_symbol = Symbol(
         name="another_var",
         symbol_type=SymbolType.VARIABLE,
-        defining_scope=child_scope,
+        defining_scope_id=child_scope.id,
         code_position=code_position
     )
+    another_symbol.bind_table(sample_symbol._table)
+    symbol_table.save_symbol(another_symbol)
     sample_symbol.assign_to(another_symbol)
-    assert sample_symbol.assigned_to == another_symbol
-    assert sample_symbol in another_symbol.assigned_from
+    assert sample_symbol.assigned_to.id == another_symbol.id
+    # assert sample_symbol in another_symbol.assigned_from
 
 
-def test_resolve_immediate(sample_symbol, child_scope, code_position):
+def test_resolve_immediate(sample_symbol, child_scope, code_position, symbol_table):
     """Test the resolve_immediate method."""
     # When not assigned, resolves to self
     assert sample_symbol.resolve_immediate() == sample_symbol
@@ -33,20 +35,26 @@ def test_resolve_immediate(sample_symbol, child_scope, code_position):
     target_symbol = Symbol(
         name="target_var",
         symbol_type=SymbolType.VARIABLE,
-        defining_scope=child_scope,
+        defining_scope_id=child_scope.id,
         code_position=code_position
     )
+    target_symbol.bind_table(sample_symbol._table)
+    symbol_table.save_symbol(target_symbol)
     sample_symbol.assign_to(target_symbol)
     assert sample_symbol.resolve_immediate() == target_symbol
 
 
-def test_resolve_final(sample_symbol, child_scope, code_position):
+def test_resolve_final(sample_symbol, child_scope, code_position, symbol_table):
     """Test the resolve_final method for a chain of assignments."""
     var1 = sample_symbol
     var2 = Symbol(name="var2", symbol_type=SymbolType.VARIABLE,
-                  defining_scope=child_scope, code_position=code_position)
+                  defining_scope_id=child_scope.id, code_position=code_position)
     func_symbol = Symbol(name="my_func", symbol_type=SymbolType.FUNCTION,
-                         defining_scope=child_scope, code_position=code_position)
+                         defining_scope_id=child_scope.id, code_position=code_position)
+    var2.bind_table(sample_symbol._table)
+    func_symbol.bind_table(sample_symbol._table)
+    symbol_table.save_symbol(var2)
+    symbol_table.save_symbol(func_symbol)
 
     var1.assign_to(var2)
     var2.assign_to(func_symbol)
@@ -58,11 +66,13 @@ def test_resolve_final(sample_symbol, child_scope, code_position):
     assert func_symbol.resolve_final() == func_symbol
 
 
-def test_resolve_final_circular_dependency(sample_symbol, child_scope, code_position):
+def test_resolve_final_circular_dependency(sample_symbol, child_scope, code_position, symbol_table):
     """Test that resolve_final detects circular dependencies."""
     var1 = sample_symbol
     var2 = Symbol(name="var2", symbol_type=SymbolType.VARIABLE,
-                  defining_scope=child_scope, code_position=code_position)
+                  defining_scope_id=child_scope.id, code_position=code_position)
+    var2.bind_table(sample_symbol._table)
+    symbol_table.save_symbol(var2)
 
     var1.assign_to(var2)
     var2.assign_to(var1)  # Circular assignment

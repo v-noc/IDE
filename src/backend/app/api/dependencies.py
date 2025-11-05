@@ -9,6 +9,14 @@ from app.core.services.class_service import ClassService
 from app.core.services.function_service import FunctionService
 from app.core.services.call_service import CallService
 from app.core.services.log_service import LogService
+from app.core.services.group_service import GroupService
+
+
+def get_group_service(
+    db: StandardDatabase = Depends(get_db),
+) -> GroupService:
+    repos = Repositories(db)
+    return GroupService(repos)
 
 
 def get_project_service(

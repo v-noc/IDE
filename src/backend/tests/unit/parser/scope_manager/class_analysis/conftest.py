@@ -2,6 +2,13 @@ import pytest
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.core import Scope, ScopeType, SymbolType
 from app.core.model.properties import CodePosition
+from app.core.parser.scope_manager.storage.symbol_table import SymbolTable
+
+
+@pytest.fixture
+def symbol_table():
+    """Provides a symbol table for testing."""
+    return SymbolTable("test_symbol_table")
 
 
 @pytest.fixture

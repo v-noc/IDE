@@ -1,5 +1,5 @@
-from sample_import import helper, User
-
+from sample_import import helper
+from .utils import User
 
 u_abs = helper.create_user()
 u_abs2 = User()

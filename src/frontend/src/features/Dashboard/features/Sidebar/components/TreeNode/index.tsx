@@ -1,9 +1,14 @@
-import type { ContainerNodeTree } from "@/types/project";
+import { type NodeType, type ContainerNodeTree } from "@/types/project";
 import { useTreeNode } from "../../hooks/useTreeNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeContent } from "./NodeContent";
 import CreateVirtualNodeDialog from "../VirtualFolders/CreateVirtualNodeDialog";
 import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
+import { useState } from "react";
+import SelectNodeDialog from "../SelectNodeDialog";
+import CreateGroupsDialog from "@/features/Dashboard/components/CreateGroupsDialog";
+import type { GroupNodeTree } from "@/types/project";
+import ManageGroupsDialog from "@/features/Dashboard/components/ManageGroupsDialog";
 // import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
 
 interface TreeNodeProps {
@@ -24,6 +29,7 @@ export const TreeNode = ({
     isSelected,
     isActive,
     hasChildren,
+    projectData,
     isCreateDialogOpen,
     isEditDialogOpen,
     // isCreatePathDialogOpen,
@@ -34,11 +40,53 @@ export const TreeNode = ({
     handleExpand,
     handleRemove,
     // handleEdit,
-    handleCreatePath,
+    handleAddCall,
     closeCreateDialog,
+    handleRemoveCall,
     closeEditDialog,
+    handleDeleteGroup,
     // closeCreatePathDialog,
   } = useTreeNode(node, childFilter);
+
+  const [isAddCallDialogOpen, setIsAddCallDialogOpen] = useState<{
+    node_id: string;
+    node_type: NodeType;
+  } | null>(null);
+
+  const [isCreateGroupsDialogOpen, setIsCreateGroupsDialogOpen] =
+    useState(false);
+  const [isManageGroupsDialogOpen, setIsManageGroupsDialogOpen] =
+    useState(false);
+
+  const closeAddCallDialog = () => {
+    setIsAddCallDialogOpen(null);
+  };
+
+  const getParentNode = (
+    node: ContainerNodeTree,
+    currentNode: ContainerNodeTree
+  ): ContainerNodeTree | null => {
+    if (currentNode.children?.some((child) => child._key === node._key)) {
+      return currentNode;
+    }
+    for (const child of currentNode.children ?? []) {
+      const parent = getParentNode(node, child);
+      if (parent) {
+        return parent;
+      }
+    }
+
+    return null;
+  };
+
+  const getSiblings = (node: ContainerNodeTree): ContainerNodeTree[] => {
+    const parentNode = getParentNode(node, projectData);
+    if (!parentNode) return [];
+    const children = parentNode.children ?? [];
+    return children.filter(
+      (child) => child._key !== node._key
+    ) as ContainerNodeTree[];
+  };
 
   const handleSelectOverride = onSelect
     ? () => onSelect(node)
@@ -50,9 +98,20 @@ export const TreeNode = ({
         node={node}
         onFocus={handleFocus}
         onExpand={handleExpand}
+        onCreateGroup={() => setIsCreateGroupsDialogOpen(true)}
+        onDeleteGroup={() => handleDeleteGroup()}
+        onRemoveCall={() => {
+          handleRemoveCall(node);
+        }}
         onRemove={handleRemove}
+        onManageGroup={() => setIsManageGroupsDialogOpen(true)}
         onEdit={undefined}
-        onCreatePath={handleCreatePath}
+        onAddCall={() =>
+          setIsAddCallDialogOpen({
+            node_id: node._key,
+            node_type: node.node_type,
+          })
+        }
       >
         <NodeContent
           node={node}
@@ -78,11 +137,30 @@ export const TreeNode = ({
         onClose={closeEditDialog}
         node={node as unknown as ContainerNodeTree}
       />
-      {/* <CreatePathDialog
-        isOpen={isCreatePathDialogOpen}
-        onClose={closeCreatePathDialog}
-        node={node}
-      /> */}
+
+      <SelectNodeDialog
+        isOpen={isAddCallDialogOpen !== null}
+        onClose={closeAddCallDialog}
+        list={projectData?.children ?? []}
+        selectNodeType={["function"]}
+        onSelect={(node) => handleAddCall(node)}
+      />
+
+      <CreateGroupsDialog
+        isOpen={isCreateGroupsDialogOpen}
+        onClose={() => setIsCreateGroupsDialogOpen(false)}
+        initialChildren={node ? [node] : []}
+        project_key={projectData?._key ?? ""}
+        parent_node_id={getParentNode(node, projectData)?._key ?? ""}
+      />
+
+      <ManageGroupsDialog
+        isOpen={isManageGroupsDialogOpen}
+        onClose={() => setIsManageGroupsDialogOpen(false)}
+        group={node as unknown as GroupNodeTree}
+        siblings={getSiblings(node)}
+        project_key={projectData?._key ?? ""}
+      />
     </>
   );
 };

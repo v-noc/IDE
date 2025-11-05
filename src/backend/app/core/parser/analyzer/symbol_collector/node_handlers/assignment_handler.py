@@ -30,7 +30,8 @@ class AssignmentHandler:
 
         value_symbol = self._resolve_value_node_to_symbol(
             node.value[0])
-
+        if not value_symbol:
+            return
         if isinstance(node.target, NameSchema):
             self._handle_name_target(node.target, value_symbol)
         elif isinstance(node.target, AttributeSchema):
@@ -163,7 +164,8 @@ class AssignmentHandler:
                 )
                 runtime_sym.assign_to(value_symbol)
                 return
-            except Exception:
+            except Exception as e:
+                print(f"Error defining runtime variable: {e}")
                 # No active frame; nothing to do safely
                 return
 
@@ -183,8 +185,10 @@ class AssignmentHandler:
                 new_attr = Symbol(
                     name=attr_name,
                     symbol_type=SymbolType.VARIABLE,
-                    defining_scope=inst_scope,
+                    defining_scope_id=inst_scope.id,
                 )
+                new_attr.bind_table(self.symbol_table.scope_manager.table)
+                self.symbol_table.scope_manager.table.save_symbol(new_attr)
                 inst_scope.add_symbol(new_attr)
                 new_attr.assign_to(value_symbol)
             return
@@ -203,8 +207,10 @@ class AssignmentHandler:
                 new_attr = Symbol(
                     name=attr_name,
                     symbol_type=SymbolType.VARIABLE,
-                    defining_scope=class_scope,
+                    defining_scope_id=class_scope.id,
                 )
+                new_attr.bind_table(self.symbol_table.scope_manager.table)
+                self.symbol_table.scope_manager.table.save_symbol(new_attr)
                 class_scope.add_symbol(new_attr)
                 new_attr.assign_to(value_symbol)
             return
@@ -223,8 +229,10 @@ class AssignmentHandler:
                 new_attr = Symbol(
                     name=attr_name,
                     symbol_type=SymbolType.VARIABLE,
-                    defining_scope=module_scope,
+                    defining_scope_id=module_scope.id,
                 )
+                new_attr.bind_table(self.symbol_table.scope_manager.table)
+                self.symbol_table.scope_manager.table.save_symbol(new_attr)
                 module_scope.add_symbol(new_attr)
                 new_attr.assign_to(value_symbol)
             return
@@ -243,8 +251,11 @@ class AssignmentHandler:
                 new_attr = Symbol(
                     name=attr_name,
                     symbol_type=SymbolType.VARIABLE,
-                    defining_scope=defining_scope,
+                    defining_scope_id=defining_scope.id,
                 )
-                defining_scope.add_symbol(new_attr)
+                new_attr.bind_table(self.symbol_table.scope_manager.table)
+                self.symbol_table.scope_manager.table.save_symbol(new_attr)
                 new_attr.assign_to(value_symbol)
+
+                defining_scope.add_symbol(new_attr)
         # Otherwise do nothing

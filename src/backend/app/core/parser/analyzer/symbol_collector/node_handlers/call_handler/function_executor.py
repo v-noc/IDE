@@ -5,14 +5,13 @@ from pydantic import BaseModel
 from app.core.parser.scope_manager.core.symbol import Symbol, SymbolType
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.ast.models import (
-    ArgSchema,
     BaseSchema,
     KeywordSchema,
     NameSchema,
     AttributeSchema,
 )
 
-from .symbol_resolver import ResolutionResult
+from .symbol_resolver import ResolutionResult, SymbolResolver
 from app.core.parser.analyzer.symbol_table import SymbolTable
 
 
@@ -32,6 +31,7 @@ class FunctionExecutor:
         self.analyzer_callback = analyzer_callback
         # symbol_table gives access to qname_to_node mapping
         self.symbol_table = symbol_table
+        self.symbol_resolver = SymbolResolver(scope_manager)
 
     def execute(
         self,
@@ -87,7 +87,8 @@ class FunctionExecutor:
 
         # Execute function body
         current_scope = self.scope_manager.current_scope
-        scope = self.scope_manager.get_scope_by_qname(callee_symbol.qualified_name)
+        scope = self.scope_manager.get_scope_by_qname(
+            callee_symbol.qualified_name)
         if not scope:
             return self.scope_manager.end_current_call(None)
 
@@ -99,7 +100,9 @@ class FunctionExecutor:
 
         self.scope_manager.exit_scope()
 
-        resolved_return_value = self.scope_manager.end_current_call(return_value)
+        resolved_return_value = self.scope_manager.end_current_call(
+            return_value)
+
         self.scope_manager.enter_scope_by_scope(current_scope)
         return resolved_return_value
 
@@ -147,9 +150,8 @@ class FunctionExecutor:
 
             resolved = None
             if isinstance(call_arg, NameSchema):
-                resolved = self.scope_manager.resolve_symbol_in_context(call_arg.name)
-                if resolved:
-                    resolved = resolved.resolve_final()
+                result_obj = self.symbol_resolver.resolve_expression(call_arg)
+                resolved = result_obj.symbol
             elif isinstance(call_arg, AttributeSchema):
                 # Conservatively skip deep attribute here; higher-level
                 # resolver should pass instances
@@ -169,11 +171,8 @@ class FunctionExecutor:
 
             resolved_kw = None
             if isinstance(kw_value, NameSchema):
-                resolved_kw = self.scope_manager.resolve_symbol_in_context(
-                    kw_value.name
-                )
-                if resolved_kw:
-                    resolved_kw = resolved_kw.resolve_final()
+                result_obj = self.symbol_resolver.resolve_expression(kw_value)
+                resolved_kw = result_obj.symbol
             elif isinstance(kw_value, AttributeSchema):
                 resolved_kw = None
 
@@ -184,8 +183,8 @@ class FunctionExecutor:
 
     def _resolve_return_value(self, func_node) -> Optional[Symbol]:
         if getattr(func_node, "return_values", None):
-            first = func_node.return_values[0]
-            if isinstance(first, NameSchema):
-                sym = self.scope_manager.resolve_symbol_in_context(first.name)
-                return sym.resolve_final() if sym else None
+            for expr in func_node.return_values:
+                result = self.symbol_resolver.resolve_expression(expr)
+                if result.symbol:
+                    return result.symbol.resolve_final()
         return None

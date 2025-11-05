@@ -20,7 +20,7 @@ def test_simple_instantiation_and_init(class_hierarchy_manager: ScopeManager):
 
     assert instance_symbol is not None
     assert instance_symbol.symbol_type == SymbolType.OBJECT_INSTANCE
-    assert instance_symbol.instance_scope is not None
+    assert instance_symbol.instance_scope_id is not None
     assert instance_symbol.qualified_name == "__main__.Dog"
 
     call_graph = manager.get_call_graph()

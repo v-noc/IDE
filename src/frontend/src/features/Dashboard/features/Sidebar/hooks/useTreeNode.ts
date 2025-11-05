@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { NodeType, AnyNodeTree, ContainerNodeTree } from "@/types/project";
+import { useAddCall, useRemoveCall } from "@/features/Dashboard/service/useCall";
+import { useDeleteGroup } from "@/features/Dashboard/service/useGroup";
 // import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
 // import { useQueryClient } from "@tanstack/react-query";
 // import { toast } from "sonner";
@@ -24,9 +26,9 @@ export const useTreeNode = (
     // addVirtualNode,
     // projectData,
   } = useProjectStore();
-
-  // const { setTheme } = useThemeStore();
-
+  const addCallMutation = useAddCall(node._key, projectData?._key || "");
+  const removeCallMutation = useRemoveCall(node._key, projectData?._key || "");
+  const deleteGroupMutation = useDeleteGroup(node._key, projectData?._key || "");
   // const queryClient = useQueryClient();
   // const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.id || "");
 
@@ -53,6 +55,7 @@ export const useTreeNode = (
   };
 
   const handleSelectNode = () => {
+
     if (selectedNode?._key === node._key) return;
     setSelectedNode(node);
     // Clear any secondary selection when a primary selection is made
@@ -63,14 +66,17 @@ export const useTreeNode = (
   };
 
   const handleFocus = () => {
+    if (focusStack.length > 0) {
+      if (focusStack[focusStack.length - 1]._key === node._key) {
+        return;
+      }
+    }
     pushFocus(node);
   };
 
   const handleExpand = () => {
+    toggleNodeExpansion(node._key);
 
-    if (hasChildren) {
-      toggleNodeExpansion(node._key);
-    }
   };
 
   const handleRemove = async () => {
@@ -97,6 +103,15 @@ export const useTreeNode = (
     setEditDialogOpen(true);
   };
 
+  const handleAddCall = (node: AnyNodeTree) => {
+    console.log("handleAddCall");
+    addCallMutation.mutate({
+      callee_target_id: node._key,
+      name: node.name,
+      description: node.description,
+    });
+  };
+
   const handleCreateFile = () => {
     setNodeTypeToCreate("file");
     setCreateDialogOpen(true);
@@ -119,12 +134,22 @@ export const useTreeNode = (
     setCreatePathDialogOpen(false);
   };
 
+  const handleRemoveCall = (node: AnyNodeTree) => {
+    removeCallMutation.mutate(node._key);
+  };
+
   const closeEditDialog = () => {
     setEditDialogOpen(false);
   };
 
+  const handleDeleteGroup = () => {
+    if (node.node_type !== "group") return;
+    deleteGroupMutation.mutate();
+  };
+
   return {
     isOpen,
+    projectData,
     isSelected,
     isActive,
     hasChildren,
@@ -132,18 +157,21 @@ export const useTreeNode = (
     isEditDialogOpen,
     isCreatePathDialogOpen,
     nodeTypeToCreate,
+    handleDeleteGroup,
+    handleEdit,
     handleToggle,
     handleSelectNode,
     handleFocus,
     handleExpand,
     handleRemove,
-    handleEdit,
+    handleAddCall,
     handleCreateFile,
     handleCreateFolder,
     handleCreatePath,
     closeCreateDialog,
     closeEditDialog,
     closeCreatePathDialog,
+    handleRemoveCall
     // addVirtualNode,
   };
 };

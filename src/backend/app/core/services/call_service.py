@@ -16,13 +16,14 @@ class CallService(ContainerService):
         description: str,
         position: CodePosition,
         target_id: str,
+        manually_created: bool = False,
     ):
         call = CallNode(
             name=name,
             qname=qname,
             description=description,
             position=position,
-
+            manually_created=manually_created,
         )
 
         new_call = self.repos.call_repo.create(call)

@@ -6,7 +6,7 @@ from .function_service import FunctionService
 from .call_service import CallService
 from .container_service import ContainerService
 from .log_service import LogService
-
+from .group_service import GroupService
 
 __all__ = [
     "FileService",
@@ -16,5 +16,6 @@ __all__ = [
     "FunctionService",
     "CallService",
     "ContainerService",
-    "LogService"
+    "LogService",
+    "GroupService"
 ]

@@ -23,7 +23,8 @@ class ContainerService:
         self,
         container_id: str,
         child_id: str,
-        contain_type: str,
+        contain_type: Optional[str] = None,
+
     ):
         container = self.repos.nodes.get_by_id(container_id)
         if not container:
@@ -32,6 +33,9 @@ class ContainerService:
         child = self.repos.nodes.get_by_id(child_id)
         if not child:
             raise ValueError(f"Child {child_id} not found")
+
+        if contain_type is None:
+            contain_type = f"{container.node_type.lower()}_to_{child.node_type.lower()}"
 
         contains_edge = ContainsEdge(
             from_id=container_id,
@@ -104,10 +108,10 @@ class ContainerService:
 
         # Limit the ascent to avoid infinite loops
         for _ in range(50):
-            parents = self.repos.nodes.get_parent(current_id)
-            if not parents:
+            parent_info = self.repos.nodes.get_parent(current_id)
+            if not parent_info:
                 break
-            parent_info = parents[0]
+
             parent_vertex = parent_info.get("vertex") or {}
             parent_id = parent_vertex.get("_id")
             node_type = parent_vertex.get("node_type")

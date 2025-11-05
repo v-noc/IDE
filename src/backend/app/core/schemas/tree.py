@@ -3,22 +3,22 @@
 from typing import List, Optional, Union
 from pydantic import Field
 
-from app.core.model.nodes import CallNode, ClassNode, FunctionNode, FileNode, FolderNode, ProjectNode
+from app.core.model.nodes import CallNode, ClassNode, FunctionNode, FileNode, FolderNode, ProjectNode, GroupNode
 
 
 class CallTreeNode(CallNode):
-    children: List["CallTreeNode"] = Field(
+    children: List["CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Call children.")
     target: Optional["ClassTreeNode | FunctionTreeNode"] = None
 
 
 class ClassTreeNode(ClassNode):
-    children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode"] = Field(
+    children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Class children.")
 
 
 class FunctionTreeNode(FunctionNode):
-    children: List["FunctionTreeNode | ClassTreeNode | CallTreeNode"] = Field(
+    children: List["FunctionTreeNode | ClassTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Function children.")
 
 
@@ -27,22 +27,29 @@ class FileTreeNode(FileNode):
         default=None,
         description="File hash."
     )
-    children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode"] = Field(
+    children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="File children.")
 
 
 class FolderTreeNode(FolderNode):
-    children: List["FolderTreeNode | FileTreeNode"] = Field(
+    children: List["FolderTreeNode | FileTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Folder children.")
 
 
 class ProjectTreeNode(ProjectNode):
-    children: List["FolderTreeNode | FileTreeNode"] = Field(
+    children: List["FolderTreeNode | FileTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Project children.")
+
+
+class GroupTreeNode(GroupNode):
+    children: List[
+        "GroupTreeNode | FolderTreeNode | FileTreeNode | ClassTreeNode | FunctionTreeNode | CallTreeNode"
+    ] = Field(default_factory=list, description="Group children.")
 
 
 # A Union of all possible nodes in our tree response
 AnyTreeNode = Union[
+    GroupTreeNode,
     FolderTreeNode,
     ProjectTreeNode,
     FileTreeNode,
@@ -58,3 +65,4 @@ ProjectTreeNode.model_rebuild()
 FileTreeNode.model_rebuild()
 ClassTreeNode.model_rebuild()
 FunctionTreeNode.model_rebuild()
+GroupTreeNode.model_rebuild()

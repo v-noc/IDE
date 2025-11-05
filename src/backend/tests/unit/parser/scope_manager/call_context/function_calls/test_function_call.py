@@ -54,7 +54,8 @@ def test_closure_creation_and_invocation(scope_manager: ScopeManager):
 
     # 2. Call the factory to create a closure instance
     scope_manager.invoke("factory", {"msg": "Hello Closure"})
-    closure_instance = scope_manager.end_current_call(return_value=closure_symbol)
+    closure_instance = scope_manager.end_current_call(
+        return_value=closure_symbol)
 
     # Assert that a closure symbol with a captured frame was returned
     assert closure_instance is not None
@@ -185,10 +186,12 @@ def test_callback_function(scope_manager: ScopeManager):
     assert callback_symbol is not None
 
     # 4. Simulate the call to the invoker, passing the callback symbol as an argument
-    invoker_frame = scope_manager.invoke("invoker", {"callback_func": callback_symbol})
+    invoker_frame = scope_manager.invoke(
+        "invoker", {"callback_func": callback_symbol})
 
     # 5. From within the invoker's context, resolve and call the callback
-    callback_param_symbol = scope_manager.resolve_symbol_in_context("callback_func")
+    callback_param_symbol = scope_manager.resolve_symbol_in_context(
+        "callback_func")
     assert callback_param_symbol is not None
     # The parameter symbol should point to the actual callback function symbol
     final_callee = callback_param_symbol.resolve_final()
@@ -233,7 +236,8 @@ def test_closure_calling_another_function(scope_manager: ScopeManager):
 
     # 3. Create the closure instance
     scope_manager.invoke("factory", {})
-    closure_instance = scope_manager.end_current_call(return_value=closure_symbol)
+    closure_instance = scope_manager.end_current_call(
+        return_value=closure_symbol)
 
     # 4. Invoke the closure
     closure_frame = scope_manager.invoke(closure_instance, {})

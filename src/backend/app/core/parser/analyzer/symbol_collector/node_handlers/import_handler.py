@@ -35,7 +35,10 @@ class ImportHandler:
                     imported_qname
                 )
                 if scope:
-                    symbol = scope.parent.symbols[scope.name]
+                    if scope.scope_type == ScopeType.PROJECT:
+                        symbol = self.symbol_table.scope_manager._root_symbols
+                    else:
+                        symbol = scope.parent.symbols[scope.name]
                     if symbol:
                         self.symbol_table.scope_manager.track_static_assignment(
                             imported_symbol, symbol
@@ -159,8 +162,9 @@ class ImportHandler:
 
         # Absolute import
         if node.module_name:
-            target_qname = f"{node.module_name}.{alias_name}"
-            module_path = node.module_name
+
+            module_path = self._resolve_module_path(node, file_scope)
+            target_qname = f"{module_path}.{alias_name}"
         else:
             target_qname = alias_name
             module_path = target_qname
@@ -187,35 +191,42 @@ class ImportHandler:
         self, node: ImportFromSchema, file_scope: str
     ) -> Optional[str]:
         """Resolve the full module path for from...import"""
+        def _resolve_to_existing(path: Optional[str]) -> Optional[str]:
+            if path is None:
+                return None
+            file_node_local = self.symbol_table.file_containers.get(path)
+            if file_node_local is not None:
+                return path
+            init_path_local = f"{path}.__init__"
+            return (
+                init_path_local
+                if self.symbol_table.file_containers.get(init_path_local) is not None
+                else None
+            )
+
+        # Absolute import
         if node.level == 0:
-            # Absolute import
-            return node.module_name
+            return _resolve_to_existing(node.module_name)
 
-        if node.module_name is None:
-            # This case should be handled by _resolve_relative_module_import
-            # But if we get here, handle it
-            current_parts = file_scope.split(".")
-            if node.level <= len(current_parts):
-                if node.level > 0:
-                    base_parts = current_parts[: -node.level]
-                else:
-                    base_parts = current_parts
-                return ".".join(base_parts) if base_parts else None
-            return None
-
-        # Relative import with module name
         current_parts = file_scope.split(".")
 
+        # Relative import without module name
+        if node.module_name is None:
+            if node.level > len(current_parts):
+                return None
+            base_parts = current_parts[: -
+                                       node.level] if node.level > 0 else current_parts
+            module_path = ".".join(base_parts) if base_parts else None
+            return _resolve_to_existing(module_path)
+
+        # Relative import with module name
         if node.level > len(current_parts):
             self._log(
                 f"  Warning: Relative import level {node.level} exceeds directory depth"
             )
             return None
 
-        # Go up 'level' directories
-        if node.level > 0:
-            base_parts = current_parts[: -node.level]
-        else:
-            base_parts = current_parts
-
-        return ".".join(base_parts + [node.module_name])
+        base_parts = current_parts[: -
+                                   node.level] if node.level > 0 else current_parts
+        module_path = ".".join(base_parts + [node.module_name])
+        return _resolve_to_existing(module_path)

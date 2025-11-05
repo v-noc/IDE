@@ -146,15 +146,21 @@ export const NodeContent = ({
               {node.children
                 ?.filter((n) => (childFilter ? childFilter(n) : true))
                 .sort((a, b) => {
-                  const getRank = (n: ContainerNodeTree) =>
-                    n.node_type === "folder"
-                      ? 0
-                      : n.node_type === "file"
-                      ? 1
-                      : 2;
-                  const rankDiff = getRank(a) - getRank(b);
-                  if (rankDiff !== 0) return rankDiff;
-                  return a.name.localeCompare(b.name);
+                  if (
+                    node.node_type == "folder" ||
+                    node.node_type == "project"
+                  ) {
+                    const getRank = (n: ContainerNodeTree) =>
+                      n.node_type === "folder"
+                        ? 0
+                        : n.node_type === "file"
+                        ? 1
+                        : 2;
+                    const rankDiff = getRank(a) - getRank(b);
+                    if (rankDiff !== 0) return rankDiff;
+                    return a.name.localeCompare(b.name);
+                  }
+                  return undefined;
                 })
                 .map((child) => (
                   <TreeNode

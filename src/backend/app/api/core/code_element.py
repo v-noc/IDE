@@ -66,16 +66,17 @@ def write_code(
             for _ in range(50):
                 if not current_id:
                     break
-                parents = node_repo.get_parent(current_id)
-                if not parents:
+                parent = node_repo.get_parent(current_id)
+                if not parent:
                     break
-                parent_vertex = parents[0].get("vertex") or {}
+                parent_vertex = parent.get("vertex") or {}
                 if parent_vertex.get("node_type") == "project":
                     project_id = parent_vertex.get("_id")
                     if project_id:
                         project_node = project_service.get(project_id)
-                        if project_node:
-                            watcher_service.start_watching(project_node)
+                        # TODO: do a syncer
+                        # if project_node:
+                        #     watcher_service.start_watching(project_node)
                     break
                 current_id = parent_vertex.get("_id")
     except Exception:
