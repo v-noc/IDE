@@ -21,6 +21,7 @@ const dragOverVariants = cva(
 interface TreeDataItem {
   id: string;
   name: string;
+  subtitle?: string;
   icon?: any;
   selectedIcon?: any;
   openIcon?: any;
@@ -295,7 +296,12 @@ const TreeNode = ({
             isOpen={value.includes(item.id)}
             default={defaultNodeIcon}
           />
-          <span className="text-sm truncate">{item.name}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm truncate">{item.name}</span>
+            {item.subtitle ? (
+              <span className="text-xs text-muted-foreground truncate">{item.subtitle}</span>
+            ) : null}
+          </div>
           <TreeActions isSelected={selectedItemId === item.id}>
             {item.actions}
           </TreeActions>
@@ -406,7 +412,12 @@ const TreeLeaf = React.forwardRef<
           isSelected={selectedItemId === item.id}
           default={defaultLeafIcon}
         />
-        <span className="flex-grow text-sm truncate">{item.name}</span>
+        <div className="flex flex-col flex-grow min-w-0">
+          <span className="text-sm truncate">{item.name}</span>
+          {item.subtitle ? (
+            <span className="text-xs text-muted-foreground truncate">{item.subtitle}</span>
+          ) : null}
+        </div>
         <TreeActions isSelected={selectedItemId === item.id && !item.disabled}>
           {item.actions}
         </TreeActions>

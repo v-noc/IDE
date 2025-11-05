@@ -99,6 +99,33 @@ class CallRepo(NodeRepository[CallNode]):
             print(f"ERROR ANALYSIS: {error_info}")
             raise
 
+    def get_downward_call_chain(self, node_id: str) -> List[Dict[str, Any]]:
+        query = """
+        FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id @@contains
+            OPTIONS { order: "bfs" }
+            FILTER v.node_type == "call"
+                OR (v.node_type == "group" AND v.group_type == "call")
+            LET target = v.node_type == "call"
+                ? FIRST(FOR t IN 1..1 OUTBOUND v @@targets RETURN t)
+                : null
+            LET parent_id = LENGTH(p.vertices) >= 2
+                ? p.vertices[LENGTH(p.vertices) - 2]._id
+                : null
+            RETURN {
+                vertex: v,
+                parent_id: parent_id,
+                target: target
+            }
+        """
+        bind_vars = {
+            "start_node_id": node_id,
+            "@contains": "contains_edges",
+            "@targets": "targets_edges",
+            "max_depth": 50,
+        }
+        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+        return list(cursor)
+
     def find_upward_call_chain(self, call_id: str) -> List[Dict[str, Any]]:
         query = """
         LET call_chain_path = (
@@ -125,8 +152,7 @@ class CallRepo(NodeRepository[CallNode]):
 
         RETURN {
             origin: origin,
-            calls: call_chain_with_targets,
-           
+            calls: call_chain_with_targets
         }
         """
         bind_vars = {

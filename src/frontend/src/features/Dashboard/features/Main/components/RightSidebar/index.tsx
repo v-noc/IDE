@@ -22,6 +22,7 @@ import type {
   BasicInfoData,
   CustomizationData,
 } from "./hooks/useConfigSidebarForm";
+import { useUpdateBasicInfo } from "../../service/useContainer";
 
 export const RightSidebar: React.FC<{
   children?: React.ReactNode;
@@ -30,6 +31,9 @@ export const RightSidebar: React.FC<{
 }> = ({ className, onToggle }) => {
   const { selectedNode, projectData, setProjectData, setSelectedNode } =
     useProjectStore();
+  const { mutate: updateBasicInfo } = useUpdateBasicInfo(
+    selectedNode?._key ?? ""
+  );
 
   const updateNodeInTree = useCallback(
     (
@@ -133,6 +137,12 @@ export const RightSidebar: React.FC<{
         })
       );
 
+      updateBasicInfo({
+        name: data.name,
+        description: data.description ?? "",
+        icon: nextIcon,
+      });
+
       setProjectData(updatedTree);
       setSelectedNode(updatedSelected);
     },
@@ -140,6 +150,7 @@ export const RightSidebar: React.FC<{
       projectData,
       selectedNode,
       setProjectData,
+      updateBasicInfo,
       setSelectedNode,
       updateNodeInTree,
     ]

@@ -15,6 +15,9 @@ const EditorCode = () => {
       }
       return secondarySelectedNode;
     }
+    if (selectedNode?.node_type === "call") {
+      return selectedNode.target;
+    }
     return selectedNode;
   }, [secondarySelectedNode, selectedNode]);
 

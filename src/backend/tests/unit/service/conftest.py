@@ -102,6 +102,24 @@ def create_function2(create_repos):
 
 
 @pytest.fixture
+def create_function3(create_repos):
+    function_service = FunctionService(create_repos)
+    position = CodePosition(
+        line_no=1,
+        col_offset=0,
+        end_line_no=1,
+        end_col_offset=0
+    )
+    return function_service.create(
+        "Test Function 3",
+        "test_project.test_function3",
+        "This is a test function",
+
+        position
+    )
+
+
+@pytest.fixture
 def create_class(create_repos):
     class_service = ClassService(create_repos)
     position = CodePosition(

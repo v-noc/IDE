@@ -18,7 +18,7 @@ class GroupService(ContainerService):
         if not group:
             raise ValueError(f"Group {group_id} not found")
 
-        parent = self.repos.nodes.get_parent(group_id)
+        parent = self.repos.nodes.get_parent(group.id)
         if not parent:
             raise ValueError(f"Parent {child_id} not found")
 

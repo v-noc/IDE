@@ -1,10 +1,12 @@
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from arango.database import StandardDatabase
 from fastapi import Depends
-from app.db.client import get_db
 from app.core.services.call_service import CallService
-from app.api.dependencies import get_call_service, get_function_service, get_container_service
+from app.api.dependencies import (
+    get_call_service,
+    get_function_service,
+    get_container_service,
+)
 from app.core.services.function_service import FunctionService
 from app.core.services.container_service import ContainerService
 from fastapi import HTTPException
@@ -14,8 +16,9 @@ router = APIRouter()
 
 
 class AddCallRequest(BaseModel):
-    callee_target_id: str = Field(...,
-                                  description="The target ID of the callee function")
+    callee_target_id: str = Field(
+        ..., description="The target ID of the callee function"
+    )
     name: str = Field(..., description="The name of the call")
     description: str = Field(..., description="The description of the call")
 
@@ -40,7 +43,11 @@ def add_call(
 
     if parent_node.node_type not in ["function", "class", "file", "call"]:
         raise HTTPException(
-            status_code=400, detail="Parent node is not a function, class, file, or call")
+            status_code=400,
+            detail=(
+                "Parent node is not a function, class, file, or call"
+            ),
+        )
 
     call = call_service.create(
         name=add_call.name,
@@ -57,7 +64,16 @@ def add_call(
     )
 
     container_service.add_child_to_container(
-        parent_node.id, call.id, f"{parent_node.node_type}_to_call")
+        parent_node.id,
+        call.id,
+        f"{parent_node.node_type}_to_call",
+    )
+
+    # Clone callee's internal call graph (calls and groups) under the new call
+    container_service.clone_callee_call_graph(
+        callee_function_node.id,
+        call.id,
+    )
 
     return call
 
