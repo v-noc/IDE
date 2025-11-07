@@ -10,6 +10,7 @@ import CreateGroupsDialog from "@/features/Dashboard/components/CreateGroupsDial
 import type { GroupNodeTree } from "@/types/project";
 import ManageGroupsDialog from "@/features/Dashboard/components/ManageGroupsDialog";
 // import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
+import PromptBuilder from "@/components/PromptBuilder/PromptBuilder";
 
 interface TreeNodeProps {
   node: ContainerNodeTree;
@@ -57,6 +58,8 @@ export const TreeNode = ({
     useState(false);
   const [isManageGroupsDialogOpen, setIsManageGroupsDialogOpen] =
     useState(false);
+
+  const [isPromptBuilderOpen, setIsPromptBuilderOpen] = useState(false);
 
   const closeAddCallDialog = () => {
     setIsAddCallDialogOpen(null);
@@ -106,6 +109,7 @@ export const TreeNode = ({
         onRemove={handleRemove}
         onManageGroup={() => setIsManageGroupsDialogOpen(true)}
         onEdit={undefined}
+        onBuildPrompt={() => setIsPromptBuilderOpen(true)}
         onAddCall={() =>
           setIsAddCallDialogOpen({
             node_id: node._key,
@@ -160,6 +164,12 @@ export const TreeNode = ({
         group={node as unknown as GroupNodeTree}
         siblings={getSiblings(node)}
         project_key={projectData?._key ?? ""}
+      />
+
+      <PromptBuilder
+        open={isPromptBuilderOpen}
+        onOpenChange={setIsPromptBuilderOpen}
+        rootNode={node}
       />
     </>
   );

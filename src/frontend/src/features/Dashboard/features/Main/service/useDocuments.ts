@@ -126,15 +126,12 @@ export const useCreateDocument = () => {
 };
 
 export const useUpdateDocument = (nodeId: string) => {
-    const queryClient = useQueryClient();
+
     return useMutation<DocumentType, Error, UpdateDocumentRequest>({
         mutationFn: (payload) => updateDocument(payload),
         onSuccess: (data) => {
-            console.log("OOO ", data);
-            queryClient.setQueryData(["documents", nodeId], (old: DocumentType[]) => {
-                console.log("useUpdateDocument ", old, " ", nodeId);
-                return old.map((d) => d._key === data._key ? data : d);
-            });
+            console.log("notify document updated ", data, " ", nodeId);
+
         },
     });
 };

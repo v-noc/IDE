@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Separator } from "@/components/ui/separator";
 import type { AnyNodeTree } from "@/types/project";
-import { Crosshair, Expand, Group, Link, Trash } from "lucide-react";
+import { Crosshair, Expand, Group, Link, Trash, FileCode } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -22,6 +22,7 @@ interface NodeContextMenuProps {
   onCreateGroup: () => void;
   onDeleteGroup: () => void;
   onManageGroup?: () => void;
+  onBuildPrompt?: () => void;
 }
 
 export const NodeContextMenu = ({
@@ -34,6 +35,7 @@ export const NodeContextMenu = ({
   onCreateGroup,
   onManageGroup,
   onDeleteGroup,
+  onBuildPrompt,
 }: NodeContextMenuProps) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -52,6 +54,12 @@ export const NodeContextMenu = ({
             <Expand />
             Expand
           </ContextMenuItem>
+          {onBuildPrompt && (
+            <ContextMenuItem onClick={onBuildPrompt}>
+              <FileCode />
+              Build Prompt
+            </ContextMenuItem>
+          )}
           <Separator />
           {(node.node_type == "function" ||
             node.node_type == "class" ||

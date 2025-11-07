@@ -34,25 +34,51 @@ type DocumentsProps = {
 const Documents = ({ document, onChange }: DocumentsProps) => {
   const editor = useCreateBlockNote({ schema, initialContent: undefined });
   const applyingRemoteContent = useRef(false);
+  const lastAppliedDataRef = useRef<string | null>(null);
 
   // Load content when selected document changes
   useEffect(() => {
     if (!editor || !document) return;
     const data = document?.data ?? "";
+
+    // Skip if we've already applied this exact content
+    if (lastAppliedDataRef.current === data) return;
+
     applyingRemoteContent.current = true;
     try {
+      // Try JSON (BlockNote blocks)
       const parsedDocument = JSON.parse(data);
       editor.replaceBlocks(editor.document, parsedDocument);
-    } catch (error) {
-      editor.replaceBlocks(editor.document, []);
-      console.error("Error parsing document data:", error);
+      lastAppliedDataRef.current = data;
+    } catch {
+      // Fallback: treat as Markdown and REPLACE content (not append)
+      try {
+        editor.replaceBlocks(editor.document, []);
+        // pasteMarkdown appends at cursor; with empty doc this effectively replaces
+        // If parse-to-blocks API is available, prefer it; otherwise paste
+        const parseMarkdownToBlocks = editor.tryParseMarkdownToBlocks;
+        if (typeof parseMarkdownToBlocks === "function") {
+          editor.tryParseMarkdownToBlocks(data).then((blocks) => {
+            if (blocks) {
+              editor.replaceBlocks(editor.document, blocks);
+            } else {
+              editor.pasteMarkdown(data);
+            }
+          });
+        } else {
+          editor.pasteMarkdown(data);
+        }
+        lastAppliedDataRef.current = data;
+      } catch (mdErr) {
+        console.error("Error applying markdown document data:", mdErr);
+      }
     } finally {
       // Let BlockNote apply the changes before re-enabling onChange propagation
       setTimeout(() => {
         applyingRemoteContent.current = false;
       }, 0);
     }
-  }, [editor, document]);
+  }, [editor, document, document?.id, document?.data]);
 
   // If no document is selected, show an empty state instead of editor
   if (!document) {
@@ -78,9 +104,9 @@ const Documents = ({ document, onChange }: DocumentsProps) => {
         <BlockNoteView
           className="rounded-none notion-like"
           theme="light"
-          onChange={(currentEditor) => {
+          onChange={async (currentEditor) => {
             if (applyingRemoteContent.current) return;
-            onChange?.(JSON.stringify(currentEditor?.document));
+            onChange?.(await currentEditor?.blocksToMarkdownLossy());
           }}
           editor={editor}
           slashMenu={false}
