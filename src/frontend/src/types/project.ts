@@ -27,6 +27,7 @@ export interface ThemeConfig {
 
 export interface ContainerNode extends BaseNode {
     theme_config?: ThemeConfig
+    documents: string[]
     icon?: string
 }
 

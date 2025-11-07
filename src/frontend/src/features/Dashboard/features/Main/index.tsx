@@ -57,10 +57,14 @@ const MainCanvas = () => {
   useEffect(() => {
     // Default to first document when available
 
-    if (!selectedDocumentId && documents.length > 0) {
+    if (
+      (!selectedDocumentId ||
+        !selectedNode?.documents.includes(selectedDocumentId)) &&
+      documents.length > 0
+    ) {
       setSelectedDocumentId(documents[0]._key);
     }
-  }, [documents, selectedDocumentId]);
+  }, [documents, selectedDocumentId, selectedNode]);
 
   useEffect(() => {
     // Listen to sidebar selection events
