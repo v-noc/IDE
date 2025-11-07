@@ -22,6 +22,8 @@ const MainCanvas = () => {
     secondarySelectedNode,
     setSelectedNode,
     setSecondarySelectedNode,
+    selectedDocumentId,
+    setSelectedDocumentId,
   } = useProjectStore();
   const [tabValue, setTabValue] = useState("docs");
   const effectiveNode = secondarySelectedNode ?? selectedNode;
@@ -42,9 +44,7 @@ const MainCanvas = () => {
   }, [effectiveNode?.node_type]);
 
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
-    null
-  );
+
   const nodeKey = effectiveNode?._key || "";
   const { data: documents = [] } = useGetDocuments(nodeKey);
 
@@ -59,23 +59,12 @@ const MainCanvas = () => {
 
     if (
       (!selectedDocumentId ||
-        !selectedNode?.documents.includes(selectedDocumentId)) &&
+        !selectedNode?.documents.includes(`documents/${selectedDocumentId}`)) &&
       documents.length > 0
     ) {
       setSelectedDocumentId(documents[0]._key);
     }
   }, [documents, selectedDocumentId, selectedNode]);
-
-  useEffect(() => {
-    // Listen to sidebar selection events
-    const onSelect = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { _key?: string } | undefined;
-      if (detail?._key) setSelectedDocumentId(detail._key);
-    };
-    window.addEventListener("select-document", onSelect as EventListener);
-    return () =>
-      window.removeEventListener("select-document", onSelect as EventListener);
-  }, []);
 
   const selectedDocument = useMemo(
     () => documents.find((d) => d._key === selectedDocumentId) || null,
@@ -190,6 +179,7 @@ const MainCanvas = () => {
                 <div className="flex-1  pl-8  overflow-hidden">
                   <div className="h-full pt-2 w-full overflow-auto ">
                     <Documents
+                      key={selectedDocument?._key || "new"}
                       document={
                         selectedDocument
                           ? {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import {
   useGetDocuments,
@@ -24,7 +24,8 @@ import {
 import { Plus, Pencil, Trash2, FileText } from "lucide-react";
 
 const DocumentsList: React.FC = () => {
-  const { selectedNode } = useProjectStore();
+  const { selectedNode, selectedDocumentId, setSelectedDocumentId } =
+    useProjectStore();
   const nodeKey = selectedNode?._key || "";
   const queryClient = useQueryClient();
 
@@ -37,13 +38,7 @@ const DocumentsList: React.FC = () => {
   const [formDesc, setFormDesc] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   // Listen for external document selections to keep highlight in sync
-  useEffect(() => {
-    if (docs.length > 0 && selectedId == null) {
-      setSelectedId(docs[0]._key);
-    }
-  }, [docs, selectedId]);
 
   const canUseDocs = useMemo(() => Boolean(nodeKey), [nodeKey]);
 
@@ -177,16 +172,13 @@ const DocumentsList: React.FC = () => {
               key={doc._key}
               className={
                 "p-3 shadow-none rounded-sm hover:cursor-pointer transition " +
-                (selectedId === doc._key
+                (selectedDocumentId === doc._key
                   ? "ring-2 ring-primary ring-offset-1"
                   : "")
               }
               onClick={() => {
-                const ev = new CustomEvent("select-document", {
-                  detail: { _key: doc._key },
-                });
-                window.dispatchEvent(ev);
-                setSelectedId(doc._key);
+                console.log("doc", doc._key);
+                setSelectedDocumentId(doc._key);
               }}
             >
               <div className="flex items-start justify-between gap-2">

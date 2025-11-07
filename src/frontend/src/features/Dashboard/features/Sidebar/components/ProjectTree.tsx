@@ -94,7 +94,6 @@ const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
     setSelectedNode,
   ]);
 
-  console.log("focusedNode", focusedNode);
   return (
     <div className="space-y-1">
       {focusedNode && (

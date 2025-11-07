@@ -2,12 +2,8 @@ import "@blocknote/core/fonts/inter.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
-import {
-  BlockNoteSchema,
-  defaultBlockSpecs,
-  filterSuggestionItems,
-} from "@blocknote/core";
-import type { BlockSpecs } from "@blocknote/core";
+import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
+import { type BlockSpecs } from "@blocknote/core";
 // import { ReactMermaidBlock } from "./blocks/MermaidBlock";
 import {
   SuggestionMenuController,
@@ -15,6 +11,7 @@ import {
 } from "@blocknote/react";
 import { useEffect, useRef } from "react";
 import { FileText } from "lucide-react";
+import { createHighlighter } from "./shiki.bundle";
 
 // Creates a new editor instance with Mermaid block registered.
 // const customBlockSpecs = {
@@ -23,7 +20,6 @@ import { FileText } from "lucide-react";
 const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
-    // ...customBlockSpecs,
   } as BlockSpecs,
 });
 type DocumentsProps = {
@@ -32,7 +28,25 @@ type DocumentsProps = {
 };
 
 const Documents = ({ document, onChange }: DocumentsProps) => {
-  const editor = useCreateBlockNote({ schema, initialContent: undefined });
+  const editor = useCreateBlockNote({
+    schema,
+    initialContent: undefined,
+    codeBlock: {
+      indentLineWithTab: true,
+      defaultLanguage: "python",
+      supportedLanguages: {
+        python: {
+          name: "Python",
+          aliases: ["py"],
+        },
+      },
+      createHighlighter: () =>
+        createHighlighter({
+          themes: ["github-dark"],
+          langs: [],
+        }),
+    },
+  });
   const applyingRemoteContent = useRef(false);
   const lastAppliedDataRef = useRef<string | null>(null);
 
@@ -56,18 +70,14 @@ const Documents = ({ document, onChange }: DocumentsProps) => {
         editor.replaceBlocks(editor.document, []);
         // pasteMarkdown appends at cursor; with empty doc this effectively replaces
         // If parse-to-blocks API is available, prefer it; otherwise paste
-        const parseMarkdownToBlocks = editor.tryParseMarkdownToBlocks;
-        if (typeof parseMarkdownToBlocks === "function") {
-          editor.tryParseMarkdownToBlocks(data).then((blocks) => {
-            if (blocks) {
-              editor.replaceBlocks(editor.document, blocks);
-            } else {
-              editor.pasteMarkdown(data);
-            }
-          });
+
+        const blocks = editor.tryParseMarkdownToBlocks(data);
+        if (!blocks) {
+          editor.replaceBlocks(editor.document, blocks);
         } else {
           editor.pasteMarkdown(data);
         }
+
         lastAppliedDataRef.current = data;
       } catch (mdErr) {
         console.error("Error applying markdown document data:", mdErr);
@@ -102,7 +112,7 @@ const Documents = ({ document, onChange }: DocumentsProps) => {
     <div className="h-full w-full overflow-auto bg-background text-foreground">
       <div className="mx-auto max-w-4xl xl:max-w-5xl px-6 sm:px-8 lg:px-16 py-12 font-sans text-[17px] leading-8 antialiased">
         <BlockNoteView
-          className="rounded-none notion-like"
+          className="rounded-none docs-editor"
           theme="light"
           onChange={async (currentEditor) => {
             if (applyingRemoteContent.current) return;
@@ -121,76 +131,6 @@ const Documents = ({ document, onChange }: DocumentsProps) => {
           />
         </BlockNoteView>
       </div>
-      <style>
-        {`
-          /* Subtle, Notion-like typography and spacing for BlockNote */
-          .notion-like,
-          .notion-like .bn-editor {
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-              Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            text-rendering: optimizeLegibility;
-            font-size: 17px;
-            line-height: 2rem;
-          }
-          .notion-like .bn-container {
-            padding: 0 !important;
-            background: transparent !important;
-          }
-          .notion-like .bn-default-app {
-            box-shadow: none !important;
-            background: transparent !important;
-          }
-          .notion-like .bn-block-content {
-            margin: 0.25rem 0;
-          }
-          .notion-like h1 {
-            font-size: 1.875rem;
-            line-height: 2.25rem;
-            font-weight: 700;
-            margin: 1.25rem 0 0.5rem;
-          }
-          .notion-like h2 {
-            font-size: 1.5rem;
-            line-height: 2rem;
-            font-weight: 700;
-            margin: 1rem 0 0.5rem;
-          }
-          .notion-like p {
-            margin: 0.25rem 0;
-          }
-          /* Code block styles */
-          .notion-like pre,
-          .notion-like .bn-code,
-          .notion-like .bn-code-block {
-            background: #0b0b0b !important;
-            color: #e5e7eb !important;
-            border: 1px solid #1f2937;
-            border-radius: 10px;
-            padding: 0.9rem 1rem;
-            overflow-x: auto;
-            margin: 0.75rem 0;
-          }
-          .notion-like pre code {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-              "Liberation Mono", "Courier New", monospace !important;
-            font-size: 0.95em;
-            color: #e5e7eb !important;
-          }
-          /* Inline code (not in block) */
-          .notion-like :not(pre) > code {
-            background: #f3f4f6;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            padding: 0.15rem 0.35rem;
-            color: inherit !important;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-              "Liberation Mono", "Courier New", monospace !important;
-            font-size: 0.95em;
-          }
-        `}
-      </style>
     </div>
   );
 };

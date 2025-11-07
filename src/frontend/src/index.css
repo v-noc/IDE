@@ -153,3 +153,18 @@
 .bn-file-block-content-wrapper:hover .bn-resize-handle {
   opacity: 0.3;
 }
+
+.bn-inline-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.95em;
+  background-color: oklch(0.96 0 0);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  white-space: break-spaces;
+}
+
+.dark .bn-inline-content code {
+  background-color: rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+}
