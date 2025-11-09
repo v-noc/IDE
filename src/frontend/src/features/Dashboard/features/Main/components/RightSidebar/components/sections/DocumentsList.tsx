@@ -22,6 +22,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, FileText } from "lucide-react";
+import type { CallNodeTree } from "@/types/project";
 
 const DocumentsList: React.FC = () => {
   const {
@@ -32,17 +33,17 @@ const DocumentsList: React.FC = () => {
   } = useProjectStore();
   const nodeKey = useMemo(() => {
     if (secondarySelectedNode) {
-      return secondarySelectedNode.target
-        ? secondarySelectedNode.target._key
+      return (secondarySelectedNode as CallNodeTree).target
+        ? (secondarySelectedNode as CallNodeTree)?.target?._key ?? ""
         : secondarySelectedNode._key;
     }
     return selectedNode?._key;
   }, [selectedNode, secondarySelectedNode]);
   const queryClient = useQueryClient();
-  console.log("NodeKey", nodeKey);
-  const { data: docs = [], isLoading } = useGetDocuments(nodeKey);
+
+  const { data: docs = [], isLoading } = useGetDocuments(nodeKey ?? "");
   const createMutation = useCreateDocument();
-  const updateMutation = useUpdateDocument(nodeKey);
+  const updateMutation = useUpdateDocument(nodeKey ?? "");
   const deleteMutation = useDeleteDocument();
 
   const [formName, setFormName] = useState("");
@@ -83,7 +84,7 @@ const DocumentsList: React.FC = () => {
       await createMutation.mutateAsync({
         name: formName.trim(),
         description: formDesc.trim(),
-        node_id: nodeKey,
+        node_id: nodeKey ?? "",
       });
     }
     setOpen(false);
@@ -93,7 +94,10 @@ const DocumentsList: React.FC = () => {
 
   const onDelete = async (doc: DocumentType) => {
     if (!canUseDocs) return;
-    await deleteMutation.mutateAsync({ documentId: doc._key, nodeId: nodeKey });
+    await deleteMutation.mutateAsync({
+      documentId: doc._key,
+      nodeId: nodeKey ?? "",
+    });
     refresh();
   };
 

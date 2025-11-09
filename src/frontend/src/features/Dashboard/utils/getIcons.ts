@@ -1,11 +1,10 @@
-import type { NodeType } from "../service/useProject";
+import type { NodeType } from "@/types/project";
 
 const getIcons = (nodeType: NodeType): string => {
   switch (nodeType) {
     case "folder":
       return "FaFolder";
-    case "virtual_folder":
-      return "FaFolder";
+
     case "file":
       return "FaFile";
     case "project":
@@ -14,8 +13,7 @@ const getIcons = (nodeType: NodeType): string => {
       return "TbFunction";
     case "class":
       return "FaTable";
-    case "package":
-      return "FiPackage";
+
     case "group":
       return "HiMiniRectangleGroup";
     default:

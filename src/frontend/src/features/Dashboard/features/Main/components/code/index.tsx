@@ -5,13 +5,14 @@ import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
 import CodeEditor from "@/components/CodeEditor";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
+import type { CallNodeTree } from "@/types/project";
 
 const EditorCode = () => {
   const { selectedNode, secondarySelectedNode } = useProjectStore();
   const effectiveNode = useMemo(() => {
     if (secondarySelectedNode) {
-      if (secondarySelectedNode.target) {
-        return secondarySelectedNode.target;
+      if ((secondarySelectedNode as CallNodeTree).target) {
+        return (secondarySelectedNode as CallNodeTree).target;
       }
       return secondarySelectedNode;
     }

@@ -20,11 +20,11 @@ export const useAddCall = (caller_node_id: string, project_key: string) => {
   });
 };
 
-export const useRemoveCall = (call_key: string, project_key: string) => {
+export const useRemoveCall = (project_key: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => removeCall(call_key),
+    mutationFn: (call_key: string) => removeCall(call_key),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
     },

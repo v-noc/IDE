@@ -37,8 +37,10 @@ const FileAndFolderSelector = ({
         type="file"
         style={{ display: "none" }}
         onChange={(e) => handleFolderSelect(e, true)}
-        webkitdirectory=""
-        directory=""
+        {...({
+          webkitdirectory: "",
+          directory: "",
+        } as React.InputHTMLAttributes<HTMLInputElement>)}
       />
     </div>
   );

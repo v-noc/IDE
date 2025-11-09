@@ -1,7 +1,11 @@
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { useMemo } from "react";
 import { TreeNode } from "../../../Sidebar/components/TreeNode";
-import { type GroupNode } from "@/types/project";
+import {
+  type AnyNodeTree,
+  type ContainerNodeTree,
+  type GroupNode,
+} from "@/types/project";
 
 type CallSidebarProps = {
   hideHeader?: boolean;
@@ -50,13 +54,13 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
           callChildren.map((call_node) => (
             <TreeNode
               key={call_node._key}
-              node={call_node}
+              node={call_node as ContainerNodeTree}
               childFilter={(node) =>
                 node.node_type === "call" ||
                 (node.node_type == "group" &&
                   (node as unknown as GroupNode).group_type == "call")
               }
-              onSelect={(n) => setSecondarySelectedNode(n)}
+              onSelect={(n) => setSecondarySelectedNode(n as AnyNodeTree)}
             />
           ))
         )}

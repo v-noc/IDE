@@ -7,7 +7,7 @@ import EditVirtualFolderDialog from "../VirtualFolders/EditVirtualFolderDialog";
 import { useState } from "react";
 import SelectNodeDialog from "../SelectNodeDialog";
 import CreateGroupsDialog from "@/features/Dashboard/components/CreateGroupsDialog";
-import type { GroupNodeTree } from "@/types/project";
+import type { AnyNodeTree, CallNodeTree, GroupNodeTree } from "@/types/project";
 import ManageGroupsDialog from "@/features/Dashboard/components/ManageGroupsDialog";
 // import CreatePathDialog from "../VirtualFolders/CreatePathDialog";
 import PromptBuilder from "@/components/PromptBuilder/PromptBuilder";
@@ -39,7 +39,7 @@ export const TreeNode = ({
     handleSelectNode,
     handleFocus,
     handleExpand,
-    handleRemove,
+
     // handleEdit,
     handleAddCall,
     closeCreateDialog,
@@ -73,7 +73,7 @@ export const TreeNode = ({
       return currentNode;
     }
     for (const child of currentNode.children ?? []) {
-      const parent = getParentNode(node, child);
+      const parent = getParentNode(node, child as ContainerNodeTree);
       if (parent) {
         return parent;
       }
@@ -83,7 +83,7 @@ export const TreeNode = ({
   };
 
   const getSiblings = (node: ContainerNodeTree): ContainerNodeTree[] => {
-    const parentNode = getParentNode(node, projectData);
+    const parentNode = getParentNode(node, projectData as ContainerNodeTree);
     if (!parentNode) return [];
     const children = parentNode.children ?? [];
     return children.filter(
@@ -98,15 +98,14 @@ export const TreeNode = ({
   return (
     <>
       <NodeContextMenu
-        node={node}
+        node={node as AnyNodeTree}
         onFocus={handleFocus}
         onExpand={handleExpand}
         onCreateGroup={() => setIsCreateGroupsDialogOpen(true)}
         onDeleteGroup={() => handleDeleteGroup()}
         onRemoveCall={() => {
-          handleRemoveCall(node);
+          handleRemoveCall(node as CallNodeTree);
         }}
-        onRemove={handleRemove}
         onManageGroup={() => setIsManageGroupsDialogOpen(true)}
         onEdit={undefined}
         onBuildPrompt={() => setIsPromptBuilderOpen(true)}
@@ -145,7 +144,7 @@ export const TreeNode = ({
       <SelectNodeDialog
         isOpen={isAddCallDialogOpen !== null}
         onClose={closeAddCallDialog}
-        list={projectData?.children ?? []}
+        list={(projectData?.children as AnyNodeTree[]) ?? []}
         selectNodeType={["function"]}
         onSelect={(node) => handleAddCall(node)}
       />
@@ -153,23 +152,25 @@ export const TreeNode = ({
       <CreateGroupsDialog
         isOpen={isCreateGroupsDialogOpen}
         onClose={() => setIsCreateGroupsDialogOpen(false)}
-        initialChildren={node ? [node] : []}
+        initialChildren={node ? [node as AnyNodeTree] : []}
         project_key={projectData?._key ?? ""}
-        parent_node_id={getParentNode(node, projectData)?._key ?? ""}
+        parent_node_id={
+          getParentNode(node, projectData as ContainerNodeTree)?._key ?? ""
+        }
       />
 
       <ManageGroupsDialog
         isOpen={isManageGroupsDialogOpen}
         onClose={() => setIsManageGroupsDialogOpen(false)}
         group={node as unknown as GroupNodeTree}
-        siblings={getSiblings(node)}
+        siblings={getSiblings(node as ContainerNodeTree) as AnyNodeTree[]}
         project_key={projectData?._key ?? ""}
       />
 
       <PromptBuilder
         open={isPromptBuilderOpen}
         onOpenChange={setIsPromptBuilderOpen}
-        rootNode={node}
+        rootNode={node as ContainerNodeTree}
       />
     </>
   );

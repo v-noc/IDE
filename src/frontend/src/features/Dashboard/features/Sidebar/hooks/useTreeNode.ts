@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import type { NodeType, AnyNodeTree, ContainerNodeTree } from "@/types/project";
+import type { NodeType, AnyNodeTree, ContainerNodeTree, CallNodeTree } from "@/types/project";
 import { useAddCall, useRemoveCall } from "@/features/Dashboard/service/useCall";
 import { useDeleteGroup } from "@/features/Dashboard/service/useGroup";
 // import { useDeleteVirtualFolder } from "@/features/Dashboard/service/useProject";
@@ -27,7 +27,7 @@ export const useTreeNode = (
     // projectData,
   } = useProjectStore();
   const addCallMutation = useAddCall(node._key, projectData?._key || "");
-  const removeCallMutation = useRemoveCall(node._key, projectData?._key || "");
+  const removeCallMutation = useRemoveCall(projectData?._key || "");
   const deleteGroupMutation = useDeleteGroup(node._key, projectData?._key || "");
   // const queryClient = useQueryClient();
   // const deleteVirtualFolderMutation = useDeleteVirtualFolder(projectData?.id || "");
@@ -46,7 +46,7 @@ export const useTreeNode = (
   const isActive = activeNodeId === node._key;
   const hasChildren = useMemo(() => {
     const children = node.children ?? [];
-    return children.some(childFilter);
+    return children.some((child) => childFilter(child as ContainerNodeTree));
   }, [node, childFilter]);
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -59,7 +59,7 @@ export const useTreeNode = (
     if (secondarySelectedNode)
       setSecondarySelectedNode(null);
     if (selectedNode?._key === node._key) return;
-    setSelectedNode(node);
+    setSelectedNode(node as unknown as AnyNodeTree);
 
     // // Update global theme from the selected node if provided
     // setTheme(node.theme);
@@ -71,7 +71,7 @@ export const useTreeNode = (
         return;
       }
     }
-    pushFocus(node);
+    pushFocus(node as unknown as AnyNodeTree);
   };
 
   const handleExpand = () => {
@@ -79,32 +79,13 @@ export const useTreeNode = (
 
   };
 
-  const handleRemove = async () => {
-    // if (node.node_type !== "virtual_folder") return;
-    // if (!projectData?.id) {
-    //   toast.error("No project selected");
-    //   return;
-    // }
-    // try {
-    //   await deleteVirtualFolderMutation.mutateAsync(node.id);
-    //   await Promise.all([
-    //     // Avoid invalidating projectTree to preserve selection
-    //     // queryClient.invalidateQueries({ queryKey: ["projectTree", projectData.id] }),
-    //     queryClient.invalidateQueries({ queryKey: ["virtualFolders", projectData.id] }),
-    //   ]);
-    //   toast.success("Virtual folder removed");
-    // } catch (error) {
-    //   console.error("Failed to remove virtual folder:", error);
-    //   toast.error("Failed to remove virtual folder");
-    // }
-  };
+
 
   const handleEdit = () => {
     setEditDialogOpen(true);
   };
 
   const handleAddCall = (node: AnyNodeTree) => {
-    console.log("handleAddCall");
     addCallMutation.mutate({
       callee_target_id: node._key,
       name: node.name,
@@ -134,7 +115,7 @@ export const useTreeNode = (
     setCreatePathDialogOpen(false);
   };
 
-  const handleRemoveCall = (node: AnyNodeTree) => {
+  const handleRemoveCall = (node: CallNodeTree) => {
     removeCallMutation.mutate(node._key);
   };
 
@@ -163,7 +144,7 @@ export const useTreeNode = (
     handleSelectNode,
     handleFocus,
     handleExpand,
-    handleRemove,
+
     handleAddCall,
     handleCreateFile,
     handleCreateFolder,

@@ -15,6 +15,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { useGetDocuments, useUpdateDocument } from "./service/useDocuments";
 import { debounce } from "remeda";
 import Canvas from "./components/Canvas";
+import type { CallNodeTree } from "@/types/project";
 
 const MainCanvas = () => {
   const {
@@ -26,7 +27,8 @@ const MainCanvas = () => {
     setSelectedDocumentId,
   } = useProjectStore();
   const [tabValue, setTabValue] = useState("docs");
-  const effectiveNode = secondarySelectedNode?.target ?? selectedNode;
+  const effectiveNode =
+    (secondarySelectedNode as CallNodeTree)?.target ?? selectedNode;
 
   const { suffixName, displayPath } = useMemo(() => {
     const base = selectedNode?.qname?.replace(/\./g, " / ") ?? "";
@@ -55,13 +57,11 @@ const MainCanvas = () => {
   }, [effectiveNode, isCodeActive]);
 
   useEffect(() => {
-    console.log("hello");
     // Default to first document when available
     const currentSelected = secondarySelectedNode
-      ? secondarySelectedNode.target
+      ? (secondarySelectedNode as CallNodeTree)?.target ?? selectedNode
       : selectedNode;
 
-    console.log("current selected", currentSelected, " ", selectedDocumentId);
     if (
       (!selectedDocumentId ||
         !currentSelected?.documents.includes(

@@ -71,8 +71,8 @@ const EditVirtualFolderDialog = ({
     });
   }, [node, form]);
 
-  const onSubmit = async (data: FormValues) => {
-    if (!projectData?.key || !node?.key) {
+  const onSubmit = async (_data: FormValues) => {
+    if (!projectData?._key || !node?._key) {
       toast.error("No project or folder selected");
       return;
     }

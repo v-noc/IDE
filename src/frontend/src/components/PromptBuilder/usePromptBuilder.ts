@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import type { AnyNodeTree, ContainerNodeTree } from "@/types/project";
 import type { DocumentType } from "@/features/Dashboard/features/Main/service/useDocuments";
 import { supportsCode } from "./types";
@@ -62,7 +62,6 @@ export const usePromptBuilder = (rootNode: ContainerNodeTree): UsePromptBuilderS
       `name="${escapeAttr(node.name)}"`,
     ];
     if (node.description) attrs.push(`description="${escapeAttr(node.description)}"`);
-    // @ts-expect-error group_type only exists on group
     if (node.node_type === "group" && node.group_type) attrs.push(`group_type="${escapeAttr(node.group_type)}"`);
 
     const children = (node.children ?? []) as AnyNodeTree[];
@@ -85,7 +84,7 @@ export const usePromptBuilder = (rootNode: ContainerNodeTree): UsePromptBuilderS
   }, [checked, includeDocs, includeCode, documentsByNode, codeByNode]);
 
   const generateXml = useCallback(() => {
-    return buildXml(rootNode);
+    return buildXml(rootNode as AnyNodeTree);
   }, [buildXml, rootNode]);
 
   return {

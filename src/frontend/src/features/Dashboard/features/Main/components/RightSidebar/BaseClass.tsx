@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type {
   AnyNodeTree,
   ClassNodeTree,
+  ContainerNodeTree,
   FunctionNodeTree,
 } from "@/types/project";
 import { TreeNode } from "../../../Sidebar/components/TreeNode";
@@ -111,7 +112,7 @@ const BaseClass = () => {
               <TreeNode
                 key={method._key}
                 node={method}
-                onSelect={(n) => setSecondarySelectedNode(n)}
+                onSelect={(n) => setSecondarySelectedNode(n as AnyNodeTree)}
               />
             ))
           )}
@@ -126,8 +127,8 @@ const BaseClass = () => {
             baseClassNodes.map((node) => (
               <TreeNode
                 key={node._key}
-                node={node}
-                onSelect={(n) => setSecondarySelectedNode(n)}
+                node={node as ContainerNodeTree}
+                onSelect={(n) => setSecondarySelectedNode(n as AnyNodeTree)}
               />
             ))
           )}

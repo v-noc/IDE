@@ -15,7 +15,6 @@ interface NodeContextMenuProps {
   node: AnyNodeTree;
   onFocus: () => void;
   onExpand: () => void;
-  onRemove: () => void;
   onRemoveCall: () => void;
   onAddCall: () => void;
   onEdit?: () => void;

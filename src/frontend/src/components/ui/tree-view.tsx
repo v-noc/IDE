@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import React from "react";
@@ -137,7 +138,8 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         />
         <div
           className="w-full h-[48px]"
-          onDrop={(e) => {
+          onDrop={(e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
             handleDrop({ id: "", name: "parent_div" });
           }}
         ></div>
@@ -299,7 +301,9 @@ const TreeNode = ({
           <div className="flex flex-col min-w-0">
             <span className="text-sm truncate">{item.name}</span>
             {item.subtitle ? (
-              <span className="text-xs text-muted-foreground truncate">{item.subtitle}</span>
+              <span className="text-xs text-muted-foreground truncate">
+                {item.subtitle}
+              </span>
             ) : null}
           </div>
           <TreeActions isSelected={selectedItemId === item.id}>
@@ -415,7 +419,9 @@ const TreeLeaf = React.forwardRef<
         <div className="flex flex-col flex-grow min-w-0">
           <span className="text-sm truncate">{item.name}</span>
           {item.subtitle ? (
-            <span className="text-xs text-muted-foreground truncate">{item.subtitle}</span>
+            <span className="text-xs text-muted-foreground truncate">
+              {item.subtitle}
+            </span>
           ) : null}
         </div>
         <TreeActions isSelected={selectedItemId === item.id && !item.disabled}>

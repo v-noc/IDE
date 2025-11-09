@@ -3,10 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 import { useThemeStore } from "../store/useThemeStore";
-import type { ThemeConfig } from "@/types/project";
+import type { AnyNodeTree, ThemeConfig } from "@/types/project";
 
 import useProjectStore from "../store/useProjectStore";
-import type { ProjectNodeTree, ContainerNodeTree } from "@/types/project";
 
 const hasEffectiveTheme = (t: ThemeConfig | undefined): boolean => {
   if (!t) return false;
@@ -86,14 +85,13 @@ const Layout = ({
 
   const selectedPath = useMemo(() => {
     // Returns path from root to selected node (inclusive)
-    const path: ContainerNodeTree[] = [];
-    if (!projectData || !selectedNode) return path;
+    if (!projectData || !selectedNode) return [];
 
-    const dfs = (node: ContainerNodeTree, acc: ProjectNodeTree[]): boolean => {
+    const dfs = (node: AnyNodeTree, acc: AnyNodeTree[]): boolean => {
       acc.push(node);
-      if (node.id === selectedNode.id) return true;
+      if (node._id === selectedNode._id) return true;
       if (node.children) {
-        for (const child of node.children) {
+        for (const child of node.children as AnyNodeTree[]) {
           if (dfs(child, acc)) return true;
         }
       }
@@ -101,7 +99,7 @@ const Layout = ({
       return false;
     };
 
-    const tmp: ContainerNodeTree[] = [];
+    const tmp: AnyNodeTree[] = [];
     if (dfs(projectData, tmp)) return tmp;
     return [];
   }, [projectData, selectedNode]);
