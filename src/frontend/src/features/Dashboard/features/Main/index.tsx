@@ -26,7 +26,7 @@ const MainCanvas = () => {
     setSelectedDocumentId,
   } = useProjectStore();
   const [tabValue, setTabValue] = useState("docs");
-  const effectiveNode = secondarySelectedNode ?? selectedNode;
+  const effectiveNode = secondarySelectedNode?.target ?? selectedNode;
 
   const { suffixName, displayPath } = useMemo(() => {
     const base = selectedNode?.qname?.replace(/\./g, " / ") ?? "";
@@ -55,16 +55,29 @@ const MainCanvas = () => {
   }, [effectiveNode, isCodeActive]);
 
   useEffect(() => {
+    console.log("hello");
     // Default to first document when available
+    const currentSelected = secondarySelectedNode
+      ? secondarySelectedNode.target
+      : selectedNode;
 
+    console.log("current selected", currentSelected, " ", selectedDocumentId);
     if (
       (!selectedDocumentId ||
-        !selectedNode?.documents.includes(`documents/${selectedDocumentId}`)) &&
+        !currentSelected?.documents.includes(
+          `documents/${selectedDocumentId}`
+        )) &&
       documents.length > 0
     ) {
       setSelectedDocumentId(documents[0]._key);
     }
-  }, [documents, selectedDocumentId, selectedNode]);
+  }, [
+    documents,
+    selectedDocumentId,
+    selectedNode,
+    secondarySelectedNode,
+    setSelectedDocumentId,
+  ]);
 
   const selectedDocument = useMemo(
     () => documents.find((d) => d._key === selectedDocumentId) || null,

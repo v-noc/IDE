@@ -134,7 +134,7 @@ export const NodeContent = ({
           <Tooltip>
             <TooltipTrigger asChild>{nodeContent}</TooltipTrigger>
             {hasDescription && (
-              <TooltipContent>
+              <TooltipContent side="right">
                 <p className="max-w-xs">{node.description}</p>
               </TooltipContent>
             )}

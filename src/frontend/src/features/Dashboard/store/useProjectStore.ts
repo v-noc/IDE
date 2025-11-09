@@ -61,6 +61,7 @@ const useProjectStore = create<ProjectState>()(
       pushFocus: (node) => set((state) => {
         state.focusStack.push(node);
         state.focusedNode = node;
+        state.setSelectedNode(node)
       }),
       popFocus: () => set((state) => {
         state.focusStack.pop();

@@ -16,6 +16,7 @@ import "@xyflow/react/dist/style.css";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { AnyNodeTree, ContainerNodeTree } from "@/types/project";
 import getNodeStyle from "@/features/Dashboard/utils/getNodeStyle";
+import { DynamicIcon } from "@/components/DynamicIcon";
 
 interface CanvasViewProps {
   projectId?: string;
@@ -150,10 +151,10 @@ const SimpleNode: React.FC<{ data: SimpleNodeData }> = ({ data }) => {
 };
 
 const CanvasView: React.FC<CanvasViewProps> = () => {
-  const { focusedNode, selectedNode, expandedNodeIds, toggleNodeExpansion } =
+  const { selectedNode, expandedNodeIds, toggleNodeExpansion } =
     useProjectStore();
 
-  const centerNode = (focusedNode ?? selectedNode) as SimpleTreeNode | null;
+  const centerNode = selectedNode as SimpleTreeNode | null;
 
   const isExpanded = useMemo(() => {
     if (!centerNode) return false;
@@ -178,7 +179,11 @@ const CanvasView: React.FC<CanvasViewProps> = () => {
       position: { x: 0, y: 0 },
       data: {
         name: centerNode.name,
-        mainIcon: centerNode.icon ?? iconForType(centerNode.node_type),
+        mainIcon: centerNode.icon ? (
+          <DynamicIcon iconName={centerNode.icon} />
+        ) : (
+          iconForType(centerNode.node_type)
+        ),
         cornerIcon: iconForType(centerNode.node_type),
         bgColor: parentStyle.cardColor ?? "white",
         textColor: parentStyle.textColor,
@@ -218,7 +223,11 @@ const CanvasView: React.FC<CanvasViewProps> = () => {
           position: { x, y },
           data: {
             name: child.name,
-            mainIcon: child.icon ?? iconForType(child.node_type),
+            mainIcon: child.icon ? (
+              <DynamicIcon iconName={child.icon} />
+            ) : (
+              iconForType(child.node_type)
+            ),
             cornerIcon: iconForType(child.node_type),
             bgColor: s.cardColor ?? s.backgroundColor,
             textColor: s.textColor,

@@ -24,11 +24,22 @@ import {
 import { Plus, Pencil, Trash2, FileText } from "lucide-react";
 
 const DocumentsList: React.FC = () => {
-  const { selectedNode, selectedDocumentId, setSelectedDocumentId } =
-    useProjectStore();
-  const nodeKey = selectedNode?._key || "";
+  const {
+    selectedNode,
+    selectedDocumentId,
+    setSelectedDocumentId,
+    secondarySelectedNode,
+  } = useProjectStore();
+  const nodeKey = useMemo(() => {
+    if (secondarySelectedNode) {
+      return secondarySelectedNode.target
+        ? secondarySelectedNode.target._key
+        : secondarySelectedNode._key;
+    }
+    return selectedNode?._key;
+  }, [selectedNode, secondarySelectedNode]);
   const queryClient = useQueryClient();
-
+  console.log("NodeKey", nodeKey);
   const { data: docs = [], isLoading } = useGetDocuments(nodeKey);
   const createMutation = useCreateDocument();
   const updateMutation = useUpdateDocument(nodeKey);
@@ -177,7 +188,7 @@ const DocumentsList: React.FC = () => {
                   : "")
               }
               onClick={() => {
-                console.log("doc", doc._key);
+                console.log("Doc", doc._key);
                 setSelectedDocumentId(doc._key);
               }}
             >
