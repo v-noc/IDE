@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.responses import JSONResponse
+from fastapi import Request
 from .api import root
 from .db.client import get_db
 from .core.watcher.service import WatcherService
@@ -54,9 +55,26 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET"],
     allow_headers=["*"],
 )
+
+# Middleware to block POST requests
+
+
+@app.middleware("http")
+async def block_post_requests(request: Request, call_next):
+    print(f"Request: {request.method} {request.url}")
+    if request.method != "GET":
+        # Reject with 405 Method Not Allowed
+        return JSONResponse(
+            status_code=405,
+            content={"detail": "Only GET method is allowed."}
+        )
+    # Proceed with the request for other methods (GET, PUT, etc.)
+    response = await call_next(request)
+    return response
+app.middleware("http")(block_post_requests)
 # Add exception handlers
 app.add_exception_handler(Exception, generic_exception_handler)
 

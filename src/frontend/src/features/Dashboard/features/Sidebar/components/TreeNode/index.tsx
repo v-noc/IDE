@@ -101,20 +101,13 @@ export const TreeNode = ({
         node={node as AnyNodeTree}
         onFocus={handleFocus}
         onExpand={handleExpand}
-        onCreateGroup={() => setIsCreateGroupsDialogOpen(true)}
-        onDeleteGroup={() => handleDeleteGroup()}
-        onRemoveCall={() => {
-          handleRemoveCall(node as CallNodeTree);
-        }}
+        onCreateGroup={() => {}}
+        onDeleteGroup={() => {}}
+        onRemoveCall={() => {}}
         onManageGroup={() => setIsManageGroupsDialogOpen(true)}
         onEdit={undefined}
         onBuildPrompt={() => setIsPromptBuilderOpen(true)}
-        onAddCall={() =>
-          setIsAddCallDialogOpen({
-            node_id: node._key,
-            node_type: node.node_type,
-          })
-        }
+        onAddCall={() => {}}
       >
         <NodeContent
           node={node}

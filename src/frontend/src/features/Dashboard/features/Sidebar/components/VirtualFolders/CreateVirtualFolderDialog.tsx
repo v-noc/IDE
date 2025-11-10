@@ -110,7 +110,12 @@ const CreateVirtualFolderDialog = () => {
   return (
     <Dialog open={isOpen} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="cursor-pointer ">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="cursor-pointer "
+          disabled={true}
+        >
           <PlusIcon className="w-4 h-4" />
         </Button>
       </DialogTrigger>

@@ -45,7 +45,7 @@ const MainCanvas = () => {
     return t === "function" || t === "class" || t === "file" || t === "call";
   }, [effectiveNode?.node_type]);
 
-  const [isSandboxOpen, setIsSandboxOpen] = useState(true);
+  const [isSandboxOpen, setIsSandboxOpen] = useState(false);
 
   const nodeKey = effectiveNode?._key || "";
   const { data: documents = [] } = useGetDocuments(nodeKey);
