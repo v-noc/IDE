@@ -151,9 +151,18 @@ class ContainerService:
           (line_no, col_offset) inclusive to (end_line_no, end_col_offset)
           exclusive. Indices follow the semantics used in CodePosition.
         """
+        from pathlib import Path
+        path = Path(abs_path).expanduser()
+        if not path.is_absolute():
+            path = (Path.cwd() / path).resolve()
+        else:
+            path = path.resolve()
+
         # Fast path: full file
         if position is None:
-            with open(abs_path, "r", encoding="utf-8") as f:
+            # if not path.exists():
+            #     return ""
+            with open(path, "r", encoding="utf-8") as f:
                 return f.read()
 
         start_line = max(1, position.line_no)
@@ -163,7 +172,7 @@ class ContainerService:
 
         # Stream through file only once
         collected: list[str] = []
-        with open(abs_path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             for idx, raw_line in enumerate(f, start=1):
                 if idx < start_line:
                     continue
@@ -321,7 +330,8 @@ class ContainerService:
             orig_parent_id = item.get("parent_id")
 
             if node_type == "group":
-                # Recreate group (keep name/description/group_type; reuse qname)
+                # Recreate group (keep name/description/group_type;
+                # reuse qname)
                 group_qname = (
                     vertex.get("qname")
                     or vertex.get("name", "group").lower().replace(" ", "_")

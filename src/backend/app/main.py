@@ -55,7 +55,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -65,7 +65,7 @@ app.add_middleware(
 @app.middleware("http")
 async def block_post_requests(request: Request, call_next):
     print(f"Request: {request.method} {request.url}")
-    if request.method != "GET":
+    if request.method == "POST" or request.method == "PUT" or request.method == "DELETE":
         # Reject with 405 Method Not Allowed
         return JSONResponse(
             status_code=405,
