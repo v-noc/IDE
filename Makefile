@@ -27,7 +27,7 @@ stop-db:
 	@echo ">>> Stopping ArangoDB..."
 	@docker-compose -f src/backend/docker-compose.yml --env-file src/backend/.env down
 
-run-backend: start-db
+run-backend: 
 	@echo ">>> Starting backend development server..."
 	@cd src/backend && ../../.venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
