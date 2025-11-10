@@ -105,7 +105,10 @@ const ProjectTree = ({ projectTree }: { projectTree: AnyNodeTree }) => {
             <button
               type="button"
               className="text-xs px-2 py-0.5 rounded border hover:bg-accent"
-              onClick={popFocus}
+              onClick={() => {
+                console.log("popFocus", focusStack);
+                popFocus();
+              }}
             >
               Back
             </button>
