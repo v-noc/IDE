@@ -7,6 +7,7 @@ from ..config.settings import get_settings
 _client: ArangoClient | None = None
 _db_connection: StandardDatabase | None = None
 
+
 def get_db() -> StandardDatabase:
     """
     Get a memoized database connection.
@@ -23,6 +24,7 @@ def get_db() -> StandardDatabase:
     # environment, reset the connection.
     if _db_connection is None or _db_connection.name != settings.ARANGO_DB:
         try:
+            print(f"Connecting to ArangoDB: {settings.ARANGO_HOST}")
             _db_connection = _client.db(
                 settings.ARANGO_DB,
                 username=settings.ARANGO_USER,
@@ -30,9 +32,11 @@ def get_db() -> StandardDatabase:
             )
         except ArangoError as e:
             raise ConnectionError(f"Failed to connect to ArangoDB: {e}")
-            
+
     return _db_connection
 
 # For application-level dependency injection, if needed
+
+
 def get_db_dependency() -> StandardDatabase:
     return get_db()

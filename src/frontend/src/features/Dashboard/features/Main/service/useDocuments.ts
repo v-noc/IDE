@@ -116,6 +116,7 @@ export const useGetDocuments = (nodeId: string) => {
   return useQuery<DocumentType[]>({
     queryKey: ["documents", nodeId],
     queryFn: () => getDocuments(nodeId),
+    enabled: !!nodeId,
   });
 };
 
