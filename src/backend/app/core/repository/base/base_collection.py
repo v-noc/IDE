@@ -54,7 +54,7 @@ class BaseRepository(Generic[T]):
 
             }
         )
-        self._ensure_collection()
+        # self._ensure_collection()
         # Handle discriminated unions
         if get_origin(model) is Union or hasattr(model, "__metadata__"):
             self.adapter = TypeAdapter(model)
