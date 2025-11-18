@@ -1,6 +1,6 @@
 # app/core/parser/scope_manager/storage/models.py
 
-from sqlalchemy import Column, String, Integer, JSON, ForeignKey, Table, Boolean
+from sqlalchemy import Column, String, Integer, JSON, ForeignKey, Table, Boolean, Index
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -32,6 +32,9 @@ class ScopeORM(Base):
     # Hierarchy
     parent_id = Column(String, ForeignKey(
         'scopes.id', ondelete='CASCADE'), nullable=True, index=True)
+
+    # For change detection
+    file_hash = Column(String, nullable=True)
 
     # Relationships with lazy loading
     parent = relationship(
@@ -129,9 +132,43 @@ class SymbolORM(Base):
         lazy="select"
     )
 
+    __table_args__ = (
+        Index('ix_symbol_scope_name', 'defining_scope_id', 'name'),
+    )
+
     def __repr__(self):
         assignment = f" -> {self.assigned_to_id}" if self.assigned_to_id else ""
         return (
             f"<SymbolORM(id='{self.id}', type='{self.symbol_type}'"
             f"{assignment})>"
         )
+
+# Add these to app/core/parser/scope_manager/storage/models.py
+
+
+class CallFrameORM(Base):
+    """Represents a single, unique function invocation."""
+    __tablename__ = 'call_frames'
+    id = Column(String, primary_key=True)
+    callee_symbol_id = Column(String, ForeignKey(
+        'symbols.id', ondelete='CASCADE'), index=True)
+    execution_scope_id = Column(String, ForeignKey(
+        'scopes.id', ondelete='CASCADE'), unique=True)
+    return_value_id = Column(String, ForeignKey(
+        'symbols.id', ondelete='SET NULL'))
+
+
+class CallSiteORM(Base):
+    """Represents the edge: 'A calls B'."""
+    __tablename__ = 'call_sites'
+    id = Column(String, primary_key=True)
+    caller_frame_id = Column(String, ForeignKey(
+        'call_frames.id', ondelete='CASCADE'), index=True)
+    callee_symbol_id = Column(String, ForeignKey(
+        'symbols.id', ondelete='CASCADE'), index=True)
+
+    # Flag for incremental updates
+    needs_verification = Column(Boolean, default=False, index=True)
+
+    # Store line/col info
+    position = Column(JSON, nullable=True)
