@@ -14,6 +14,12 @@ class ScopeRepository:
         self.session.add(scope)
         return scope
 
+    def get_root(self) -> Optional[ScopeModel]:
+        """Get the root scope."""
+        return self.session.query(ScopeModel).filter(
+            ScopeModel.is_root is True
+        ).first()
+
     def get_by_id(self, scope_id: str, include_stale: bool = False) -> Optional[ScopeModel]:
         """Retrieve scope by ID."""
         query = self.session.query(ScopeModel).filter(

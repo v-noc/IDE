@@ -15,7 +15,7 @@ class SourceWriter:
         self.repo = repo
 
     def create_source(
-        self, file_path: str, content_hash: str
+        self, file_path: str, content_hash: str = ""
     ) -> SourceUnit:
         """
         Create a new source file record.

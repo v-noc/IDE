@@ -20,6 +20,7 @@ class ScopeWriter:
         name: str,
         scope_type: ScopeType,
         source_unit_id: str,
+        is_root: bool = False,
         parent_id: Optional[str] = None,
     ) -> ScopeModel:
         """
@@ -29,6 +30,7 @@ class ScopeWriter:
             name: Scope name
             scope_type: Type of scope
             source_unit_id: Source file ID
+            is_root: Whether the scope is the root scope
             parent_id: Parent scope ID (optional)
 
         Returns:
@@ -39,7 +41,8 @@ class ScopeWriter:
             name=name,
             scope_type=scope_type.value,
             source_unit_id=source_unit_id,
-            parent_id=parent_id
+            is_root=is_root,
+            parent_id=parent_id,
         )
         return self.repo.scopes.create(scope)
 

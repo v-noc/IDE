@@ -27,6 +27,8 @@ class ScopeModel(Base):
     # 'module', 'class', 'function', 'execution'
     scope_type = Column(String, nullable=False, index=True)
 
+    is_root = Column(Boolean, default=False, index=True)
+
     # The Adjacency List link: connects a scope to its parent.
     parent_id = Column(String, ForeignKey(
         'scopes.id', ondelete='CASCADE'), index=True)
