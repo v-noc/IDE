@@ -4,6 +4,7 @@ from .scope_resolver import ScopeResolver
 from .symbol_resolver import SymbolResolver
 from .qname_resolver import QNameResolver
 from .assignment_resolver import AssignmentResolver
+from .inheritance_resolver import InheritanceResolver
 
 
 class Resolver:
@@ -22,3 +23,6 @@ class Resolver:
 
         self.assignment_resolver = AssignmentResolver(
             self.repo, self.scope_resolver, self.symbol_resolver)
+
+        self.inheritance_resolver = InheritanceResolver(
+            self.repo, self.qname_resolver)
