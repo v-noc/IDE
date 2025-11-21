@@ -1,6 +1,6 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from ..models import ScopeModel, SymbolModel, CallFrameModel, CallSiteModel
+from ..models import ScopeModel, SymbolModel, CallFrameModel, CallSiteModel, ScopeType
 
 
 class ScopeRepository:
@@ -19,7 +19,8 @@ class ScopeRepository:
     def get_root(self) -> Optional[ScopeModel]:
         """Get the root scope."""
         return self.session.query(ScopeModel).filter(
-            ScopeModel.is_root == True
+            ScopeModel.is_root == True,
+            ScopeModel.scope_type == ScopeType.PROJECT.value
         ).first()
 
     def get_by_id(self, scope_id: str, include_stale: bool = False) -> Optional[ScopeModel]:

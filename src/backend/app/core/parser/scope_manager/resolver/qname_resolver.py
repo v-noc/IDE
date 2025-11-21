@@ -47,23 +47,12 @@ class QNameResolver:
             if i == 0:
                 # First part: look for module or top-level symbol
                 # Try to find in module scope
-                symbols = self.repo.symbols.get_by_type(
-                    SymbolType.MODULE.value)
-                for sym in symbols:
-                    if sym.name == part:
-                        current_symbol = sym
-                        current_scope = self.repo.scopes.get_by_id(
-                            sym.defining_scope_id)
-                        break
 
-                if not current_symbol:
-                    # Try any scope with this name
-                    all_scopes = self.repo.scopes.get_by_type(
-                        ScopeType.MODULE.value)
-                    for scope in all_scopes:
-                        if scope.name == part:
-                            current_scope = scope
-                            break
+                current_scope = self.repo.scopes.get_root()
+                # Subsequent parts: look in current scope
+                if not current_scope:
+                    return None
+
             else:
                 # Subsequent parts: look in current scope
                 if not current_scope:
@@ -72,6 +61,7 @@ class QNameResolver:
                 # Look for a symbol or scope with this name
                 symbol = self.repo.symbols.get_by_name_in_scope(
                     part, current_scope.id)
+
                 if symbol:
                     current_symbol = symbol
                     # If this symbol defines a scope (class or function), move into it
@@ -144,12 +134,13 @@ class QNameResolver:
         if not symbol:
             return None
 
-        scope = self.repo.scopes.get_by_id(symbol.defining_scope_id)
+        scope = symbol.defining_scope
+
         if not scope:
             return symbol.name
 
         # Build path from scope hierarchy
-        path_parts = [symbol.name]
+        path_parts = [scope.name, symbol.name]
         current_scope = scope
 
         while current_scope.parent_id:

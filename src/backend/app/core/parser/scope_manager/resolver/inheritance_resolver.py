@@ -19,6 +19,7 @@ class MROCalculator:
         classes = self.repo.symbols.get_by_type(SymbolType.CLASS.value)
         for class_symbol in classes:
             qname = self.qname_resolver.get_qname_for_symbol(class_symbol.id)
+
             if qname:
                 try:
                     self.get_mro(qname)
@@ -36,10 +37,9 @@ class MROCalculator:
         if not class_symbol:
             # Fail-safe: treat unknown/external classes as a simple leaf in MRO
             logger.warning(
-                f"MRO: class '{class_qname}' not found; treating as external."
+                f"MRO: class '{class_qname}' not found;"
             )
-            mro = [class_qname]
-            self._mro_cache[class_qname] = mro
+
             return mro
 
         # Check if MRO is already computed and stored in DB

@@ -72,3 +72,21 @@ def test_symbol_lookup_in_scope(manager, root_scope_id):
     assert func_symbol.name == "greet"
     assert func_symbol.symbol_type == SymbolType.FUNCTION
     assert func_symbol.defines_scope_id == func.id
+
+
+def test_symbol_lookup_in_scope_by_qname(manager, root_scope_id):
+    """Test looking up symbols by qname in scope."""
+    # Create a function in root scope
+
+    manager.define_symbol(name="global_var", symbol_type=SymbolType.VARIABLE)
+
+    func = manager.enter_scope("greet", ScopeType.FUNCTION, "test.py")
+
+    # The function scope has a symbol in root
+    func_symbol = manager.resolver.qname_resolver.resolve_qname(
+        "__main__.global_var")
+
+    assert func_symbol is not None
+    assert func_symbol.name == "global_var"
+    assert func_symbol.symbol_type == SymbolType.VARIABLE
+    assert func_symbol.defining_scope_id == root_scope_id
