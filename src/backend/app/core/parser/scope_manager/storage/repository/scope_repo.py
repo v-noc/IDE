@@ -11,6 +11,7 @@ class ScopeRepository:
 
     def create(self, scope: ScopeModel) -> ScopeModel:
         """Create and persist a new scope."""
+
         self.session.add(scope)
         self.session.commit()
         return scope
@@ -24,9 +25,6 @@ class ScopeRepository:
     def get_by_id(self, scope_id: str, include_stale: bool = False) -> Optional[ScopeModel]:
         """Retrieve scope by ID."""
 
-        all_scopes = self.session.query(ScopeModel).all()
-        for scope in all_scopes:
-            print(f"scope: {scope.id} {scope.name} {scope.scope_type} {scope.is_root} {scope.parent_id} {scope.source_unit_id} {scope.is_stale} {scope.stale_reason} {scope.stale_since} {scope.last_verified}")
         query = self.session.query(ScopeModel).filter(
             ScopeModel.id == scope_id)
         if not include_stale:

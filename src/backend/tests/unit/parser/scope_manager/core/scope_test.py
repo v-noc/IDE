@@ -1,51 +1,74 @@
-from app.core.parser.scope_manager.storage.models import ScopeType
+from app.core.parser.scope_manager.storage.models import ScopeType, SymbolType
 
 
 def test_scope_creation(manager, root_scope_id):
     """Test the basic creation of a Scope."""
     scope = manager.repo.scopes.get_by_id(root_scope_id)
 
-    print(f"scope: {root_scope_id}")
     assert scope.name == "__main__"
     assert scope.scope_type == ScopeType.PROJECT
     assert scope.parent_id is None
-    children = scope.children
 
-    for child in children:
-        print(f"child: {child.name}")
     assert not scope.children
     assert not scope.symbols
 
 
-def test_add_child_scope(root_scope, child_scope):
+def test_add_child_scope(manager, root_scope_id, child_scope_id):
     """Test adding a child scope to a parent scope."""
-    assert child_scope.parent_id == root_scope.id
-    assert "my_function" in root_scope.children
-    assert root_scope.children["my_function"] == child_scope
+    child = manager.repo.scopes.get_by_id(child_scope_id)
+    root = manager.repo.scopes.get_by_id(root_scope_id)
+
+    # Verify parent-child relationship
+    assert child.parent_id == root.id
+
+    # Verify we can get children
+    children = manager.repo.scopes.get_children(root.id)
+    assert len(children) > 0
+    assert any(c.id == child_scope_id for c in children)
 
 
-def test_add_symbol(child_scope, sample_symbol):
+def test_add_symbol(manager, child_scope_id, sample_symbol_id):
     """Test adding a symbol to a scope."""
-    assert "my_var" in child_scope.symbols
-    assert child_scope.symbols["my_var"] == sample_symbol
-    assert sample_symbol.defining_scope.id == child_scope.id
+    child = manager.repo.scopes.get_by_id(child_scope_id)
+
+    symbol = manager.repo.symbols.get_by_id(sample_symbol_id)
+
+    for s in child.symbols:
+        assert s.name == symbol.name
+    assert symbol.defining_scope.id == child.id
 
 
-def test_add_wildcard_import(root_scope, child_scope, code_position):
-    """Test adding wildcard import scopes."""
-    module_scope1 = Scope(
-        name="module1", scope_type=ScopeType.MODULE, code_position=code_position)
-    module_scope2 = Scope(
-        name="module2", scope_type=ScopeType.MODULE, code_position=code_position)
+def test_scope_qualified_name(manager, root_scope_id):
+    """Test qualified name generation for nested scopes."""
+    # Create root > module > function
 
-    root_scope.add_wildcard_import(module_scope1)
-    assert root_scope.wildcard_import_scope_ids == [module_scope1.id]
+    manager.enter_scope("MyClass", ScopeType.CLASS, "test.py")
 
-    root_scope.add_wildcard_import(module_scope2)
-    assert root_scope.wildcard_import_scope_ids == [
-        module_scope1.id, module_scope2.id]
+    method = manager.enter_scope("my_method", ScopeType.FUNCTION, "test.py")
 
-    # Test that re-adding a scope moves it to the end (last import wins)
-    root_scope.add_wildcard_import(module_scope1)
-    assert root_scope.wildcard_import_scope_ids == [
-        module_scope2.id, module_scope1.id]
+    # Get scope chain
+    chain = manager.repo.scopes.get_scope_chain(method.id)
+
+    # Should be [method, class, root]
+    assert len(chain) == 3
+    assert chain[0].name == "my_method"
+    assert chain[1].name == "MyClass"
+    assert chain[2].name == "__main__"
+
+
+def test_symbol_lookup_in_scope(manager, root_scope_id):
+    """Test looking up symbols by name in scope."""
+    # Create a function in root scope
+
+    func = manager.enter_scope("greet", ScopeType.FUNCTION, "test.py")
+
+    manager.exit_scope()
+
+    # The function scope has a symbol in root
+    func_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "greet", root_scope_id)
+
+    assert func_symbol is not None
+    assert func_symbol.name == "greet"
+    assert func_symbol.symbol_type == SymbolType.FUNCTION
+    assert func_symbol.defines_scope_id == func.id

@@ -12,7 +12,7 @@ class SourceUnitRepository:
     def create(self, source_unit: SourceUnit) -> SourceUnit:
         """Create and persist a new source unit."""
         self.session.add(source_unit)
-        self.session.flush()
+        self.session.commit()
         return source_unit
 
     def get_by_id(self, source_unit_id: str) -> Optional[SourceUnit]:

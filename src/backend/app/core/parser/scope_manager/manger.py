@@ -1,3 +1,4 @@
+from typing import Optional
 from .storage.models import ScopeModel, ScopeType, SymbolType, SymbolModel
 from .storage.repository.repos import ScopeManagerRepository
 from .storage.database import DatabaseManager
@@ -11,8 +12,8 @@ class ScopeManager:
     """
 
     def __init__(self):
-        self.root_scope_id = None
-        self.current_scope_id = None
+        self.root_scope_id: Optional[str] = None
+        self.current_scope_id: Optional[str] = None
         self.db_session = None
 
         self.db_manager = None
@@ -89,6 +90,7 @@ class ScopeManager:
             name=name,
             symbol_type=symbol_type,
             scope_id=self.current_scope_id,
+            defines_scope_id=scope.id,
         )
         self.current_scope_id = scope.id
 
@@ -102,7 +104,12 @@ class ScopeManager:
             raise ValueError(
                 "Cannot exit scope without a current scope. Call enter_scope() first."
             )
+        if self.current_scope_id == self.root_scope_id:
+            raise ValueError(
+                "Cannot exit root scope. Call create_root_scope() first."
+            )
         parent_scope = self.repo.scopes.get_by_id(self.current_scope_id).parent
+
         self.current_scope_id = parent_scope.id
         return parent_scope
 
@@ -141,6 +148,6 @@ class ScopeManager:
         return symbol
 
     def close(self):
-        print(f"closing scope manager f{self.db_session}")
+
         if self.db_session:
             self.db_session.close()

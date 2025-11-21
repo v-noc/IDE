@@ -20,7 +20,7 @@ class SymbolWriter:
         name: str,
         symbol_type: SymbolType,
         scope_id: str,
-
+        defines_scope_id: Optional[str] = None,
         assigned_to_id: Optional[str] = None,
         instance_scope_id: Optional[str] = None,
         attrs: Optional[Dict[str, Any]] = None,
@@ -32,7 +32,7 @@ class SymbolWriter:
             name: Symbol name
             symbol_type: Type of symbol
             scope_id: Scope where defined
-
+            defines_scope_id: Scope where defined
             assigned_to_id: Optional - what it's assigned to
             instance_scope_id: Optional - instance scope
             attrs: Optional - metadata attributes
@@ -45,6 +45,7 @@ class SymbolWriter:
             name=name,
             symbol_type=symbol_type.value,
             defining_scope_id=scope_id,
+            defines_scope_id=defines_scope_id,
             assigned_to_id=assigned_to_id,
             instance_scope_id=instance_scope_id,
             attrs=attrs or {},
