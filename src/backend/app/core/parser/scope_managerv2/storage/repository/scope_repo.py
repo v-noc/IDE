@@ -14,15 +14,15 @@ class ScopeRepository:
         self.session.add(scope)
         return scope
 
-    def get_by_id(self, scope_id: str, include_stale: bool = True) -> Optional[ScopeModel]:
+    def get_by_id(self, scope_id: str, include_stale: bool = False) -> Optional[ScopeModel]:
         """Retrieve scope by ID."""
         query = self.session.query(ScopeModel).filter(
             ScopeModel.id == scope_id)
         if not include_stale:
-            query = query.filter(ScopeModel.is_stale == False)
+            query = query.filter(ScopeModel.is_stale is False)
         return query.first()
 
-    def get_by_name_in_scope(self, name: str, parent_id: Optional[str], include_stale: bool = True) -> Optional[ScopeModel]:
+    def get_by_name_in_scope(self, name: str, parent_id: Optional[str], include_stale: bool = False) -> Optional[ScopeModel]:
         """Get a scope by name within a parent scope."""
         query = self.session.query(ScopeModel).filter(ScopeModel.name == name)
         if parent_id:
@@ -31,16 +31,16 @@ class ScopeRepository:
             query = query.filter(ScopeModel.parent_id.is_(None))
 
         if not include_stale:
-            query = query.filter(ScopeModel.is_stale == False)
+            query = query.filter(ScopeModel.is_stale is False)
 
         return query.first()
 
-    def get_children(self, parent_id: str, include_stale: bool = True) -> List[ScopeModel]:
+    def get_children(self, parent_id: str, include_stale: bool = False) -> List[ScopeModel]:
         """Get all child scopes."""
         query = self.session.query(ScopeModel).filter(
             ScopeModel.parent_id == parent_id)
         if not include_stale:
-            query = query.filter(ScopeModel.is_stale == False)
+            query = query.filter(ScopeModel.is_stale is False)
         return query.all()
 
     def get_scope_chain(self, scope_id: str) -> List[ScopeModel]:
@@ -55,14 +55,14 @@ class ScopeRepository:
             current_id = scope.parent_id
         return chain
 
-    def get_by_source(self, source_id: str) -> List[ScopeModel]:
+    def get_by_source_unit(self, source_unit_id: str) -> List[ScopeModel]:
         """Get all scopes defined in a source file."""
-        return self.session.query(ScopeModel).filter(ScopeModel.source_id == source_id).all()
+        return self.session.query(ScopeModel).filter(ScopeModel.source_unit_id == source_unit_id).all()
 
-    def delete_by_source(self, source_id: str) -> int:
+    def delete_by_source(self, source_unit_id: str) -> int:
         """Delete all scopes in a source file (Resync operation)."""
         count = self.session.query(ScopeModel).filter(
-            ScopeModel.source_id == source_id).delete()
+            ScopeModel.source_unit_id == source_unit_id).delete()
         return count
 
     def get_by_type(self, scope_type: str) -> List[ScopeModel]:
@@ -142,14 +142,12 @@ class ScopeRepository:
             ).update({
                 "is_stale": True,
                 "stale_reason": reason,
-                "needs_recompute": True
             }, synchronize_session=False)
 
             # 5. Bulk update CallSites (outgoing calls from these frames)
             total_marked += self.session.query(CallSiteModel).filter(
                 CallSiteModel.caller_frame_id.in_(frame_ids)
             ).update({
-                "needs_verification": True,
                 "is_stale": True
             }, synchronize_session=False)
 

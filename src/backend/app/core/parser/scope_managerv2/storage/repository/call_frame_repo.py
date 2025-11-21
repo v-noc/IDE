@@ -1,6 +1,6 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from ..models import CallFrameModel, CallSiteModel
+from ..models import CallFrameModel
 
 
 class CallFrameRepository:

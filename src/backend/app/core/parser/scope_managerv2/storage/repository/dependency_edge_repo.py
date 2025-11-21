@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from ..models import DependencyEdge
 
 
-class DependencyRepository:
+class DependencyEdgeRepository:
     """Repository for DependencyEdge entities."""
 
     def __init__(self, session: Session):

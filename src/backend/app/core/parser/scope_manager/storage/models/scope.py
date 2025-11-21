@@ -9,7 +9,6 @@ class ScopeType(str, Enum):
     MODULE = "module"
     CLASS = "class"
     FUNCTION = "function"
-    PACKAGE = "package"
 
 
 class ScopeChangeType(str, Enum):
@@ -35,11 +34,17 @@ class ScopeModel(Base):
     source_unit_id = Column(String, ForeignKey(
         'source_unit.id', ondelete='CASCADE'), index=True)
 
+    # Code Location (vital for updates)
+    # Storing as JSON array [start_line, end_line]
+    location_range = Column(JSON, default=[0, 0])
+
     # --- Staleness Tracking for Resync ---
     is_stale = Column(Boolean, default=False, index=True)
     stale_reason = Column(String, nullable=True)
     stale_since = Column(String, nullable=True)  # ISO datetime string
     last_verified = Column(String, nullable=True)  # ISO datetime string
+    source_line_start = Column(Integer, nullable=True)
+    source_line_end = Column(Integer, nullable=True)
 
     # For Classes: track base classes via a relationship instead of JSON
     base_classes_ids = relationship(
@@ -72,13 +77,6 @@ class ScopeModel(Base):
         foreign_keys="SymbolModel.defines_scope_id"
     )
 
-    source_unit = relationship(
-        "SourceUnit",
-        backref="scope",
-        uselist=False,
-        foreign_keys="SourceUnit.id"
-    )
-
 
 class SourceUnit(Base):
     """Represents a physical file. Key for Resync logic."""
@@ -87,13 +85,6 @@ class SourceUnit(Base):
     file_path = Column(String, nullable=False)
     content_hash = Column(String, nullable=False)
     last_analyzed = Column(String, nullable=True)  # ISO datetime string
-
-    scope = relationship(
-        "ScopeModel",
-        backref="source_unit",
-        uselist=False,
-        foreign_keys="ScopeModel.source_unit_id"
-    )
 
 
 class DependencyEdge(Base):

@@ -1,4 +1,5 @@
 from typing import Optional, List
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from ..models import SymbolModel
 
@@ -15,7 +16,7 @@ class SymbolRepository:
         self.session.flush()
         return symbol
 
-    def get_by_id(self, symbol_id: str, include_stale: bool = True) -> Optional[SymbolModel]:
+    def get_by_id(self, symbol_id: str, include_stale: bool = False) -> Optional[SymbolModel]:
         """Retrieve symbol by ID."""
         query = self.session.query(SymbolModel).filter(
             SymbolModel.id == symbol_id)
@@ -23,7 +24,7 @@ class SymbolRepository:
             query = query.filter(SymbolModel.is_stale == False)
         return query.first()
 
-    def get_in_scope(self, scope_id: str, include_stale: bool = True) -> List[SymbolModel]:
+    def get_in_scope(self, scope_id: str, include_stale: bool = False) -> List[SymbolModel]:
         """Get all symbols defined in a scope."""
         query = self.session.query(SymbolModel).filter(
             SymbolModel.defining_scope_id == scope_id)
@@ -31,7 +32,7 @@ class SymbolRepository:
             query = query.filter(SymbolModel.is_stale == False)
         return query.all()
 
-    def get_by_name_in_scope(self, name: str, scope_id: str, include_stale: bool = True) -> Optional[SymbolModel]:
+    def get_by_name_in_scope(self, name: str, scope_id: str, include_stale: bool = False) -> Optional[SymbolModel]:
         """Get a symbol by name within a specific scope."""
         query = self.session.query(SymbolModel).filter(
             and_(SymbolModel.name == name,

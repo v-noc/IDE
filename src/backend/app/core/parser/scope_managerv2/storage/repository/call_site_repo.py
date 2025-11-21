@@ -1,6 +1,6 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from ..models import CallSiteModel
+from ..models import CallFrameModel, CallSiteModel, ScopeModel
 
 
 class CallSiteRepository:
@@ -15,42 +15,49 @@ class CallSiteRepository:
         self.session.flush()
         return site
 
-    def get_by_id(self, site_id: str) -> Optional[CallSiteModel]:
+    def get_by_id(self, site_id: str, include_stale: bool = False) -> Optional[CallSiteModel]:
         """Retrieve call site by ID."""
-        return self.session.query(CallSiteModel).filter(CallSiteModel.id == site_id).first()
+        query = self.session.query(CallSiteModel).filter(
+            CallSiteModel.id == site_id)
+        if not include_stale:
+            query = query.filter(CallSiteModel.is_stale is False)
+        return query.first()
 
-    def find_by_caller(self, caller_frame_id: str) -> List[CallSiteModel]:
+    def find_by_caller(self, caller_frame_id: str, include_stale: bool = False) -> List[CallSiteModel]:
         """
         Get all function calls made from a specific caller frame (forward edges).
         This answers: "What does this frame call?"
         """
-        return (
-            self.session.query(CallSiteModel)
-            .filter(CallSiteModel.caller_frame_id == caller_frame_id)
-            .all()
-        )
 
-    def find_by_callee(self, callee_symbol_id: str) -> List[CallSiteModel]:
+        query = self.session.query(CallSiteModel).filter(
+            CallSiteModel.caller_frame_id == caller_frame_id)
+        if not include_stale:
+            query = query.filter(CallSiteModel.is_stale is False)
+        return query.all()
+
+    def find_by_callee(self, callee_symbol_id: str, include_stale: bool = False) -> List[CallSiteModel]:
         """
         Get all call sites that call a specific function (reverse edges).
         This answers: "Who calls this function?"
         """
-        return (
-            self.session.query(CallSiteModel)
-            .filter(CallSiteModel.callee_symbol_id == callee_symbol_id)
-            .all()
-        )
 
-    def mark_stale(self, source_id: str) -> int:
+        query = self.session.query(CallSiteModel).filter(
+            CallSiteModel.callee_symbol_id == callee_symbol_id)
+
+        if not include_stale:
+            query = query.filter(CallSiteModel.is_stale is False)
+        return query.all()
+
+    def mark_stale(self, source_unit_id: str) -> int:
         """
         Mark all call sites from a source as needing verification.
         Used during incremental analysis when a file changes.
         """
         # Find all frames from this source
         frames_in_source = (
-            self.session.query(CallFrameORM)
-            .join(ScopeORM, CallFrameORM.execution_scope_id == ScopeORM.id)
-            .filter(ScopeORM.source_id == source_id)
+            self.session.query(CallFrameModel)
+            .join(ScopeModel, CallFrameModel.execution_scope_id == ScopeModel.id)
+            .filter(ScopeModel.source_unit_id == source_unit_id)
             .all()
         )
 
@@ -72,7 +79,7 @@ class CallSiteRepository:
         """Get all call sites that need verification."""
         return (
             self.session.query(CallSiteModel)
-            .filter(CallSiteModel.needs_verification == True)
+            .filter(CallSiteModel.is_stale is True)
             .all()
         )
 
@@ -80,7 +87,7 @@ class CallSiteRepository:
         """Delete all stale call sites (cleanup after reanalysis)."""
         count = (
             self.session.query(CallSiteModel)
-            .filter(CallSiteModel.needs_verification == True)
+            .filter(CallSiteModel.is_stale is True)
             .delete()
         )
         return count
