@@ -25,7 +25,7 @@ class ScopeRepository:
         query = self.session.query(ScopeModel).filter(
             ScopeModel.id == scope_id)
         if not include_stale:
-            query = query.filter(ScopeModel.is_stale is False)
+            query = query.filter(ScopeModel.is_stale == False)
         return query.first()
 
     def get_by_name_in_scope(self, name: str, parent_id: Optional[str], include_stale: bool = False) -> Optional[ScopeModel]:
@@ -37,7 +37,7 @@ class ScopeRepository:
             query = query.filter(ScopeModel.parent_id.is_(None))
 
         if not include_stale:
-            query = query.filter(ScopeModel.is_stale is False)
+            query = query.filter(ScopeModel.is_stale == False)
 
         return query.first()
 
@@ -46,7 +46,7 @@ class ScopeRepository:
         query = self.session.query(ScopeModel).filter(
             ScopeModel.parent_id == parent_id)
         if not include_stale:
-            query = query.filter(ScopeModel.is_stale is False)
+            query = query.filter(ScopeModel.is_stale == False)
         return query.all()
 
     def get_scope_chain(self, scope_id: str) -> List[ScopeModel]:

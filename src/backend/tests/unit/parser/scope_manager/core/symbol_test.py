@@ -1,47 +1,51 @@
 import pytest
-from app.core.parser.scope_manager.core.symbol import Symbol, SymbolType
+from app.core.parser.scope_manager.storage.models import SymbolType
 
 
-def test_symbol_creation(sample_symbol, child_scope):
+def test_symbol_creation(sample_symbol_id, child_scope_id, repo):
     """Test the basic creation of a Symbol."""
-    assert sample_symbol.name == "my_var"
-    assert sample_symbol.symbol_type == SymbolType.VARIABLE
-    assert sample_symbol.defining_scope.id == child_scope.id
-    assert not sample_symbol.assigned_to
+
+    symbol = repo.symbols.get_by_id(sample_symbol_id)
+    scope = repo.scopes.get_by_id(child_scope_id)
+
+    print(f"symbol: {symbol}")
+    print(f"scope: {scope} {child_scope_id}")
+
+    assert symbol.name == "my_var"
+    assert symbol.symbol_type == SymbolType.VARIABLE
+    assert symbol.defining_scope_id == scope.id
+    assert symbol.assigned_to_id is None  # Not assigned yet
     # assert not sample_symbol.assigned_from
 
 
-def test_assign_to(sample_symbol, child_scope, code_position, symbol_table):
+def test_assign_to(manager, sample_symbol_id):
     """Test the assign_to method."""
-    another_symbol = Symbol(
-        name="another_var",
-        symbol_type=SymbolType.VARIABLE,
-        defining_scope_id=child_scope.id,
-        code_position=code_position
-    )
-    another_symbol.bind_table(sample_symbol._table)
-    symbol_table.save_symbol(another_symbol)
-    sample_symbol.assign_to(another_symbol)
-    assert sample_symbol.assigned_to.id == another_symbol.id
+    another_symbol = manager.define_symbol(
+        name="another_var", symbol_type=SymbolType.VARIABLE)
+    manager.writer.assignment_writer.assign_symbol(
+        sample_symbol_id, another_symbol.id)
+    sample_symbol = manager.repo.symbols.get_by_id(sample_symbol_id)
+    assert sample_symbol.assigned_to_id == another_symbol.id
     # assert sample_symbol in another_symbol.assigned_from
 
 
-def test_resolve_immediate(sample_symbol, child_scope, code_position, symbol_table):
-    """Test the resolve_immediate method."""
-    # When not assigned, resolves to self
-    assert sample_symbol.resolve_immediate() == sample_symbol
+def test_resolve_immediate(manager, sample_symbol_id, child_scope_id):
+    """Test the resolve_assignment functionality via AssignmentResolver."""
+    # When not assigned, should return None (no assignment to follow)
+
+    result = manager.resolver.assignment_resolver.resolve_assignment(
+        sample_symbol_id)
+    assert result.id == sample_symbol_id  # Returns self when no assignment
 
     # When assigned, resolves to the target
-    target_symbol = Symbol(
-        name="target_var",
-        symbol_type=SymbolType.VARIABLE,
-        defining_scope_id=child_scope.id,
-        code_position=code_position
-    )
-    target_symbol.bind_table(sample_symbol._table)
-    symbol_table.save_symbol(target_symbol)
-    sample_symbol.assign_to(target_symbol)
-    assert sample_symbol.resolve_immediate() == target_symbol
+    manager.current_scope_id = child_scope_id
+    target = manager.define_symbol("target_var", SymbolType.VARIABLE)
+    manager.writer.assignment_writer.assign_symbol(
+        sample_symbol_id, target.id)
+
+    immediate = manager.resolver.assignment_resolver.resolve_assignment(
+        sample_symbol_id)
+    assert immediate.id == target.id  # Resolves to target
 
 
 def test_resolve_final(sample_symbol, child_scope, code_position, symbol_table):

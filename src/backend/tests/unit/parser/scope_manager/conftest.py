@@ -1,54 +1,52 @@
 import pytest
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.core import Scope, ScopeType, SymbolType, Symbol
-from app.core.model.properties import CodePosition
-from app.core.parser.scope_manager.storage.symbol_table import SymbolTable
+from app.core.parser.scope_manager.manger import ScopeManager
+from app.core.parser.scope_manager.storage.repository.repos import ScopeManagerRepository
+from app.core.parser.scope_manager.storage.models import SymbolType, ScopeType
 
 
 @pytest.fixture
-def code_position():
-    """Provides a default CodePosition."""
-    return CodePosition(line_no=1, col_offset=0, end_line_no=1, end_col_offset=10)
+def manager():
+    """Provides a ScopeManager with in-memory database for testing."""
+    mgr = ScopeManager()
+    yield mgr
+    mgr.close()
 
 
 @pytest.fixture
-def symbol_table():
-    """Provides a symbol table for testing."""
-    return SymbolTable("test_symbol_table")
+def root_scope_id(manager):
+    """Provides a root scope ID for testing."""
+    scope = manager.create_root_scope(name="__main__", file_path="test.py")
+    return scope.id
 
 
 @pytest.fixture
-def root_scope(symbol_table):
-    """Provides a root scope for testing."""
-    scope = Scope(name="__main__", scope_type=ScopeType.MODULE)
-    scope.bind_table(symbol_table)
-    print("Saving root scope", symbol_table)
-    symbol_table.save_scope(scope)
-    return scope
+def child_scope_id(manager, root_scope_id):
+    """Provides a child function scope ID attached to the root scope."""
+    # Make sure we're in root scope
+    manager.current_scope_id = root_scope_id
+
+    # Enter function scope
+    scope = manager.enter_scope(
+        "my_function", ScopeType.FUNCTION, "test.py")
+    return scope.id
 
 
 @pytest.fixture
-def child_scope(root_scope, symbol_table):
-    """Provides a child scope attached to the root scope."""
-    scope = Scope(name="my_function", scope_type=ScopeType.FUNCTION)
-    scope.bind_table(symbol_table)
-    print("Saving child scope", root_scope)
-    root_scope.bind_table(symbol_table)
-    symbol_table.save_scope(scope)
-    root_scope.add_child_scope(scope)
-    return scope
+def sample_symbol_id(manager, child_scope_id):
+    """Provides a sample symbol ID within the child scope."""
+    # Make sure we're in child scope
+    manager.current_scope_id = child_scope_id
+
+    # Define a variable
+    symbol = manager.define_symbol("my_var", SymbolType.VARIABLE)
+    return symbol.id
 
 
 @pytest.fixture
-def sample_symbol(child_scope, symbol_table):
-    """Provides a sample symbol within the child scope."""
-    symbol = Symbol(
-        name="my_var",
-        symbol_type=SymbolType.VARIABLE,
-        defining_scope_id=child_scope.id,
-    )
-    symbol.bind_table(symbol_table)
-    symbol_table.save_symbol(symbol)
-    child_scope.add_symbol(symbol)
+def repo(manager):
+    """Provides a repository for direct database access in tests."""
+    with manager.db_session as session:
 
-    return symbol
+        repo = ScopeManagerRepository(session)
+        yield repo
+        session.commit()

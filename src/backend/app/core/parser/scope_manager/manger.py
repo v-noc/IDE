@@ -1,8 +1,5 @@
-from .storage.models import ScopeModel, ScopeType
+from .storage.models import ScopeModel, ScopeType, SymbolType, SymbolModel
 from .storage.repository.repos import ScopeManagerRepository
-from .resolver.scope_resolver import ScopeResolver
-from .resolver.symbol_resolver import SymbolResolver
-from .resolver.qname_resolver import QNameResolver
 from .storage.database import DatabaseManager
 from .resolver import Resolver
 from .writer import Writer
@@ -16,6 +13,13 @@ class ScopeManager:
     def __init__(self):
         self.root_scope_id = None
         self.current_scope_id = None
+        self.db_session = None
+
+        self.db_manager = None
+        self.repo = None
+        self.resolver = None
+        self.writer = None
+        self.project_name = None
 
     def create_root_scope(self, name: str = "__main__", file_path: str = "") -> ScopeModel:
         """
@@ -24,9 +28,9 @@ class ScopeManager:
 
         self.project_name = name
         self.db_manager = DatabaseManager(name)
-        self.session = self.db_manager.get_session()
+        self.db_session = self.db_manager.get_session()
 
-        self.repo = ScopeManagerRepository(self.session)
+        self.repo = ScopeManagerRepository(self.db_session)
 
         self.resolver = Resolver(self.repo)
         self.writer = Writer(self.repo)
@@ -103,3 +107,22 @@ class ScopeManager:
             )
         self.current_scope_id = scope.id
         return scope
+
+    def define_symbol(self, name: str, symbol_type: SymbolType) -> SymbolModel:
+        """
+        Defines a new symbol in the current scope.
+        """
+        if not self.current_scope_id:
+            raise ValueError(
+                "Cannot define symbol without a current scope. Call enter_scope() first."
+            )
+        return self.writer.symbol_writer.create_symbol(
+            name=name,
+            symbol_type=symbol_type,
+            scope_id=self.current_scope_id,
+
+        )
+
+    def close(self):
+        if self.db_session:
+            self.db_session.close()

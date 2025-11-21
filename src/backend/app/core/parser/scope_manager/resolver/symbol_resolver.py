@@ -67,6 +67,7 @@ class SymbolResolver:
 
             # Check if the target exists and is valid
             target_id = symbol.assigned_to_id
+
             if not include_stale:
                 target = self.repo.symbols.get_by_id(
                     target_id, include_stale=False)

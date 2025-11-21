@@ -20,7 +20,7 @@ class CallSiteRepository:
         query = self.session.query(CallSiteModel).filter(
             CallSiteModel.id == site_id)
         if not include_stale:
-            query = query.filter(CallSiteModel.is_stale is False)
+            query = query.filter(CallSiteModel.is_stale == False)
         return query.first()
 
     def find_by_caller(self, caller_frame_id: str, include_stale: bool = False) -> List[CallSiteModel]:
@@ -32,7 +32,7 @@ class CallSiteRepository:
         query = self.session.query(CallSiteModel).filter(
             CallSiteModel.caller_frame_id == caller_frame_id)
         if not include_stale:
-            query = query.filter(CallSiteModel.is_stale is False)
+            query = query.filter(CallSiteModel.is_stale == False)
         return query.all()
 
     def find_by_callee(self, callee_symbol_id: str, include_stale: bool = False) -> List[CallSiteModel]:
@@ -45,7 +45,7 @@ class CallSiteRepository:
             CallSiteModel.callee_symbol_id == callee_symbol_id)
 
         if not include_stale:
-            query = query.filter(CallSiteModel.is_stale is False)
+            query = query.filter(CallSiteModel.is_stale == False)
         return query.all()
 
     def mark_stale(self, source_unit_id: str) -> int:
@@ -79,7 +79,7 @@ class CallSiteRepository:
         """Get all call sites that need verification."""
         return (
             self.session.query(CallSiteModel)
-            .filter(CallSiteModel.is_stale is True)
+            .filter(CallSiteModel.is_stale == True)
             .all()
         )
 
@@ -87,7 +87,7 @@ class CallSiteRepository:
         """Delete all stale call sites (cleanup after reanalysis)."""
         count = (
             self.session.query(CallSiteModel)
-            .filter(CallSiteModel.is_stale is True)
+            .filter(CallSiteModel.is_stale == True)
             .delete()
         )
         return count

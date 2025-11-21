@@ -25,9 +25,15 @@ class AssignmentWriter:
         Returns:
             True if successful, False otherwise
         """
+        if not isinstance(assigned_to_id, str):
+            raise ValueError(
+                f"assigned_to_id must be a string, got {type(assigned_to_id)}")
+
         symbol = self.repo.symbols.get_by_id(symbol_id)
         if symbol:
             symbol.assigned_to_id = assigned_to_id
+            self.repo.symbols.update(symbol)
+
             return True
         return False
 
@@ -44,6 +50,7 @@ class AssignmentWriter:
         symbol = self.repo.symbols.get_by_id(symbol_id)
         if symbol:
             symbol.assigned_to_id = None
+            self.repo.symbols.update(symbol)
             return True
         return False
 

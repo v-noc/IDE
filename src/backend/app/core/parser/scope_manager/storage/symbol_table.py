@@ -5,11 +5,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import delete, insert
 from .database import DatabaseManager
 from .models import ScopeORM, SymbolORM, wildcard_imports
-from .adapters import ScopeAdapter, SymbolAdapter
-
-if TYPE_CHECKING:
-    from ..core.scope import Scope
-    from ..core.symbol import Symbol
 
 
 class SymbolTable:

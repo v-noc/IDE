@@ -10,6 +10,12 @@ class SymbolRepository:
     def __init__(self, session: Session):
         self.session = session
 
+    def update(self, symbol: SymbolModel) -> SymbolModel:
+        """Update a symbol."""
+        self.session.add(symbol)
+        self.session.flush()
+        return symbol
+
     def create(self, symbol: SymbolModel) -> SymbolModel:
         """Create and persist a new symbol."""
         self.session.add(symbol)
