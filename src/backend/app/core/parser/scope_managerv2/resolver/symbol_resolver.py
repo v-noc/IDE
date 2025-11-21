@@ -5,20 +5,20 @@ Handles symbol lookup, aliases, and references.
 Resolves symbols through assignment chains and imports.
 """
 
-from typing import List, Optional, Dict, Set
-from ..db_repository import AnalysisRepository
-from ..models import SymbolORM, SymbolType
+from typing import List, Optional, Dict
+from ..storage.repository.repos import ScopeManagerRepository
+from ..storage.models import SymbolModel, SymbolType
 from .scope_resolver import ScopeResolver
 
 
 class SymbolResolver:
     """Resolves symbols and follows references."""
 
-    def __init__(self, repo: AnalysisRepository, scope_resolver: ScopeResolver):
+    def __init__(self, repo: ScopeManagerRepository, scope_resolver: ScopeResolver):
         self.repo = repo
         self.scope_resolver = scope_resolver
 
-    def get_symbol_definition(self, symbol_id: str, include_stale: bool = True) -> Optional[SymbolORM]:
+    def get_symbol_definition(self, symbol_id: str, include_stale: bool = True) -> Optional[SymbolModel]:
         """
         Get the definition of a symbol.
 
@@ -27,11 +27,11 @@ class SymbolResolver:
             include_stale: Whether to include stale symbols
 
         Returns:
-            The SymbolORM, or None if not found
+            The SymbolModel, or None if not found
         """
         return self.repo.symbols.get_by_id(symbol_id, include_stale=include_stale)
 
-    def resolve_alias_chain(self, symbol_id: str, include_stale: bool = True) -> Optional[SymbolORM]:
+    def resolve_alias_chain(self, symbol_id: str, include_stale: bool = True) -> Optional[SymbolModel]:
         """
         Follow an alias chain to find the original symbol.
         Example: x = y; y = z; resolve_alias_chain(x) -> z
@@ -52,7 +52,8 @@ class SymbolResolver:
                 return None
             visited.add(current_id)
 
-            symbol = self.repo.symbols.get_by_id(current_id, include_stale=include_stale)
+            symbol = self.repo.symbols.get_by_id(
+                current_id, include_stale=include_stale)
             if not symbol:
                 return None
 
@@ -67,7 +68,8 @@ class SymbolResolver:
             # Check if the target exists and is valid
             target_id = symbol.assigned_to_id
             if not include_stale:
-                target = self.repo.symbols.get_by_id(target_id, include_stale=False)
+                target = self.repo.symbols.get_by_id(
+                    target_id, include_stale=False)
                 if not target:
                     # Target is missing or stale, so the chain is broken
                     return None
@@ -76,7 +78,7 @@ class SymbolResolver:
 
         return None
 
-    def get_all_aliases(self, symbol_id: str) -> List[SymbolORM]:
+    def get_all_aliases(self, symbol_id: str) -> List[SymbolModel]:
         """
         Get all symbols that alias to this symbol.
         Example: if x = original_func, get_all_aliases(original_func) includes x
@@ -89,7 +91,7 @@ class SymbolResolver:
         """
         return self.repo.symbols.get_by_assigned_to(symbol_id)
 
-    def find_all_references(self, symbol_id: str) -> List[SymbolORM]:
+    def find_all_references(self, symbol_id: str) -> List[SymbolModel]:
         """
         Find all direct references to a symbol (symbols assigned to it).
         This is shallow - only direct assignments, not transitive.
@@ -119,7 +121,7 @@ class SymbolResolver:
 
     def find_symbols_by_name(
         self, name: str, source_id: Optional[str] = None
-    ) -> List[SymbolORM]:
+    ) -> List[SymbolModel]:
         """
         Find all symbols with a given name (can be in multiple scopes).
 
@@ -173,7 +175,7 @@ class SymbolResolver:
             return self.repo.scopes.get_by_id(symbol.defining_scope_id)
         return None
 
-    def get_symbols_of_type(self, symbol_type: SymbolType) -> List[SymbolORM]:
+    def get_symbols_of_type(self, symbol_type: SymbolType) -> List[SymbolModel]:
         """
         Get all symbols of a specific type.
 
