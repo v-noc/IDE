@@ -12,7 +12,7 @@ class CallFrameRepository:
     def create(self, frame: CallFrameModel) -> CallFrameModel:
         """Create and persist a new call frame."""
         self.session.add(frame)
-        self.session.flush()
+        self.session.commit()
         return frame
 
     def get_by_id(self, frame_id: str, include_stale: bool = True) -> Optional[CallFrameModel]:

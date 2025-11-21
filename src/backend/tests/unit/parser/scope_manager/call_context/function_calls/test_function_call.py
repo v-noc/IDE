@@ -1,39 +1,42 @@
-from app.core.parser.scope_manager.core import ScopeType, SymbolType
-from app.core.parser.scope_manager.manager import ScopeManager
 
 
-def test_simple_function_call(scope_manager: ScopeManager):
+from app.core.parser.scope_manager.manger import ScopeManager
+from app.core.parser.scope_manager.storage.models import ScopeType, SymbolType
+
+
+def test_simple_function_call(manager: ScopeManager, root_scope_id: str):
     """
     Tests a simple function declaration and call, then verifies the call graph.
     """
     # 1. Define a simple function `greet` in the global scope
     # def greet(name): ...
-    scope_manager.enter_scope("greet", ScopeType.FUNCTION)
-    scope_manager.define_symbol("name", SymbolType.PARAMETER)
-    scope_manager.exit_scope()
+    manager.enter_scope("greet", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("name", SymbolType.PARAMETER)
+    manager.exit_scope()
 
+    greet_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "greet", manager.root_scope_id)
     # 2. Invoke the function from the global scope
-    scope_manager.invoke("greet", {"name": "World"})
-    scope_manager.end_current_call()
+    frame_id = manager.call_tracking_service.start_call(
+        greet_symbol.id, {"name": "World"})
+    manager.call_tracking_service.end_call(frame_id)
 
-    # 3. Assert the call graph structure
-    call_graph = scope_manager.get_call_graph()
-    assert len(call_graph.edges) == 1
+    frame = manager.repo.call_frames.get_by_id(frame_id)
+    assert frame is not None
+    assert frame.callee_symbol_id == greet_symbol.id
 
-    # The caller should be the main module
-    caller_qname = "__main__"
-    assert caller_qname in call_graph.edges
+    # Verify execution scope was created
+    exec_scope = manager.repo.scopes.get_by_id(frame.execution_scope_id)
+    assert exec_scope is not None
+    # Execution scopes are created dynamically during calls
 
-    # It should have one call site
-    call_sites = call_graph.edges[caller_qname]
-    assert len(call_sites) == 1
-
-    # The call site should point to the 'greet' function
-    call_site = call_sites[0]
-    assert call_site.callee_symbol.qualified_name == "__main__.greet"
+    # Verify arguments were populated
+    params = manager.repo.symbols.get_in_scope(frame.execution_scope_id)
+    param_names = [p.name for p in params]
+    assert "name" in param_names
 
 
-def test_closure_creation_and_invocation(scope_manager: ScopeManager):
+def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: str):
     """
     Tests creating a closure, invoking it, and ensuring it can access its
     captured environment.
@@ -43,39 +46,44 @@ def test_closure_creation_and_invocation(scope_manager: ScopeManager):
     #   def closure():
     #     ...
     #   return closure
-    factory_scope = scope_manager.enter_scope("factory", ScopeType.FUNCTION)
-    scope_manager.define_symbol("msg", SymbolType.PARAMETER)
-    scope_manager.enter_scope("closure", ScopeType.FUNCTION)
-    scope_manager.exit_scope()  # Exit closure scope
-    scope_manager.exit_scope()  # Exit factory scope
+    factory_scope = manager.enter_scope(
+        "factory", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("msg", SymbolType.PARAMETER)
+    manager.enter_scope("closure", ScopeType.FUNCTION, "test.py")
+    manager.exit_scope()  # Exit closure scope
+    manager.exit_scope()  # Exit factory scope
 
     # Get the symbol for the nested function
-    closure_symbol = factory_scope.symbols["closure"]
+    closure_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "closure", factory_scope.id)
 
     # 2. Call the factory to create a closure instance
-    scope_manager.invoke("factory", {"msg": "Hello Closure"})
-    closure_instance = scope_manager.end_current_call(
-        return_value=closure_symbol)
+    frame_id = manager.call_tracking_service.start_call(
+        factory_scope.symbol.id, {"msg": "Hello Closure"})
+    manager.call_tracking_service.end_call(frame_id)
+    closure_instance = manager.call_tracking_service.end_call(frame_id,
+                                                              closure_symbol.id)
 
     # Assert that a closure symbol with a captured frame was returned
-    assert closure_instance is not None
+    assert closure_instance_id is not None
     assert closure_instance.name == "closure"
     assert closure_instance.captured_frame is not None, (
         "Closure should have a captured frame"
     )
 
     # 3. Invoke the returned closure
-    scope_manager.invoke(closure_instance, {})
+    manager.call_tracking_service.start_call(closure_instance, {}, frame_id)
 
     # 4. From within the closure's execution context, resolve a captured variable
-    resolved_msg_symbol = scope_manager.resolve_symbol_in_context("msg")
+    resolved_msg_symbol = manager.resolver.execution_resolver.resolve_in_frame(
+        "msg", frame_id)
     assert resolved_msg_symbol is not None
     assert resolved_msg_symbol.name == "msg"
 
-    scope_manager.end_current_call()  # End closure call
+    manager.call_tracking_service.end_call(frame_id)  # End closure call
 
     # 5. Verify the call graph
-    call_graph = scope_manager.get_call_graph()
+    call_graph = manager.resolver.call_graph_resolver.get_call_tree(frame_id)
     main_calls = call_graph.edges.get("__main__", [])
     assert len(main_calls) == 2
     assert main_calls[0].callee_symbol.qualified_name == "__main__.factory"

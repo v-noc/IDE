@@ -5,6 +5,8 @@ from .symbol_resolver import SymbolResolver
 from .qname_resolver import QNameResolver
 from .assignment_resolver import AssignmentResolver
 from .inheritance_resolver import InheritanceResolver
+from .execution_resolver import ExecutionResolver
+from .call_graph_resolver import CallGraphResolver
 
 
 class Resolver:
@@ -26,3 +28,8 @@ class Resolver:
 
         self.inheritance_resolver = InheritanceResolver(
             self.repo, self.qname_resolver)
+
+        self.execution_resolver = ExecutionResolver(
+            self.repo, self.scope_resolver, self.symbol_resolver)
+
+        self.call_graph_resolver = CallGraphResolver(self.repo)

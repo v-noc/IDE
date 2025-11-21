@@ -4,6 +4,7 @@ from .storage.repository.repos import ScopeManagerRepository
 from .storage.database import DatabaseManager
 from .resolver import Resolver
 from .writer import Writer
+from .services.call_tracking_service import CallTrackingService
 
 
 class ScopeManager:
@@ -22,6 +23,8 @@ class ScopeManager:
         self.writer = None
         self.project_name = None
 
+        self.call_tracking_service = None
+
     def create_root_scope(self, name: str = "__main__", file_path: str = "", db_name: str = "") -> ScopeModel:
         """
         Create the root scope for the project.
@@ -36,6 +39,12 @@ class ScopeManager:
 
         self.resolver = Resolver(self.repo)
         self.writer = Writer(self.repo)
+        self.call_tracking_service = CallTrackingService(
+            self.repo,
+            self.writer.call_frame_writer,
+            self.writer.call_site_writer,
+
+        )
 
         root_scope = self.repo.scopes.get_root()
 

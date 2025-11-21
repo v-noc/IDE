@@ -9,6 +9,7 @@ class SymbolType(str, Enum):
     CLASS = "class"
     FUNCTION = "function"
     VARIABLE = "variable"
+    CAPTURED_CLOSURE = "captured_closure"
     PARAMETER = "parameter"
     OBJECT_INSTANCE = "object_instance"  # For class instances
 
