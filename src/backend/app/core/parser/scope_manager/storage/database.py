@@ -12,6 +12,8 @@ def get_db_url(db_name: str) -> str:
     """Generate SQLite database URL."""
     db_dir = os.path.join(pl.user_data_dir("v-noc"), "scope_manager")
     os.makedirs(db_dir, exist_ok=True)
+    if db_name == "memory":
+        return "sqlite:///:memory:"
     db_path = os.path.join(db_dir, f"{db_name}.db")
     print(f"Database path: {db_path}")
     return f"sqlite:///{db_path}"
@@ -31,6 +33,7 @@ class DatabaseManager:
         if db_name not in cls._instances:
             instance = super().__new__(cls)
             # Bind instance-specific attributes
+
             instance._db_name = db_name
             instance._engine = None
             instance._session_factory = None
@@ -38,10 +41,19 @@ class DatabaseManager:
             cls._instances[db_name] = instance
         return cls._instances[db_name]
 
+    @classmethod
+    def reset_instance(cls, db_name: str):
+        """Reset the database instance (useful for testing)."""
+        if db_name in cls._instances:
+            instance = cls._instances[db_name]
+            if instance._engine:
+                instance._engine.dispose()
+            del cls._instances[db_name]
+
     def _initialize(self, db_name: str):
         """Initialize the database engine and session factory."""
         db_url = get_db_url(db_name)
-
+        print(f"db_url: {db_url}")
         # SQLite-specific optimizations
         self._engine = create_engine(
             db_url,

@@ -2,20 +2,24 @@ import pytest
 from app.core.parser.scope_manager.manger import ScopeManager
 from app.core.parser.scope_manager.storage.repository.repos import ScopeManagerRepository
 from app.core.parser.scope_manager.storage.models import SymbolType, ScopeType
+from app.core.parser.scope_manager.storage.database import DatabaseManager
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def manager():
     """Provides a ScopeManager with in-memory database for testing."""
     mgr = ScopeManager()
+
     yield mgr
     mgr.close()
+    DatabaseManager.reset_instance("memory")
 
 
 @pytest.fixture
 def root_scope_id(manager):
     """Provides a root scope ID for testing."""
-    scope = manager.create_root_scope(name="__main__", file_path="test.py")
+    scope = manager.create_root_scope(
+        name="__main__", file_path="test.py", db_name="memory")
     return scope.id
 
 

@@ -1,13 +1,20 @@
-from app.core.parser.scope_manager.core.scope import Scope, ScopeType
+from app.core.parser.scope_manager.storage.models import ScopeType
 
 
-def test_scope_creation(root_scope):
+def test_scope_creation(manager, root_scope_id):
     """Test the basic creation of a Scope."""
-    assert root_scope.name == "__main__"
-    assert root_scope.scope_type == ScopeType.MODULE
-    assert root_scope.parent_id is None
-    assert not root_scope.children
-    assert not root_scope.symbols
+    scope = manager.repo.scopes.get_by_id(root_scope_id)
+
+    print(f"scope: {root_scope_id}")
+    assert scope.name == "__main__"
+    assert scope.scope_type == ScopeType.PROJECT
+    assert scope.parent_id is None
+    children = scope.children
+
+    for child in children:
+        print(f"child: {child.name}")
+    assert not scope.children
+    assert not scope.symbols
 
 
 def test_add_child_scope(root_scope, child_scope):

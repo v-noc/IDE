@@ -21,13 +21,14 @@ class ScopeManager:
         self.writer = None
         self.project_name = None
 
-    def create_root_scope(self, name: str = "__main__", file_path: str = "") -> ScopeModel:
+    def create_root_scope(self, name: str = "__main__", file_path: str = "", db_name: str = "") -> ScopeModel:
         """
         Create the root scope for the project.
         """
-
+        if not db_name:
+            db_name = name
         self.project_name = name
-        self.db_manager = DatabaseManager(name)
+        self.db_manager = DatabaseManager(db_name)
         self.db_session = self.db_manager.get_session()
 
         self.repo = ScopeManagerRepository(self.db_session)
@@ -54,6 +55,7 @@ class ScopeManager:
         )
         self.root_scope_id = root_scope.id
         self.current_scope_id = root_scope.id
+
         return root_scope
 
     def enter_scope(self, name: str, scope_type: ScopeType, file_path: str) -> ScopeModel:
@@ -89,6 +91,7 @@ class ScopeManager:
             scope_id=self.current_scope_id,
         )
         self.current_scope_id = scope.id
+
         return scope
 
     def exit_scope(self) -> ScopeModel:
@@ -128,13 +131,16 @@ class ScopeManager:
             raise ValueError(
                 "Cannot define symbol without a current scope. Call enter_scope() first."
             )
-        return self.writer.symbol_writer.create_symbol(
+        symbol = self.writer.symbol_writer.create_symbol(
             name=name,
             symbol_type=symbol_type,
             scope_id=self.current_scope_id,
 
         )
 
+        return symbol
+
     def close(self):
+        print(f"closing scope manager f{self.db_session}")
         if self.db_session:
             self.db_session.close()
