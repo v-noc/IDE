@@ -1,5 +1,5 @@
 import pytest
-from app.core.parser.scope_manager.storage.models import SymbolType
+from app.core.parser.scope_manager.storage.models import SymbolType, ScopeType
 
 
 def test_symbol_creation(sample_symbol_id, child_scope_id, repo):
@@ -48,26 +48,39 @@ def test_resolve_immediate(manager, sample_symbol_id, child_scope_id):
     assert immediate.id == target.id  # Resolves to target
 
 
-def test_resolve_final(sample_symbol, child_scope, code_position, symbol_table):
+def test_resolve_final(manager, sample_symbol_id, child_scope_id):
     """Test the resolve_final method for a chain of assignments."""
-    var1 = sample_symbol
-    var2 = Symbol(name="var2", symbol_type=SymbolType.VARIABLE,
-                  defining_scope_id=child_scope.id, code_position=code_position)
-    func_symbol = Symbol(name="my_func", symbol_type=SymbolType.FUNCTION,
-                         defining_scope_id=child_scope.id, code_position=code_position)
-    var2.bind_table(sample_symbol._table)
-    func_symbol.bind_table(sample_symbol._table)
-    symbol_table.save_symbol(var2)
-    symbol_table.save_symbol(func_symbol)
+    # Create assignment chain: var1 -> var2 -> func_symbol
+    manager.current_scope_id = child_scope_id
 
-    var1.assign_to(var2)
-    var2.assign_to(func_symbol)
+    var2 = manager.define_symbol("var2", SymbolType.VARIABLE)
+    func = manager.enter_scope("my_func", ScopeType.FUNCTION, "")
+    manager.exit_scope()  # Back to child scope
 
-    # Resolves through the chain to the final function symbol
-    assert var1.resolve_final() == func_symbol
-    assert var2.resolve_final() == func_symbol
-    # A function symbol resolves to itself
-    assert func_symbol.resolve_final() == func_symbol
+    # Now get the function symbol (created in child scope when entering)
+
+    func_symbol = manager.resolver.scope_resolver.resolve_name(
+        "my_func", child_scope_id)
+    assert func_symbol is not None
+    func_symbol_id = func_symbol.id
+
+    # Create chain: sample_symbol -> var2 -> func_symbol
+    manager.writer.assignment_writer.assign_symbol(sample_symbol_id, var2.id)
+    manager.writer.assignment_writer.assign_symbol(var2.id, func_symbol_id)
+
+    # Resolve var1 (sample_symbol)
+    final1 = manager.resolver.assignment_resolver.resolve_assignment(
+        sample_symbol_id)
+    assert final1.id == func_symbol_id
+
+    # Resolve var2
+    final2 = manager.resolver.assignment_resolver.resolve_assignment(var2.id)
+    assert final2.id == func_symbol_id
+
+    # Function symbol resolves to itself
+    final3 = manager.resolver.assignment_resolver.resolve_assignment(
+        func_symbol_id)
+    assert final3.id == func_symbol_id
 
 
 def test_resolve_final_circular_dependency(sample_symbol, child_scope, code_position, symbol_table):

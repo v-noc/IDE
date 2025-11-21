@@ -76,6 +76,18 @@ class ScopeManager:
             source_unit_id=source_unit.id,
             parent_id=self.current_scope_id,
         )
+        if scope_type in (ScopeType.FUNCTION, ScopeType.CLASS, ScopeType.MODULE):
+            symbol_type = {
+                ScopeType.FUNCTION: SymbolType.FUNCTION,
+                ScopeType.CLASS: SymbolType.CLASS,
+                ScopeType.MODULE: SymbolType.MODULE,
+            }[scope_type]
+
+        self.writer.symbol_writer.create_symbol(
+            name=name,
+            symbol_type=symbol_type,
+            scope_id=self.current_scope_id,
+        )
         self.current_scope_id = scope.id
         return scope
 
