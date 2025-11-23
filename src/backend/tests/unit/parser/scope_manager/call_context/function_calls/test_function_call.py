@@ -98,47 +98,55 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
     assert closure_qname == "__main__.factory.closure"
 
 
-def test_independent_closures(scope_manager: ScopeManager):
+def test_independent_closures(manager: ScopeManager, root_scope_id: str):
     """
     Tests that calling a factory function twice creates two independent closures
     with their own captured environments.
     """
     # 1. Define the factory function (same as before)
-    factory_scope = scope_manager.enter_scope("factory", ScopeType.FUNCTION)
-    scope_manager.define_symbol("msg", SymbolType.PARAMETER)
-    scope_manager.enter_scope("closure", ScopeType.FUNCTION)
-    scope_manager.exit_scope()
-    scope_manager.exit_scope()
-    closure_symbol = factory_scope.symbols["closure"]
+    factory_scope = manager.enter_scope(
+        "factory", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("msg", SymbolType.PARAMETER)
+    manager.enter_scope("closure", ScopeType.FUNCTION, "test.py")
+    manager.exit_scope()
+    manager.exit_scope()
+    closure_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "closure", factory_scope.id)
 
     # 2. Create the first closure
-    scope_manager.invoke("factory", {"msg": "First Message"})
-    closure_one = scope_manager.end_current_call(return_value=closure_symbol)
-    closure_one_id = closure_one.captured_frame.id
+    factory_frame_id = manager.call_tracking_service.start_call(
+        factory_scope.symbol.id, {"msg": "First Message"}, caller_scope_id=root_scope_id)
+    closure_one = manager.call_tracking_service.end_call(
+        factory_frame_id, closure_symbol.id)
 
     # 3. Create the second closure
-    scope_manager.invoke("factory", {"msg": "Second Message"})
-    closure_two = scope_manager.end_current_call(return_value=closure_symbol)
-    closure_two_id = closure_two.captured_frame.id
-    print("Closure 2", closure_two_id)
+    factory_frame_id = manager.call_tracking_service.start_call(
+        factory_scope.symbol.id, {"msg": "Second Message"}, caller_scope_id=root_scope_id)
+    closure_two = manager.call_tracking_service.end_call(
+        factory_frame_id, closure_symbol.id)
 
-    # # 4. Assert that the closures are distinct and have different captured frames
     assert closure_one is not None and closure_two is not None
-
-    assert closure_one_id != closure_two_id
+    assert closure_one.id != closure_two.id
+    assert closure_one.captured_frame_id is not None
+    assert closure_two.captured_frame_id is not None
+    assert closure_one.captured_frame_id != closure_two.captured_frame_id
 
     # # 5. Invoke the first closure and check its context
 
-    # scope_manager.invoke(closure_one, {})
-    # resolved_msg1 = scope_manager.resolve_symbol_in_context("msg")
-    # assert resolved_msg1.defining_scope.parent.id == closure_one.captured_frame.id
-    # scope_manager.end_current_call()
+    closure_one_frame_id = manager.call_tracking_service.start_call(
+        closure_one.id, {}, caller_scope_id=root_scope_id)
+    resolved_msg1 = manager.resolver.execution_resolver.resolve_in_frame(
+        "msg", closure_one_frame_id)
+    assert resolved_msg1.defining_scope_id == closure_one.defining_scope_id
+    manager.call_tracking_service.end_call(closure_one_frame_id)
 
     # # 6. Invoke the second closure and check its context
-    # scope_manager.invoke(closure_two, {})
-    # resolved_msg2 = scope_manager.resolve_symbol_in_context("msg")
-    # assert resolved_msg2.defining_scope.parent.id == closure_two.captured_frame.id
-    # scope_manager.end_current_call()
+    closure_two_frame_id = manager.call_tracking_service.start_call(
+        closure_two.id, {}, caller_scope_id=root_scope_id)
+    resolved_msg2 = manager.resolver.execution_resolver.resolve_in_frame(
+        "msg", closure_two_frame_id)
+    assert resolved_msg2.defining_scope_id == closure_two.defining_scope_id
+    manager.call_tracking_service.end_call(closure_two_frame_id)
 
 
 def test_nested_function_call(scope_manager: ScopeManager):
