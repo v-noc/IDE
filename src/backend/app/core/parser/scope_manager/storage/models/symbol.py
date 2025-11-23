@@ -59,6 +59,17 @@ class SymbolModel(Base):
         ForeignKey('call_frames.id', ondelete='SET NULL'),
     )
 
+    # For closures and object instances: Links back to the original symbol.
+    # - For CAPTURED_CLOSURE: links to the original FUNCTION symbol
+    # - For OBJECT_INSTANCE: links to the original CLASS symbol
+    # This enables: function.closure_instances or class_symbol.object_instances
+    original_symbol_id = Column(
+        String,
+        ForeignKey('symbols.id', ondelete='SET NULL'),
+        index=True,
+        nullable=True
+    )
+
     # --- Staleness Tracking for Resync ---
     is_stale = Column(Boolean, default=False, index=True)
     stale_reason = Column(String, nullable=True)
@@ -88,6 +99,19 @@ class SymbolModel(Base):
         back_populates="symbol",
         foreign_keys=[defines_scope_id]
     )
+
+    # Relationship for tracking derived symbols (closures, instances)
+    original_symbol = relationship(
+        "SymbolModel",
+        foreign_keys=[original_symbol_id],
+        remote_side=[id],
+        backref="derived_symbols"
+    )
+    # Usage:
+    # - function.derived_symbols -> all closures created from this function
+    # - class_symbol.derived_symbols -> all instances created from this class
+    # - closure.original_symbol -> the original function
+    # - instance.original_symbol -> the original class
 
     # The most important index for performance!
     __table_args__ = (

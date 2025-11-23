@@ -39,7 +39,7 @@ class CallTrackingService:
         self,
         callee_symbol_id: str,
         args: Dict[str, Any],
-        caller_frame_id: Optional[str] = None
+        caller_scope_id: Optional[str] = None
     ) -> str:
         """
         Start a new function call.
@@ -54,7 +54,7 @@ class CallTrackingService:
         Args:
             callee_symbol_id: ID of the function/method being called
             args: Dictionary of argument name -> value (symbol ID or literal)
-            caller_frame_id: ID of the calling frame (None for root calls)
+            caller_scope_id: ID of the calling scope (None for root calls)
 
         Returns:
             ID of the created call frame
@@ -64,7 +64,7 @@ class CallTrackingService:
             ValueError: If callee symbol is invalid
         """
         # 1. Business rule: Check recursion depth
-        current_depth = self._get_current_depth(caller_frame_id)
+        current_depth = self._get_current_depth(caller_scope_id)
         if current_depth >= self.max_recursion_depth:
             raise RecursionError(
                 f"Maximum call depth exceeded: {self.max_recursion_depth}"
@@ -82,7 +82,7 @@ class CallTrackingService:
         frame_id = self.frame_writer.create_frame(
             callee_symbol_id=callee_symbol_id,
             execution_scope_id=execution_scope_id,
-            parent_frame_id=caller_frame_id,
+
             call_depth=current_depth + 1
         )
 
@@ -90,9 +90,9 @@ class CallTrackingService:
         self._populate_arguments(frame_id, execution_scope_id, args)
 
         # 5. Create call edge (if not root call)
-        if caller_frame_id:
-            self.site_writer.create_call_site(
-                caller_frame_id, callee_symbol_id)
+
+        self.site_writer.create_call_site(
+            caller_scope_id, frame_id)
 
         return frame_id
 
@@ -105,7 +105,7 @@ class CallTrackingService:
         End a function call.
 
         Handles the CRITICAL closure capture logic:
-        - If returning a function, creates a closure symbol with captured_frame_id
+        - If returning a function, creates a closure symbol with captured_scope_id
         - Updates the frame with the return value
 
         Args:
@@ -239,6 +239,7 @@ class CallTrackingService:
                 symbol_type=SymbolType.CAPTURED_CLOSURE,
                 defining_scope_id=frame.execution_scope_id,
                 captured_frame_id=frame.id,  # CRITICAL: Link to captured frame
+                original_symbol_id=return_symbol.id,  # Link back to original function
                 attrs=return_symbol.attrs.copy() if return_symbol.attrs else {}
             )
 

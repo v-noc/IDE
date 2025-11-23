@@ -12,7 +12,7 @@ class CallSiteRepository:
     def create(self, site: CallSiteModel) -> CallSiteModel:
         """Create and persist a new call site."""
         self.session.add(site)
-        self.session.flush()
+        self.session.commit()
         return site
 
     def get_by_id(self, site_id: str, include_stale: bool = False) -> Optional[CallSiteModel]:
@@ -35,14 +35,14 @@ class CallSiteRepository:
             query = query.filter(CallSiteModel.is_stale == False)
         return query.all()
 
-    def find_by_callee(self, callee_symbol_id: str, include_stale: bool = False) -> List[CallSiteModel]:
+    def find_by_callee_frame_id(self, callee_frame_id: str, include_stale: bool = False) -> List[CallSiteModel]:
         """
-        Get all call sites that call a specific symbol (reverse edges).
+        Get all call sites that call a specific frame (reverse edges).
         This answers: "Who calls this function?"
         """
 
         query = self.session.query(CallSiteModel).filter(
-            CallSiteModel.callee_symbol_id == callee_symbol_id)
+            CallSiteModel.callee_frame_id == callee_frame_id)
 
         if not include_stale:
             query = query.filter(CallSiteModel.is_stale == False)

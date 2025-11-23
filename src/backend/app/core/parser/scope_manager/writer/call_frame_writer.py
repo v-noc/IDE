@@ -24,7 +24,6 @@ class CallFrameWriter:
         self,
         callee_symbol_id: str,
         execution_scope_id: str,
-        parent_frame_id: Optional[str] = None,
         call_depth: int = 0
     ) -> str:
         """
@@ -33,7 +32,6 @@ class CallFrameWriter:
         Args:
             callee_symbol_id: ID of the function/method being called
             execution_scope_id: ID of the scope holding this frame's locals
-            parent_frame_id: ID of the calling frame (None for root calls)
             call_depth: Depth in the call stack (for recursion detection)
 
         Returns:
@@ -50,7 +48,6 @@ class CallFrameWriter:
             id=frame_id,
             callee_symbol_id=callee_symbol_id,
             execution_scope_id=execution_scope_id,
-            parent_frame_id=parent_frame_id,
             call_depth=call_depth,
             return_symbol_id=None  # Set later via complete_frame
         )

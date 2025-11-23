@@ -31,16 +31,6 @@ class CallFrameRepository:
             query = query.filter(CallFrameModel.is_stale == False)
         return query.first()
 
-    def get_root_call_from_scope(self, scope_id: str, include_stale: bool = True) -> List[CallFrameModel]:
-        """Get the root call from a scope."""
-        query = self.session.query(CallFrameModel).filter(
-            CallFrameModel.callee_symbol.has(defining_scope_id=scope_id),
-            CallFrameModel.parent_frame_id.is_(None),
-        )
-        if not include_stale:
-            query = query.filter(CallFrameModel.is_stale == False)
-        return query.all()
-
     def get_by_callee(self, callee_id: str, include_stale: bool = True) -> List[CallFrameModel]:
         """Get all call frames for a callee symbol (all invocations of a function)."""
         query = self.session.query(CallFrameModel).filter(

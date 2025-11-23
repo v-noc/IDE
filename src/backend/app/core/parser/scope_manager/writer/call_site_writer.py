@@ -22,14 +22,14 @@ class CallSiteWriter:
     def create_call_site(
         self,
         caller_scope_id: str,
-        callee_symbol_id: str
+        callee_frame_id: str
     ) -> str:
         """
         Create a call edge in the call graph.
 
         Args:
             caller_scope_id: ID of the scope making the call
-            callee_symbol_id: ID of the symbol being called
+            callee_frame_id: ID of the frame being called
 
         Returns:
             The ID of the created call site
@@ -44,7 +44,7 @@ class CallSiteWriter:
         call_site = CallSiteModel(
             id=site_id,
             caller_scope_id=caller_scope_id,
-            callee_symbol_id=callee_symbol_id,
+            callee_frame_id=callee_frame_id,
 
         )
 
@@ -94,8 +94,9 @@ class CallSiteWriter:
             )
 
         # Verify callee symbol exists
-        callee_symbol = self.repo.symbols.get_by_id(call_site.callee_symbol_id)
-        if not callee_symbol:
+        callee_frame = self.repo.call_frames.get_by_id(
+            call_site.callee_frame_id)
+        if not callee_frame:
             raise ValueError(
-                f"Callee symbol {call_site.callee_symbol_id} not found"
+                f"Callee frame {call_site.callee_frame_id} not found"
             )

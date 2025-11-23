@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, Boolean, Index, JSON
+from sqlalchemy import Column, String, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -15,10 +15,6 @@ class CallFrameModel(Base):
     # The unique scope that holds this frame's local variables and arguments.
     execution_scope_id = Column(String, ForeignKey(
         'scopes.id', ondelete='CASCADE'), unique=True)
-
-    # Parent frame in the call stack (for nested calls)
-    parent_frame_id = Column(String, ForeignKey(
-        'call_frames.id', ondelete='CASCADE'), index=True, nullable=True)
 
     # What this specific invocation returned
     return_symbol_id = Column(String, ForeignKey(
@@ -48,17 +44,18 @@ class CallFrameModel(Base):
         backref="call_frame"
     )
 
-    parent_frame = relationship(
-        "CallFrameModel",
-        remote_side=[id],
-        backref="child_frames",
-        foreign_keys=[parent_frame_id]
-    )
-
     return_symbol = relationship(
         "SymbolModel",
         foreign_keys=[return_symbol_id],
         backref="call_frames_as_return"
+    )
+
+    # Call sites where this frame is the callee
+    call_sites_as_callee = relationship(
+        "CallSiteModel",
+        back_populates="callee_frame",
+        cascade="all, delete-orphan",
+        foreign_keys="CallSiteModel.callee_frame_id",
     )
 
 
@@ -72,8 +69,8 @@ class CallSiteModel(Base):
         'scopes.id', ondelete='CASCADE'), index=True)
 
     # Which function was called at this site?
-    callee_symbol_id = Column(String, ForeignKey(
-        'symbols.id', ondelete='CASCADE'), index=True)
+    callee_frame_id = Column(String, ForeignKey(
+        'call_frames.id', ondelete='CASCADE'), index=True)
 
     # --- Staleness Tracking for Resync ---
     is_stale = Column(Boolean, default=False, index=True)
@@ -83,11 +80,11 @@ class CallSiteModel(Base):
     caller_scope = relationship(
         "ScopeModel",
         foreign_keys=[caller_scope_id],
-        backref="call_sites_as_caller"
+        back_populates="call_sites_as_caller"
     )
 
-    callee_symbol = relationship(
-        "SymbolModel",
-        foreign_keys=[callee_symbol_id],
-        backref="call_sites_as_callee"
+    callee_frame = relationship(
+        "CallFrameModel",
+        foreign_keys=[callee_frame_id],
+        back_populates="call_sites_as_callee"
     )

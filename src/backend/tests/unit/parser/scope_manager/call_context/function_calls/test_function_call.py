@@ -59,7 +59,7 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
 
     # 2. Call the factory to create a closure instance
     frame_id = manager.call_tracking_service.start_call(
-        factory_scope.symbol.id, {"msg": "Hello Closure"})
+        factory_scope.symbol.id, {"msg": "Hello Closure"}, caller_scope_id=root_scope_id)
     manager.call_tracking_service.end_call(frame_id)
     closure_instance = manager.call_tracking_service.end_call(frame_id,
                                                               closure_symbol.id)
@@ -72,7 +72,8 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
     )
 
     # 3. Invoke the returned closure
-    manager.call_tracking_service.start_call(closure_instance.id, {}, None)
+    manager.call_tracking_service.start_call(
+        closure_instance.id, {}, root_scope_id)
 
     # 4. From within the closure's execution context, resolve a captured variable
     resolved_msg_symbol = manager.resolver.execution_resolver.resolve_in_frame(
@@ -85,11 +86,16 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
     # 5. Verify the call graph
     call_graph = manager.resolver.call_graph_resolver.get_root_call_from_scope(
         root_scope_id)
-    print("Call graph", call_graph)
-    main_calls = call_graph.edges.get("__main__", [])
-    assert len(main_calls) == 2
-    assert main_calls[0].callee_symbol.qualified_name == "__main__.factory"
-    assert main_calls[1].callee_symbol.qualified_name == "__main__.factory.closure"
+
+    # main_calls = call_graph.edges.get("__main__", [])
+    assert len(call_graph) == 2
+
+    factory_qname = manager.resolver.qname_resolver.get_qname_for_symbol(
+        call_graph[0].callee_frame.callee_symbol.id)
+    closure_qname = manager.resolver.qname_resolver.get_qname_for_symbol(
+        call_graph[1].callee_frame.callee_symbol.original_symbol_id)
+    assert factory_qname == "__main__.factory"
+    assert closure_qname == "__main__.factory.closure"
 
 
 def test_independent_closures(scope_manager: ScopeManager):

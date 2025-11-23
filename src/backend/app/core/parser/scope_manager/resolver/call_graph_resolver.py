@@ -24,7 +24,7 @@ class CallGraphResolver:
         """
         Get the root call from a scope.
         """
-        return self.repo.call_frames.get_root_call_from_scope(scope_id)
+        return self.repo.call_sites.find_by_caller(scope_id)
 
     def get_callees(self, caller_frame_id: str) -> List[CallSiteModel]:
         """
@@ -155,11 +155,11 @@ class CallGraphResolver:
                 ]
             }
         """
-        def _build_tree(frame_id: str, depth: int) -> Optional[dict]:
+        def _build_tree(execution_scope_id: str, depth: int) -> Optional[dict]:
             if depth >= max_depth:
                 return None
 
-            frame = self.repo.call_frames.get_by_id(frame_id)
+            frame = self.repo.call_sites.find_by_caller(execution_scope_id)
             if not frame:
                 return None
 
@@ -183,7 +183,7 @@ class CallGraphResolver:
                     site.callee_symbol_id)
 
                 for child_frame in child_frames:
-                    if child_frame.parent_frame_id == frame_id:
+                    if child_frame.execution_scope_id == frame_id:
                         child_tree = _build_tree(child_frame.id, depth + 1)
                         if child_tree:
                             tree['children'].append(child_tree)
