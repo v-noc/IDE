@@ -18,7 +18,7 @@ def test_simple_function_call(manager: ScopeManager, root_scope_id: str):
         "greet", manager.root_scope_id)
     # 2. Invoke the function from the global scope
     frame_id = manager.call_tracking_service.start_call(
-        greet_symbol.id, {"name": "World"})
+        greet_symbol.id, {"name": "World"}, caller_scope_id=root_scope_id)
     manager.call_tracking_service.end_call(frame_id)
 
     frame = manager.repo.call_frames.get_by_id(frame_id)
@@ -47,7 +47,8 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
     #     ...
     #   return closure
     factory_scope = manager.enter_scope(
-        "factory", ScopeType.FUNCTION, "test.py")
+        "factory", ScopeType.FUNCTION, "test.py"
+    )
     manager.define_symbol("msg", SymbolType.PARAMETER)
     manager.enter_scope("closure", ScopeType.FUNCTION, "test.py")
     manager.exit_scope()  # Exit closure scope
@@ -59,10 +60,14 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
 
     # 2. Call the factory to create a closure instance
     frame_id = manager.call_tracking_service.start_call(
-        factory_scope.symbol.id, {"msg": "Hello Closure"}, caller_scope_id=root_scope_id)
+        factory_scope.symbol.id,
+        {"msg": "Hello Closure"},
+        caller_scope_id=root_scope_id,
+    )
     manager.call_tracking_service.end_call(frame_id)
-    closure_instance = manager.call_tracking_service.end_call(frame_id,
-                                                              closure_symbol.id)
+    closure_instance = manager.call_tracking_service.end_call(
+        frame_id, closure_symbol.id
+    )
 
     # Assert that a closure symbol with a captured frame was returned
     assert closure_instance is not None
@@ -77,7 +82,8 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
 
     # 4. From within the closure's execution context, resolve a captured variable
     resolved_msg_symbol = manager.resolver.execution_resolver.resolve_in_frame(
-        "msg", frame_id)
+        "msg", frame_id
+    )
     assert resolved_msg_symbol is not None
     assert resolved_msg_symbol.name == "msg"
 
@@ -85,7 +91,8 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
 
     # 5. Verify the call graph
     call_graph = manager.resolver.call_graph_resolver.get_root_call_from_scope(
-        root_scope_id)
+        root_scope_id
+    )
 
     # main_calls = call_graph.edges.get("__main__", [])
     assert len(call_graph) == 2
@@ -105,7 +112,8 @@ def test_independent_closures(manager: ScopeManager, root_scope_id: str):
     """
     # 1. Define the factory function (same as before)
     factory_scope = manager.enter_scope(
-        "factory", ScopeType.FUNCTION, "test.py")
+        "factory", ScopeType.FUNCTION, "test.py"
+    )
     manager.define_symbol("msg", SymbolType.PARAMETER)
     manager.enter_scope("closure", ScopeType.FUNCTION, "test.py")
     manager.exit_scope()
@@ -115,13 +123,19 @@ def test_independent_closures(manager: ScopeManager, root_scope_id: str):
 
     # 2. Create the first closure
     factory_frame_id = manager.call_tracking_service.start_call(
-        factory_scope.symbol.id, {"msg": "First Message"}, caller_scope_id=root_scope_id)
+        factory_scope.symbol.id,
+        {"msg": "First Message"},
+        caller_scope_id=root_scope_id,
+    )
     closure_one = manager.call_tracking_service.end_call(
         factory_frame_id, closure_symbol.id)
 
     # 3. Create the second closure
     factory_frame_id = manager.call_tracking_service.start_call(
-        factory_scope.symbol.id, {"msg": "Second Message"}, caller_scope_id=root_scope_id)
+        factory_scope.symbol.id,
+        {"msg": "Second Message"},
+        caller_scope_id=root_scope_id,
+    )
     closure_two = manager.call_tracking_service.end_call(
         factory_frame_id, closure_symbol.id)
 
@@ -134,7 +148,9 @@ def test_independent_closures(manager: ScopeManager, root_scope_id: str):
     # # 5. Invoke the first closure and check its context
 
     closure_one_frame_id = manager.call_tracking_service.start_call(
-        closure_one.id, {}, caller_scope_id=root_scope_id)
+        closure_one.id, {},
+        caller_scope_id=root_scope_id,
+    )
     resolved_msg1 = manager.resolver.execution_resolver.resolve_in_frame(
         "msg", closure_one_frame_id)
     assert resolved_msg1.defining_scope_id == closure_one.defining_scope_id
@@ -142,7 +158,9 @@ def test_independent_closures(manager: ScopeManager, root_scope_id: str):
 
     # # 6. Invoke the second closure and check its context
     closure_two_frame_id = manager.call_tracking_service.start_call(
-        closure_two.id, {}, caller_scope_id=root_scope_id)
+        closure_two.id, {},
+        caller_scope_id=root_scope_id,
+    )
     resolved_msg2 = manager.resolver.execution_resolver.resolve_in_frame(
         "msg", closure_two_frame_id)
     assert resolved_msg2.defining_scope_id == closure_two.defining_scope_id
@@ -165,22 +183,31 @@ def test_nested_function_call(manager: ScopeManager, root_scope_id: str):
 
     # 2. Simulate the execution flow: call outer()
     outer_frame_id = manager.call_tracking_service.start_call(
-        manager.repo.symbols.get_by_name_in_scope("outer", root_scope_id).id, {}, caller_scope_id=root_scope_id)
+        manager.repo.symbols.get_by_name_in_scope(
+            "outer", root_scope_id
+        ).id,
+        {},
+        caller_scope_id=root_scope_id,
+    )
 
     outer_frame = manager.repo.call_frames.get_by_id(outer_frame_id)
 
     # 3. From within outer's context, look up and call inner()
     inner_symbol = manager.resolver.execution_resolver.resolve_in_frame(
-        "inner", outer_frame_id)
+        "inner", outer_frame_id
+    )
     assert inner_symbol is not None, "Could not find 'inner' from within 'outer'"
     inner_frame = manager.call_tracking_service.start_call(
-        inner_symbol.id, {}, caller_scope_id=outer_frame.execution_scope_id)
+        inner_symbol.id, {},
+        caller_scope_id=outer_frame.execution_scope_id,
+    )
     manager.call_tracking_service.end_call(inner_frame)
     manager.call_tracking_service.end_call(outer_frame_id)  # End outer call
 
     # 4. Verify the call graph
     call_graph = manager.resolver.call_graph_resolver.get_call_tree(
-        root_scope_id)
+        root_scope_id
+    )
     # __main__ should call outer
 
     # main_calls = call_graph.edges.get("__main__", [])
@@ -206,7 +233,8 @@ def test_callback_function(manager: ScopeManager, root_scope_id: str):
     # def invoker(callback_func):
     #   callback_func("some_data")
     invoker_scope = manager.enter_scope(
-        "invoker", ScopeType.FUNCTION, "test.py")
+        "invoker", ScopeType.FUNCTION, "test.py"
+    )
     manager.define_symbol("callback_func", SymbolType.PARAMETER)
     manager.exit_scope()
 
@@ -217,12 +245,16 @@ def test_callback_function(manager: ScopeManager, root_scope_id: str):
 
     # 4. Simulate the call to the invoker, passing the callback symbol as an argument
     invoker_frame_id = manager.call_tracking_service.start_call(
-        invoker_scope.symbol.id, {"callback_func": callback_symbol}, caller_scope_id=root_scope_id)
+        invoker_scope.symbol.id,
+        {"callback_func": callback_symbol},
+        caller_scope_id=root_scope_id,
+    )
     manager.call_tracking_service.end_call(invoker_frame_id)
 
     # 5. From within the invoker's context, resolve and call the callback
     callback_param_symbol = manager.resolver.execution_resolver.resolve_in_frame(
-        "callback_func", invoker_frame_id)
+        "callback_func", invoker_frame_id
+    )
 
     invoker_frame = manager.repo.call_frames.get_by_id(invoker_frame_id)
 
@@ -231,11 +263,15 @@ def test_callback_function(manager: ScopeManager, root_scope_id: str):
     final_callee = manager.resolver.symbol_resolver.resolve_alias_chain(
         callback_param_symbol.id)
     qname = manager.resolver.qname_resolver.get_qname_for_symbol(
-        final_callee.id)
+        final_callee.id
+    )
     assert qname == "__main__.my_callback"
 
     callback_frame_id = manager.call_tracking_service.start_call(
-        final_callee.id, {"data": "some_data"}, caller_scope_id=invoker_frame.execution_scope_id)
+        final_callee.id,
+        {"data": "some_data"},
+        caller_scope_id=invoker_frame.execution_scope_id,
+    )
 
     manager.call_tracking_service.end_call(
         callback_frame_id)  # End callback call
@@ -245,7 +281,8 @@ def test_callback_function(manager: ScopeManager, root_scope_id: str):
 
     # # 6. Verify the call graph
     call_graph = manager.resolver.call_graph_resolver.get_call_tree(
-        root_scope_id)
+        root_scope_id
+    )
     # # __main__ -> invoker
     assert len(call_graph) == 1
     assert len(call_graph[0]['children']) == 1
@@ -253,48 +290,75 @@ def test_callback_function(manager: ScopeManager, root_scope_id: str):
     assert call_graph[0]['children'][0]['callee_symbol'].name == "my_callback"
 
 
-def test_closure_calling_another_function(scope_manager: ScopeManager):
+def test_closure_calling_another_function(manager: ScopeManager, root_scope_id: str):
     """
     Tests that a call from within a closure is correctly recorded in the call graph.
     """
     # 1. Define a target function to be called by the closure
-    scope_manager.enter_scope("target_func", ScopeType.FUNCTION)
-    scope_manager.exit_scope()
+    # def target_func(): ...
+    manager.enter_scope("target_func", ScopeType.FUNCTION, "test.py")
+    manager.exit_scope()
+    target_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "target_func", root_scope_id
+    )
 
     # 2. Define a factory that creates a closure
-    factory_scope = scope_manager.enter_scope("factory", ScopeType.FUNCTION)
-    scope_manager.enter_scope("closure", ScopeType.FUNCTION)
-    scope_manager.exit_scope()  # Exit closure scope
-    scope_manager.exit_scope()  # Exit factory scope
-    closure_symbol = factory_scope.symbols["closure"]
+    # def factory():
+    #   def closure():
+    #       target_func()
+    #   return closure
+    factory_scope = manager.enter_scope(
+        "factory", ScopeType.FUNCTION, "test.py"
+    )
+    manager.enter_scope("closure", ScopeType.FUNCTION, "test.py")
+    manager.exit_scope()  # Exit closure scope
+    manager.exit_scope()  # Exit factory scope
+    closure_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "closure", factory_scope.id
+    )
 
-    # 3. Create the closure instance
-    scope_manager.invoke("factory", {})
-    closure_instance = scope_manager.end_current_call(
-        return_value=closure_symbol)
+    # 3. Create the closure instance by calling factory()
+    factory_frame_id = manager.call_tracking_service.start_call(
+        factory_scope.symbol.id, {},
+        caller_scope_id=root_scope_id,
+    )
+    # Complete the factory call and capture the returned closure
+    manager.call_tracking_service.end_call(factory_frame_id)
+    closure_instance = manager.call_tracking_service.end_call(
+        factory_frame_id, closure_symbol.id)
 
-    # 4. Invoke the closure
-    closure_frame = scope_manager.invoke(closure_instance, {})
+    assert closure_instance is not None
+    assert closure_instance.captured_frame_id is not None
 
-    # 5. From within the closure's context, call the target function
-    target_symbol = scope_manager.lookup_symbol("target_func")
+    # 4. Invoke the closure from the global scope
+    closure_frame_id = manager.call_tracking_service.start_call(
+        closure_instance.id, {},
+        caller_scope_id=root_scope_id,
+    )
+    closure_frame = manager.repo.call_frames.get_by_id(closure_frame_id)
+
+    # 5. From within the closure's execution context, call the target function
     assert target_symbol is not None
-    scope_manager.invoke(target_symbol, {})
-    scope_manager.end_current_call()  # End target_func call
-
-    scope_manager.end_current_call()  # End closure call
+    target_call_frame_id = manager.call_tracking_service.start_call(
+        target_symbol.id, {},
+        caller_scope_id=closure_frame.execution_scope_id,
+    )
+    manager.call_tracking_service.end_call(
+        target_call_frame_id)  # End target_func call
+    manager.call_tracking_service.end_call(
+        closure_frame_id)  # End closure call
 
     # 6. Verify the call graph
-    call_graph = scope_manager.get_call_graph()
+    call_graph = manager.resolver.call_graph_resolver.get_call_tree(
+        root_scope_id
+    )
 
-    # Check calls made from the global scope (__main__)
-    main_calls = call_graph.edges.get("__main__", [])
-    assert len(main_calls) == 2
-    assert main_calls[0].callee_symbol.qualified_name == "__main__.factory"
-    assert main_calls[1].callee_symbol.qualified_name == "__main__.factory.closure"
+    # From the global scope we should see calls to factory and then the closure
+    assert len(call_graph) == 2
+    assert call_graph[0]['callee_symbol'].name == "factory"
+    assert call_graph[1]['callee_symbol'].name == "closure"
 
-    # Check calls made from the closure's execution scope
-    closure_exec_qname = closure_frame.callee_symbol.qualified_name
-    closure_calls = call_graph.edges.get(closure_exec_qname, [])
-    assert len(closure_calls) == 1
-    assert closure_calls[0].callee_symbol.qualified_name == "__main__.target_func"
+    # From the closure's execution scope, we should see a call to target_func
+    closure_children = call_graph[1]['children'] or []
+    assert len(closure_children) == 1
+    assert closure_children[0]['callee_symbol'].name == "target_func"
