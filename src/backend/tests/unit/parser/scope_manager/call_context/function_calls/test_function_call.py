@@ -149,7 +149,7 @@ def test_independent_closures(manager: ScopeManager, root_scope_id: str):
     manager.call_tracking_service.end_call(closure_two_frame_id)
 
 
-def test_nested_function_call(scope_manager: ScopeManager):
+def test_nested_function_call(manager: ScopeManager, root_scope_id: str):
     """
     Tests a function that defines and then immediately calls a nested function,
     verifying the call relationship in the graph.
@@ -158,34 +158,38 @@ def test_nested_function_call(scope_manager: ScopeManager):
     # def outer():
     #   def inner(): ...
     #   inner()
-    scope_manager.enter_scope("outer", ScopeType.FUNCTION)
-    scope_manager.enter_scope("inner", ScopeType.FUNCTION)
-    scope_manager.exit_scope()  # Exit inner scope
-    scope_manager.exit_scope()  # Exit outer scope
+    manager.enter_scope("outer", ScopeType.FUNCTION, "test.py")
+    manager.enter_scope("inner", ScopeType.FUNCTION, "test.py")
+    manager.exit_scope()  # Exit inner scope
+    manager.exit_scope()  # Exit outer scope
 
     # 2. Simulate the execution flow: call outer()
-    outer_frame = scope_manager.invoke("outer", {})
+    outer_frame_id = manager.call_tracking_service.start_call(
+        manager.repo.symbols.get_by_name_in_scope("outer", root_scope_id).id, {}, caller_scope_id=root_scope_id)
+
+    outer_frame = manager.repo.call_frames.get_by_id(outer_frame_id)
 
     # 3. From within outer's context, look up and call inner()
-    inner_symbol = scope_manager.resolve_symbol_in_context("inner")
+    inner_symbol = manager.resolver.execution_resolver.resolve_in_frame(
+        "inner", outer_frame_id)
     assert inner_symbol is not None, "Could not find 'inner' from within 'outer'"
-    scope_manager.invoke(inner_symbol, {})
-    scope_manager.end_current_call()  # End inner call
-
-    scope_manager.end_current_call()  # End outer call
+    inner_frame = manager.call_tracking_service.start_call(
+        inner_symbol.id, {}, caller_scope_id=outer_frame.execution_scope_id)
+    manager.call_tracking_service.end_call(inner_frame)
+    manager.call_tracking_service.end_call(outer_frame_id)  # End outer call
 
     # 4. Verify the call graph
-    call_graph = scope_manager.get_call_graph()
+    call_graph = manager.resolver.call_graph_resolver.get_call_tree(
+        root_scope_id)
     # __main__ should call outer
-    main_calls = call_graph.edges.get("__main__", [])
-    assert len(main_calls) == 1
-    assert main_calls[0].callee_symbol.qualified_name == "__main__.outer"
 
-    # outer's execution scope should call inner
-    outer_exec_qname = outer_frame.callee_symbol.qualified_name
-    outer_calls = call_graph.edges.get(outer_exec_qname, [])
-    assert len(outer_calls) == 1
-    assert outer_calls[0].callee_symbol.qualified_name == "__main__.outer.inner"
+    # main_calls = call_graph.edges.get("__main__", [])
+    assert len(call_graph) == 1
+    assert len(call_graph[0]['children']) == 1
+    print(f"Call graph: {call_graph}")
+    assert call_graph[0]['callee_symbol'].name == "outer"
+
+    assert call_graph[0]['children'][0]['callee_symbol'].name == "inner"
 
 
 def test_callback_function(scope_manager: ScopeManager):
