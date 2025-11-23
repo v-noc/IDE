@@ -88,6 +88,7 @@ class CallSiteWriter:
         # Verify caller scope exists
         caller_scope = self.repo.scopes.get_by_id(
             call_site.caller_scope_id)
+
         if not caller_scope:
             raise ValueError(
                 f"Caller scope {call_site.caller_scope_id} not found"

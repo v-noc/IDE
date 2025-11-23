@@ -13,13 +13,13 @@ class SymbolRepository:
     def update(self, symbol: SymbolModel) -> SymbolModel:
         """Update a symbol."""
         self.session.add(symbol)
-        self.session.flush()
+        self.session.commit()
         return symbol
 
     def create(self, symbol: SymbolModel) -> SymbolModel:
         """Create and persist a new symbol."""
         self.session.add(symbol)
-        self.session.flush()
+        self.session.commit()
         return symbol
 
     def get_by_id(self, symbol_id: str, include_stale: bool = False) -> Optional[SymbolModel]:

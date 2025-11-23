@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, Boolean, JSON
+from sqlalchemy import Column, String, ForeignKey, Boolean, Integer
 from sqlalchemy.orm import relationship
 from ..database import Base
 
@@ -21,7 +21,7 @@ class CallFrameModel(Base):
         'symbols.id', ondelete='SET NULL'), nullable=True)
 
     # Call depth for recursion detection
-    call_depth = Column(JSON, default=0)
+    call_depth = Column(Integer, default=0)
 
     # --- Staleness Tracking for Resync ---
     is_stale = Column(Boolean, default=False, index=True)

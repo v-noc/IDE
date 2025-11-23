@@ -192,59 +192,65 @@ def test_nested_function_call(manager: ScopeManager, root_scope_id: str):
     assert call_graph[0]['children'][0]['callee_symbol'].name == "inner"
 
 
-def test_callback_function(scope_manager: ScopeManager):
+def test_callback_function(manager: ScopeManager, root_scope_id: str):
     """
     Tests passing a function as a callback and invoking it, checking the call graph.
     """
     # 1. Define the function that will be used as a callback
     # def my_callback(data): ...
-    scope_manager.enter_scope("my_callback", ScopeType.FUNCTION)
-    scope_manager.define_symbol("data", SymbolType.PARAMETER)
-    scope_manager.exit_scope()
+    manager.enter_scope("my_callback", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("data", SymbolType.PARAMETER)
+    manager.exit_scope()
 
     # 2. Define the function that accepts and calls the callback
     # def invoker(callback_func):
     #   callback_func("some_data")
-    scope_manager.enter_scope("invoker", ScopeType.FUNCTION)
-    scope_manager.define_symbol("callback_func", SymbolType.PARAMETER)
-    scope_manager.exit_scope()
+    invoker_scope = manager.enter_scope(
+        "invoker", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("callback_func", SymbolType.PARAMETER)
+    manager.exit_scope()
 
     # 3. Get the symbol for the callback function
-    callback_symbol = scope_manager.lookup_symbol("my_callback")
+    callback_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "my_callback", root_scope_id)
     assert callback_symbol is not None
 
     # 4. Simulate the call to the invoker, passing the callback symbol as an argument
-    invoker_frame = scope_manager.invoke(
-        "invoker", {"callback_func": callback_symbol})
+    invoker_frame_id = manager.call_tracking_service.start_call(
+        invoker_scope.symbol.id, {"callback_func": callback_symbol}, caller_scope_id=root_scope_id)
+    manager.call_tracking_service.end_call(invoker_frame_id)
 
     # 5. From within the invoker's context, resolve and call the callback
-    callback_param_symbol = scope_manager.resolve_symbol_in_context(
-        "callback_func")
+    callback_param_symbol = manager.resolver.execution_resolver.resolve_in_frame(
+        "callback_func", invoker_frame_id)
+
+    invoker_frame = manager.repo.call_frames.get_by_id(invoker_frame_id)
+
     assert callback_param_symbol is not None
     # The parameter symbol should point to the actual callback function symbol
-    final_callee = callback_param_symbol.resolve_final()
-    assert final_callee.qualified_name == "__main__.my_callback"
+    final_callee = manager.resolver.symbol_resolver.resolve_alias_chain(
+        callback_param_symbol.id)
+    qname = manager.resolver.qname_resolver.get_qname_for_symbol(
+        final_callee.id)
+    assert qname == "__main__.my_callback"
 
-    scope_manager.invoke(final_callee, {"data": "some_data"})
-    scope_manager.end_current_call()  # End callback call
+    callback_frame_id = manager.call_tracking_service.start_call(
+        final_callee.id, {"data": "some_data"}, caller_scope_id=invoker_frame.execution_scope_id)
 
-    scope_manager.end_current_call()  # End invoker call
+    manager.call_tracking_service.end_call(
+        callback_frame_id)  # End callback call
 
-    # 6. Verify the call graph
-    call_graph = scope_manager.get_call_graph()
-    # __main__ -> invoker
-    main_calls = call_graph.edges.get("__main__", [])
-    assert len(main_calls) == 1
-    assert main_calls[0].callee_symbol.qualified_name == "__main__.invoker"
+    manager.call_tracking_service.end_call(
+        invoker_frame_id)  # End invoker call
 
-    # invoker -> my_callback
-    invoker_exec_qname = invoker_frame.callee_symbol.qualified_name
-    call_graph = scope_manager.get_call_graph()
-
-    invoker_calls = call_graph.edges.get(invoker_exec_qname, [])
-    assert len(invoker_calls) == 1
-
-    assert invoker_calls[0].callee_symbol.qualified_name == "__main__.my_callback"
+    # # 6. Verify the call graph
+    call_graph = manager.resolver.call_graph_resolver.get_call_tree(
+        root_scope_id)
+    # # __main__ -> invoker
+    assert len(call_graph) == 1
+    assert len(call_graph[0]['children']) == 1
+    assert call_graph[0]['callee_symbol'].name == "invoker"
+    assert call_graph[0]['children'][0]['callee_symbol'].name == "my_callback"
 
 
 def test_closure_calling_another_function(scope_manager: ScopeManager):

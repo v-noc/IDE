@@ -59,16 +59,12 @@ class CallFrameRepository:
             .count()
         )
 
-    def get_stack_depth(self, frame_id: str) -> int:
+    def get_stack_depth(self, caller_scope_id: str) -> int:
         """
         Calculate the stack depth for a frame by counting parent frames.
         """
-        depth = 0
-        current_id = frame_id
-        while current_id:
-            frame = self.get_by_id(current_id)
-            if not frame:
-                break
-            depth += 1
-            current_id = frame.parent_frame_id
-        return depth
+
+        current_frame = self.get_by_execution_scope(caller_scope_id)
+        if not current_frame:
+            return 0
+        return current_frame.call_depth

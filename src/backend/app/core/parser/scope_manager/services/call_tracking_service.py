@@ -143,14 +143,14 @@ class CallTrackingService:
         # TODO: Implement active frame tracking
         return 0
 
-    def _get_current_depth(self, frame_id: Optional[str]) -> int:
+    def _get_current_depth(self, caller_scope_id: Optional[str]) -> int:
         """
         Calculate depth by walking parent chain.
         """
-        if not frame_id:
+        if not caller_scope_id:
             return 0
 
-        return self.repo.call_frames.get_stack_depth(frame_id)
+        return self.repo.call_frames.get_stack_depth(caller_scope_id)
 
     def _create_execution_scope(self, callee_symbol: SymbolModel) -> str:
         """
@@ -183,7 +183,7 @@ class CallTrackingService:
         Populate the execution scope with function arguments.
 
         Always creates parameter symbols in the execution scope.
-        If an argument value is a symbol ID, links via assigned_to_id.
+        If an argument value is a symbol ID or SymbolModel, links via assigned_to_id.
         """
         for param_name, arg_value in arguments.items():
             # Create a parameter symbol local to the execution scope
@@ -194,8 +194,11 @@ class CallTrackingService:
                 defining_scope_id=execution_scope_id,
             )
 
+            # Handle SymbolModel objects directly (for convenience)
+            if isinstance(arg_value, SymbolModel):
+                param_symbol.assigned_to_id = arg_value.id
             # If the argument is a symbol ID (string), link it
-            if isinstance(arg_value, str):
+            elif isinstance(arg_value, str):
                 # Check if it's a valid symbol ID
                 target_symbol = self.repo.symbols.get_by_id(arg_value)
                 if target_symbol:
