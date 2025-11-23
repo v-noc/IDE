@@ -24,6 +24,7 @@ class SymbolWriter:
         assigned_to_id: Optional[str] = None,
         instance_scope_id: Optional[str] = None,
         attrs: Optional[Dict[str, Any]] = None,
+        original_symbol_id: Optional[str] = None,
     ) -> SymbolModel:
         """
         Create a new symbol.
@@ -47,6 +48,7 @@ class SymbolWriter:
             defining_scope_id=scope_id,
             defines_scope_id=defines_scope_id,
             assigned_to_id=assigned_to_id,
+            original_symbol_id=original_symbol_id,
             instance_scope_id=instance_scope_id,
             attrs=attrs or {},
         )

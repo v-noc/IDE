@@ -5,6 +5,7 @@ from .storage.database import DatabaseManager
 from .resolver import Resolver
 from .writer import Writer
 from .services.call_tracking_service import CallTrackingService
+from .services.instantiation_service import InstantiationService
 
 
 class ScopeManager:
@@ -24,6 +25,7 @@ class ScopeManager:
         self.project_name = None
 
         self.call_tracking_service = None
+        self.instantiation_service = None
 
     def create_root_scope(self, name: str = "__main__", file_path: str = "", db_name: str = "") -> ScopeModel:
         """
@@ -45,7 +47,12 @@ class ScopeManager:
             self.writer.call_site_writer,
 
         )
+        self.instantiation_service = InstantiationService(
+            self.repo,
+            self.writer.scope_writer,
+            self.writer.symbol_writer,
 
+        )
         root_scope = self.repo.scopes.get_root()
 
         if root_scope:

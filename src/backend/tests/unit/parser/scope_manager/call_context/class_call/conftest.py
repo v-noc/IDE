@@ -1,20 +1,11 @@
 import pytest
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.core import ScopeType, SymbolType
+
+from app.core.parser.scope_manager.storage.models import ScopeType, SymbolType
+from app.core.parser.scope_manager.manger import ScopeManager
 
 
 @pytest.fixture
-def scope_manager() -> ScopeManager:
-    """
-    Provides a clean ScopeManager instance with a root scope for each test.
-    """
-    manager = ScopeManager()
-    manager.create_root_scope("__main__")
-    return manager
-
-
-@pytest.fixture
-def class_hierarchy_manager(scope_manager: ScopeManager) -> ScopeManager:
+def class_hierarchy_manager(manager: ScopeManager, root_scope_id: str) -> ScopeManager:
     """
     Provides a ScopeManager with a pre-defined class hierarchy:
     - class Animal:
@@ -27,32 +18,63 @@ def class_hierarchy_manager(scope_manager: ScopeManager) -> ScopeManager:
         - def bark(self)
     """
     # Define Animal class
-    scope_manager.enter_scope("Animal", ScopeType.CLASS)
-    scope_manager.enter_scope("__init__", ScopeType.FUNCTION)
-    scope_manager.define_symbol("self", SymbolType.PARAMETER)
-    scope_manager.define_symbol("name", SymbolType.PARAMETER)
-    scope_manager.exit_scope()  # __init__
-    scope_manager.enter_scope("speak", ScopeType.FUNCTION)
-    scope_manager.define_symbol("self", SymbolType.PARAMETER)
-    scope_manager.exit_scope()  # speak
-    scope_manager.enter_scope("wake_up", ScopeType.FUNCTION)
-    scope_manager.define_symbol("self", SymbolType.PARAMETER)
-    scope_manager.exit_scope()  # wake_up
-    scope_manager.register_class([])
-    scope_manager.exit_scope()  # Animal
 
-    # Define Dog class inheriting from Animal
-    scope_manager.enter_scope("Dog", ScopeType.CLASS)
-    scope_manager.enter_scope("speak", ScopeType.FUNCTION)
-    scope_manager.define_symbol("self", SymbolType.PARAMETER)
-    scope_manager.exit_scope()  # speak
-    scope_manager.enter_scope("bark", ScopeType.FUNCTION)
-    scope_manager.define_symbol("self", SymbolType.PARAMETER)
-    scope_manager.exit_scope()  # bark
-    scope_manager.register_class(["__main__.Animal"])
-    scope_manager.exit_scope()  # Dog
+    # --- Define Animal class ---
+    manager.current_scope_id = manager.root_scope_id
+    animal_scope_id = manager.enter_scope("Animal", ScopeType.CLASS, "test.py")
 
-    # Finalize MROs
-    scope_manager.calculate_all_mro()
+    # __init__ method
+    manager.enter_scope("__init__", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("self", SymbolType.PARAMETER)
+    manager.define_symbol("name", SymbolType.PARAMETER)
+    manager.exit_scope()
 
-    return scope_manager
+    # wake_up method
+    manager.enter_scope("wake_up", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("self", SymbolType.PARAMETER)
+    manager.exit_scope()
+
+    # speak method
+    manager.enter_scope("speak", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("self", SymbolType.PARAMETER)
+    manager.exit_scope()
+
+    manager.exit_scope()  # Exit Animal
+
+    # --- Define Dog class (inherits from Animal) ---
+    manager.current_scope_id = manager.root_scope_id
+    dog_scope_id = manager.enter_scope("Dog", ScopeType.CLASS, "test.py")
+
+    # speak method (override)
+    manager.enter_scope("speak", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("self", SymbolType.PARAMETER)
+    manager.exit_scope()
+
+    # bark method
+    manager.enter_scope("bark", ScopeType.FUNCTION, "test.py")
+    manager.define_symbol("self", SymbolType.PARAMETER)
+    manager.exit_scope()
+
+    manager.exit_scope()  # Exit Dog
+
+    # Get class symbols
+    animal_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "Animal", manager.root_scope_id)
+    dog_symbol = manager.repo.symbols.get_by_name_in_scope(
+        "Dog", manager.root_scope_id)
+
+    # Set base classes
+    if not animal_symbol.attrs:
+        animal_symbol.attrs = {}
+    animal_symbol.attrs['base_classes'] = []
+
+    if not dog_symbol.attrs:
+        dog_symbol.attrs = {}
+    dog_symbol.attrs['base_classes'] = ["__main__.Animal"]
+
+    # Calculate MRO
+
+    manager.resolver.inheritance_resolver.mro_calculator.calculate_all()
+
+    yield manager
+    manager.close()
