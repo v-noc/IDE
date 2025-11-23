@@ -106,7 +106,7 @@ class CallFrameWriter:
             )
 
         # Verify callee is callable
-        if callee.symbol_type not in (SymbolType.FUNCTION, SymbolType.CLASS):
+        if callee.symbol_type not in (SymbolType.FUNCTION, SymbolType.CLASS, SymbolType.CAPTURED_CLOSURE):
             raise ValueError(
                 f"Cannot call symbol '{callee.name}' of type {callee.symbol_type}. "
                 f"Only functions and classes are callable."

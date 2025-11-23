@@ -68,8 +68,8 @@ class CallSiteModel(Base):
     id = Column(String, primary_key=True)
 
     # In which runtime context did the call happen?
-    caller_frame_id = Column(String, ForeignKey(
-        'call_frames.id', ondelete='CASCADE'), index=True)
+    caller_scope_id = Column(String, ForeignKey(
+        'scopes.id', ondelete='CASCADE'), index=True)
 
     # Which function was called at this site?
     callee_symbol_id = Column(String, ForeignKey(
@@ -80,10 +80,10 @@ class CallSiteModel(Base):
     verified_valid = Column(Boolean, default=False)
 
     # SQLAlchemy relationships for navigation
-    caller_frame = relationship(
-        "CallFrameModel",
-        foreign_keys=[caller_frame_id],
-        backref="call_sites"
+    caller_scope = relationship(
+        "ScopeModel",
+        foreign_keys=[caller_scope_id],
+        backref="call_sites_as_caller"
     )
 
     callee_symbol = relationship(

@@ -90,6 +90,14 @@ class ScopeModel(Base):
         foreign_keys=[source_unit_id]
     )
 
+    # Call sites that call this scope
+    call_sites_as_caller = relationship(
+        "CallSiteModel",
+        back_populates="caller_scope",
+        cascade="all, delete-orphan",
+        foreign_keys="CallSiteModel.caller_scope_id",
+    )
+
 
 class SourceUnit(Base):
     """Represents a physical file. Key for Resync logic."""

@@ -21,14 +21,14 @@ class CallSiteWriter:
 
     def create_call_site(
         self,
-        caller_frame_id: str,
+        caller_scope_id: str,
         callee_symbol_id: str
     ) -> str:
         """
         Create a call edge in the call graph.
 
         Args:
-            caller_frame_id: ID of the frame making the call
+            caller_scope_id: ID of the scope making the call
             callee_symbol_id: ID of the symbol being called
 
         Returns:
@@ -43,9 +43,9 @@ class CallSiteWriter:
         # Build ORM entity
         call_site = CallSiteModel(
             id=site_id,
-            caller_frame_id=caller_frame_id,
+            caller_scope_id=caller_scope_id,
             callee_symbol_id=callee_symbol_id,
-            needs_verification=False  # Fresh sites are verified
+
         )
 
         # Validate before persisting
@@ -85,12 +85,12 @@ class CallSiteWriter:
         Raises:
             ValueError: If validation fails
         """
-        # Verify caller frame exists
-        caller_frame = self.repo.call_frames.get_by_id(
-            call_site.caller_frame_id)
-        if not caller_frame:
+        # Verify caller scope exists
+        caller_scope = self.repo.scopes.get_by_id(
+            call_site.caller_scope_id)
+        if not caller_scope:
             raise ValueError(
-                f"Caller frame {call_site.caller_frame_id} not found"
+                f"Caller scope {call_site.caller_scope_id} not found"
             )
 
         # Verify callee symbol exists

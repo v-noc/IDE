@@ -23,21 +23,21 @@ class CallSiteRepository:
             query = query.filter(CallSiteModel.is_stale == False)
         return query.first()
 
-    def find_by_caller(self, caller_frame_id: str, include_stale: bool = False) -> List[CallSiteModel]:
+    def find_by_caller(self, caller_scope_id: str, include_stale: bool = False) -> List[CallSiteModel]:
         """
-        Get all function calls made from a specific caller frame (forward edges).
-        This answers: "What does this frame call?"
+        Get all function calls made from a specific caller scope (forward edges).
+        This answers: "What does this scope call?"
         """
 
         query = self.session.query(CallSiteModel).filter(
-            CallSiteModel.caller_frame_id == caller_frame_id)
+            CallSiteModel.caller_scope_id == caller_scope_id)
         if not include_stale:
             query = query.filter(CallSiteModel.is_stale == False)
         return query.all()
 
     def find_by_callee(self, callee_symbol_id: str, include_stale: bool = False) -> List[CallSiteModel]:
         """
-        Get all call sites that call a specific function (reverse edges).
+        Get all call sites that call a specific symbol (reverse edges).
         This answers: "Who calls this function?"
         """
 

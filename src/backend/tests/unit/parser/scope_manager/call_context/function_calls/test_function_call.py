@@ -65,14 +65,14 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
                                                               closure_symbol.id)
 
     # Assert that a closure symbol with a captured frame was returned
-    assert closure_instance_id is not None
+    assert closure_instance is not None
     assert closure_instance.name == "closure"
-    assert closure_instance.captured_frame is not None, (
+    assert closure_instance.captured_frame_id is not None, (
         "Closure should have a captured frame"
     )
 
     # 3. Invoke the returned closure
-    manager.call_tracking_service.start_call(closure_instance, {}, frame_id)
+    manager.call_tracking_service.start_call(closure_instance.id, {}, None)
 
     # 4. From within the closure's execution context, resolve a captured variable
     resolved_msg_symbol = manager.resolver.execution_resolver.resolve_in_frame(
@@ -83,7 +83,9 @@ def test_closure_creation_and_invocation(manager: ScopeManager, root_scope_id: s
     manager.call_tracking_service.end_call(frame_id)  # End closure call
 
     # 5. Verify the call graph
-    call_graph = manager.resolver.call_graph_resolver.get_call_tree(frame_id)
+    call_graph = manager.resolver.call_graph_resolver.get_root_call_from_scope(
+        root_scope_id)
+    print("Call graph", call_graph)
     main_calls = call_graph.edges.get("__main__", [])
     assert len(main_calls) == 2
     assert main_calls[0].callee_symbol.qualified_name == "__main__.factory"

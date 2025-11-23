@@ -7,7 +7,7 @@ Part of the Resolver Layer in the call graph architecture.
 from typing import List, Optional, Set
 
 from app.core.parser.scope_manager.storage.repository.repos import ScopeManagerRepository
-from app.core.parser.scope_manager.storage.models import CallSiteModel
+from app.core.parser.scope_manager.storage.models import CallSiteModel, CallFrameModel
 
 
 class CallGraphResolver:
@@ -19,6 +19,12 @@ class CallGraphResolver:
 
     def __init__(self, repo: ScopeManagerRepository):
         self.repo = repo
+
+    def get_root_call_from_scope(self, scope_id: str) -> List[CallFrameModel]:
+        """
+        Get the root call from a scope.
+        """
+        return self.repo.call_frames.get_root_call_from_scope(scope_id)
 
     def get_callees(self, caller_frame_id: str) -> List[CallSiteModel]:
         """
