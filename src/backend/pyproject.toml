@@ -18,6 +18,7 @@ dependencies = [
   "libcst>=1.7.0",
   "platformdirs>=4.5.0",
   "sqlalchemy>=2.0.44",
+  "parso>=0.8.5",
 ]
 
 [project.optional-dependencies]

@@ -1,42 +1,26 @@
-from ast import parse
 from typing import List, Optional
+from .models import BaseNode
+from .parser import JediParser
+from .id_injector import inject_ids
+import os
 
-from .models import BaseSchema
-from .visitor import CodeStructureVisitor
-from .pre_processor import DocstringPreProcessor
-import libcst as cst
-
-
-def scan(content: str, file_path: Optional[str] = None) -> List[BaseSchema]:
+def scan(content: str, file_path: Optional[str] = None) -> List[BaseNode]:
     """
-Parses Python code content and returns a hierarchical list of structured
-Pydantic nodes representing the code.
-
-Args:
-    content: The Python code as a string.
-
-Returns:
-    A list of root nodes representing the parsed code structure.
-"""
-    try:
-        module = cst.parse_module(content)
-        transformer = DocstringPreProcessor()
-        processed_content = module.visit(transformer)
-
-        if file_path:
-            with open(file_path, "w") as f:
-                f.write(processed_content.code)
-
-        ast_tree = parse(processed_content.code)
+    Scans the content, injects IDs if missing (and updates file), and returns the parsed AST.
+    """
+    # Step 1: Inject IDs
+    # We only write to file if file_path is provided AND content was modified.
+    processed_content, modified = inject_ids(content)
+    
+    if modified and file_path:
         try:
-            ast_tree._source_lines = content.splitlines()
-        except Exception:
-            ast_tree._source_lines = []
+            with open(file_path, "w") as f:
+                f.write(processed_content)
+        except Exception as e:
+            print(f"Error writing updated content to {file_path}: {e}")
+            # We continue with processed_content even if write failed, 
+            # so the parser sees the IDs.
 
-        visitor = CodeStructureVisitor()
-        visitor.visit(ast_tree)
-        return visitor.get_root_nodes()
-    except SyntaxError as e:
-        # Handle potential parsing errors gracefully
-        print(f"Error parsing code: {e}")
-        return []
+    # Step 2: Parse with Jedi/Parso
+    parser = JediParser(processed_content)
+    return parser.parse()
