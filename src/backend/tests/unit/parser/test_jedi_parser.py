@@ -10,7 +10,8 @@ class MyClass:
         my_call()
 """
     nodes = scan(code)
-
+    print(nodes)
+    print("hello")
     # Check Class
     assert len(nodes) == 1
     cls = nodes[0]

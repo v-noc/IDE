@@ -19,6 +19,7 @@ dependencies = [
   "platformdirs>=4.5.0",
   "sqlalchemy>=2.0.44",
   "parso>=0.8.5",
+  "kuzu>=0.11.3",
 ]
 
 [project.optional-dependencies]
