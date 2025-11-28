@@ -110,15 +110,16 @@ class ScopeManager:
         callee_id: str,
         line: int,
         col: int,
-
+        prev_call_site_id: Optional[str] = None,
     ) -> CallSiteModel:
-        """Create a call site linking caller to callee."""
+        """Create a call site linking caller to callee, optionally chaining to previous call."""
         call_site = CallSiteModel(
             id=str(uuid.uuid4()),
             line=line,
             col=col,
         )
-        self.repository.create_call_site(caller_id, callee_id, call_site)
+        self.repository.create_call_site(
+            caller_id, callee_id, call_site, prev_call_site_id)
         return call_site
 
     def get_calls_from(self, caller_id: str) -> List[dict]:
@@ -192,6 +193,20 @@ class ScopeManager:
                 ),
             })
         return calls
+
+    def get_call_chain(self, call_site_id: str) -> List[CallSiteModel]:
+        """Get the full call chain starting from a call site."""
+        return self.repository.get_call_chain(call_site_id)
+
+    def get_call_chain_roots(self, target_scope_id: Optional[str] = None) -> List[CallSiteModel]:
+        """
+        Get all call sites that are roots of call chains.
+
+        If `target_scope_id` is provided, only return those root call sites for which
+        there exists a path along `NEXT_IN_CHAIN` that contains a call site targeting
+        the given scope.
+        """
+        return self.repository.get_call_chain_roots(target_scope_id)
 
     # Utility
 

@@ -75,9 +75,15 @@ class DBConnectionManager:
                 raise e
 
         # TARGETS: CallSite -> Scope (Callee)
-        # Note: The target might be a Scope (Function/Class).
         try:
             self.conn.execute("CREATE REL TABLE TARGETS (FROM CallSite TO Scope)")
+        except RuntimeError as e:
+            if "already exists" not in str(e):
+                raise e
+
+        # NEXT_IN_CHAIN: CallSite -> CallSite (Call chain)
+        try:
+            self.conn.execute("CREATE REL TABLE NEXT_IN_CHAIN (FROM CallSite TO CallSite)")
         except RuntimeError as e:
             if "already exists" not in str(e):
                 raise e
