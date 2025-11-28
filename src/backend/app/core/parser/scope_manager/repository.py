@@ -20,7 +20,9 @@ class ScopeRepository:
                 start_line: $start_line,
                 start_col: $start_col,
                 end_line: $end_line,
-                end_col: $end_col
+                end_col: $end_col,
+                base_classes: $base_classes,
+                mro: $mro
             })
             """,
             {
@@ -33,6 +35,8 @@ class ScopeRepository:
                 "start_col": scope.start_col,
                 "end_line": scope.end_line,
                 "end_col": scope.end_col,
+                "base_classes": scope.base_classes,
+                "mro": scope.mro,
             }
         )
 
@@ -55,6 +59,8 @@ class ScopeRepository:
                 start_col=node["start_col"],
                 end_line=node["end_line"],
                 end_col=node["end_col"],
+                base_classes=node.get("base_classes", []),
+                mro=node.get("mro", []),
             )
         return None
 
@@ -77,6 +83,8 @@ class ScopeRepository:
                 start_col=node["start_col"],
                 end_line=node["end_line"],
                 end_col=node["end_col"],
+                base_classes=node.get("base_classes", []),
+                mro=node.get("mro", []),
             )
         return None
 
@@ -142,6 +150,8 @@ class ScopeRepository:
                 start_col=node["start_col"],
                 end_line=node["end_line"],
                 end_col=node["end_col"],
+                base_classes=node.get("base_classes", []),
+                mro=node.get("mro", []),
             ))
         return scopes
 

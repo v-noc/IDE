@@ -36,6 +36,8 @@ class DBConnectionManager:
                     start_col INT64,
                     end_line INT64,
                     end_col INT64,
+                    base_classes STRING[],
+                    mro STRING[],
                     PRIMARY KEY (id)
                 )
             """)

@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 class ScopeType(str, Enum):
     FOLDER = "folder"
@@ -18,6 +18,8 @@ class ScopeModel(BaseModel):
     start_col: int
     end_line: int
     end_col: int
+    base_classes: List[str] = Field(default_factory=list)  # For CLASS type
+    mro: List[str] = Field(default_factory=list)  # Method Resolution Order for CLASS type
 
 class CallSiteModel(BaseModel):
     id: str
