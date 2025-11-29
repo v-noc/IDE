@@ -3,7 +3,7 @@ import logging
 import uuid
 import hashlib
 import json
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Optional
 
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel, ScopeType

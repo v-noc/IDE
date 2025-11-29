@@ -1,6 +1,5 @@
 import kuzu
 import os
-from pathlib import Path
 
 import platformdirs as pl
 
@@ -8,10 +7,7 @@ import platformdirs as pl
 class DBConnectionManager:
     def __init__(self, project_name: str, db_path: str = None):
         if db_path is None:
-            # Use platformdirs to match legacy behavior: user_data_dir("v-noc") / "scope_manager" / <project_name>
-            # Or similar structure. The legacy used "scope_manager" dir.
-            # We'll use a dedicated kuzu dir to avoid conflicts if needed, or same if compatible.
-            # User said: "i used project name and generate the path for the embed db"
+            # Match legacy layout using app data dir per project
             db_dir = os.path.join(pl.user_data_dir("v-noc"), "kuzu_db")
             self.db_path = os.path.join(db_dir, project_name)
         else:
@@ -25,10 +21,7 @@ class DBConnectionManager:
         self._initialize_schema()
 
     def _initialize_schema(self):
-        # Create Scope Node Table
-        # We use 'CREATE NODE TABLE IF NOT EXISTS' logic by checking if table exists first
-        # Kuzu doesn't support IF NOT EXISTS for tables in all versions, so we try/except or check catalog.
-        # For simplicity in this iteration, we'll try to create and ignore "already exists" error.
+        # Create Scope node table (ignore "already exists" errors)
 
         try:
             self.conn.execute("""
@@ -58,6 +51,7 @@ class DBConnectionManager:
                     id STRING,
                     line INT64,
                     col INT64,
+                    name STRING,
                     PRIMARY KEY (id)
                 )
             """)

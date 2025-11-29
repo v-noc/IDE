@@ -1,7 +1,8 @@
+from collections import deque
+from typing import List, Optional
+
 from .db import DBConnectionManager
 from .models import ScopeModel, CallSiteModel
-from typing import List, Optional
-import uuid
 
 
 class ScopeRepository:
@@ -22,7 +23,6 @@ class ScopeRepository:
                 start_col: $start_col,
                 end_line: $end_line,
                 end_col: $end_col,
-          
                 mro: $mro,
                 checksum: $checksum
             })
@@ -127,36 +127,44 @@ class ScopeRepository:
 
     def delete_scope(self, scope_id: str) -> None:
         """Delete a scope and its relationships."""
-        self.conn.execute(
-            "MATCH (s:Scope {id: $id}) DETACH DELETE s",
-            {"id": scope_id}
-        )
+        scope_ids = self._collect_scope_tree_ids(scope_id)
+        if not scope_ids:
+            return
+        self._delete_scope_nodes(scope_ids)
 
     def delete_file_scope(self, file_path: str) -> None:
         """Delete a file scope and its children."""
-        # Find file scope
-        self.conn.execute(
-            """
-            MATCH (s:Scope {file_path: $file_path, type: 'file'})
-            DETACH DELETE s
-            """,
-            {"file_path": file_path}
-        )
-        # Note: DETACH DELETE s will remove relationships.
-        # But what about children (classes/functions)?
-        # They are connected via CONTAINS.
-        # If we delete the file scope, the children become orphans?
-        # Or should we cascade delete?
-        # Usually we want to cascade delete the entire tree under the file.
-        # We can use a variable length path or just delete everything with that file_path?
-        # Deleting everything with file_path is safer and easier.
-        self.conn.execute(
-            """
-            MATCH (s:Scope {file_path: $file_path})
-            DETACH DELETE s
-            """,
-            {"file_path": file_path}
-        )
+        file_scope_ids = [
+            row[0]
+            for row in self.conn.execute(
+                """
+                MATCH (s:Scope {file_path: $file_path, type: 'file'})
+                RETURN s.id
+                """,
+                {"file_path": file_path},
+            )
+            if row[0]
+        ]
+
+        if file_scope_ids:
+            for scope_id in file_scope_ids:
+                self.delete_scope(scope_id)
+            return
+
+        orphan_scope_ids = [
+            row[0]
+            for row in self.conn.execute(
+                """
+                MATCH (s:Scope {file_path: $file_path})
+                RETURN s.id
+                """,
+                {"file_path": file_path},
+            )
+            if row[0]
+        ]
+
+        if orphan_scope_ids:
+            self._delete_scope_nodes(orphan_scope_ids)
 
     def link_parent_child(self, parent_id: str, child_id: str) -> None:
         """Create CONTAINS relationship."""
@@ -203,7 +211,7 @@ class ScopeRepository:
         call_site: CallSiteModel,
         prev_call_site_id: Optional[str] = None,
     ) -> None:
-        """Create a call site node and link it to caller and (optionally) callee."""
+        """Create a call site node and link it to caller/callee."""
         # Create CallSite node
         self.conn.execute(
             """
@@ -235,7 +243,8 @@ class ScopeRepository:
         if callee_id:
             self.conn.execute(
                 """
-                MATCH (cs:CallSite {id: $cs_id}), (callee:Scope {id: $callee_id})
+                MATCH (cs:CallSite {id: $cs_id})
+                MATCH (callee:Scope {id: $callee_id})
                 CREATE (cs)-[:TARGETS]->(callee)
                 """,
                 {"cs_id": call_site.id, "callee_id": callee_id}
@@ -245,7 +254,8 @@ class ScopeRepository:
         if prev_call_site_id:
             self.conn.execute(
                 """
-                MATCH (prev:CallSite {id: $prev_id}), (curr:CallSite {id: $curr_id})
+                MATCH (prev:CallSite {id: $prev_id})
+                MATCH (curr:CallSite {id: $curr_id})
                 CREATE (prev)-[:NEXT_IN_CHAIN]->(curr)
                 """,
                 {"prev_id": prev_call_site_id, "curr_id": call_site.id}
@@ -309,7 +319,9 @@ class ScopeRepository:
         """Get the full call chain starting from a call site."""
         result = self.conn.execute(
             """
-            MATCH path = (start:CallSite {id: $id})-[:NEXT_IN_CHAIN*0..]->(cs:CallSite)
+            MATCH path = (
+                start:CallSite {id: $id}
+            )-[:NEXT_IN_CHAIN*0..]->(cs:CallSite)
             RETURN cs
             ORDER BY length(path)
             """,
@@ -326,13 +338,15 @@ class ScopeRepository:
             ))
         return chain
 
-    def get_call_chain_roots(self, target_scope_id: Optional[str] = None) -> List[CallSiteModel]:
+    def get_call_chain_roots(
+        self,
+        target_scope_id: Optional[str] = None,
+    ) -> List[CallSiteModel]:
         """
-        Get all call sites that start a chain (no incoming NEXT_IN_CHAIN edge).
+        Get call sites that start a chain (no incoming NEXT_IN_CHAIN).
 
-        If `target_scope_id` is provided, only return those root call sites for which
-        there exists a path along `NEXT_IN_CHAIN` that contains a call site targeting
-        the given scope.
+        If `target_scope_id` is provided, only include roots whose chain
+        targets that scope.
         """
         if target_scope_id is None:
             result = self.conn.execute(
@@ -357,13 +371,80 @@ class ScopeRepository:
         roots = []
         for row in result:
             node = row[0]
-            roots.append(CallSiteModel(
-                id=node["id"],
-                line=node["line"],
-                col=node["col"],
-            ))
+            roots.append(
+                CallSiteModel(
+                    id=node["id"],
+                    line=node["line"],
+                    col=node["col"],
+                )
+            )
         return roots
 
     def clear_db(self) -> None:
         """Clear all nodes and relationships."""
         self.conn.execute("MATCH (n) DETACH DELETE n")
+
+    def _collect_scope_tree_ids(self, root_scope_id: str) -> List[str]:
+        root_result = self.conn.execute(
+            """
+            MATCH (root:Scope {id: $id})
+            RETURN root.id
+            """,
+            {"id": root_scope_id},
+        )
+
+        root_exists = False
+        for row in root_result:
+            if row[0]:
+                root_exists = True
+                break
+
+        if not root_exists:
+            return []
+
+        scope_ids: List[str] = []
+        queue: deque[str] = deque([root_scope_id])
+        seen = set()
+
+        while queue:
+            current_id = queue.popleft()
+            if current_id in seen:
+                continue
+            seen.add(current_id)
+            scope_ids.append(current_id)
+
+            child_result = self.conn.execute(
+                """
+                MATCH (parent:Scope {id: $parent_id})
+                      -[:CONTAINS]->(child:Scope)
+                RETURN child.id
+                """,
+                {"parent_id": current_id},
+            )
+            for row in child_result:
+                child_id = row[0]
+                if child_id and child_id not in seen:
+                    queue.append(child_id)
+
+        return scope_ids
+
+    def _delete_scope_nodes(self, scope_ids: List[str]) -> None:
+        unique_ids = list({scope_id for scope_id in scope_ids if scope_id})
+        for scope_id in unique_ids:
+            # Delete call sites owned by this scope
+            self.conn.execute(
+                """
+                MATCH (scope:Scope {id: $id})
+                OPTIONAL MATCH (scope)-[:HAS_CALL_SITE]->(cs:CallSite)
+                DETACH DELETE cs
+                """,
+                {"id": scope_id},
+            )
+            # Delete the scope node itself (DETACH removes relationships)
+            self.conn.execute(
+                """
+                MATCH (scope:Scope {id: $id})
+                DETACH DELETE scope
+                """,
+                {"id": scope_id},
+            )

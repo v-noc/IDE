@@ -118,5 +118,28 @@ def test_scope_contains_links(tmp_path):
     assert core_children["data"].type.value == "folder"
 
     data_children = scope_manager.get_children(core_children["data"].id)
-    assert {child.name for child in data_children} == {"user"}
+    assert len(data_children) == 1
+    assert data_children[0].name == "user"
     assert data_children[0].type.value == "file"
+
+
+def test_delete_scope_cascades(tmp_path):
+    scope_manager, _, _ = _build_sample_hierarchy(tmp_path)
+
+    core_scope = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.core")
+    assert core_scope is not None
+
+    core_user = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.core.user")
+    assert core_user is not None
+
+    scope_manager.delete_scope(core_scope.id)
+
+    assert scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.core") is None
+    assert scope_manager.get_scope_by_qname(
+        f"{PROJECT_NAME}.core.user") is None
+
+    root = scope_manager.get_scope_by_qname(PROJECT_NAME)
+    remaining_children = {
+        child.name for child in scope_manager.get_children(root.id)
+    }
+    assert "core" not in remaining_children
