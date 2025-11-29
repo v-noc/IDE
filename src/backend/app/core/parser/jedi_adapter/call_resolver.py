@@ -61,7 +61,8 @@ class CallResolver:
         file_path: str,
         source: str,
         line: int,
-        column: int
+        column: int,
+        call_trailer_index: Optional[int] = None,
     ) -> Optional[CallResolutionResult]:
         """
         Resolve a call at the given position.
@@ -94,7 +95,23 @@ class CallResolver:
                 return None
 
             # Find the trailer with the call parentheses
-            trailer = atom_expr.children[-1]
+            trailer_indices = [
+                idx for idx, child in enumerate(atom_expr.children)
+                if child.type == 'trailer'
+                and child.children
+                and getattr(child.children[0], 'value', None) == '('
+            ]
+            if not trailer_indices:
+                logger.debug(
+                    f"No call trailers found at {file_path}:{line}:{column}")
+                return None
+
+            if call_trailer_index is None or call_trailer_index >= len(trailer_indices):
+                trailer_idx = trailer_indices[-1]
+            else:
+                trailer_idx = trailer_indices[call_trailer_index]
+
+            trailer = atom_expr.children[trailer_idx]
             if trailer.type != 'trailer' or trailer.children[0].value != '(':
                 logger.debug(
                     f"Last trailer is not a call at {file_path}:{line}:{column}")
@@ -104,8 +121,8 @@ class CallResolver:
             call_context = module_context.create_context(call_leaf)
 
             # Infer the callee (everything before the call trailer)
-            index = atom_expr.children.index(trailer)
-            callee_values = self._infer_callee(call_context, atom_expr, index)
+            callee_values = self._infer_callee(
+                call_context, atom_expr, trailer_idx)
 
             if not callee_values:
                 logger.debug(
@@ -131,7 +148,7 @@ class CallResolver:
                     # Regular function or method call
                     result.callee_qname = self._extract_qualified_name(callee)
                     logger.debug(f"Resolved call to: {result.callee_qname}")
-                    print(f"Resolved call to: {result.callee_qname}")
+
                 # Try to create execution context
                 try:
                     # Prepare arguments
@@ -197,7 +214,7 @@ class CallResolver:
         Returns the most specific name available.
         """
         try:
-            print(f"Extracting qualified name: {value.get_qualified_names()}")
+
             # Try to get qualified names straight from Jedi
             if hasattr(value, 'get_qualified_names'):
                 qnames = value.get_qualified_names()

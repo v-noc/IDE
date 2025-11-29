@@ -31,8 +31,7 @@ def main():
     """ID: 4b20776e-824a-45ce-9644-897fac77af54"""
     factory_call()
     curry_call()
-    builder = factory()
-    call_back(builder)
+    call_back(factory())
 
 
 main()

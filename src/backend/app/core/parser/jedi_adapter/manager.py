@@ -25,6 +25,4 @@ class JediProjectManager:
         """
         Create a Jedi Script for a file with the project context.
         """
-        print(f"Getting script for: {path}")
-        print(f"Project: {self.project}")
         return jedi.Script(code=source, path=path, project=self.project)

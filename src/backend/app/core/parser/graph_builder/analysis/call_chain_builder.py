@@ -94,7 +94,8 @@ class CallChainBuilder:
             str(file_path),
             source,
             call_node.position.line,
-            call_node.position.column
+            call_node.position.column,
+            call_trailer_index=getattr(call_node, "call_index", None),
         )
 
         # Determine callee_id based on resolution
@@ -142,12 +143,14 @@ class CallChainBuilder:
                 f"{call_node.position.line}:{call_node.position.column}"
             )
 
+        call_name = self._normalize_call_name(call_node.name)
+
         # Create the call site
         call_site = self.scope_manager.create_call(
             caller_id=caller_scope.id,
             line=call_node.position.line,
             col=call_node.position.column,
-            name=call_node.name,
+            name=call_name,
             callee_id=callee_id,
             prev_call_site_id=current_call_id
         )
@@ -174,6 +177,18 @@ class CallChainBuilder:
             qualified = f"{project_prefix}.{qualified}"
 
         return qualified
+
+    def _normalize_call_name(self, raw_name: Optional[str]) -> Optional[str]:
+        """Normalize the call site name for comparisons (use last attribute segment)."""
+        if not raw_name:
+            return raw_name
+
+        segment = raw_name.strip().split('.')[-1]
+        if segment.endswith('()'):
+            segment = segment[:-2]
+
+        segment = segment.strip()
+        return segment or raw_name
 
     def _process_scope_body(self, scope: ScopeModel, depth: int):
         """
