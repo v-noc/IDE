@@ -50,15 +50,17 @@ class ASTProcessor:
             node, ClassNode) else ScopeType.FUNCTION
 
         mro = []
+        name_column = node.position.column
         if isinstance(node, ClassNode) and self.mro_resolver and content:
             # Resolve MRO using Jedi
             # Note: Jedi uses 1-based lines. Our AST scanner uses 1-based lines.
             try:
+                name_column = self._get_name_column(content, node)
                 mro = self.mro_resolver.resolve_mro(
                     file_path=parent_scope.file_path,
                     source=content,
                     line=node.position.line,
-                    column=node.position.column
+                    column=name_column
                 )
                 if mro:
                     logger.debug(f"Resolved MRO for {node.name}: {mro}")
@@ -80,7 +82,7 @@ class ASTProcessor:
             type=scope_type,
             file_path=parent_scope.file_path,
             start_line=node.position.line,
-            start_col=node.position.column,
+            start_col=name_column if scope_type == ScopeType.CLASS else node.position.column,
             end_line=node.position.end_line,
             end_col=node.position.end_column,
             mro=mro,
@@ -147,6 +149,25 @@ class ASTProcessor:
                 pass
 
         return scope
+
+    def _get_name_column(self, content: str, node: BaseNode) -> int:
+        """
+        Approximate the column where the identifier name starts on its line.
+        Required for Jedi inference which expects the cursor on the identifier.
+        """
+        line_index = node.position.line - 1
+        if line_index < 0:
+            return node.position.column
+
+        lines = content.splitlines()
+        if line_index >= len(lines):
+            return node.position.column
+
+        line = lines[line_index]
+        name_idx = line.find(node.name)
+        if name_idx == -1:
+            return node.position.column
+        return name_idx
 
     def _compute_checksum(self, node: BaseNode) -> str:
         """
