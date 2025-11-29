@@ -335,6 +335,7 @@ class ScopeRepository:
                 id=node["id"],
                 line=node["line"],
                 col=node["col"],
+                name=node.get("name"),
             ))
         return chain
 
@@ -376,6 +377,7 @@ class ScopeRepository:
                     id=node["id"],
                     line=node["line"],
                     col=node["col"],
+                    name=node.get("name"),
                 )
             )
         return roots

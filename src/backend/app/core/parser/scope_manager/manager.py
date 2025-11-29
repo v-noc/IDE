@@ -155,6 +155,7 @@ class ScopeManager:
                     id=cs_node["id"],
                     line=cs_node["line"],
                     col=cs_node["col"],
+                    name=cs_node.get("name"),
                 ),
                 "callee": ScopeModel(
                     id=callee_node["id"],
@@ -190,6 +191,7 @@ class ScopeManager:
                     id=cs_node["id"],
                     line=cs_node["line"],
                     col=cs_node["col"],
+                    name=cs_node.get("name"),
                 ),
                 "caller": ScopeModel(
                     id=caller_node["id"],

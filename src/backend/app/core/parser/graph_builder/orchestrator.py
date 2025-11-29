@@ -56,7 +56,12 @@ class GraphBuilderOrchestrator:
         )
 
         # Initialize Analysis components
-        self.body_parser = BodyParser(self.project_path, self.scope_manager)
+        self.body_parser = BodyParser(
+            self.project_path,
+            self.project_node.name,
+            self.scope_manager,
+            self.jedi_manager
+        )
 
     def resync(self) -> ChangeSet:
         """

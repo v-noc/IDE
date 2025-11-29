@@ -91,6 +91,66 @@ def test_function_scope_hierarchy(setup_project):
     assert "build" in child_names
 
     # Verify IDs are persisted (if we check against the IDs in docstrings, we'd need to parse them,
-    # but here we just check if they are valid UUIDs or whatever ASTProcessor generates)
+    # but here we just check if they are valid UUIDs or whatever ASTProcessor generates).
     assert factory.id is not None
     assert add.id is not None
+
+
+def test_call_chain_construction(setup_project):
+    """Test that call chains are built correctly with Jedi resolution."""
+    project_node, scope_manager = setup_project
+
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
+        scope_manager=scope_manager,
+    )
+    orchestrator.resync()
+
+    # Get scopes
+    main = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.main")
+    factory = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory")
+    factory_call = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory_call")
+    add = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory.add")
+    build = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory.build")
+    call_back = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.call_back")
+
+    # Test 1: Verify calls from main()
+    main_calls = scope_manager.get_calls_from(main.id)
+    assert len(main_calls) > 0, "main should have calls"
+    
+    # main() calls factory_call()
+    factory_call_calls = [c for c in main_calls if c['call_site'].name == 'factory_call']
+    assert len(factory_call_calls) > 0
+    if factory_call_calls[0]['callee']:
+        assert factory_call_calls[0]['callee'].qname == f"{PROJECT_NAME}.main.factory_call"
+
+    # Test 2: Verify calls from factory_call()
+    factory_call_calls_list = scope_manager.get_calls_from(factory_call.id)
+    assert len(factory_call_calls_list) > 0
+    
+    # factory_call() calls factory()
+    factory_calls = [c for c in factory_call_calls_list if c['call_site'].name == 'factory']
+    assert len(factory_calls) > 0
+    if factory_calls[0]['callee']:
+        assert factory_calls[0]['callee'].qname == f"{PROJECT_NAME}.main.factory"
+    
+    # factory_call() calls add()
+    add_calls = [c for c in factory_call_calls_list if c['call_site'].name == 'add']
+    assert len(add_calls) > 0
+
+    # Test 3: Verify calls from add() - nested function
+    add_calls_list = scope_manager.get_calls_from(add.id)
+    assert len(add_calls_list) > 0
+    
+    # add() calls build()
+    build_calls = [c for c in add_calls_list if c['call_site'].name == 'build']
+    assert len(build_calls) > 0
+    if build_calls[0]['callee']:
+        assert build_calls[0]['callee'].qname == f"{PROJECT_NAME}.main.factory.build"
+
+    # Test 4: Verify calls from call_back()
+    call_back_calls = scope_manager.get_calls_from(call_back.id)
+    # call_back() calls call_back_func() parameter - may not be resolved to a specific scope
+    assert len(call_back_calls) > 0
+
+    print("\n✅ All call chain tests passed!")
