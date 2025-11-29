@@ -85,7 +85,7 @@ class ScopeManager:
 
     def link_parent_child(self, parent_id: str, child_id: str) -> None:
         """Link a parent scope to a child scope (e.g., Class contains Function)."""
-        self.repository.create_contains_edge(parent_id, child_id)
+        self.repository.link_parent_child(parent_id, child_id)
 
     def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all children of a scope."""

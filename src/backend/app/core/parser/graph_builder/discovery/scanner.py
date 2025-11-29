@@ -2,10 +2,12 @@ import hashlib
 import os
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Iterable
 import pathspec
+import tomllib
 
 logger = logging.getLogger(__name__)
+
 
 class FileScanner:
     def __init__(self, project_path: str, ignore_file_name: str = ".gitignore"):
@@ -14,14 +16,33 @@ class FileScanner:
         self.spec = self._load_ignore_spec()
 
     def _load_ignore_spec(self) -> Optional[pathspec.PathSpec]:
+        if self.ignore_file_name is None:
+            return None
+
         ignore_file = self.project_path / self.ignore_file_name
-        if ignore_file.is_file():
-            try:
-                with open(ignore_file, "r") as f:
-                    return pathspec.PathSpec.from_lines("gitwildmatch", f)
-            except Exception as e:
-                logger.warning(f"Failed to load ignore file {ignore_file}: {e}")
+        if not ignore_file.is_file():
+            return None
+
+        try:
+            patterns = self._load_patterns(ignore_file)
+            if patterns:
+                return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+        except Exception as e:
+            logger.warning(f"Failed to load ignore file {ignore_file}: {e}")
         return None
+
+    def _load_patterns(self, ignore_file: Path) -> Iterable[str]:
+        if ignore_file.suffix == ".toml":
+            with ignore_file.open("rb") as f:
+                data = tomllib.load(f)
+            ignore_section = data.get("ignore", {})
+            patterns = ignore_section.get("patterns", [])
+            if isinstance(patterns, list):
+                return [str(pattern) for pattern in patterns if pattern]
+            return []
+
+        with ignore_file.open("r") as f:
+            return [line.strip() for line in f if line.strip()]
 
     def scan(self) -> Dict[str, str]:
         """
@@ -29,32 +50,32 @@ class FileScanner:
         Returns: Dict[absolute_file_path, checksum]
         """
         file_map = {}
-        
+
         for root, dirs, files in os.walk(self.project_path):
             # Filter directories using pathspec
             root_path = Path(root)
             rel_root = root_path.relative_to(self.project_path)
-            
+
             # Prune ignored directories
             dirs[:] = [
-                d for d in dirs 
+                d for d in dirs
                 if not self._is_ignored(rel_root / d)
             ]
-            
+
             for file in files:
                 if file.endswith(".py"):
                     file_path = root_path / file
                     rel_path = file_path.relative_to(self.project_path)
-                    
+
                     if self._is_ignored(rel_path):
                         continue
-                        
+
                     try:
                         checksum = self._calculate_checksum(file_path)
                         file_map[str(file_path.absolute())] = checksum
                     except Exception as e:
                         logger.error(f"Error scanning file {file_path}: {e}")
-                        
+
         return file_map
 
     def _is_ignored(self, rel_path: Path) -> bool:

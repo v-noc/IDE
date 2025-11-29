@@ -43,6 +43,7 @@ class DBConnectionManager:
                     end_line INT64,
                     end_col INT64,
                     mro STRING[],
+                    checksum STRING,
                     PRIMARY KEY (id)
                 )
             """)

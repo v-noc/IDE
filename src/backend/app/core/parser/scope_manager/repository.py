@@ -107,23 +107,23 @@ class ScopeRepository:
             "MATCH (s:Scope {qname: $qname}) RETURN s",
             {"qname": qname}
         )
-        if not result:
-            return None
-        node = result[0][0]
-        return ScopeModel(
-            id=node["id"],
-            name=node["name"],
-            qname=node["qname"],
-            type=node["type"],
-            file_path=node["file_path"],
-            start_line=node["start_line"],
-            start_col=node["start_col"],
-            end_line=node["end_line"],
-            end_col=node["end_col"],
+        for row in result:
+            node = row[0]
+            return ScopeModel(
+                id=node["id"],
+                name=node["name"],
+                qname=node["qname"],
+                type=node["type"],
+                file_path=node["file_path"],
+                start_line=node["start_line"],
+                start_col=node["start_col"],
+                end_line=node["end_line"],
+                end_col=node["end_col"],
 
-            mro=node.get("mro", []),
-            checksum=node.get("checksum"),
-        )
+                mro=node.get("mro", []),
+                checksum=node.get("checksum"),
+            )
+        return None
 
     def delete_scope(self, scope_id: str) -> None:
         """Delete a scope and its relationships."""

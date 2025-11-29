@@ -1,69 +1,122 @@
-from app.core.repository import Repositories
-from app.core.services.project_service import ProjectService
-from app.core.parser.graph_builder import GraphBuilder
-from app.core.builder.tree_builder import TreeBuilder
-
 from pathlib import Path
+import shutil
+
+from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.parser.graph_builder.discovery.scanner import FileScanner
+from app.core.parser.graph_builder.collection.hierarchy import HierarchyBuilder
+from app.core.model.nodes import ProjectNode
+
+FIXTURE_PROJECT = Path(__file__).parent / "simple_project"
+PROJECT_NAME = "sample_project"
+IGNORE_FILE = "v-noc.toml"
 
 
-current_file_path = Path(__file__).resolve()
-print("Current file path:", current_file_path)
+def _build_sample_hierarchy(tmp_path):
+    project_path = tmp_path / "project"
+    shutil.copytree(FIXTURE_PROJECT, project_path)
 
-# Get the directory of the current file
-current_dir = current_file_path.parent
-PROJECT_PATH = Path(current_dir, "./simple_project").absolute()
+    ignored_file = project_path / "build" / "ignored.py"
+    ignored_file.write_text("")
 
+    db_path = tmp_path / "db" / PROJECT_NAME
+    db_path.parent.mkdir(parents=True, exist_ok=True)
 
-def test_file_hierarchy(arangodb_client):
-    graph_builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        ignore_file_name=None,
-        db=arangodb_client
+    scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
+    scanner = FileScanner(str(project_path), ignore_file_name=IGNORE_FILE)
+    scanned_files = scanner.scan()
+
+    project_node = ProjectNode(
+        name=PROJECT_NAME,
+        path=str(project_path),
+        qname=PROJECT_NAME,
+        description="Test Project",
     )
-    graph_builder.build(
-        "Protector", "Protector is a tool for protecting your code.")
+    builder = HierarchyBuilder(project_node, scope_manager)
 
-    repos = Repositories(arangodb_client)
-    project_service = ProjectService(repos)
+    for file_path, checksum in scanned_files.items():
+        rel_path = Path(file_path).relative_to(project_path)
+        builder.build_hierarchy(rel_path, checksum)
 
-    project = project_service.get_all()
-    print(project)
-
-    children = project_service.get_children(project[0].id)
-
-    tree_builder = TreeBuilder(children)
-    tree = tree_builder.build()
-
-    # The root should have 3 children: main.py, app/, and core/
-    assert len(tree) == 3
-
-    # Sort the tree by name to have a predictable order for assertions
-    tree.sort(key=lambda x: x.name)
-
-    # Check the 'app' folder
-    app_folder = tree[0]
-    assert app_folder.name == "app"
-    assert len(app_folder.children) == 1
-    assert app_folder.children[0].name == "api.py"
-
-    # Check the 'core' folder
-    core_folder = tree[1]
-    assert core_folder.name == "core"
-    assert len(core_folder.children) == 3
-    # Sort children for predictable order
-    core_folder.children.sort(key=lambda x: x.name)
-    assert core_folder.children[0].name == "data"
-
-    assert core_folder.children[1].name == "post.py"
-    assert core_folder.children[1].node_type == "file"
-
-    assert core_folder.children[2].name == "user.py"
-    assert core_folder.children[1].node_type == "file"
-
-    # Check for main.py at the root
-    main_file = tree[2]
-    assert main_file.name == "main.py"
-    assert len(main_file.children) == 0
+    return scope_manager, scanned_files, project_path
 
 
-# src/backend/tests/unit/parser/analyzer/simple_project
+def test_hierarchy_and_ignore(tmp_path):
+    scope_manager, scanned_files, project_path = _build_sample_hierarchy(
+        tmp_path
+    )
+
+    scanned_paths = [
+        Path(p).relative_to(project_path).as_posix()
+        for p in scanned_files.keys()
+    ]
+    expected_paths = {
+        "main.py",
+        "core/user.py",
+        "core/post.py",
+        "core/data/user.py",
+        "app/api.py",
+    }
+    assert set(scanned_paths) == expected_paths
+    assert "build/ignored.py" not in scanned_paths
+
+    root = scope_manager.get_scope_by_qname(PROJECT_NAME)
+    assert root is not None
+    assert root.type.value == "folder"
+
+    main = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main")
+    assert main is not None and main.type.value == "file"
+
+    core_scope = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.core")
+    assert core_scope is not None and core_scope.type.value == "folder"
+
+    core_user = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.core.user")
+    assert core_user is not None and core_user.type.value == "file"
+
+    core_post = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.core.post")
+    assert core_post is not None and core_post.type.value == "file"
+
+    core_data = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.core.data")
+    assert core_data is not None and core_data.type.value == "folder"
+
+    core_data_user = scope_manager.get_scope_by_qname(
+        f"{PROJECT_NAME}.core.data.user"
+    )
+    assert core_data_user is not None and core_data_user.type.value == "file"
+
+    app_scope = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.app")
+    assert app_scope is not None and app_scope.type.value == "folder"
+
+    app_api = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.app.api")
+    assert app_api is not None and app_api.type.value == "file"
+
+    build_scope = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.build")
+    assert build_scope is None, "Build folder should not exist in DB"
+
+
+def test_scope_contains_links(tmp_path):
+    scope_manager, _, _ = _build_sample_hierarchy(tmp_path)
+
+    root = scope_manager.get_scope_by_qname(PROJECT_NAME)
+    assert root is not None
+
+    root_children = {
+        child.name: child for child in scope_manager.get_children(root.id)
+    }
+    assert set(root_children.keys()) == {"main", "core", "app"}
+    assert root_children["main"].type.value == "file"
+    assert root_children["core"].type.value == "folder"
+    assert root_children["app"].type.value == "folder"
+
+    core_children = {
+        child.name: child for child in scope_manager.get_children(
+            root_children["core"].id
+        )
+    }
+    assert set(core_children.keys()) == {"user", "post", "data"}
+    assert core_children["user"].type.value == "file"
+    assert core_children["post"].type.value == "file"
+    assert core_children["data"].type.value == "folder"
+
+    data_children = scope_manager.get_children(core_children["data"].id)
+    assert {child.name for child in data_children} == {"user"}
+    assert data_children[0].type.value == "file"
