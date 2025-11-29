@@ -27,9 +27,9 @@ class ScopeManager:
         start_col: int,
         end_line: int,
         end_col: int,
-        base_classes: List[str] = None,
         mro: List[str] = None,
         scope_id: Optional[str] = None,
+        checksum: Optional[str] = None,
     ) -> ScopeModel:
         """Create a new scope."""
         scope = ScopeModel(
@@ -42,10 +42,15 @@ class ScopeManager:
             start_col=start_col,
             end_line=end_line,
             end_col=end_col,
-            base_classes=base_classes or [],
             mro=mro or [],
+            checksum=checksum,
         )
         self.repository.create_scope(scope)
+        return scope
+
+    def update_scope(self, scope: ScopeModel) -> ScopeModel:
+        """Update an existing scope."""
+        self.repository.update_scope(scope)
         return scope
 
     def get_scope(self, scope_id: str) -> Optional[ScopeModel]:
@@ -58,15 +63,23 @@ class ScopeManager:
 
     def delete_scope(self, scope_id: str) -> None:
         """Delete a scope and its relationships."""
-        # Note: In Kuzu, deleting a node with DETACH will remove all relationships
-        self.repository.conn.execute(
-            "MATCH (s:Scope {id: $id}) DETACH DELETE s",
-            {"id": scope_id}
-        )
+        self.repository.delete_scope(scope_id)
+
+    def delete_file_scope(self, file_path: str) -> None:
+        """Delete a file scope by its path."""
+        self.repository.delete_file_scope(file_path)
 
     def get_all_scopes(self) -> List[ScopeModel]:
         """Get all scopes."""
         return self.repository.get_all_scopes()
+
+    def get_all_file_scopes(self) -> List[ScopeModel]:
+        """Get all scopes of type FILE."""
+        return self.repository.get_all_file_scopes()
+
+    def get_children(self, parent_id: str) -> List[ScopeModel]:
+        """Get all direct children of a scope."""
+        return self.repository.get_children(parent_id)
 
     # Hierarchy Management
 
@@ -97,7 +110,6 @@ class ScopeManager:
                 start_col=node["start_col"],
                 end_line=node["end_line"],
                 end_col=node["end_col"],
-                base_classes=node.get("base_classes", []),
                 mro=node.get("mro", []),
             ))
         return children
@@ -107,16 +119,18 @@ class ScopeManager:
     def create_call(
         self,
         caller_id: str,
-        callee_id: str,
         line: int,
         col: int,
+        name: Optional[str] = None,
+        callee_id: Optional[str] = None,
         prev_call_site_id: Optional[str] = None,
     ) -> CallSiteModel:
-        """Create a call site linking caller to callee, optionally chaining to previous call."""
+        """Create a call site linking caller to callee (if resolved), optionally chained."""
         call_site = CallSiteModel(
             id=str(uuid.uuid4()),
             line=line,
             col=col,
+            name=name,
         )
         self.repository.create_call_site(
             caller_id, callee_id, call_site, prev_call_site_id)
@@ -152,7 +166,6 @@ class ScopeManager:
                     start_col=callee_node["start_col"],
                     end_line=callee_node["end_line"],
                     end_col=callee_node["end_col"],
-                    base_classes=callee_node.get("base_classes", []),
                     mro=callee_node.get("mro", []),
                 ),
             })
@@ -188,7 +201,6 @@ class ScopeManager:
                     start_col=caller_node["start_col"],
                     end_line=caller_node["end_line"],
                     end_col=caller_node["end_col"],
-                    base_classes=caller_node.get("base_classes", []),
                     mro=caller_node.get("mro", []),
                 ),
             })
@@ -207,6 +219,10 @@ class ScopeManager:
         the given scope.
         """
         return self.repository.get_call_chain_roots(target_scope_id)
+
+    def clear_calls(self, scope_id: str) -> None:
+        """Clear all calls originating from a scope."""
+        self.repository.clear_calls_from_scope(scope_id)
 
     # Utility
 

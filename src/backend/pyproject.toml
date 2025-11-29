@@ -20,6 +20,7 @@ dependencies = [
   "sqlalchemy>=2.0.44",
   "parso>=0.8.5",
   "kuzu>=0.11.3",
+  "jedi>=0.19.2",
 ]
 
 [project.optional-dependencies]

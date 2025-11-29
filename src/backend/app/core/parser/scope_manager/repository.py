@@ -22,8 +22,9 @@ class ScopeRepository:
                 start_col: $start_col,
                 end_line: $end_line,
                 end_col: $end_col,
-                base_classes: $base_classes,
-                mro: $mro
+          
+                mro: $mro,
+                checksum: $checksum
             })
             """,
             {
@@ -36,8 +37,42 @@ class ScopeRepository:
                 "start_col": scope.start_col,
                 "end_line": scope.end_line,
                 "end_col": scope.end_col,
-                "base_classes": scope.base_classes,
+
                 "mro": scope.mro,
+                "checksum": scope.checksum,
+            }
+        )
+
+    def update_scope(self, scope: ScopeModel) -> None:
+        """Update an existing Scope node's properties."""
+        self.conn.execute(
+            """
+            MATCH (s:Scope {id: $id})
+            SET s.name = $name,
+                s.qname = $qname,
+                s.type = $type,
+                s.file_path = $file_path,
+                s.start_line = $start_line,
+                s.start_col = $start_col,
+                s.end_line = $end_line,
+                s.end_col = $end_col,
+
+                s.mro = $mro,
+                s.checksum = $checksum
+            """,
+            {
+                "id": scope.id,
+                "name": scope.name,
+                "qname": scope.qname,
+                "type": scope.type.value,
+                "file_path": scope.file_path,
+                "start_line": scope.start_line,
+                "start_col": scope.start_col,
+                "end_line": scope.end_line,
+                "end_col": scope.end_col,
+
+                "mro": scope.mro,
+                "checksum": scope.checksum,
             }
         )
 
@@ -60,21 +95,92 @@ class ScopeRepository:
                 start_col=node["start_col"],
                 end_line=node["end_line"],
                 end_col=node["end_col"],
-                base_classes=node.get("base_classes", []),
+
                 mro=node.get("mro", []),
+                checksum=node.get("checksum"),
             )
         return None
 
     def get_scope_by_qname(self, qname: str) -> Optional[ScopeModel]:
-        """Get a Scope by qualified name."""
+        """Get a scope by its qualified name."""
         result = self.conn.execute(
             "MATCH (s:Scope {qname: $qname}) RETURN s",
             {"qname": qname}
         )
+        if not result:
+            return None
+        node = result[0][0]
+        return ScopeModel(
+            id=node["id"],
+            name=node["name"],
+            qname=node["qname"],
+            type=node["type"],
+            file_path=node["file_path"],
+            start_line=node["start_line"],
+            start_col=node["start_col"],
+            end_line=node["end_line"],
+            end_col=node["end_col"],
 
+            mro=node.get("mro", []),
+            checksum=node.get("checksum"),
+        )
+
+    def delete_scope(self, scope_id: str) -> None:
+        """Delete a scope and its relationships."""
+        self.conn.execute(
+            "MATCH (s:Scope {id: $id}) DETACH DELETE s",
+            {"id": scope_id}
+        )
+
+    def delete_file_scope(self, file_path: str) -> None:
+        """Delete a file scope and its children."""
+        # Find file scope
+        self.conn.execute(
+            """
+            MATCH (s:Scope {file_path: $file_path, type: 'file'})
+            DETACH DELETE s
+            """,
+            {"file_path": file_path}
+        )
+        # Note: DETACH DELETE s will remove relationships.
+        # But what about children (classes/functions)?
+        # They are connected via CONTAINS.
+        # If we delete the file scope, the children become orphans?
+        # Or should we cascade delete?
+        # Usually we want to cascade delete the entire tree under the file.
+        # We can use a variable length path or just delete everything with that file_path?
+        # Deleting everything with file_path is safer and easier.
+        self.conn.execute(
+            """
+            MATCH (s:Scope {file_path: $file_path})
+            DETACH DELETE s
+            """,
+            {"file_path": file_path}
+        )
+
+    def link_parent_child(self, parent_id: str, child_id: str) -> None:
+        """Create CONTAINS relationship."""
+        self.conn.execute(
+            """
+            MATCH (p:Scope {id: $parent_id}), (c:Scope {id: $child_id})
+            CREATE (p)-[:CONTAINS]->(c)
+            """,
+            {"parent_id": parent_id, "child_id": child_id}
+        )
+
+    def get_children(self, parent_id: str) -> List[ScopeModel]:
+        """Get all direct children of a scope."""
+        result = self.conn.execute(
+            """
+            MATCH (p:Scope {id: $parent_id})-[:CONTAINS]->(c:Scope)
+            RETURN c
+            """,
+            {"parent_id": parent_id}
+        )
+        children = []
         for row in result:
             node = row[0]
-            return ScopeModel(
+            children.append(ScopeModel(
                 id=node["id"],
                 name=node["name"],
                 qname=node["qname"],
@@ -84,40 +190,39 @@ class ScopeRepository:
                 start_col=node["start_col"],
                 end_line=node["end_line"],
                 end_col=node["end_col"],
-                base_classes=node.get("base_classes", []),
+
                 mro=node.get("mro", []),
-            )
-        return None
+                checksum=node.get("checksum"),
+            ))
+        return children
 
-    def create_contains_edge(self, parent_id: str, child_id: str) -> None:
-        """Create CONTAINS relationship from parent to child."""
-        self.conn.execute(
-            """
-            MATCH (p:Scope {id: $parent_id}), (c:Scope {id: $child_id})
-            CREATE (p)-[:CONTAINS]->(c)
-            """,
-            {"parent_id": parent_id, "child_id": child_id}
-        )
-
-    def create_call_site(self, caller_id: str, callee_id: str, call_site: CallSiteModel, prev_call_site_id: Optional[str] = None) -> None:
-        """Create CallSite and relationships."""
-        # Create the CallSite node
+    def create_call_site(
+        self,
+        caller_id: str,
+        callee_id: Optional[str],
+        call_site: CallSiteModel,
+        prev_call_site_id: Optional[str] = None,
+    ) -> None:
+        """Create a call site node and link it to caller and (optionally) callee."""
+        # Create CallSite node
         self.conn.execute(
             """
             CREATE (cs:CallSite {
                 id: $id,
                 line: $line,
-                col: $col
+                col: $col,
+                name: $name
             })
             """,
             {
                 "id": call_site.id,
                 "line": call_site.line,
                 "col": call_site.col,
+                "name": call_site.name,
             }
         )
 
-        # Create HAS_CALL_SITE edge from caller
+        # Link to Caller
         self.conn.execute(
             """
             MATCH (caller:Scope {id: $caller_id}), (cs:CallSite {id: $cs_id})
@@ -126,16 +231,17 @@ class ScopeRepository:
             {"caller_id": caller_id, "cs_id": call_site.id}
         )
 
-        # Create TARGETS edge to callee
-        self.conn.execute(
-            """
-            MATCH (cs:CallSite {id: $cs_id}), (callee:Scope {id: $callee_id})
-            CREATE (cs)-[:TARGETS]->(callee)
-            """,
-            {"cs_id": call_site.id, "callee_id": callee_id}
-        )
+        # Link to Callee (if resolved)
+        if callee_id:
+            self.conn.execute(
+                """
+                MATCH (cs:CallSite {id: $cs_id}), (callee:Scope {id: $callee_id})
+                CREATE (cs)-[:TARGETS]->(callee)
+                """,
+                {"cs_id": call_site.id, "callee_id": callee_id}
+            )
 
-        # Create NEXT_IN_CHAIN edge if prev_call_site_id is provided
+        # Link to previous call site (if chained)
         if prev_call_site_id:
             self.conn.execute(
                 """
@@ -144,6 +250,16 @@ class ScopeRepository:
                 """,
                 {"prev_id": prev_call_site_id, "curr_id": call_site.id}
             )
+
+    def clear_calls_from_scope(self, scope_id: str) -> None:
+        """Delete all call sites originating from the given scope."""
+        self.conn.execute(
+            """
+            MATCH (s:Scope {id: $id})-[:HAS_CALL_SITE]->(cs:CallSite)
+            DETACH DELETE cs
+            """,
+            {"id": scope_id}
+        )
 
     def get_all_scopes(self) -> List[ScopeModel]:
         """Get all scopes."""
@@ -161,8 +277,31 @@ class ScopeRepository:
                 start_col=node["start_col"],
                 end_line=node["end_line"],
                 end_col=node["end_col"],
-                base_classes=node.get("base_classes", []),
+
                 mro=node.get("mro", []),
+                checksum=node.get("checksum"),
+            ))
+        return scopes
+
+    def get_all_file_scopes(self) -> List[ScopeModel]:
+        """Get all scopes of type FILE."""
+        result = self.conn.execute("MATCH (s:Scope {type: 'file'}) RETURN s")
+        scopes = []
+        for row in result:
+            node = row[0]
+            scopes.append(ScopeModel(
+                id=node["id"],
+                name=node["name"],
+                qname=node["qname"],
+                type=node["type"],
+                file_path=node["file_path"],
+                start_line=node["start_line"],
+                start_col=node["start_col"],
+                end_line=node["end_line"],
+                end_col=node["end_col"],
+
+                mro=node.get("mro", []),
+                checksum=node.get("checksum"),
             ))
         return scopes
 
