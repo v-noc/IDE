@@ -1,36 +1,39 @@
 import logging
+from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Optional
 
-from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.model.nodes import ProjectNode
 from app.core.parser.ast.scanner import scan
+from app.core.parser.jedi_adapter.manager import JediProjectManager
+from app.core.parser.jedi_adapter.resolver import MROResolver
+from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.parser.scope_manager.models import ScopeModel
 
-from .hierarchy import HierarchyBuilder
 from .ast_processor import ASTProcessor
+from .hierarchy import HierarchyBuilder
 
 logger = logging.getLogger(__name__)
 
-from typing import List, Tuple, Optional
-from dataclasses import dataclass
-from app.core.parser.scope_manager.models import ScopeModel
-from app.core.parser.ast.models import BaseNode
 
 @dataclass
 class CollectionResult:
     file_scope: ScopeModel
     removed_scope_ids: List[str]  # IDs of scopes that were deleted
-    file_ast_nodes: List[BaseNode]  # Top-level AST nodes with hierarchy
 
-from app.core.parser.jedi_adapter.manager import JediProjectManager
-from app.core.parser.jedi_adapter.resolver import MROResolver
 
 class Collector:
-    def __init__(self, project_node: ProjectNode, scope_manager: ScopeManager, jedi_manager: JediProjectManager):
+    def __init__(
+        self,
+        project_node: ProjectNode,
+        scope_manager: ScopeManager,
+        jedi_manager: JediProjectManager,
+    ):
         self.project_node = project_node
         self.project_path = Path(project_node.path)
         self.manager = scope_manager
         self.jedi_manager = jedi_manager
-        
+
         self.hierarchy_builder = HierarchyBuilder(project_node, scope_manager)
         self.mro_resolver = MROResolver(jedi_manager)
         self.ast_processor = ASTProcessor(scope_manager, self.mro_resolver)
@@ -38,12 +41,12 @@ class Collector:
     def process_file(self, file_path: str, checksum: str) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 1 collection.
-        
+
         For NEW files:
         - Create folder hierarchy and file scope
         - Parse AST and create all scopes
         - Return all scopes as updated (new) for Phase 2
-        
+
         For UPDATED files:
         - Build folder hierarchy and update file scope if needed
         - Parse AST and build current scope hierarchy
@@ -51,23 +54,25 @@ class Collector:
         - Create new scopes
         - Track removed scopes (by ID)
         - Return only new or modified scopes for Phase 2
-        
+
         Returns:
         - file_scope: The file scope node
         - updated_scopes: New or modified scopes (need Phase 2 body analysis)
         - removed_scope_ids: IDs of deleted scopes
-        - file_ast_nodes: Top-level AST nodes with hierarchy
         """
         abs_path = Path(file_path)
         try:
             rel_path = abs_path.relative_to(self.project_path)
         except ValueError:
-            logger.error(f"File {file_path} is not inside project path {self.project_path}")
+            logger.error(
+                "File %s is not inside project path %s",
+                file_path,
+                self.project_path,
+            )
             return None
-
         # 1. Build Hierarchy (creates/updates file, folder scopes)
         file_scope = self.hierarchy_builder.build_hierarchy(rel_path, checksum)
-        
+
         if not file_scope:
             logger.error(f"Failed to build hierarchy for {file_path}")
             return None
@@ -80,22 +85,21 @@ class Collector:
         except Exception as e:
             logger.error(f"Failed to scan AST for {file_path}: {e}")
             return None
-
         # 3. Get existing children from database
         existing_children = self.manager.get_children(file_scope.id)
         existing_map = {child.id: child for child in existing_children}
-        
+
         # 4. Process AST Nodes to build current scope hierarchy
         # ASTProcessor will check each scope by ID and update if path/pos/name changed
-        current_scopes_nodes = self.ast_processor.process_ast_nodes(ast_nodes, file_scope, content)
-        
+        current_scopes_nodes = self.ast_processor.process_ast_nodes(
+            ast_nodes, file_scope, content)
         # 5. Determine which scopes are new or modified (Internal Update)
         # We still need to iterate to find removed scopes and update DB
         current_ids = set()
-        
+
         for scope, node in current_scopes_nodes:
             current_ids.add(scope.id)
-            
+
             existing = existing_map.get(scope.id)
             if not existing:
                 # New scope - already created by ASTProcessor
@@ -105,22 +109,21 @@ class Collector:
                 if self._scope_changed(existing, scope):
                     # Modified scope - already updated by ASTProcessor
                     logger.debug(f"Modified scope detected: {scope.qname}")
-        
         # 6. Identify removed scopes (existed before but not in current AST)
         removed_scope_ids = []
         for child_id in existing_map.keys():
             if child_id not in current_ids:
                 removed_scope_ids.append(child_id)
-                logger.info(f"Scope removed: {existing_map[child_id].qname} (ID: {child_id})")
-        
-        logger.info(f"File {file_path}: {len(removed_scope_ids)} scopes removed")
-        
+                logger.info(
+                    f"Scope removed: {existing_map[child_id].qname} (ID: {child_id})")
+        logger.info(
+            f"File {file_path}: {len(removed_scope_ids)} scopes removed")
+
         return CollectionResult(
             file_scope=file_scope,
             removed_scope_ids=removed_scope_ids,
-            file_ast_nodes=ast_nodes
         )
-    
+
     def _scope_changed(self, existing: ScopeModel, current: ScopeModel) -> bool:
         """
         Check if a scope has changed by comparing key attributes.

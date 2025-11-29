@@ -106,34 +106,31 @@ class GraphBuilderOrchestrator:
                 if result:
                     collection_results.append(result)
 
-        # # Phase 2: Analysis (Bodies)
-        # logger.info("Starting Phase 2: Analysis")
-        # for result in collection_results:
-        #     logger.info(
-        #         "Analyzing changes for: %s",
-        #         result.file_scope.file_path,
-        #     )
+        # Phase 2: Analysis (Bodies)
+        logger.info("Starting Phase 2: Analysis")
+        for result in collection_results:
+            logger.info(
+                "Analyzing changes for: %s",
+                result.file_scope.file_path,
+            )
 
-        #     # 1. Delete Removed Scopes
-        #     for scope_id in result.removed_scope_ids:
-        #         logger.info(f"Deleting removed scope ID: {scope_id}")
-        #         self.scope_manager.delete_scope(scope_id)
+            # 1. Delete Removed Scopes
+            for scope_id in result.removed_scope_ids:
+                logger.info(f"Deleting removed scope ID: {scope_id}")
+                self.scope_manager.delete_scope(scope_id)
 
-        #     # 2. Process File Body (Full Analysis)
-        #     # We process the entire file AST every time it changes
-        #     logger.info("Processing file body: %s", result.file_scope.qname)
+            # 2. Process File Body (Full Analysis)
+            # We process the entire file AST every time it changes
+            logger.info("Processing file body: %s", result.file_scope.qname)
 
-        #     # Clear file-scope calls; children clear during traversal
-        #     self.scope_manager.clear_calls(result.file_scope.id)
+            # Clear file-scope calls; children clear during traversal
+            self.scope_manager.clear_calls(result.file_scope.id)
 
-        #     # Parse the full AST tree
-        #     # BodyParser traverses descendants and clears their calls en route
-        #     self.body_parser.process_ast(
-        #         result.file_scope,
-        #         result.file_ast_nodes,
-        #     )
+            # Parse the full AST tree
+            # BodyParser traverses descendants and clears their calls en route
+            self.body_parser.process_ast(result.file_scope)
 
-        # # Process Deleted files (Full file deletion)
-        # for file_path in change_set.deleted_files:
-        #     logger.info(f"Processing file deletion: {file_path}")
-        #     self.scope_manager.delete_file_scope(file_path)
+        # Process Deleted files (Full file deletion)
+        for file_path in change_set.deleted_files:
+            logger.info(f"Processing file deletion: {file_path}")
+            self.scope_manager.delete_file_scope(file_path)
