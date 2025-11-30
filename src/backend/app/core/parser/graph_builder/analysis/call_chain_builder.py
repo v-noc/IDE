@@ -102,41 +102,32 @@ class CallChainBuilder:
         callee_id = None
 
         if resolution and resolution.callee_qname:
-            # Jedi returns qnames without the project prefix.
             jedi_qname = resolution.callee_qname
-            full_qname = self._qualify_qname(caller_scope.qname, jedi_qname)
+            candidates = self._candidate_qnames(caller_scope, jedi_qname)
 
-            # Check if this is a class instantiation
-            if resolution.is_class_instantiation:
-                # Link to the CLASS scope, not __init__
+            for full_qname in candidates:
                 callee_scope = self.scope_manager.get_scope_by_qname(
                     full_qname)
+                if not callee_scope:
+                    continue
 
-                if callee_scope:
-                    callee_id = callee_scope.id
+                callee_id = callee_scope.id
+                if resolution.is_class_instantiation:
                     logger.debug(
                         f"Resolved class instantiation {call_node.name} -> "
                         f"{full_qname} (scope_id={callee_id})"
                     )
                 else:
                     logger.debug(
-                        f"Class {full_qname} not registered locally (Jedi qname: {jedi_qname})"
-                    )
-            else:
-                # Regular function/method call
-                callee_scope = self.scope_manager.get_scope_by_qname(
-                    full_qname)
-
-                if callee_scope:
-                    callee_id = callee_scope.id
-                    logger.debug(
                         f"Resolved call {call_node.name} -> "
                         f"{full_qname} (scope_id={callee_id})"
                     )
-                else:
-                    logger.debug(
-                        f"Function {full_qname} not registered locally (Jedi qname: {jedi_qname})"
-                    )
+                break
+            else:
+                logger.debug(
+                    f"Callee not registered locally for {call_node.name} "
+                    f"(Jedi qname candidates: {candidates})"
+                )
         else:
             logger.debug(
                 f"Could not resolve call {call_node.name} at "
@@ -157,26 +148,50 @@ class CallChainBuilder:
 
         return call_site.id
 
-    def _qualify_qname(self, caller_qname: str, jedi_qname: str) -> str:
+    def _candidate_qnames(
+        self,
+        caller_scope: ScopeModel,
+        jedi_qname: str,
+    ) -> List[str]:
         """
-        Convert a Jedi-provided qname (module-relative) into the fully-qualified qname
-        used by the scope manager (project.module.qname).
+        Generate possible fully-qualified qnames for a callee based on the caller scope.
+
+        Jedi often returns module-relative names. This method tries:
+        1. The raw qname (if already project-qualified)
+        2. Project + module + qname (same file/module reference)
+        3. Project + qname (cross-module references within the project)
         """
-        # Do not duplicate module names if Jedi already included them
-        scope_parts = caller_qname.split('.')
+        if not jedi_qname:
+            return []
+
+        normalized = jedi_qname.strip().strip('.')
+        if not normalized:
+            return []
+
+        scope_parts = caller_scope.qname.split('.')
         project_prefix = scope_parts[0] if scope_parts else self.project_name
         module_prefix = scope_parts[1] if len(scope_parts) >= 2 else None
 
-        if module_prefix and not jedi_qname.startswith(f"{module_prefix}."):
-            qualified = f"{project_prefix}.{module_prefix}.{jedi_qname}"
-        else:
-            qualified = f"{project_prefix}.{jedi_qname}"
+        candidates: List[str] = []
 
-        # Ensure project name is always present
-        if not qualified.startswith(f"{project_prefix}."):
-            qualified = f"{project_prefix}.{qualified}"
+        if normalized.startswith(f"{project_prefix}."):
+            candidates.append(normalized)
 
-        return qualified
+        if module_prefix and not normalized.startswith(f"{module_prefix}."):
+            candidates.append(
+                f"{project_prefix}.{module_prefix}.{normalized}"
+            )
+
+        candidates.append(f"{project_prefix}.{normalized}")
+
+        # Deduplicate while preserving order
+        seen = set()
+        ordered = []
+        for candidate in candidates:
+            if candidate not in seen:
+                seen.add(candidate)
+                ordered.append(candidate)
+        return ordered
 
     def _normalize_call_name(self, raw_name: Optional[str]) -> Optional[str]:
         """Normalize the call site name for comparisons (use last attribute segment)."""

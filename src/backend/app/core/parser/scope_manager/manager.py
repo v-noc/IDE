@@ -137,10 +137,11 @@ class ScopeManager:
         return call_site
 
     def get_calls_from(self, caller_id: str) -> List[dict]:
-        """Get all calls made from a scope."""
+        """Get all calls made from a scope (including unresolved callees)."""
         result = self.repository.conn.execute(
             """
-            MATCH (caller:Scope {id: $caller_id})-[:HAS_CALL_SITE]->(cs:CallSite)-[:TARGETS]->(callee:Scope)
+            MATCH (caller:Scope {id: $caller_id})-[:HAS_CALL_SITE]->(cs:CallSite)
+            OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
             RETURN cs, callee
             """,
             {"caller_id": caller_id}
@@ -149,15 +150,11 @@ class ScopeManager:
         calls = []
         for row in result:
             cs_node = row[0]
-            callee_node = row[1]
-            calls.append({
-                "call_site": CallSiteModel(
-                    id=cs_node["id"],
-                    line=cs_node["line"],
-                    col=cs_node["col"],
-                    name=cs_node.get("name"),
-                ),
-                "callee": ScopeModel(
+            callee_node = row[1] if len(row) > 1 else None
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
                     id=callee_node["id"],
                     name=callee_node["name"],
                     qname=callee_node["qname"],
@@ -168,7 +165,16 @@ class ScopeManager:
                     end_line=callee_node["end_line"],
                     end_col=callee_node["end_col"],
                     mro=callee_node.get("mro", []),
+                )
+
+            calls.append({
+                "call_site": CallSiteModel(
+                    id=cs_node["id"],
+                    line=cs_node["line"],
+                    col=cs_node["col"],
+                    name=cs_node.get("name"),
                 ),
+                "callee": callee,
             })
         return calls
 

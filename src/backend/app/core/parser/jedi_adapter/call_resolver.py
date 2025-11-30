@@ -150,6 +150,7 @@ class CallResolver:
                     logger.debug(f"Resolved call to: {result.callee_qname}")
 
                 # Try to create execution context
+                # Try to create execution context
                 try:
                     # Prepare arguments
                     arglist = trailer.children[1] if len(
@@ -163,7 +164,13 @@ class CallResolver:
                     )
 
                     # Create execution context
-                    exec_context = callee.as_context(arguments=tree_arguments)
+                    if callee.api_type == 'class':
+                        # Classes don't accept arguments for context creation
+                        # We get the class context (static), not instance context
+                        exec_context = callee.as_context()
+                    else:
+                        exec_context = callee.as_context(arguments=tree_arguments)
+                        
                     result.execution_context = exec_context
                     logger.debug(f"Created execution context: {exec_context}")
                 except Exception as e:
@@ -219,7 +226,12 @@ class CallResolver:
             if hasattr(value, 'get_qualified_names'):
                 qnames = value.get_qualified_names()
                 if qnames:
-                    return '.'.join(qnames)
+                    qualified = '.'.join(qnames)
+                    if len(qnames) == 1:
+                        contextual = self._build_contextual_name(value)
+                        if contextual:
+                            return contextual
+                    return qualified
 
             # Fallback: build the name from context hierarchy manually
             contextual_name = self._build_contextual_name(value)
@@ -261,6 +273,9 @@ class CallResolver:
             context = getattr(value, "parent_context", None)
             while context:
                 if self._is_module_context(context):
+                    module_name = self._safe_py_name(context)
+                    if module_name:
+                        parts.append(module_name)
                     break
 
                 ctx_name = self._safe_py_name(context)

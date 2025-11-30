@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from app.core.parser.graph_builder import GraphBuilder
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.services.project_service import ProjectService
 from app.core.repository import Repositories
 from app.core.builder.tree_builder import TreeBuilder
@@ -17,7 +17,7 @@ def project_path() -> Path:
 
 @pytest.fixture
 def project_tree(arangodb_client, project_path) -> ProjectNode:
-    graph_builder = GraphBuilder(
+    graph_builder = GraphBuilderOrchestrator(
         project_path=project_path.as_posix(), ignore_file_name="v-noc.toml", db=arangodb_client
     )
     graph_builder.build("sample_import", "A test project for imports.")
