@@ -7,7 +7,7 @@ from .properties import CodePosition
 
 class ContainsEdge(BaseEdge):
     edge_type: str = "contains_edges"
-
+    version: int = Field(..., description="The version of the edge.")
     # NEW: Differentiates the type of containment relationship.
     contain_type: Literal[
         "project_to_folder",

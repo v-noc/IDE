@@ -133,6 +133,7 @@ class HierarchyBuilder:
             name=self.project_node.name,
             qname=current_qname,
             scope_type=ScopeType.FOLDER,
+            scope_id=self.project_node.id,
             file_path=str(self.project_path),
             start_line=0,
             start_col=0,

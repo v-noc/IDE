@@ -41,9 +41,6 @@ class BaseNode(ArangoBase):
                        description="The qualified name of the node.", min_length=1)
     node_type: str = Field(..., description="The type of the node.")
 
-    current_version: int = Field(...,
-                                 description="The current version of the node.")
-
     model_config = ConfigDict(
         populate_by_name=True,
         indexes=[

@@ -16,7 +16,11 @@ from app.core.parser.graph_builder.discovery.change_detector import (
 from app.core.parser.graph_builder.collection.collector import Collector
 from app.core.parser.graph_builder.collection.hierarchy import FolderChange
 from app.core.parser.graph_builder.analysis.body_parser import BodyParser
-from app.core.parser.graph_builder.sync.graph_sync import MainGraphSyncService
+from app.core.parser.graph_builder.sync.graph_sync import (
+    MainGraphSyncService,
+)
+from app.core.repository import Repositories
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -68,7 +72,8 @@ class GraphBuilderOrchestrator:
         )
 
         # Initialize Sync components
-        self.sync_service = MainGraphSyncService(self.db, self.project_node)
+        # Will create sync service with version when needed in _process_changes
+        self.repos = Repositories(self.db) if self.db else None
         self._pending_folder_changes: list[FolderChange] = []
 
     def resync(self) -> ChangeSet:
@@ -96,7 +101,8 @@ class GraphBuilderOrchestrator:
         change_set = self.change_detector.detect_changes(scan_result)
         logger.info(f"Detected changes: {change_set}")
 
-        if not change_set.has_changes() and not change_set.has_folder_changes():
+        if (not change_set.has_changes() and
+                not change_set.has_folder_changes()):
             logger.info("No changes detected. Graph is up to date.")
             return change_set
 
@@ -172,8 +178,20 @@ class GraphBuilderOrchestrator:
             self._handle_file_deletion(
                 file_path, folder_changes, touched_folder_ids)
 
-        for result in collection_results:
-            self.sync_service.sync_file(result)
+        # Phase 3: Sync scopes to graph database
+        # Generate version at project level
+        sync_version = int(time.time_ns())
+        if self.repos:
+            sync_service = MainGraphSyncService(
+                self.repos,
+                self.scope_manager,
+                self.project_node,
+                sync_version
+            )
+
+            sync_service.sync_scope_hierarchy(result.file_scope.id)
+        else:
+            logger.warning("No database connection for sync; skipping")
 
         logger.info("Folder changes prepared for sync: %d",
                     len(folder_changes))
@@ -244,10 +262,14 @@ class GraphBuilderOrchestrator:
     ) -> None:
         if not scope or scope.id in touched_folder_ids:
             return
-        folder_changes.append(FolderChange(scope=scope, action=action))
+        folder_changes.append(
+            FolderChange(scope=scope, action=action)
+        )
         touched_folder_ids.add(scope.id)
 
-    def _scope_from_path(self, abs_path: str, is_file: bool) -> Optional[ScopeModel]:
+    def _scope_from_path(
+        self, abs_path: str, is_file: bool
+    ) -> Optional[ScopeModel]:
         """
         Resolve a scope using a filesystem path by mapping to its qname.
         """
@@ -255,7 +277,9 @@ class GraphBuilderOrchestrator:
             rel_path = Path(abs_path).relative_to(self.project_root)
         except ValueError:
             logger.warning(
-                "Path %s is outside project root %s", abs_path, self.project_root
+                "Path %s is outside project root %s",
+                abs_path,
+                self.project_root
             )
             return None
 
