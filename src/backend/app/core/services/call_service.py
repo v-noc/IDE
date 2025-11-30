@@ -63,6 +63,23 @@ class CallService(ContainerService):
     def get_children(self, call_id: str):
         return self.repos.call_repo.get_containment_tree(call_id)
 
+    def get_direct_call_children(self, parent_id: str):
+        """
+        Get direct call-node children of a given parent (call/group/container).
+
+        This only returns vertices whose node_type == \"call\" at depth 1,
+        ignoring groups and deeper descendants.
+        """
+        children = self.repos.call_repo.get_containment_tree(
+            parent_id, depth=1
+        )
+        direct_calls = []
+        for item in children:
+            vertex = item.get("vertex", {})
+            if vertex.get("node_type") == "call":
+                direct_calls.append(item)
+        return direct_calls
+
     def get_code(self, call_id: str):
         call = self.repos.call_repo.get_by_id(call_id)
         if not call:
