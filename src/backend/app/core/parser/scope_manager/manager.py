@@ -155,6 +155,48 @@ class ScopeManager:
             })
         return calls
 
+    def get_call_chain_children(self, call_site_id: str) -> List[dict]:
+        """Get NEXT_IN_CHAIN children for a call site, plus their target scope."""
+        result = self.repository.conn.execute(
+            """
+            MATCH (cs:CallSite {id: $call_site_id})-[:NEXT_IN_CHAIN]->(child:CallSite)
+            OPTIONAL MATCH (child)-[:TARGETS]->(callee:Scope)
+            RETURN child, callee
+            """,
+            {"call_site_id": call_site_id}
+        )
+
+        children = []
+        for row in result:
+            child_node = row[0]
+            callee_node = row[1] if len(row) > 1 else None
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
+
+            children.append({
+                "call_site": CallSiteModel(
+                    id=child_node["id"],
+                    line=child_node["line"],
+                    col=child_node["col"],
+                    name=child_node.get("name"),
+                ),
+                "callee": callee,
+            })
+        return children
+
     def get_calls_to(self, callee_id: str) -> List[dict]:
         """Get all calls made to a scope."""
         result = self.repository.conn.execute(

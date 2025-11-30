@@ -17,6 +17,7 @@ from app.core.parser.graph_builder.sync.mappers import (
 )
 from app.core.model.properties import CodePosition
 from app.core.model.edges import TargetsEdge
+from app.core.model.base import BaseNode
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,9 @@ class MainGraphSyncService:
             if scope.type == ScopeType.FILE or scope.type == ScopeType.FUNCTION or scope.type == ScopeType.CLASS:
                 graph_node = self._get_graph_node_for_scope(scope)
                 if graph_node:
-                    self._sync_root_calls(scope, graph_node.id)
+                    call_infos = self.scope_manager.get_calls_from(scope.id)
+                    for call_info in call_infos:
+                        self._sync_node_calls(call_info, graph_node)
 
             children = self.scope_manager.get_children(scope.id)
             stack.extend(children)
@@ -162,58 +165,86 @@ class MainGraphSyncService:
         # Folders typically don't own calls directly
         return None
 
-    def _sync_root_calls(self, scope, parent_node_id: str):
+    def _sync_node_calls(self, call_info, parent_node: BaseNode):
         """
         Sync root calls from a scope (calls that originated in this scope).
         Root calls are those starting from file/function/class level.
         """
         try:
-            call_infos = self.scope_manager.get_calls_from(scope.id)
+            call_site = call_info.get("call_site")
+            callee_scope = call_info.get("callee")
 
-            for call_info in call_infos:
-                call_site = call_info.get("call_site")
-                callee_scope = call_info.get("callee")
+            # We only care about resolved calls (have a callee scope)
+            if not call_site or not callee_scope:
+                continue
 
-                # We only care about resolved calls (have a callee scope)
-                if not call_site or not callee_scope:
-                    continue
+            # Resolve callee node in the main graph
+            callee_node = self._get_graph_node_for_scope(callee_scope)
+            if not callee_node:
+                continue
 
-                # Resolve callee node in the main graph
-                callee_node = self._get_graph_node_for_scope(callee_scope)
-                if not callee_node:
-                    continue
+            # Find existing CallNode by (parent container, target)
+            call_node = self.call_service.get_call_with_parent_and_target(
+                parent_id=parent_node.id,
+                target_id=callee_node.id,
+            )
 
-                # Find existing CallNode by (parent container, target)
-                call_node = self.call_service.get_call_with_parent_and_target(
-                    parent_id=parent_node_id,
-                    target_id=callee_node.id,
-                )
-
-                if not call_node:
-                    # No CallNode created for this call in the main graph – skip
-                    # create a new CallNode
-                    continue
-
-                # Update call node version only (CallNode is the call site)
+            # If no CallNode exists yet, this is a new call site → create it
+            if not call_node:
                 try:
-                    if call_node.current_version != self.sync_version:
-                        call_node.current_version = self.sync_version
-                        self.repos.call_repo.update(call_node.key, call_node)
+                    parent_qname = parent_node.qname
+                    if parent_node.node_type == "call":
+                        parent_qname = parent_node.target.qname
+                    call_node = CallNode(
+                        name=call_site.name or "call",
+                        qname=f"{parent_qname}::{callee_scope.qname}",
+                        description=f"Call: {call_site.name}",
+                        position=CodePosition(
+                            line_no=call_site.line,
+                            col_offset=call_site.col,
+                            end_line_no=call_site.line,
+                            end_col_offset=call_site.col,
+                        ),
+                        current_version=self.sync_version,
+                    )
+                    call_node = self.repos.call_repo.create(call_node)
                 except Exception as e:
                     logger.error(
-                        "Error updating call node %s version: %s",
-                        call_node.id,
+                        "Error creating call node for %s at %s:%s: %s",
+                        call_site.name,
+                        call_site.line,
+                        call_site.col,
                         e,
                     )
                     continue
 
-                # Ensure contains edge from parent container -> call
-                self._ensure_contains_edge(
-                    parent_node_id, call_node.id, self.sync_version
+            # Update call node version only (CallNode is the call site)
+            try:
+                if call_node.current_version != self.sync_version:
+                    call_node.current_version = self.sync_version
+                    self.repos.call_repo.update(call_node.key, call_node)
+            except Exception as e:
+                logger.error(
+                    "Error updating call node %s version: %s",
+                    call_node.id,
+                    e,
                 )
+                continue
 
-                # Ensure / update targets edge call -> callee
-                self._ensure_targets_edge(call_node.id, callee_node.id)
+            # Ensure contains edge from parent container -> call
+            self._ensure_contains_edge(
+                parent_node.id, call_node.id, self.sync_version
+            )
+
+            # Ensure / update targets edge call -> callee
+            self._ensure_targets_edge(call_node.id, callee_node.id)
+
+            # Recursively sync calls inside the callee scope as well.
+            # This keeps the call-chain traversal going across functions.
+            callee_call_infos = self.scope_manager.get_call_chain_children(
+                call_site.id)
+            for callee_call_info in callee_call_infos:
+                self._sync_node_calls(callee_call_info, call_node)
 
         except Exception as e:
             logger.error(
@@ -236,10 +267,6 @@ class MainGraphSyncService:
 
             if existing_targets:
                 pass
-                # edge = existing_targets[0]
-                # if getattr(edge, "version", None) != self.sync_version:
-                #     edge.version = self.sync_version
-                #     self.repos.targets_edges.update(edge.key, edge)
             else:
                 targets_edge = TargetsEdge(
                     from_id=call_id,
