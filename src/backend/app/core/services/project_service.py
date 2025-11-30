@@ -13,6 +13,9 @@ class ProjectService(ContainerService):
     def update(self, project: ProjectNode):
         return self.repos.project_repo.update(project.key, project)
 
+    def create_node(self, project: ProjectNode):
+        return self.repos.project_repo.create(project)
+
     def create(self, name: str, description: str, path: str):
         project = ProjectNode(
             name=name,

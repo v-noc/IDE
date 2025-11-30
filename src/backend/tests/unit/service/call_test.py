@@ -32,7 +32,7 @@ def test_get_call(create_repos, create_call):
     assert new_call is not None
     assert new_call.name == "Test Call"
     assert new_call.qname == "test_project.test_call"
-    assert new_call.description == "This is a test call"
+    assert new_call.description == "This is test call"
 
 
 def test_update_call(create_repos, create_call):
