@@ -176,12 +176,12 @@ class MainGraphSyncService:
 
             # We only care about resolved calls (have a callee scope)
             if not call_site or not callee_scope:
-                continue
+                return
 
             # Resolve callee node in the main graph
             callee_node = self._get_graph_node_for_scope(callee_scope)
             if not callee_node:
-                continue
+                return
 
             # Find existing CallNode by (parent container, target)
             call_node = self.call_service.get_call_with_parent_and_target(
@@ -216,7 +216,7 @@ class MainGraphSyncService:
                         call_site.col,
                         e,
                     )
-                    continue
+                    return
 
             # Update call node version only (CallNode is the call site)
             try:
@@ -229,7 +229,7 @@ class MainGraphSyncService:
                     call_node.id,
                     e,
                 )
-                continue
+                return
 
             # Ensure contains edge from parent container -> call
             self._ensure_contains_edge(

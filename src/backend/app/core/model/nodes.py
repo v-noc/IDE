@@ -10,7 +10,7 @@ class ContainerNode(BaseNode):
         default=None, description="Container theme configuration."
     )
     icon: Optional[str] = Field(default=None, description="Container icon.")
-    current_version: int = Field(...,
+    current_version: int = Field(default=0,
                                  description="The current version of the node.")
 
     documents: List[str] = Field(
