@@ -1,13 +1,12 @@
 from typing import Literal
 from .base import BaseEdge
 
-from pydantic import ConfigDict, Field
-from .properties import CodePosition
+from pydantic import Field
 
 
 class ContainsEdge(BaseEdge):
     edge_type: str = "contains_edges"
-    version: int = Field(..., description="The version of the edge.")
+    version: int = Field(default=0, description="The version of the edge.")
     # NEW: Differentiates the type of containment relationship.
     contain_type: Literal[
         "project_to_folder",
