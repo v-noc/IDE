@@ -23,7 +23,7 @@ def _build_sample_hierarchy(tmp_path):
 
     scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
     scanner = FileScanner(str(project_path), ignore_file_name=IGNORE_FILE)
-    scanned_files = scanner.scan()
+    scan_result = scanner.scan()
 
     project_node = ProjectNode(
         name=PROJECT_NAME,
@@ -33,21 +33,21 @@ def _build_sample_hierarchy(tmp_path):
     )
     builder = HierarchyBuilder(project_node, scope_manager)
 
-    for file_path, checksum in scanned_files.items():
+    for file_path, checksum in scan_result.files.items():
         rel_path = Path(file_path).relative_to(project_path)
         builder.build_hierarchy(rel_path, checksum)
 
-    return scope_manager, scanned_files, project_path
+    return scope_manager, scan_result, project_path
 
 
 def test_hierarchy_and_ignore(tmp_path):
-    scope_manager, scanned_files, project_path = _build_sample_hierarchy(
+    scope_manager, scan_result, project_path = _build_sample_hierarchy(
         tmp_path
     )
 
     scanned_paths = [
         Path(p).relative_to(project_path).as_posix()
-        for p in scanned_files.keys()
+        for p in scan_result.files.keys()
     ]
     expected_paths = {
         "main.py",
@@ -58,6 +58,15 @@ def test_hierarchy_and_ignore(tmp_path):
     }
     assert set(scanned_paths) == expected_paths
     assert "build/ignored.py" not in scanned_paths
+
+    scanned_folders = {
+        Path(folder).relative_to(project_path).as_posix()
+        for folder in scan_result.folders
+        if folder != str(project_path)
+    }
+    assert f"core" in scanned_folders
+    assert f"core/data" in scanned_folders
+    assert f"app" in scanned_folders
 
     root = scope_manager.get_scope_by_qname(PROJECT_NAME)
     assert root is not None

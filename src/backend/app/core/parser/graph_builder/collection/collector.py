@@ -11,7 +11,7 @@ from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel
 
 from .ast_processor import ASTProcessor
-from .hierarchy import HierarchyBuilder
+from .hierarchy import HierarchyBuilder, HierarchyBuildResult, FolderChange
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class CollectionResult:
     file_scope: ScopeModel
     removed_scope_ids: List[str]  # IDs of scopes that were deleted
+    folder_changes: List[FolderChange]
 
 
 class Collector:
@@ -37,6 +38,10 @@ class Collector:
         self.hierarchy_builder = HierarchyBuilder(project_node, scope_manager)
         self.mro_resolver = MROResolver(jedi_manager)
         self.ast_processor = ASTProcessor(scope_manager, self.mro_resolver)
+
+    def reset_session(self) -> None:
+        """Reset builder caches between orchestrator runs."""
+        self.hierarchy_builder.reset_session()
 
     def process_file(self, file_path: str, checksum: str) -> Optional[CollectionResult]:
         """
@@ -71,11 +76,12 @@ class Collector:
             )
             return None
         # 1. Build Hierarchy (creates/updates file, folder scopes)
-        file_scope = self.hierarchy_builder.build_hierarchy(rel_path, checksum)
-
-        if not file_scope:
+        build_result = self.hierarchy_builder.build_hierarchy(
+            rel_path, checksum)
+        if not build_result:
             logger.error(f"Failed to build hierarchy for {file_path}")
             return None
+        file_scope = build_result.scope
 
         # 2. Parse Content & Scan AST
         try:
@@ -109,6 +115,7 @@ class Collector:
                 if self._scope_changed(existing, scope):
                     # Modified scope - already updated by ASTProcessor
                     logger.debug(f"Modified scope detected: {scope.qname}")
+
         # 6. Identify removed scopes (existed before but not in current AST)
         removed_scope_ids = []
         for child_id in existing_map.keys():
@@ -122,7 +129,25 @@ class Collector:
         return CollectionResult(
             file_scope=file_scope,
             removed_scope_ids=removed_scope_ids,
+            folder_changes=build_result.folder_changes,
         )
+
+    def process_folder(self, folder_path: str) -> Optional[List[FolderChange]]:
+        """Ensure folder hierarchy exists for a folder change event."""
+        abs_path = Path(folder_path)
+        try:
+            rel_path = abs_path.relative_to(self.project_path)
+        except ValueError:
+            logger.error(
+                "Folder %s is not inside project path %s",
+                folder_path,
+                self.project_path,
+            )
+            return None
+        build_result = self.hierarchy_builder.ensure_folder(rel_path)
+        if not build_result:
+            return None
+        return build_result.folder_changes
 
     def _scope_changed(self, existing: ScopeModel, current: ScopeModel) -> bool:
         """

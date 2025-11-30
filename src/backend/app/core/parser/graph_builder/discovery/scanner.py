@@ -1,12 +1,19 @@
 import hashlib
 import os
 import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Iterable
+from typing import Dict, Iterable, Optional, Set
 import pathspec
 import tomllib
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ScanResult:
+    files: Dict[str, str]
+    folders: Set[str]
 
 
 class FileScanner:
@@ -44,17 +51,20 @@ class FileScanner:
         with ignore_file.open("r") as f:
             return [line.strip() for line in f if line.strip()]
 
-    def scan(self) -> Dict[str, str]:
+    def scan(self) -> ScanResult:
         """
         Scan all .py files in the project directory and calculate their checksums.
-        Returns: Dict[absolute_file_path, checksum]
+        Returns: ScanResult(files=Dict[path, checksum], folders=Set[absolute_path])
         """
-        file_map = {}
+        file_map: Dict[str, str] = {}
+        folder_set: Set[str] = {str(self.project_path.absolute())}
 
         for root, dirs, files in os.walk(self.project_path):
             # Filter directories using pathspec
             root_path = Path(root)
             rel_root = root_path.relative_to(self.project_path)
+
+            folder_set.add(str(root_path.absolute()))
 
             # Prune ignored directories
             dirs[:] = [
@@ -76,7 +86,14 @@ class FileScanner:
                     except Exception as e:
                         logger.error(f"Error scanning file {file_path}: {e}")
 
-        return file_map
+                    # Track folder hierarchy contributed by this file
+                    for parent in rel_path.parents:
+                        if str(parent) == ".":
+                            break
+                        folder_set.add(
+                            str((self.project_path / parent).absolute()))
+
+        return ScanResult(files=file_map, folders=folder_set)
 
     def _is_ignored(self, rel_path: Path) -> bool:
         if self.spec:

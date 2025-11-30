@@ -77,9 +77,9 @@ class ScopeManager:
         """Get all scopes of type FILE."""
         return self.repository.get_all_file_scopes()
 
-    def get_children(self, parent_id: str) -> List[ScopeModel]:
-        """Get all direct children of a scope."""
-        return self.repository.get_children(parent_id)
+    def get_all_folder_scopes(self) -> List[ScopeModel]:
+        """Get all scopes of type FOLDER."""
+        return self.repository.get_all_folder_scopes()
 
     # Hierarchy Management
 
@@ -89,30 +89,7 @@ class ScopeManager:
 
     def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all children of a scope."""
-        result = self.repository.conn.execute(
-            """
-            MATCH (p:Scope {id: $parent_id})-[:CONTAINS]->(c:Scope)
-            RETURN c
-            """,
-            {"parent_id": parent_id}
-        )
-
-        children = []
-        for row in result:
-            node = row[0]
-            children.append(ScopeModel(
-                id=node["id"],
-                name=node["name"],
-                qname=node["qname"],
-                type=node["type"],
-                file_path=node["file_path"],
-                start_line=node["start_line"],
-                start_col=node["start_col"],
-                end_line=node["end_line"],
-                end_col=node["end_col"],
-                mro=node.get("mro", []),
-            ))
-        return children
+        return self.repository.get_children(parent_id)
 
     # Call Site Management
 

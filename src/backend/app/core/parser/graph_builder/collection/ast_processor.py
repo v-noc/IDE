@@ -86,7 +86,8 @@ class ASTProcessor:
             end_line=node.position.end_line,
             end_col=node.position.end_column,
             mro=mro,
-            checksum=checksum
+            checksum=checksum,
+            parent_id=parent_scope.id
         )
 
         # Check if scope exists

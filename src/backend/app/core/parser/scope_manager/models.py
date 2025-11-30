@@ -24,6 +24,8 @@ class ScopeModel(BaseModel):
     mro: List[str] = Field(default_factory=list)
     # File hash for change detection (only for FILE scopes)
     checksum: Optional[str] = None
+    # Parent Scope ID for linking
+    parent_id: Optional[str] = None
 
 
 class CallSiteModel(BaseModel):
