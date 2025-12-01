@@ -53,10 +53,20 @@ class ArangoNodeCollection(Generic[T]):
         if self.db.has_collection(self.collection_name):
             collection = self.db.collection(self.collection_name)
             if not collection.properties()['edge']:
+                self._ensure_indices(collection)
                 return collection
             self.db.delete_collection(self.collection_name)
 
-        return self.db.create_collection(self.collection_name, edge=False)
+        collection = self.db.create_collection(self.collection_name, edge=False)
+        self._ensure_indices(collection)
+        return collection
+
+    def _ensure_indices(self, collection: StandardCollection):
+        """Ensure necessary indices exist."""
+        # Index for node_type filtering
+        collection.add_hash_index(["node_type"])
+        # Index for qname lookups (often used)
+        collection.add_hash_index(["qname"])
 
     def get(self, key: str) -> T | None:
         """

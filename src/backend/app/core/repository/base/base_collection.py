@@ -197,3 +197,18 @@ class BaseRepository(Generic[T]):
             bind_vars=bind_vars or {},
         )
         return [self._validate(doc) for doc in cursor]
+
+    def bulk_create(self, entities: List[T]) -> List[T]:
+        """Batch create multiple documents."""
+        if not entities:
+            return []
+        dumps = [
+            e.model_dump(by_alias=True, exclude_none=True, mode="json")
+            for e in entities
+        ]
+        results = self.collection.insert_many(
+            dumps,
+            return_new=True,
+            overwrite=True,
+        )
+        return [self._validate(r["new"]) for r in results]

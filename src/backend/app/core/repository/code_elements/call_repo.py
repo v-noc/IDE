@@ -1,7 +1,11 @@
+import logging
+
 from app.core.model.nodes import CallNode, ClassNode, FunctionNode
 from app.core.repository.base.node_repo import NodeRepository
 from arango.database import StandardDatabase
 from typing import Optional, List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class CallRepo(NodeRepository[CallNode]):
@@ -40,64 +44,103 @@ class CallRepo(NodeRepository[CallNode]):
         target_id: str,
         parent_id: str,
     ) -> Optional[CallNode]:
-
+        """
+        Find call node by parent and target.
+        Original approach but with early LIMIT to stop scanning.
+        """
         query = """
-        FOR c IN nodes
+        FOR c IN 1..1 OUTBOUND @parent_id contains_edges
             FILTER c.node_type == "call"
             LET t = FIRST(
                 FOR target IN 1..1 OUTBOUND c targets_edges
                     RETURN target
             )
-            LET p = FIRST(
-                FOR v, e IN 1..1 INBOUND c contains_edges
-                    RETURN e._from
-            )
-            FILTER t != null && t._id == @target_id && p == @parent_id
+            FILTER t != null && t._id == @target_id
             LIMIT 1
             RETURN c
         """
 
-        # Create bind variables with explicit type conversion
         bind_vars = {
             "target_id": str(target_id),
             "parent_id": str(parent_id)
         }
 
-        # Add debug logging for bind variables
-
         try:
-            # Try direct execution with maximum debug options
             cursor = self.db.aql.execute(
                 query,
                 bind_vars=bind_vars,
-                count=True,
                 batch_size=1,
-                ttl=60,
-                fail_on_warning=False
             )
 
-            # Process results explicitly
-            results = []
-            for doc in cursor:
-                results.append(doc)
-
-            if not results:
+            doc = next(cursor, None)
+            if not doc:
                 return None
-            return CallNode(**results[0])
+            return CallNode(**doc)
 
         except Exception as e:
-            # Comprehensive error analysis
-            error_info = {
-                "query": query,
-                "bind_vars": bind_vars,
-                "error_message": str(e),
-                "error_type": type(e).__name__,
-                "db_version": self.db.version(),
-                "collections": self.db.collections()
-            }
+            logger.error(
+                "Error finding call by target/parent: %s", e
+            )
+            return None
 
-            print(f"ERROR ANALYSIS: {error_info}")
-            raise
+    def find_calls_by_target_parent_batch(
+        self,
+        parent_target_pairs: List[tuple[str, str]],
+    ) -> Dict[tuple[str, str], Optional[CallNode]]:
+        """
+        Batch find call nodes by (parent_id, target_id) pairs.
+        Returns dict mapping (parent_id, target_id) -> CallNode or None.
+        """
+        if not parent_target_pairs:
+            return {}
+
+        query = """
+        FOR pair IN @pairs
+            FOR call IN 1..1 OUTBOUND pair.parent_id contains_edges
+                FILTER call.node_type == "call"
+                LET target = FIRST(
+                    FOR t IN 1..1 OUTBOUND call targets_edges
+                        RETURN t
+                )
+                FILTER target != null && target._id == pair.target_id
+                LIMIT 1
+                RETURN {
+                    parent_id: pair.parent_id,
+                    target_id: pair.target_id,
+                    call: call
+                }
+        """
+
+        bind_vars = {
+            "pairs": [
+                {"parent_id": str(p), "target_id": str(t)}
+                for p, t in parent_target_pairs
+            ]
+        }
+
+        try:
+            cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+            results = {}
+
+            # Initialize all pairs to None
+            for parent_id, target_id in parent_target_pairs:
+                results[(parent_id, target_id)] = None
+
+            # Fill in found calls
+            for row in cursor:
+                key = (row["parent_id"], row["target_id"])
+                results[key] = CallNode(**row["call"])
+
+            return results
+
+        except Exception as e:
+            logger.error(
+                "Error batch finding calls by target/parent: %s", e
+            )
+            # Fallback: return None for all
+            return {
+                (p, t): None for p, t in parent_target_pairs
+            }
 
     def get_downward_call_chain(self, node_id: str) -> List[Dict[str, Any]]:
         query = """
