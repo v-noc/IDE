@@ -104,7 +104,11 @@ class MainGraphSyncService:
         while stack:
             scope = stack.pop()
 
-            if scope.type == ScopeType.FILE or scope.type == ScopeType.FUNCTION or scope.type == ScopeType.CLASS:
+            if scope.type in (
+                ScopeType.FILE,
+                ScopeType.FUNCTION,
+                ScopeType.CLASS,
+            ):
                 graph_node = self._get_graph_node_for_scope(scope)
                 if graph_node:
                     call_infos = self.scope_manager.get_calls_from(scope.id)
@@ -196,7 +200,12 @@ class MainGraphSyncService:
                 try:
                     parent_qname = parent_node.qname
                     if parent_node.node_type == "call":
-                        parent_qname = parent_node.target.qname
+                        # For call nodes, get the target via edges
+                        target_node = self.repos.call_repo.get_target(
+                            parent_node.id
+                        )
+                        if target_node:
+                            parent_qname = target_node.qname
                     call_node = CallNode(
                         name=call_site.name or "call",
                         qname=f"{parent_qname}::{callee_scope.qname}",
@@ -241,16 +250,24 @@ class MainGraphSyncService:
             # Ensure / update targets edge call -> callee
             self._ensure_targets_edge(call_node.id, callee_node.id)
 
-            # Recursively sync calls inside the callee scope as well.
-            # This keeps the call-chain traversal going across functions.
-            callee_call_infos = self.scope_manager.get_call_chain_children(
-                call_site.id)
+            # Recursively sync calls inside the callee scope.
+            # Get calls made INSIDE the callee function/class.
+            callee_call_infos = self.scope_manager.get_calls_inside_callee(
+                call_site.id
+            )
             for callee_call_info in callee_call_infos:
                 self._sync_node_calls(callee_call_info, call_node)
 
+            # Also sync NEXT_IN_CHAIN call sites (method chaining)
+            chain_children = self.scope_manager.get_call_chain_children(
+                call_site.id
+            )
+            for chain_child_info in chain_children:
+                self._sync_node_calls(chain_child_info, call_node)
+
         except Exception as e:
             logger.error(
-                f"Error syncing root calls for scope {scope.id}: {e}"
+                f"Error syncing call node: {e}"
             )
 
     def _ensure_targets_edge(self, call_id: str, callee_id: str):
