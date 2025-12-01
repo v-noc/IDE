@@ -197,6 +197,56 @@ class ScopeManager:
             })
         return children
 
+    def get_calls_inside_callee(self, call_site_id: str) -> List[dict]:
+        """
+        Get calls made INSIDE the scope targeted by this call site.
+
+        This follows the pattern:
+        CallSite -[:TARGETS]-> Scope -[:HAS_CALL_SITE]-> CallSite
+
+        Returns calls that are executed within the callee function's body.
+        """
+        result = self.repository.conn.execute(
+            """
+            MATCH (cs:CallSite {id: $call_site_id})-[:TARGETS]->(callee:Scope)
+            MATCH (callee)-[:HAS_CALL_SITE]->(inner_call:CallSite)
+            OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
+            RETURN inner_call, inner_callee
+            """,
+            {"call_site_id": call_site_id}
+        )
+
+        calls = []
+        for row in result:
+            call_node = row[0]
+            callee_node = row[1] if len(row) > 1 else None
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
+
+            calls.append({
+                "call_site": CallSiteModel(
+                    id=call_node["id"],
+                    line=call_node["line"],
+                    col=call_node["col"],
+                    name=call_node.get("name"),
+                ),
+                "callee": callee,
+            })
+        return calls
+
     def get_calls_to(self, callee_id: str) -> List[dict]:
         """Get all calls made to a scope."""
         result = self.repository.conn.execute(

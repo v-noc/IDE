@@ -2,7 +2,7 @@ from pathlib import Path
 import time
 
 import pytest
-
+import shutil
 from app.core.model.properties import CodePosition
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
@@ -12,6 +12,7 @@ from app.core.services.file_service import FileService
 from app.core.services.folder_service import FolderService
 from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
+from app.core.parser.scope_manager.manager import ScopeManager
 
 
 PROJECT_PATH = Path(__file__).resolve().parent / "sample_project"
@@ -52,24 +53,32 @@ def _create_call(call_service: CallService, name: str, qname: str, target_id: st
 
 
 @pytest.fixture()
-def create_sample_project(arangodb_client, create_repos):
+def create_sample_project(arangodb_client, create_repos, tmp_path):
+    project_path = tmp_path / "project"
+    shutil.copytree(PROJECT_PATH, project_path)
     project_node = ProjectNode(
         name="Protector",
         description="Protector is a tool for protecting your code.",
-        qname="Protector",
+        qname="protector",
         current_version=int(time.time_ns()),
-        path=PROJECT_PATH.as_posix(),
+        path=project_path.as_posix(),
     )
+
+    db_path = tmp_path / "db" / project_node.name
+    db_path.parent.mkdir(parents=True, exist_ok=True)
 
     project_service = ProjectService(create_repos)
     project_node = project_service.create_node(
         project_node
     )
 
+    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
+
     orchestrator = GraphBuilderOrchestrator(
         project_node=project_node,
         db=arangodb_client,
         ignore_file_name=None,
+        scope_manager=scope_manager,
     )
     orchestrator.resync()
 

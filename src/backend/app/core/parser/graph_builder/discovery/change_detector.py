@@ -41,8 +41,8 @@ class ChangeDetector:
 
         # 1. Fetch DB State
         db_scopes = self.manager.get_all_file_scopes()
-        db_state = {s.file_path: s.checksum for s in db_scopes}
 
+        db_state = {s.file_path: s.checksum for s in db_scopes}
         db_folders = self.manager.get_all_folder_scopes()
         db_folder_paths: Set[str] = {folder.file_path for folder in db_folders}
 

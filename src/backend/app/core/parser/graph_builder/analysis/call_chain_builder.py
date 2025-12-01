@@ -7,16 +7,20 @@ This module:
 3. Recursively processes function bodies to build complete call chains
 4. Handles class instantiation edge case (links to class, processes __init__ if present)
 """
-import logging
-from typing import Optional, List
-from pathlib import Path
 
-from app.core.parser.ast.models import BaseNode, CallNode, FunctionNode, ClassNode
+import logging
+from pathlib import Path
+from typing import List, Optional
+
+from app.core.parser.ast.models import BaseNode, CallNode, ClassNode, FunctionNode
 from app.core.parser.ast.scanner import scan
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import ScopeModel, CallSiteModel
-from app.core.parser.jedi_adapter.call_resolver import CallResolver, CallResolutionResult
+from app.core.parser.jedi_adapter.call_resolver import (
+    CallResolutionResult,
+    CallResolver,
+)
 from app.core.parser.jedi_adapter.manager import JediProjectManager
+from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.parser.scope_manager.models import CallSiteModel, ScopeModel
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +42,7 @@ class CallChainBuilder:
         project_name: str,
         scope_manager: ScopeManager,
         jedi_manager: JediProjectManager,
-        max_depth: int = 50
+        max_depth: int = 50,
     ):
         self.project_path = project_path
         self.project_name = project_name
@@ -55,13 +59,14 @@ class CallChainBuilder:
         call_node: CallNode,
         caller_scope: ScopeModel,
         current_call_id: Optional[str] = None,
-        depth: int = 0
+        depth: int = 0,
+        parent_context: Optional[object] = None,
     ) -> Optional[str]:
         """
         Build a call chain starting from a call node.
 
         This method:
-        1. Uses Jedi to resolve the call WITH context preservation  
+        1. Uses Jedi to resolve the call WITH context preservation
         2. Creates a call site linking caller -> callee
         3. Returns the call site ID for chaining
 
@@ -73,6 +78,7 @@ class CallChainBuilder:
             caller_scope: The scope containing this call
             current_call_id: ID of the previous call site in the chain
             depth: Current recursion depth (unused, kept for compatibility)
+            parent_context: Optional Jedi context from the caller
 
         Returns:
             The ID of the created call site
@@ -83,7 +89,7 @@ class CallChainBuilder:
             file_path = self.project_path / file_path
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 source = f.read()
         except OSError as e:
             logger.error(f"Could not read file {file_path}: {e}")
@@ -96,31 +102,30 @@ class CallChainBuilder:
             call_node.position.line,
             call_node.position.column,
             call_trailer_index=getattr(call_node, "call_index", None),
+            parent_context=parent_context,
         )
 
         # Determine callee_id based on resolution
-        callee_id = None
+        callee_scope = None
 
         if resolution and resolution.callee_qname:
             jedi_qname = resolution.callee_qname
             candidates = self._candidate_qnames(caller_scope, jedi_qname)
 
             for full_qname in candidates:
-                callee_scope = self.scope_manager.get_scope_by_qname(
-                    full_qname)
+                callee_scope = self.scope_manager.get_scope_by_qname(full_qname)
                 if not callee_scope:
                     continue
 
-                callee_id = callee_scope.id
                 if resolution.is_class_instantiation:
                     logger.debug(
                         f"Resolved class instantiation {call_node.name} -> "
-                        f"{full_qname} (scope_id={callee_id})"
+                        f"{full_qname} (scope_id={callee_scope.id})"
                     )
                 else:
                     logger.debug(
                         f"Resolved call {call_node.name} -> "
-                        f"{full_qname} (scope_id={callee_id})"
+                        f"{full_qname} (scope_id={callee_scope.id})"
                     )
                 break
             else:
@@ -142,9 +147,14 @@ class CallChainBuilder:
             line=call_node.position.line,
             col=call_node.position.column,
             name=call_name,
-            callee_id=callee_id,
-            prev_call_site_id=current_call_id
+            callee_id=callee_scope.id,
+            prev_call_site_id=current_call_id,
         )
+
+        # Extract execution context for recursion
+        execution_context = resolution.execution_context if resolution else None
+
+        self._process_scope_body(callee_scope, depth + 1, call_site.id, execution_context)
 
         return call_site.id
 
@@ -164,11 +174,11 @@ class CallChainBuilder:
         if not jedi_qname:
             return []
 
-        normalized = jedi_qname.strip().strip('.')
+        normalized = jedi_qname.strip().strip(".")
         if not normalized:
             return []
 
-        scope_parts = caller_scope.qname.split('.')
+        scope_parts = caller_scope.qname.split(".")
         project_prefix = scope_parts[0] if scope_parts else self.project_name
         module_prefix = scope_parts[1] if len(scope_parts) >= 2 else None
 
@@ -178,9 +188,7 @@ class CallChainBuilder:
             candidates.append(normalized)
 
         if module_prefix and not normalized.startswith(f"{module_prefix}."):
-            candidates.append(
-                f"{project_prefix}.{module_prefix}.{normalized}"
-            )
+            candidates.append(f"{project_prefix}.{module_prefix}.{normalized}")
 
         candidates.append(f"{project_prefix}.{normalized}")
 
@@ -198,20 +206,28 @@ class CallChainBuilder:
         if not raw_name:
             return raw_name
 
-        segment = raw_name.strip().split('.')[-1]
-        if segment.endswith('()'):
+        segment = raw_name.strip().split(".")[-1]
+        if segment.endswith("()"):
             segment = segment[:-2]
 
         segment = segment.strip()
         return segment or raw_name
 
-    def _process_scope_body(self, scope: ScopeModel, depth: int):
+    def _process_scope_body(
+        self, 
+        scope: ScopeModel, 
+        depth: int, 
+        current_call_id, 
+        parent_context: Optional[object] = None
+    ):
         """
         Process all calls within a function/method scope.
 
         Args:
             scope: The scope to process
             depth: Current recursion depth
+            current_call_id: ID of the previous call
+            parent_context: Optional Jedi context to use for resolution within this body
         """
         logger.debug(f"Processing body of {scope.qname}")
 
@@ -221,7 +237,7 @@ class CallChainBuilder:
             file_path = self.project_path / file_path
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 source = f.read()
         except OSError as e:
             logger.error(f"Could not read file {file_path}: {e}")
@@ -247,19 +263,18 @@ class CallChainBuilder:
         logger.debug(f"Found {len(call_nodes)} call(s) in {scope.qname}")
 
         # Process each call recursively
-        current_call_id = None
+
         for call_node in call_nodes:
             current_call_id = self.build_chain(
-                call_node,
-                scope,
-                current_call_id,
-                depth
+                call_node, 
+                scope, 
+                current_call_id, 
+                depth, 
+                parent_context=parent_context
             )
 
     def _find_scope_node(
-        self,
-        nodes: List[BaseNode],
-        scope: ScopeModel
+        self, nodes: List[BaseNode], scope: ScopeModel
     ) -> Optional[BaseNode]:
         """
         Find the AST node that corresponds to a scope.
@@ -270,12 +285,11 @@ class CallChainBuilder:
             # Check if this node matches the scope
             if isinstance(node, (FunctionNode, ClassNode)):
                 # Match by position (line)
-                if (node.position.line == scope.start_line and
-                        node.name == scope.name):
+                if node.position.line == scope.start_line and node.name == scope.name:
                     return node
 
             # Recurse into children
-            if hasattr(node, 'children'):
+            if hasattr(node, "children"):
                 result = self._find_scope_node(node.children, scope)
                 if result:
                     return result
@@ -290,7 +304,7 @@ class CallChainBuilder:
         """
         calls = []
 
-        if hasattr(node, 'children'):
+        if hasattr(node, "children"):
             for child in node.children:
                 if isinstance(child, CallNode):
                     calls.append(child)

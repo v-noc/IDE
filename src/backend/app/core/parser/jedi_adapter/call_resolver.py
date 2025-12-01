@@ -63,6 +63,7 @@ class CallResolver:
         line: int,
         column: int,
         call_trailer_index: Optional[int] = None,
+        parent_context: Optional[Any] = None,
     ) -> Optional[CallResolutionResult]:
         """
         Resolve a call at the given position.
@@ -72,13 +73,20 @@ class CallResolver:
             source: Source code content
             line: Line number (1-indexed)
             column: Column number (0-indexed in Jedi)
+            call_trailer_index: Optional index of the call trailer
+            parent_context: Optional Jedi context from the caller (for recursion)
 
         Returns:
             CallResolutionResult if successful, None otherwise
         """
         try:
             script = self.jedi_manager.get_script(file_path, source)
-            module_context = script._get_module_context()
+            
+            # Use provided parent context or fall back to module context
+            if parent_context:
+                context = parent_context
+            else:
+                context = script._get_module_context()
 
             # Find the call node at this position
             call_leaf = script._module_node.get_name_of_position(
@@ -118,7 +126,16 @@ class CallResolver:
                 return None
 
             # Create context for the call site
-            call_context = module_context.create_context(call_leaf)
+            # If we have a parent_context, we might need to be careful, 
+            # but create_context usually takes a node and returns the context for it.
+            # However, if we are already in a context, we should use that context's inference state?
+            # Actually, module_context.create_context(call_leaf) creates a context *at* that leaf.
+            # If we passed parent_context, we want to use it to infer the callee.
+            
+            # When we have parent_context (e.g. inside a function), we should use it 
+            # to infer the values.
+            
+            call_context = context.create_context(call_leaf)
 
             # Infer the callee (everything before the call trailer)
             callee_values = self._infer_callee(

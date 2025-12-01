@@ -76,6 +76,7 @@ class MainGraphSyncService:
             self._sync_scope_recursive(
                 child_scope, parent_node_id=self.project_node.id
             )
+        self.sync_call_chains(root_scope_id)
 
     def sync_call_chains(self, root_scope_id: str):
         """
@@ -102,6 +103,7 @@ class MainGraphSyncService:
         stack = [root_scope]
         while stack:
             scope = stack.pop()
+
             if scope.type == ScopeType.FILE or scope.type == ScopeType.FUNCTION or scope.type == ScopeType.CLASS:
                 graph_node = self._get_graph_node_for_scope(scope)
                 if graph_node:

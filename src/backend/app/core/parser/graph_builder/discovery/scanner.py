@@ -61,6 +61,7 @@ class FileScanner:
 
         for root, dirs, files in os.walk(self.project_path):
             # Filter directories using pathspec
+
             root_path = Path(root)
             rel_root = root_path.relative_to(self.project_path)
 

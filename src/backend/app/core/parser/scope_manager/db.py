@@ -15,7 +15,7 @@ class DBConnectionManager:
 
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-
+        print(f"Database path: {self.db_path}")
         self.db = kuzu.Database(self.db_path)
         self.conn = kuzu.Connection(self.db)
         self._initialize_schema()
