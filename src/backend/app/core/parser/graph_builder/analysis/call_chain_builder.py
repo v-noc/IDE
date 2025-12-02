@@ -113,7 +113,8 @@ class CallChainBuilder:
             candidates = self._candidate_qnames(caller_scope, jedi_qname)
 
             for full_qname in candidates:
-                callee_scope = self.scope_manager.get_scope_by_qname(full_qname)
+                callee_scope = self.scope_manager.get_scope_by_qname(
+                    full_qname)
                 if not callee_scope:
                     continue
 
@@ -138,6 +139,8 @@ class CallChainBuilder:
                 f"Could not resolve call {call_node.name} at "
                 f"{call_node.position.line}:{call_node.position.column}"
             )
+            return
+        if not callee_scope:
             return
         call_name = self._normalize_call_name(call_node.name)
 
