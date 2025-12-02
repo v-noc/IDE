@@ -81,7 +81,7 @@ class CallResolver:
         """
         try:
             script = self.jedi_manager.get_script(file_path, source)
-            
+
             # Use provided parent context or fall back to module context
             if parent_context:
                 context = parent_context
@@ -92,8 +92,12 @@ class CallResolver:
             call_leaf = script._module_node.get_name_of_position(
                 (line, column))
             if not call_leaf:
-                logger.debug(f"No leaf found at {file_path}:{line}:{column}")
-                return None
+                call_leaf = script._module_node.get_name_of_position(
+                    (line, column+1))
+                if not call_leaf:
+                    logger.debug(
+                        f"No leaf found at {file_path}:{line}:{column}")
+                    return None
 
             # Navigate up to find the atom_expr or power node
             atom_expr = self._find_call_expression(call_leaf)
@@ -126,15 +130,15 @@ class CallResolver:
                 return None
 
             # Create context for the call site
-            # If we have a parent_context, we might need to be careful, 
+            # If we have a parent_context, we might need to be careful,
             # but create_context usually takes a node and returns the context for it.
             # However, if we are already in a context, we should use that context's inference state?
             # Actually, module_context.create_context(call_leaf) creates a context *at* that leaf.
             # If we passed parent_context, we want to use it to infer the callee.
-            
-            # When we have parent_context (e.g. inside a function), we should use it 
+
+            # When we have parent_context (e.g. inside a function), we should use it
             # to infer the values.
-            
+
             call_context = context.create_context(call_leaf)
 
             # Infer the callee (everything before the call trailer)
@@ -186,8 +190,9 @@ class CallResolver:
                         # We get the class context (static), not instance context
                         exec_context = callee.as_context()
                     else:
-                        exec_context = callee.as_context(arguments=tree_arguments)
-                        
+                        exec_context = callee.as_context(
+                            arguments=tree_arguments)
+
                     result.execution_context = exec_context
                     logger.debug(f"Created execution context: {exec_context}")
                 except Exception as e:

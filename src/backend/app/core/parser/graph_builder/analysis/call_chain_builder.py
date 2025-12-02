@@ -116,6 +116,7 @@ class CallChainBuilder:
                 callee_scope = self.scope_manager.get_scope_by_qname(
                     full_qname)
                 if not callee_scope:
+                    logger.debug(f"Callee not found for {full_qname}")
                     continue
 
                 if resolution.is_class_instantiation:
@@ -183,17 +184,12 @@ class CallChainBuilder:
         if not normalized:
             return []
 
-        scope_parts = caller_scope.qname.split(".")
-        project_prefix = scope_parts[0] if scope_parts else self.project_name
-        module_prefix = scope_parts[1] if len(scope_parts) >= 2 else None
+        project_prefix = self.project_name
 
         candidates: List[str] = []
 
         if normalized.startswith(f"{project_prefix}."):
             candidates.append(normalized)
-
-        if module_prefix and not normalized.startswith(f"{module_prefix}."):
-            candidates.append(f"{project_prefix}.{module_prefix}.{normalized}")
 
         candidates.append(f"{project_prefix}.{normalized}")
 

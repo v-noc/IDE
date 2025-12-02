@@ -1,30 +1,28 @@
 import logging
-from typing import Optional
+import time
 from pathlib import Path
+from typing import Optional
 
 from arango.database import StandardDatabase
 
 from app.core.model.nodes import ProjectNode
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import ScopeModel
-from app.core.parser.graph_builder.discovery.scanner import (
-    FileScanner,
-    ScanResult,
-)
+from app.core.parser.graph_builder.analysis.body_parser import BodyParser
+from app.core.parser.graph_builder.collection.collector import Collector
+from app.core.parser.graph_builder.collection.hierarchy import FolderChange
 from app.core.parser.graph_builder.discovery.change_detector import (
     ChangeDetector,
     ChangeSet,
 )
-
-from app.core.parser.graph_builder.collection.collector import Collector
-from app.core.parser.graph_builder.collection.hierarchy import FolderChange
-from app.core.parser.graph_builder.analysis.body_parser import BodyParser
+from app.core.parser.graph_builder.discovery.scanner import (
+    FileScanner,
+    ScanResult,
+)
 from app.core.parser.graph_builder.sync.graph_sync import (
     MainGraphSyncService,
 )
+from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.parser.scope_manager.models import ScopeModel
 from app.core.repository import Repositories
-import time
-
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +69,7 @@ class GraphBuilderOrchestrator:
             self.project_path,
             self.project_node.name,
             self.scope_manager,
-            self.jedi_manager
+            self.jedi_manager,
         )
 
         # Initialize Sync components
@@ -105,8 +103,7 @@ class GraphBuilderOrchestrator:
         change_set = self.change_detector.detect_changes(scan_result)
         logger.info(f"Detected changes: {change_set}")
 
-        if (not change_set.has_changes() and
-                not change_set.has_folder_changes()):
+        if not change_set.has_changes() and not change_set.has_folder_changes():
             logger.info("No changes detected. Graph is up to date.")
             return change_set
 
@@ -144,7 +141,8 @@ class GraphBuilderOrchestrator:
                     collection_results.append(result)
                     folder_changes.extend(result.folder_changes)
                     touched_folder_ids.update(
-                        fc.scope.id for fc in result.folder_changes)
+                        fc.scope.id for fc in result.folder_changes
+                    )
 
         # Phase 2: Analysis (Bodies)
         logger.info("Starting Phase 2: Analysis")
@@ -172,13 +170,14 @@ class GraphBuilderOrchestrator:
 
         # Debugger: Visualize scope and call site graph
         # self._print_call_site_tree()
-        # self._visualize_graph()
+        self._visualize_graph()
 
         # Process Deleted folders before files to avoid orphan references
         for folder_path in change_set.deleted_folders:
             logger.info(f"Processing folder deletion: {folder_path}")
             self._handle_folder_deletion(
-                folder_path, folder_changes, touched_folder_ids)
+                folder_path, folder_changes, touched_folder_ids
+            )
 
         # Process Deleted files (Full file deletion)
         for file_path in change_set.deleted_files:
@@ -191,10 +190,7 @@ class GraphBuilderOrchestrator:
         sync_version = int(time.time_ns())
         if self.repos:
             sync_service = MainGraphSyncService(
-                self.repos,
-                self.scope_manager,
-                self.project_node,
-                sync_version
+                self.repos, self.scope_manager, self.project_node, sync_version
             )
 
             sync_service.sync_scope_hierarchy(self.project_node.id)
@@ -228,7 +224,6 @@ class GraphBuilderOrchestrator:
         folder_changes: list,
         touched_folder_ids: set,
     ) -> None:
-
         self.scope_manager.delete_file_scope(file_path)
         self._touch_parent_folders(
             file_path, folder_changes, touched_folder_ids)
@@ -242,8 +237,9 @@ class GraphBuilderOrchestrator:
         try:
             rel_path = Path(target_path).relative_to(self.project_root)
         except ValueError:
-            logger.warning("Path %s is outside project root %s",
-                           target_path, self.project_root)
+            logger.warning(
+                "Path %s is outside project root %s", target_path, self.project_root
+            )
             return
 
         folder_parts = rel_path.parts[:-1]
@@ -270,14 +266,10 @@ class GraphBuilderOrchestrator:
     ) -> None:
         if not scope or scope.id in touched_folder_ids:
             return
-        folder_changes.append(
-            FolderChange(scope=scope, action=action)
-        )
+        folder_changes.append(FolderChange(scope=scope, action=action))
         touched_folder_ids.add(scope.id)
 
-    def _scope_from_path(
-        self, abs_path: str, is_file: bool
-    ) -> Optional[ScopeModel]:
+    def _scope_from_path(self, abs_path: str, is_file: bool) -> Optional[ScopeModel]:
         """
         Resolve a scope using a filesystem path by mapping to its qname.
         """
@@ -285,17 +277,13 @@ class GraphBuilderOrchestrator:
             rel_path = Path(abs_path).relative_to(self.project_root)
         except ValueError:
             logger.warning(
-                "Path %s is outside project root %s",
-                abs_path,
-                self.project_root
+                "Path %s is outside project root %s", abs_path, self.project_root
             )
             return None
 
         parts = list(rel_path.parts)
         if not parts:
-            return self.scope_manager.get_scope_by_qname(
-                self.project_node.name
-            )
+            return self.scope_manager.get_scope_by_qname(self.project_node.name)
 
         if is_file and parts:
             parts[-1] = Path(parts[-1]).stem
@@ -315,8 +303,7 @@ class GraphBuilderOrchestrator:
             from pyvis.network import Network
         except ImportError:
             logger.warning(
-                "pyvis not installed. Skipping graph visualization."
-            )
+                "pyvis not installed. Skipping graph visualization.")
             return
 
         # Create network graph
@@ -349,9 +336,9 @@ class GraphBuilderOrchestrator:
 
         # Color mapping for scope types
         scope_type_colors = {
-            "folder": "#4A90E2",    # Blue
-            "file": "#50C878",      # Green
-            "class": "#FF6B6B",     # Red
+            "folder": "#4A90E2",  # Blue
+            "file": "#50C878",  # Green
+            "class": "#FF6B6B",  # Red
             "function": "#FFD93D",  # Yellow
         }
 
@@ -508,12 +495,14 @@ class GraphBuilderOrchestrator:
 
         root_calls = []
         for row in root_query:
-            root_calls.append({
-                "id": row[0],
-                "line": row[1],
-                "col": row[2],
-                "name": row[3],
-            })
+            root_calls.append(
+                {
+                    "id": row[0],
+                    "line": row[1],
+                    "col": row[2],
+                    "name": row[3],
+                }
+            )
 
         if not root_calls:
             print("No root call sites found.")
@@ -616,8 +605,7 @@ class GraphBuilderOrchestrator:
         if callee_info:
             file_name = Path(callee_info["file_path"]).name
             callee_str = (
-                f" -> [{callee_info['type']}] {callee_info['name']} "
-                f"({file_name})"
+                f" -> [{callee_info['type']}] {callee_info['name']} ({file_name})"
             )
 
         # Determine tree connector

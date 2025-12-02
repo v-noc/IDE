@@ -13,7 +13,7 @@ PROJECT_NAME = "sample_import"
 
 @pytest.fixture
 def setup_project(tmp_path):
-    project_path = tmp_path / "project"
+    project_path = tmp_path / "sample_import"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
     db_path = tmp_path / "db" / PROJECT_NAME
