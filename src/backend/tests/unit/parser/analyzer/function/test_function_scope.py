@@ -119,11 +119,11 @@ def test_call_chain_construction(setup_project):
     call_back = scope_manager.get_scope_by_qname(
         f"{PROJECT_NAME}.main.call_back")
 
-    curry_call_calls = scope_manager.get_calls_from(curry_call.id)
+    curry_call_calls = scope_manager.get_call_chain_roots(curry_call.id)
     assert len(curry_call_calls) == 2, "curry_call should have calls"
 
     # Test 1: Verify calls from main()
-    main_calls = scope_manager.get_calls_from(main.id)
+    main_calls = scope_manager.get_call_chain_roots(main.id)
     assert len(main_calls) == 4, "main should have calls"
 
     # main() calls factory_call()
