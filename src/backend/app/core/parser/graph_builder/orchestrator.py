@@ -76,6 +76,7 @@ class GraphBuilderOrchestrator:
 
         # Initialize Sync components
         # Will create sync service with version when needed in _process_changes
+
         self.repos = Repositories(self.db) if self.db else None
         self._pending_folder_changes: list[FolderChange] = []
 

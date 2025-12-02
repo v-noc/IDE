@@ -1,36 +1,57 @@
-from app.core.repository import Repositories
-from app.core.services.project_service import ProjectService
-from app.core.parser.graph_builder import GraphBuilder
-from app.core.builder.tree_builder import TreeBuilder
-from app.core.schemas.tree import AnyTreeNode
-
+import shutil
 from pathlib import Path
 from typing import List
 
+import pytest
+
+from app.core.model.nodes import ProjectNode
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.repository import Repositories
+from app.core.services.project_service import ProjectService
+from app.core.builder.tree_builder import TreeBuilder
+from app.core.schemas.tree import AnyTreeNode
 from app.core.services.function_service import FunctionService
 
+FIXTURE_PROJECT = Path(__file__).parent / "simple_function"
+PROJECT_NAME = "simple_function"
 
-current_file_path = Path(__file__).resolve()
-print("Current file path:", current_file_path)
 
-# Get the directory of the current file
-current_dir = current_file_path.parent
-PROJECT_PATH = Path(current_dir, "./simple_function").absolute()
+@pytest.fixture
+def setup_project(tmp_path, arangodb_client):
+    project_path = tmp_path / "project"
+    shutil.copytree(FIXTURE_PROJECT, project_path)
+
+    db_path = tmp_path / "db" / PROJECT_NAME
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    project_node = ProjectNode(
+        name=PROJECT_NAME,
+        path=str(project_path),
+        qname=PROJECT_NAME,
+        description="Test Project",
+    )
+    scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
+    repos = Repositories(arangodb_client)
+    project_service = ProjectService(repos)
+    project_node = project_service.create_node(project_node)
+
+    return project_node, scope_manager, arangodb_client
 
 
 def find_node_by_name(nodes: List[AnyTreeNode], name: str):
-    return next((node for node in nodes if node.name == name), None)
+    return next((node for node in nodes if node.qname.split('.')[-1] == name), None)
 
 
-def test_function_get_code(arangodb_client):
+def test_function_get_code(setup_project):
+    project_node, scope_manager, arangodb_client = setup_project
 
-    builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        ignore_file_name=None,
-        db=arangodb_client
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
+        db=arangodb_client,
+        scope_manager=scope_manager,
     )
-    builder.build(
-        "Protector", "Protector is a tool for protecting your code.")
+    orchestrator.resync()
 
     repos = Repositories(arangodb_client)
     proj_service = ProjectService(repos)
@@ -77,15 +98,16 @@ def test_function_get_code(arangodb_client):
     assert 'return add' in code
 
 
-def test_function_collector(arangodb_client):
+def test_function_collector(setup_project):
+    project_node, scope_manager, arangodb_client = setup_project
 
-    builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        project_node=None,
-        db=arangodb_client
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
+        db=arangodb_client,
+        scope_manager=scope_manager,
     )
-    builder.build(
-        "Protector", "Protector is a tool for protecting your code.")
+
+    orchestrator.resync()
 
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
@@ -93,6 +115,7 @@ def test_function_collector(arangodb_client):
     project = project_service.get_all()
 
     children = project_service.get_children(project[0].id)
+
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
@@ -153,6 +176,7 @@ def test_function_collector(arangodb_client):
         main_curry_call.children, 'factory')
     curry_add_call = find_node_by_name(main_curry_call.children, 'add')
     assert curry_factory_call.target.id == factory_func.id
+
     assert curry_add_call.target.id == add_func.id
     assert len(curry_add_call.children) == 1
     final_build_call = find_node_by_name(curry_add_call.children, 'build')
