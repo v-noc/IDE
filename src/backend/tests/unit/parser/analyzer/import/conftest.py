@@ -1,4 +1,5 @@
 import pytest
+import shutil
 from pathlib import Path
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.services.project_service import ProjectService
@@ -7,6 +8,10 @@ from app.core.builder.tree_builder import TreeBuilder
 from app.core.schemas.tree import ProjectTreeNode
 from app.core.model.nodes import ProjectNode
 from app.core.parser.scope_manager.manager import ScopeManager
+
+
+FIXTURE_PROJECT = Path(__file__).parent / "sample_import"
+PROJECT_NAME = "sample_import"
 
 
 @pytest.fixture
@@ -18,24 +23,19 @@ def project_path() -> Path:
 
 @pytest.fixture
 def setup_project(tmp_path, arangodb_client, project_path):
-    """Setup project similar to test_function.py pattern."""
-    import shutil
+    project_path = tmp_path / "sample_import"
+    shutil.copytree(FIXTURE_PROJECT, project_path)
 
-    # Copy the project to a temporary location
-    test_project_path = tmp_path / "project"
-    print(f"Test project path: {test_project_path}")
-    shutil.copytree(project_path, test_project_path)
-
-    db_path = tmp_path / "db" / "sample_import"
+    db_path = tmp_path / "db" / PROJECT_NAME
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     project_node = ProjectNode(
-        name="sample_import",
-        path=str(test_project_path),
-        qname="sample_import",
-        description="A test project for imports.",
+        name=PROJECT_NAME,
+        path=str(project_path),
+        qname=PROJECT_NAME,
+        description="Test Project",
     )
-    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
+    scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
 
     # Create project node in database (matching test_function.py pattern)
     repos = Repositories(arangodb_client)
