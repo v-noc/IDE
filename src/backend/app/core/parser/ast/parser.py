@@ -132,7 +132,25 @@ class JediParser:
                     collect_nodes(child)
 
         collect_nodes(scope_node)
-        return nodes
+
+        # Filter out duplicate nodes with the same position in the same scope
+        seen_positions = set()
+        unique_nodes = []
+        for node in nodes:
+            if node is None:
+                continue
+            # Create a key based on position (line, column, end_line, end_column)
+            pos_key = (
+                node.position.line,
+                node.position.column,
+                node.position.end_line,
+                node.position.end_column
+            )
+            if pos_key not in seen_positions:
+                seen_positions.add(pos_key)
+                unique_nodes.append(node)
+
+        return unique_nodes
 
     def _visit_class(self, node: Class) -> ClassNode:
         return ClassNode(

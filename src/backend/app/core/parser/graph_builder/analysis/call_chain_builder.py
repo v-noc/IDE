@@ -138,7 +138,7 @@ class CallChainBuilder:
                 f"Could not resolve call {call_node.name} at "
                 f"{call_node.position.line}:{call_node.position.column}"
             )
-
+            return
         call_name = self._normalize_call_name(call_node.name)
 
         # Create the call site
@@ -154,7 +154,9 @@ class CallChainBuilder:
         # Extract execution context for recursion
         execution_context = resolution.execution_context if resolution else None
 
-        self._process_scope_body(callee_scope, depth + 1, call_site.id, execution_context)
+        self._process_scope_body(
+            callee_scope, depth + 1, call_site.id, execution_context
+        )
 
         return call_site.id
 
@@ -214,11 +216,11 @@ class CallChainBuilder:
         return segment or raw_name
 
     def _process_scope_body(
-        self, 
-        scope: ScopeModel, 
-        depth: int, 
-        current_call_id, 
-        parent_context: Optional[object] = None
+        self,
+        scope: ScopeModel,
+        depth: int,
+        current_call_id,
+        parent_context: Optional[object] = None,
     ):
         """
         Process all calls within a function/method scope.
@@ -266,11 +268,7 @@ class CallChainBuilder:
 
         for call_node in call_nodes:
             current_call_id = self.build_chain(
-                call_node, 
-                scope, 
-                current_call_id, 
-                depth, 
-                parent_context=parent_context
+                call_node, scope, current_call_id, depth, parent_context=parent_context
             )
 
     def _find_scope_node(

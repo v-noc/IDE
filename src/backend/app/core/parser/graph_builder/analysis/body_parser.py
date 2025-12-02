@@ -2,12 +2,12 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from app.core.parser.ast.models import BaseNode, CallNode, FunctionNode, ClassNode
+from app.core.parser.ast.models import BaseNode, CallNode, ClassNode, FunctionNode
 from app.core.parser.ast.scanner import scan
+from app.core.parser.graph_builder.analysis.call_chain_builder import CallChainBuilder
+from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel
-from app.core.parser.jedi_adapter.manager import JediProjectManager
-from app.core.parser.graph_builder.analysis.call_chain_builder import CallChainBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class BodyParser:
         project_path: Path,
         project_name: str,
         scope_manager: ScopeManager,
-        jedi_manager: JediProjectManager
+        jedi_manager: JediProjectManager,
     ):
         self.project_path = project_path
         self.project_name = project_name
@@ -30,7 +30,7 @@ class BodyParser:
             project_path=project_path,
             project_name=project_name,
             scope_manager=scope_manager,
-            jedi_manager=jedi_manager
+            jedi_manager=jedi_manager,
         )
 
     def process_ast(self, file_scope: ScopeModel):
@@ -58,7 +58,12 @@ class BodyParser:
         # Start traversal from file scope
         self._traverse(nodes, file_scope)
 
-    def _traverse(self, nodes: List[BaseNode], current_scope: ScopeModel, prev_call_id: Optional[str] = None):
+    def _traverse(
+        self,
+        nodes: List[BaseNode],
+        current_scope: ScopeModel,
+        prev_call_id: Optional[str] = None,
+    ):
         """
         Traverse AST nodes in the current scope.
 
@@ -75,14 +80,14 @@ class BodyParser:
             if isinstance(node, (ClassNode, FunctionNode)):
                 # Enter child scope (function or class)
                 if not node.id:
-                    logger.warning(
-                        f"Node {node.name} has no ID in Phase 2. Skipping.")
+                    logger.warning(f"Node {node.name} has no ID in Phase 2. Skipping.")
                     continue
 
                 child_scope = self.manager.get_scope(node.id)
                 if not child_scope:
                     logger.warning(
-                        f"Scope not found for node {node.name} ({node.id}). Skipping.")
+                        f"Scope not found for node {node.name} ({node.id}). Skipping."
+                    )
                     continue
 
                 # Clear old calls for this scope before processing
@@ -91,30 +96,28 @@ class BodyParser:
                 # Recurse into the scope to process its calls
                 # All calls in child scope are root calls (prev_call_id=None)
                 if hasattr(node, "children"):
-                    self._traverse(node.children, child_scope,
-                                   prev_call_id=None)
+                    self._traverse(node.children, child_scope, prev_call_id=None)
 
             elif isinstance(node, CallNode):
                 # Create call site (this is a root call at this scope level)
                 logger.debug(
-                    f"Processing CallNode: {node.name} at {node.position.line}:{node.position.column} in scope {current_scope.qname}")
+                    f"Processing CallNode: {node.name} at {node.position.line}:{node.position.column} in scope {current_scope.qname}"
+                )
                 call_site_id = self.call_chain_builder.build_chain(
                     call_node=node,
                     caller_scope=current_scope,
-                    current_call_id=prev_call_id,  # Chain to previous if in nested context
-                    depth=0
+                    current_call_id=None,  # Chain to previous if in nested context
+                    depth=0,
                 )
                 logger.debug(f"Created call site with ID: {call_site_id}")
 
                 # Recurse into call arguments
                 # Calls within arguments chain to this call site
                 if hasattr(node, "children"):
-                    self._traverse(node.children, current_scope,
-                                   prev_call_id=None)
+                    self._traverse(node.children, current_scope, prev_call_id=None)
 
             else:
                 # Other nodes (If, For, etc.) - Recurse staying in current scope
                 # Preserve prev_call_id context
                 if hasattr(node, "children"):
-                    self._traverse(node.children, current_scope,
-                                   prev_call_id=prev_call_id)
+                    self._traverse(node.children, current_scope, prev_call_id=None)
