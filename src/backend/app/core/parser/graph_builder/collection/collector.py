@@ -11,7 +11,7 @@ from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel
 
 from .ast_processor import ASTProcessor
-from .hierarchy import HierarchyBuilder, HierarchyBuildResult, FolderChange
+from .hierarchy import HierarchyBuilder, FolderChange
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,9 @@ class Collector:
         """Reset builder caches between orchestrator runs."""
         self.hierarchy_builder.reset_session()
 
-    def process_file(self, file_path: str, checksum: str) -> Optional[CollectionResult]:
+    def process_file(
+        self, file_path: str, checksum: str
+    ) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 1 collection.
 
@@ -91,12 +93,13 @@ class Collector:
         except Exception as e:
             logger.error(f"Failed to scan AST for {file_path}: {e}")
             return None
-        # 3. Get existing children from database
-        existing_children = self.manager.get_children(file_scope.id)
-        existing_map = {child.id: child for child in existing_children}
+        # 3. Get existing children from database (recursively collect all
+        # descendants)
+        existing_map = self._collect_all_descendant_scopes(file_scope.id)
 
         # 4. Process AST Nodes to build current scope hierarchy
-        # ASTProcessor will check each scope by ID and update if path/pos/name changed
+        # ASTProcessor will check each scope by ID and update if path/pos/name
+        # changed
         current_scopes_nodes = self.ast_processor.process_ast_nodes(
             ast_nodes, file_scope, content)
         # 5. Determine which scopes are new or modified (Internal Update)
@@ -122,7 +125,8 @@ class Collector:
             if child_id not in current_ids:
                 removed_scope_ids.append(child_id)
                 logger.info(
-                    f"Scope removed: {existing_map[child_id].qname} (ID: {child_id})")
+                    f"Scope removed: {existing_map[child_id].qname} "
+                    f"(ID: {child_id})")
         logger.info(
             f"File {file_path}: {len(removed_scope_ids)} scopes removed")
 
@@ -149,7 +153,29 @@ class Collector:
             return None
         return build_result.folder_changes
 
-    def _scope_changed(self, existing: ScopeModel, current: ScopeModel) -> bool:
+    def _collect_all_descendant_scopes(
+        self, parent_scope_id: str
+    ) -> dict[str, ScopeModel]:  # noqa: E501
+        """
+        Recursively collect all descendant scopes from a parent scope.
+        Returns a dictionary mapping scope ID to ScopeModel.
+        """
+        result = {}
+        queue = [parent_scope_id]
+
+        while queue:
+            current_id = queue.pop(0)
+            children = self.manager.get_children(current_id)
+            for child in children:
+                if child.id not in result:
+                    result[child.id] = child
+                    queue.append(child.id)
+
+        return result
+
+    def _scope_changed(
+        self, existing: ScopeModel, current: ScopeModel
+    ) -> bool:
         """
         Check if a scope has changed by comparing key attributes.
         Checks: checksum, position, name, qname (path).
