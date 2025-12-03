@@ -100,7 +100,7 @@ class CallChainBuilder:
             str(file_path),
             source,
             call_node.position.line,
-            call_node.position.column,
+            call_node.position.column + (len(call_node.name)),
             call_trailer_index=getattr(call_node, "call_index", None),
             parent_context=parent_context,
         )
@@ -112,12 +112,25 @@ class CallChainBuilder:
             jedi_qname = resolution.callee_qname
             candidates = self._candidate_qnames(caller_scope, jedi_qname)
 
+            # Debug: Log what Jedi returned
+            logger.debug(
+                f"Resolving call {call_node.name} at {call_node.position.line}:{call_node.position.column}: "
+                f"Jedi qname={jedi_qname}, is_class_inst={resolution.is_class_instantiation}, "
+                f"candidates={candidates}"
+            )
+
             for full_qname in candidates:
                 callee_scope = self.scope_manager.get_scope_by_qname(
                     full_qname)
                 if not callee_scope:
                     logger.debug(f"Callee not found for {full_qname}")
                     continue
+
+                # Debug: Log what scope was found
+                logger.debug(
+                    f"Found callee scope: qname={callee_scope.qname}, "
+                    f"type={callee_scope.type}, name={callee_scope.name}"
+                )
 
                 if resolution.is_class_instantiation:
                     logger.debug(
@@ -149,7 +162,7 @@ class CallChainBuilder:
         call_site = self.scope_manager.create_call(
             caller_id=caller_scope.id,
             line=call_node.position.line,
-            col=call_node.position.column,
+            col=call_node.position.column + (len(call_node.name)),
             name=call_name,
             callee_id=callee_scope.id,
             prev_call_site_id=current_call_id,

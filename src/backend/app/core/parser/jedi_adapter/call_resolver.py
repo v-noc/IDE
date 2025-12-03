@@ -7,10 +7,11 @@ This module provides accurate call resolution by:
 3. Properly resolving class instantiation
 4. Extracting qualified names from resolved callees
 """
+from jedi.api import helpers
 import logging
-from typing import Optional, List, Any
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, List, Optional
 
 import jedi
 from jedi.inference.helpers import infer_call_of_leaf
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CallResolutionResult:
     """Result of resolving a call site."""
+
     callee_qname: Optional[str] = None
     """Fully qualified name of the resolved callee"""
 
@@ -93,7 +95,7 @@ class CallResolver:
                 (line, column))
             if not call_leaf:
                 call_leaf = script._module_node.get_name_of_position(
-                    (line, column+1))
+                    (line, column + 1))
                 if not call_leaf:
                     logger.debug(
                         f"No leaf found at {file_path}:{line}:{column}")
@@ -108,10 +110,11 @@ class CallResolver:
 
             # Find the trailer with the call parentheses
             trailer_indices = [
-                idx for idx, child in enumerate(atom_expr.children)
-                if child.type == 'trailer'
+                idx
+                for idx, child in enumerate(atom_expr.children)
+                if child.type == "trailer"
                 and child.children
-                and getattr(child.children[0], 'value', None) == '('
+                and getattr(child.children[0], "value", None) == "("
             ]
             if not trailer_indices:
                 logger.debug(
@@ -124,9 +127,10 @@ class CallResolver:
                 trailer_idx = trailer_indices[call_trailer_index]
 
             trailer = atom_expr.children[trailer_idx]
-            if trailer.type != 'trailer' or trailer.children[0].value != '(':
+            if trailer.type != "trailer" or trailer.children[0].value != "(":
                 logger.debug(
-                    f"Last trailer is not a call at {file_path}:{line}:{column}")
+                    f"Last trailer is not a call at {file_path}:{line}:{column}"
+                )
                 return None
 
             # Create context for the call site
@@ -142,8 +146,9 @@ class CallResolver:
             call_context = context.create_context(call_leaf)
 
             # Infer the callee (everything before the call trailer)
-            callee_values = self._infer_callee(
-                call_context, atom_expr, trailer_idx)
+
+            callee_values = helpers.infer(
+                script._inference_state, call_context, call_leaf)
 
             if not callee_values:
                 logger.debug(
@@ -155,7 +160,7 @@ class CallResolver:
 
             for callee in callee_values:
                 # Check if this is a class instantiation
-                if callee.api_type == 'class':
+                if callee.api_type == "class":
                     result.is_class_instantiation = True
                     result.class_qname = self._extract_qualified_name(callee)
                     result.callee_qname = result.class_qname
@@ -163,8 +168,7 @@ class CallResolver:
                     # For classes, we want to link to the class scope, not __init__
                     # But we may still want to process __init__ body
                     logger.debug(
-                        f"Resolved class instantiation: {result.class_qname}"
-                    )
+                        f"Resolved class instantiation: {result.class_qname}")
                 else:
                     # Regular function or method call
                     result.callee_qname = self._extract_qualified_name(callee)
@@ -177,15 +181,13 @@ class CallResolver:
                     arglist = trailer.children[1] if len(
                         trailer.children) > 2 else None
                     from jedi.inference.arguments import TreeArguments
+
                     tree_arguments = TreeArguments(
-                        script._inference_state,
-                        call_context,
-                        arglist,
-                        trailer
+                        script._inference_state, call_context, arglist, trailer
                     )
 
                     # Create execution context
-                    if callee.api_type == 'class':
+                    if callee.api_type == "class":
                         # Classes don't accept arguments for context creation
                         # We get the class context (static), not instance context
                         exec_context = callee.as_context()
@@ -208,20 +210,21 @@ class CallResolver:
             logger.error(
                 f"Error resolving call at {file_path}:{line}:{column}: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 
     def _find_call_expression(self, leaf):
         """Navigate up the AST to find the atom_expr or power node."""
         curr = leaf
-        while curr.parent and curr.type not in ('atom_expr', 'power'):
+        while curr.parent and curr.type not in ("atom_expr", "power"):
             curr = curr.parent
 
-        if curr.type in ('atom_expr', 'power'):
+        if curr.type in ("atom_expr", "power"):
             return curr
         return None
 
-    def _infer_callee(self, context, atom_expr, trailer_index):
+    def _infer_callee(self, context, script, atom_expr, trailer_index):
         """
         Infer the callee by applying all trailers except the call trailer.
 
@@ -229,6 +232,12 @@ class CallResolver:
         """
         base = atom_expr.children[0]
         values = context.infer_node(base)
+        if not values:
+            module_context = script._get_module_context()
+            res = script._inference_state.infer(module_context,
+                                                base)
+            print(f"res: {res}")
+            values = module_context.infer_node(base)
 
         # Apply all trailers EXCEPT the last one (which is the call)
         for trailer in atom_expr.children[1:trailer_index]:
@@ -240,33 +249,42 @@ class CallResolver:
         """
         Extract fully qualified name from a Jedi value.
 
-        Returns the most specific name available.
+        Returns the most specific name available, always including the module name.
         """
         try:
-
-            # Try to get qualified names straight from Jedi
-            if hasattr(value, 'get_qualified_names'):
+            # Try to get qualified names from Jedi first (has correct class hierarchy)
+            qnames = None
+            if hasattr(value, "get_qualified_names"):
                 qnames = value.get_qualified_names()
-                if qnames:
-                    qualified = '.'.join(qnames)
-                    if len(qnames) == 1:
-                        contextual = self._build_contextual_name(value)
-                        if contextual:
-                            return contextual
-                    return qualified
 
-            # Fallback: build the name from context hierarchy manually
+            # If we got qnames, check if it includes the module
+            if qnames:
+                # Convert to list if it's a tuple
+                qnames = list(qnames)
+
+                # Check if the first element looks like a module name or class/function
+                # If it starts with a capital letter or looks like a class, we need to prepend module
+                module_name = self._get_module_name(value)
+
+                # Check if qnames already includes the module
+                if module_name and qnames[0] != module_name:
+                    # Prepend module name to get full path
+                    qnames = [module_name] + qnames
+
+                return ".".join(qnames)
+
+            # Fallback: Try to build contextual name (for nested functions, etc.)
             contextual_name = self._build_contextual_name(value)
             if contextual_name:
                 return contextual_name
 
             # Fallback to attributes exposed on the value.name object
-            if hasattr(value, 'name'):
-                if hasattr(value.name, 'get_qualified_names'):
+            if hasattr(value, "name"):
+                if hasattr(value.name, "get_qualified_names"):
                     qnames = value.name.get_qualified_names()
                     if qnames:
-                        return '.'.join(qnames)
-                if hasattr(value.name, 'string_name'):
+                        return ".".join(qnames)
+                if hasattr(value.name, "string_name"):
                     return value.name.string_name
 
             # Last resort: string representation
@@ -274,6 +292,32 @@ class CallResolver:
         except Exception as e:
             logger.warning(f"Could not extract qualified name: {e}")
             return None
+
+    def _get_module_name(self, value) -> Optional[str]:
+        """Extract the module name from a Jedi value."""
+        try:
+            # Walk up to find the module context
+            context = getattr(value, "parent_context", None)
+            while context:
+                if self._is_module_context(context):
+                    return self._safe_py_name(context)
+                context = getattr(context, "parent_context", None)
+
+            # Alternative: check if value has module_name attribute
+            if hasattr(value, "module_name"):
+                return value.module_name
+
+            # Try tree_name.get_root_context()
+            if hasattr(value, "tree_name"):
+                tree_name = value.tree_name
+                if hasattr(tree_name, "get_root_context"):
+                    root = tree_name.get_root_context()
+                    if root:
+                        return self._safe_py_name(root)
+        except Exception as e:
+            logger.debug(f"Could not get module name: {e}")
+
+        return None
 
     def _build_contextual_name(self, value) -> Optional[str]:
         """
@@ -307,7 +351,7 @@ class CallResolver:
                 context = getattr(context, "parent_context", None)
 
             if parts:
-                return '.'.join(reversed(parts))
+                return ".".join(reversed(parts))
         except Exception as exc:
             logger.debug(f"Failed to build contextual name: {exc}")
         return None

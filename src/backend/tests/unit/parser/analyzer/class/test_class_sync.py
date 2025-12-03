@@ -175,7 +175,8 @@ def test_class_sync_add_and_remove_inside_class(arangodb_client):
         _insert_block(TARGET_FILE)
 
         tree_after_add = _resync_and_get_tree(arangodb_client)
-        parent_after_add = _find_node_by_name_recursive(tree_after_add, "Parent")
+        parent_after_add = _find_node_by_name_recursive(
+            tree_after_add, "Parent")
         assert "SyncAddedInner" in [
             getattr(c, "name", None) for c in parent_after_add.children
         ], "New inner class not detected in 'Parent'"
@@ -188,7 +189,8 @@ def test_class_sync_add_and_remove_inside_class(arangodb_client):
         _write_file(TARGET_FILE, content_without_block)
 
         tree_after_remove = _resync_and_get_tree(arangodb_client)
-        parent_after_remove = _find_node_by_name_recursive(tree_after_remove, "Parent")
+        parent_after_remove = _find_node_by_name_recursive(
+            tree_after_remove, "Parent")
         assert "SyncAddedInner" not in [
             getattr(c, "name", None) for c in parent_after_remove.children
         ], "Removed inner class still present"
