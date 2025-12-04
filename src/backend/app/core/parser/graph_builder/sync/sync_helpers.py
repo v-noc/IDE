@@ -39,10 +39,9 @@ class SyncHelpers:
         if scope.type == ScopeType.FILE:
             node = self.repos.file_repo.find_one({"qname": scope.qname})
         elif scope.type == ScopeType.CLASS:
-            node = self.repos.class_repo.get_by_id(scope.id)
+            node = self.repos.class_repo.find_one({"qname": scope.qname})
         elif scope.type == ScopeType.FUNCTION:
-            node = self.repos.function_repo.get_by_id(scope.id)
-
+            node = self.repos.function_repo.find_one({"qname": scope.qname})
         if node:
             self.node_cache[scope.id] = node
 

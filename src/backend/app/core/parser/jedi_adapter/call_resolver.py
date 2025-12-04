@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import jedi
+from jedi.inference.arguments import TreeArguments
 from jedi.inference.helpers import infer_call_of_leaf
 from jedi.inference.syntax_tree import infer_trailer
 
@@ -85,120 +86,82 @@ class CallResolver:
             script = self.jedi_manager.get_script(file_path, source)
 
             # Use provided parent context or fall back to module context
-            if parent_context:
-                context = parent_context
-            else:
-                context = script._get_module_context()
+            context = parent_context or script._get_module_context()
 
-            # Find the call node at this position
-            call_leaf = script._module_node.get_name_of_position(
-                (line, column))
-            if not call_leaf:
-                call_leaf = script._module_node.get_name_of_position(
-                    (line, column + 1))
-                if not call_leaf:
-                    logger.debug(
-                        f"No leaf found at {file_path}:{line}:{column}")
-                    return None
+            # Find the leaf at this position
+            leaf = script._module_node.get_name_of_position((line, column))
 
-            # Navigate up to find the atom_expr or power node
-            atom_expr = self._find_call_expression(call_leaf)
-            if not atom_expr:
-                logger.debug(
-                    f"Not a call expression at {file_path}:{line}:{column}")
-                return None
+            # Create context at call site
+            call_context = context.create_context(leaf)
 
-            # Find the trailer with the call parentheses
-            trailer_indices = [
-                idx
-                for idx, child in enumerate(atom_expr.children)
-                if child.type == "trailer"
-                and child.children
-                and getattr(child.children[0], "value", None) == "("
-            ]
-            if not trailer_indices:
-                logger.debug(
-                    f"No call trailers found at {file_path}:{line}:{column}")
-                return None
-
-            if call_trailer_index is None or call_trailer_index >= len(trailer_indices):
-                trailer_idx = trailer_indices[-1]
-            else:
-                trailer_idx = trailer_indices[call_trailer_index]
-
-            trailer = atom_expr.children[trailer_idx]
-            if trailer.type != "trailer" or trailer.children[0].value != "(":
-                logger.debug(
-                    f"Last trailer is not a call at {file_path}:{line}:{column}"
-                )
-                return None
-
-            # Create context for the call site
-            # If we have a parent_context, we might need to be careful,
-            # but create_context usually takes a node and returns the context for it.
-            # However, if we are already in a context, we should use that context's inference state?
-            # Actually, module_context.create_context(call_leaf) creates a context *at* that leaf.
-            # If we passed parent_context, we want to use it to infer the callee.
-
-            # When we have parent_context (e.g. inside a function), we should use it
-            # to infer the values.
-
-            call_context = context.create_context(call_leaf)
-
-            # Infer the callee (everything before the call trailer)
-
+            # Use Jedi's infer_call_of_leaf to get the callee
+            # cut_own_trailer=True gives us the function/class being called
             callee_values = helpers.infer(
-                script._inference_state, call_context, call_leaf)
+                script._inference_state,
+                call_context,
+                leaf,
+            )
 
             if not callee_values:
-                logger.debug(
-                    f"Could not infer callee at {file_path}:{line}:{column}")
+                logger.debug(f"Could not infer callee at {line}:{column}")
                 return None
 
-            # Extract qualified names and check for class instantiation
             result = CallResolutionResult(callee_values=list(callee_values))
 
             for callee in callee_values:
-                # Check if this is a class instantiation
+
+                # Extract qualified name - ALWAYS includes module
+                result.callee_qname = self._extract_qualified_name(callee)
+
+                trailer = leaf.parent
+                while trailer and trailer.type != 'trailer':
+                    trailer = trailer.parent
+                if callee.is_function():
+                    if trailer and len(trailer.children) >= 2:
+                        # trailer.children[0] is '(' and trailer.children[-1] is ')'
+                        # argument_node is in between (could be None if no args)
+                        if len(trailer.children) == 3:
+                            argument_node = trailer.children[1]
+                        else:
+                            argument_node = None
+
+                        # Create TreeArguments to preserve argument context
+                        arguments = TreeArguments(
+                            callee.inference_state,
+                            call_context,
+                            argument_node,
+                            trailer=trailer
+                        )
+                        result.execution_context = callee.as_context(arguments)
+                    else:
+                        # No trailer found, fallback to anonymous context
+                        result.execution_context = callee.as_context()
+
                 if callee.api_type == "class":
                     result.is_class_instantiation = True
-                    result.class_qname = self._extract_qualified_name(callee)
-                    result.callee_qname = result.class_qname
+                    trailer = leaf.parent
+                    while trailer and trailer.type != 'trailer':
+                        trailer = trailer.parent
 
-                    # For classes, we want to link to the class scope, not __init__
-                    # But we may still want to process __init__ body
+                    if trailer and len(trailer.children) >= 2:
+                        if len(trailer.children) == 3:
+                            argument_node = trailer.children[1]
+                        else:
+                            argument_node = None
+
+                        arguments = TreeArguments(
+                            callee.inference_state,
+                            call_context,
+                            argument_node,
+                            trailer=trailer
+                        )
+                        # Execute the class with arguments to get instance
+                        result.execution_context = callee.as_context()
                     logger.debug(
-                        f"Resolved class instantiation: {result.class_qname}")
+                        f"Resolved class instantiation: {result.callee_qname}")
                 else:
-                    # Regular function or method call
-                    result.callee_qname = self._extract_qualified_name(callee)
                     logger.debug(f"Resolved call to: {result.callee_qname}")
-
-                # Try to create execution context
-                # Try to create execution context
-                try:
-                    # Prepare arguments
-                    arglist = trailer.children[1] if len(
-                        trailer.children) > 2 else None
-                    from jedi.inference.arguments import TreeArguments
-
-                    tree_arguments = TreeArguments(
-                        script._inference_state, call_context, arglist, trailer
-                    )
-
-                    # Create execution context
-                    if callee.api_type == "class":
-                        # Classes don't accept arguments for context creation
-                        # We get the class context (static), not instance context
-                        exec_context = callee.as_context()
-                    else:
-                        exec_context = callee.as_context(
-                            arguments=tree_arguments)
-
-                    result.execution_context = exec_context
-                    logger.debug(f"Created execution context: {exec_context}")
-                except Exception as e:
-                    logger.warning(f"Could not create execution context: {e}")
+                    result.execution_context = callee.as_context()
 
                 # We only need the first successful resolution
                 if result.callee_qname:
@@ -207,12 +170,62 @@ class CallResolver:
             return result if result.callee_qname else None
 
         except Exception as e:
-            logger.error(
-                f"Error resolving call at {file_path}:{line}:{column}: {e}")
+            logger.error(f"Error resolving call at {line}:{column}: {e}")
             import traceback
-
             traceback.print_exc()
             return None
+
+    def _extract_qualified_name(self, value) -> Optional[str]:
+        """
+        Extract fully qualified name.
+        """
+        try:
+            module_name = self._get_module_name(value)
+
+            if hasattr(value, 'qualified_name'):
+                return f"{module_name}.{value.qualified_name}"
+
+            if hasattr(value, 'get_qualified_names'):
+                qnames = value.get_qualified_names()
+                if qnames:
+                    return f"{module_name}.{'.'.join(qnames)}"
+
+            # Special handling for BoundMethod if standard ways fail
+            if hasattr(value, 'is_bound_method') and value.is_bound_method():
+                if hasattr(value, 'py__name__'):
+                    method_name = value.py__name__()
+                    # Try to get class name
+                    if hasattr(value, 'py__class__'):
+                        cls = value.py__class__()
+                        if cls and hasattr(cls, 'qualified_name'):
+                            return f"{module_name}.{cls.qualified_name}.{method_name}"
+
+            # Fallback for some Jedi versions or types
+            if hasattr(value, 'py__name__'):
+                name = value.py__name__()
+                if name:
+                    if module_name:
+                        return f"{module_name}.{name}"
+                    return name
+
+            return None
+        except Exception as e:
+            logger.warning(f"Could not extract qualified name: {e}")
+            return None
+
+    def _get_module_name(self, value) -> Optional[str]:
+        """Get the module name for a value."""
+        try:
+            if hasattr(value, 'get_root_context'):
+                root = value.get_root_context()
+                if root and self._is_module_context(root):
+                    if hasattr(root, 'py__name__'):
+                        return root.py__name__()
+                    if hasattr(root, 'string_name'):
+                        return root.string_name
+        except:
+            pass
+        return None
 
     def _find_call_expression(self, leaf):
         """Navigate up the AST to find the atom_expr or power node."""
@@ -224,158 +237,53 @@ class CallResolver:
             return curr
         return None
 
-    def _infer_callee(self, context, script, atom_expr, trailer_index):
+    def _infer_before_trailer(self, context, power_node, trailer_index):
         """
-        Infer the callee by applying all trailers except the call trailer.
+        Infer everything before the given trailer index.
 
-        This preserves the context through attribute accesses like a.b.c
+        For example:
+        - power_node: [name 'p', trailer '.wake_up', trailer '()']
+        - trailer_index: 2 (the call trailer)
+        - Returns: inference of 'p.wake_up' (the bound method)
         """
-        base = atom_expr.children[0]
-        values = context.infer_node(base)
-        if not values:
-            module_context = script._get_module_context()
-            res = script._inference_state.infer(module_context,
-                                                base)
-            print(f"res: {res}")
-            values = module_context.infer_node(base)
+        from jedi.inference.syntax_tree import infer_trailer
 
-        # Apply all trailers EXCEPT the last one (which is the call)
-        for trailer in atom_expr.children[1:trailer_index]:
-            values = infer_trailer(context, values, trailer)
-
-        return values
-
-    def _extract_qualified_name(self, value) -> Optional[str]:
-        """
-        Extract fully qualified name from a Jedi value.
-
-        Returns the most specific name available, always including the module name.
-        """
         try:
-            # Try to get qualified names from Jedi first (has correct class hierarchy)
-            qnames = None
-            if hasattr(value, "get_qualified_names"):
-                qnames = value.get_qualified_names()
+            # Start with the base (first child) - returns ValueSet
+            values = context.infer_node(power_node.children[0])
 
-            # If we got qnames, check if it includes the module
-            if qnames:
-                # Convert to list if it's a tuple
-                qnames = list(qnames)
+            # Apply each trailer BEFORE the call trailer
+            # infer_trailer expects a ValueSet and returns a ValueSet
+            for i in range(1, trailer_index):
+                child = power_node.children[i]
+                if child.type == 'trailer':
+                    # Apply this trailer (values is already a ValueSet)
+                    values = infer_trailer(context, values, child)
 
-                # Check if the first element looks like a module name or class/function
-                # If it starts with a capital letter or looks like a class, we need to prepend module
-                module_name = self._get_module_name(value)
-
-                # Check if qnames already includes the module
-                if module_name and qnames[0] != module_name:
-                    # Prepend module name to get full path
-                    qnames = [module_name] + qnames
-
-                return ".".join(qnames)
-
-            # Fallback: Try to build contextual name (for nested functions, etc.)
-            contextual_name = self._build_contextual_name(value)
-            if contextual_name:
-                return contextual_name
-
-            # Fallback to attributes exposed on the value.name object
-            if hasattr(value, "name"):
-                if hasattr(value.name, "get_qualified_names"):
-                    qnames = value.name.get_qualified_names()
-                    if qnames:
-                        return ".".join(qnames)
-                if hasattr(value.name, "string_name"):
-                    return value.name.string_name
-
-            # Last resort: string representation
-            return str(value)
+            return list(values)  # Convert ValueSet to list for consistency
         except Exception as e:
-            logger.warning(f"Could not extract qualified name: {e}")
-            return None
-
-    def _get_module_name(self, value) -> Optional[str]:
-        """Extract the module name from a Jedi value."""
-        try:
-            # Walk up to find the module context
-            context = getattr(value, "parent_context", None)
-            while context:
-                if self._is_module_context(context):
-                    return self._safe_py_name(context)
-                context = getattr(context, "parent_context", None)
-
-            # Alternative: check if value has module_name attribute
-            if hasattr(value, "module_name"):
-                return value.module_name
-
-            # Try tree_name.get_root_context()
-            if hasattr(value, "tree_name"):
-                tree_name = value.tree_name
-                if hasattr(tree_name, "get_root_context"):
-                    root = tree_name.get_root_context()
-                    if root:
-                        return self._safe_py_name(root)
-        except Exception as e:
-            logger.debug(f"Could not get module name: {e}")
-
-        return None
-
-    def _build_contextual_name(self, value) -> Optional[str]:
-        """
-        Construct a qualified name by walking Jedi's parent_context chain.
-
-        This is required for nested functions where Jedi doesn't expose
-        qualified names by default (e.g., factory.build inside factory()).
-        """
-        try:
-            parts: List[str] = []
-
-            # Start with the value's own name
-            value_name = self._safe_py_name(value)
-            if not value_name:
-                return None
-            parts.append(value_name)
-
-            # Walk up through parent contexts until we hit the module
-            context = getattr(value, "parent_context", None)
-            while context:
-                if self._is_module_context(context):
-                    module_name = self._safe_py_name(context)
-                    if module_name:
-                        parts.append(module_name)
-                    break
-
-                ctx_name = self._safe_py_name(context)
-                if ctx_name:
-                    parts.append(ctx_name)
-
-                context = getattr(context, "parent_context", None)
-
-            if parts:
-                return ".".join(reversed(parts))
-        except Exception as exc:
-            logger.debug(f"Failed to build contextual name: {exc}")
-        return None
-
-    def _safe_py_name(self, obj) -> Optional[str]:
-        """Safely call py__name__ or fall back to string_name when available."""
-        name_func = getattr(obj, "py__name__", None)
-        name = None
-        if callable(name_func):
-            name = name_func()
-
-        if not name and hasattr(obj, "name"):
-            if hasattr(obj.name, "string_name"):
-                name = obj.name.string_name
-
-        return name
+            logger.debug(f"Error in _infer_before_trailer: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def _is_module_context(self, context: Any) -> bool:
         """Detect whether a Jedi context represents a module."""
-        if context.__class__.__name__ == "ModuleContext":
+        # Check class name
+        if context.__class__.__name__ in ('ModuleContext', 'CompiledModuleContext'):
             return True
 
-        tree_node = getattr(context, "tree_node", None)
-        if tree_node and getattr(tree_node, "type", None) == "file_input":
+        # Check if it's a module via is_module method
+        if hasattr(context, 'is_module') and callable(context.is_module):
+            try:
+                if context.is_module():
+                    return True
+            except:
+                pass
+
+        # Check tree_node type
+        tree_node = getattr(context, 'tree_node', None)
+        if tree_node and getattr(tree_node, 'type', None) == 'file_input':
             return True
 
         return False

@@ -168,6 +168,8 @@ class CallChainBuilder:
             prev_call_site_id=current_call_id,
         )
 
+        print(f"Call site: {caller_scope.qname} -> {callee_scope.qname}")
+
         # Extract execution context for recursion
         execution_context = resolution.execution_context if resolution else None
 

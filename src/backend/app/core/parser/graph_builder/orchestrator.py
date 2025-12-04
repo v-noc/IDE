@@ -548,23 +548,29 @@ class GraphBuilderOrchestrator:
             return
         visited.add(call_site_id)
 
-        # Get call site details
+        # Get call site details with caller scope
         cs_query = self.scope_manager.repository.conn.execute(
             """
-            MATCH (cs:CallSite {id: $cs_id})
+            MATCH (caller:Scope)-[:HAS_CALL_SITE]->(cs:CallSite {id: $cs_id})
             RETURN cs.id AS id, cs.line AS line, cs.col AS col,
-                   cs.name AS name
+                   cs.name AS name, caller.qname AS caller_qname,
+                   caller.name AS caller_name
             """,
             {"cs_id": call_site_id},
         )
 
         cs_data = None
+        caller_info = None
         for row in cs_query:
             cs_data = {
                 "id": row[0],
                 "line": row[1],
                 "col": row[2],
                 "name": row[3],
+            }
+            caller_info = {
+                "qname": row[4],
+                "name": row[5],
             }
             break
 
@@ -601,12 +607,21 @@ class GraphBuilderOrchestrator:
         call_name = cs_data["name"] or "unknown"
         line_col = f"L{cs_data['line']}:C{cs_data['col']}"
 
+        # Build caller info string
+        caller_str = ""
+        if caller_info:
+            caller_str = f"[{caller_info['qname']}] "
+
+        # Build callee info string with qualified name
         callee_str = ""
         if callee_info:
             file_name = Path(callee_info["file_path"]).name
             callee_str = (
-                f" -> [{callee_info['type']}] {callee_info['name']} ({file_name})"
+                f" -> [{callee_info['type']}] {callee_info['name']} "
+                f"({callee_info['qname']}) [{file_name}]"
             )
+        else:
+            callee_str = " -> [unresolved]"
 
         # Determine tree connector
         if indent == 0:
@@ -616,8 +631,8 @@ class GraphBuilderOrchestrator:
         else:
             tree_char = "└─"
 
-        # Print call site
-        print(f"{prefix}{tree_char} {call_name} {line_col}{callee_str}")
+        # Print call site with qualified names
+        print(f"{prefix}{tree_char} {caller_str}{call_name} {line_col}{callee_str}")
 
         # Print chain continuation (NEXT_IN_CHAIN)
         if children:

@@ -1,6 +1,10 @@
+import shutil
 from fastapi.testclient import TestClient
 from pathlib import Path
-from app.core.parser.graph_builder import GraphBuilder
+from app.core.model.nodes import ProjectNode
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 from app.core.builder.tree_builder import TreeBuilder
 
@@ -12,12 +16,31 @@ current_dir = current_file_path.parent
 PROJECT_PATH = Path(current_dir, "./sample_project").absolute()
 
 
-def test_add_call(client: TestClient,  arangodb_client, create_repos):
+def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
+    project_path = tmp_path / "sample_project"
+    shutil.copytree(PROJECT_PATH, project_path)
 
-    graph_builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(), ignore_file_name=None, db=arangodb_client
+    db_path = tmp_path / "db" / "sample_import"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    project_node = ProjectNode(
+        name="sample_import",
+        description="A test project for imports.",
+        qname="sample_import",
+        path=str(project_path),
     )
-    graph_builder.build("sample_import", "A test project for imports.")
+    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
+    repos = Repositories(arangodb_client)
+    project_service = ProjectService(repos)
+    project_node = project_service.create_node(project_node)
+
+    orchestrator = GraphBuilderOrchestrator(
+        project_node=project_node,
+        db=arangodb_client,
+        ignore_file_name=None,
+        scope_manager=scope_manager,
+    )
+    orchestrator.resync()
 
     project_service = ProjectService(create_repos)
     project = project_service.get_all()[0]
@@ -54,12 +77,31 @@ def test_add_call(client: TestClient,  arangodb_client, create_repos):
     assert len(main_py_node.children) == 3
 
 
-def test_remove_call(client: TestClient,  arangodb_client, create_repos):
+def test_remove_call(client: TestClient, arangodb_client, create_repos, tmp_path):
+    project_path = tmp_path / "sample_project"
+    shutil.copytree(PROJECT_PATH, project_path)
 
-    graph_builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(), ignore_file_name=None, db=arangodb_client
+    db_path = tmp_path / "db" / "sample_import"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    project_node = ProjectNode(
+        name="sample_import",
+        description="A test project for imports.",
+        qname="sample_import",
+        path=str(project_path),
     )
-    graph_builder.build("sample_import", "A test project for imports.")
+    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
+    repos = Repositories(arangodb_client)
+    project_service = ProjectService(repos)
+    project_node = project_service.create_node(project_node)
+
+    orchestrator = GraphBuilderOrchestrator(
+        project_node=project_node,
+        db=arangodb_client,
+        ignore_file_name=None,
+        scope_manager=scope_manager,
+    )
+    orchestrator.resync()
 
     project_service = ProjectService(create_repos)
     project = project_service.get_all()[0]

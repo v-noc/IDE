@@ -106,6 +106,7 @@ def test_class_analysis(setup_project):
     greet_call_children = [
         child for child in greet_call.children if isinstance(child, CallTreeNode)
     ]
+    print(greet_call_children)
     assert len(greet_call_children) == 2
 
     # Test 'self.callback()' call within 'greet'

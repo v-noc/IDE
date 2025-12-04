@@ -17,10 +17,7 @@
     "request": "launch",
     "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
     "module": "pytest",
-    "args": [
-      "-s",
-      "tests/unit/parser/analyzer/import/test_import_from.py::test_import_from_init"
-    ],
+    "args": ["-s", "tests/unit/parser/analyzer/calls/test_call_sync.py"],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
       "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"
