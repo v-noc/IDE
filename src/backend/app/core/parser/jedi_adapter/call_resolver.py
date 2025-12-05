@@ -6,7 +6,9 @@ This module provides accurate call resolution by:
 2. Handling nested attributes (e.g., a.b.c())
 3. Properly resolving class instantiation
 4. Extracting qualified names from resolved callees
+5. Extracting IDs from docstrings for direct scope lookup
 """
+import re
 from jedi.api import helpers
 import logging
 from dataclasses import dataclass
@@ -29,6 +31,9 @@ class CallResolutionResult:
 
     callee_qname: Optional[str] = None
     """Fully qualified name of the resolved callee"""
+
+    callee_id: Optional[str] = None
+    """ID extracted from the callee's docstring"""
 
     callee_values: List[Any] = None
     """Jedi values representing the callee"""
@@ -91,6 +96,17 @@ class CallResolver:
             # Find the leaf at this position
             leaf = script._module_node.get_name_of_position((line, column))
 
+            if leaf is None:
+                leaf = script._module_node.get_leaf_for_position(
+                    (line, column))
+                if leaf is None or leaf.type == 'string':
+                    return []
+                if leaf.end_pos == (line, column) and leaf.type == 'operator':
+                    next_ = leaf.get_next_leaf()
+                    if next_.start_pos == leaf.end_pos \
+                            and next_.type in ('number', 'string', 'keyword'):
+                        leaf = next_
+
             # Create context at call site
             call_context = context.create_context(leaf)
 
@@ -109,6 +125,9 @@ class CallResolver:
             result = CallResolutionResult(callee_values=list(callee_values))
 
             for callee in callee_values:
+
+                # Extract ID from docstring - PRIORITY for direct lookup
+                result.callee_id = self._extract_id_from_docstring(callee)
 
                 # Extract qualified name - ALWAYS includes module
                 result.callee_qname = self._extract_qualified_name(callee)
@@ -164,15 +183,60 @@ class CallResolver:
                     result.execution_context = callee.as_context()
 
                 # We only need the first successful resolution
-                if result.callee_qname:
+                if result.callee_qname or result.callee_id:
                     break
 
-            return result if result.callee_qname else None
+            return result if (result.callee_qname or result.callee_id) else None
 
         except Exception as e:
-            logger.error(f"Error resolving call at {line}:{column}: {e}")
+            print(f"Error resolving call at {source} {line}:{column}: {e}")
             import traceback
             traceback.print_exc()
+            return None
+
+    def _extract_id_from_docstring(self, value) -> Optional[str]:
+        """
+        Extract ID from docstring using the same logic as parser.py.
+        
+        Args:
+            value: Jedi value object
+            
+        Returns:
+            Extracted ID or None
+        """
+        try:
+            # Try to get docstring from the Jedi value
+            docstring = None
+            
+            # Method 1: Use tree_node.get_doc_node() for parso nodes
+            if hasattr(value, 'tree_node') and value.tree_node:
+                tree_node = value.tree_node
+                if hasattr(tree_node, 'get_doc_node'):
+                    doc_node = tree_node.get_doc_node()
+                    if doc_node:
+                        val = doc_node.value
+                        # Remove quotes
+                        if val.startswith('"""') or val.startswith("'''"):
+                            docstring = val[3:-3]
+                        elif val.startswith('"') or val.startswith("'"):
+                            docstring = val[1:-1]
+            
+            # Method 2: Use py__doc__() if available
+            if not docstring and hasattr(value, 'py__doc__'):
+                try:
+                    docstring = value.py__doc__()
+                except:
+                    pass
+            
+            # Extract ID from docstring
+            if docstring:
+                match = re.search(r"ID:\s*([^\s]+)", docstring)
+                if match:
+                    return match.group(1).strip()
+            
+            return None
+        except Exception as e:
+            logger.debug(f"Could not extract ID from docstring: {e}")
             return None
 
     def _extract_qualified_name(self, value) -> Optional[str]:

@@ -65,7 +65,8 @@ class CallChainBuilder:
 
         # Batch processing for call sites
         self._call_site_buffer: List[dict] = []
-        self._temp_id_to_actual_id: dict = {}  # Maps temp_id -> actual_id for resolved call sites
+        # Maps temp_id -> actual_id for resolved call sites
+        self._temp_id_to_actual_id: dict = {}
 
         # Clear timings on initialization
         global _timings
@@ -112,7 +113,7 @@ class CallChainBuilder:
         except OSError as e:
             logger.error(f"Could not read file {file_path}: {e}")
             return None
-        _timings['read_file'].append(time.time() - t0)
+        _timings["read_file"].append(time.time() - t0)
 
         # Resolve the call using Jedi with context preservation
         t0 = time.time()
@@ -121,58 +122,80 @@ class CallChainBuilder:
             source,
             call_node.position.line,
             call_node.position.column + (len(call_node.name)),
-            call_trailer_index=getattr(call_node, "call_index", None),
             parent_context=parent_context,
         )
-        _timings['resolve_call'].append(time.time() - t0)
+        _timings["resolve_call"].append(time.time() - t0)
 
         # Determine callee_id based on resolution
         callee_scope = None
 
-        if resolution and resolution.callee_qname:
-            jedi_qname = resolution.callee_qname
-            candidates = self._candidate_qnames(caller_scope, jedi_qname)
-
-            # Debug: Log what Jedi returned
-            logger.debug(
-                f"Resolving call {call_node.name} at "
-                f"{call_node.position.line}:{call_node.position.column}: "
-                f"Jedi qname={jedi_qname}, "
-                f"is_class_inst={resolution.is_class_instantiation}, "
-                f"candidates={candidates}"
-            )
-
-            for full_qname in candidates:
-                t0 = time.time()
-                callee_scope = self.scope_manager.get_scope_by_qname(
-                    full_qname)
-                _timings['get_scope_by_qname'].append(time.time() - t0)
-                if not callee_scope:
-                    logger.debug(f"Callee not found for {full_qname}")
-                    continue
-
-                # Debug: Log what scope was found
+        if resolution:
+            # Priority 1: Try ID-based lookup (most direct and accurate)
+            if resolution.callee_id:
                 logger.debug(
-                    f"Found callee scope: qname={callee_scope.qname}, "
-                    f"type={callee_scope.type}, name={callee_scope.name}"
+                    f"Resolving call {call_node.name} at "
+                    f"{call_node.position.line}:{call_node.position.column} "
+                    f"using ID: {resolution.callee_id}"
                 )
+                t0 = time.time()
+                callee_scope = self.scope_manager.get_scope(
+                    resolution.callee_id)
+                _timings["get_scope_by_id"].append(time.time() - t0)
 
-                if resolution.is_class_instantiation:
+                if callee_scope:
                     logger.debug(
-                        f"Resolved class instantiation {call_node.name} -> "
-                        f"{full_qname} (scope_id={callee_scope.id})"
+                        f"Found callee scope via ID: qname={callee_scope.qname}, "
+                        f"type={callee_scope.type}, name={callee_scope.name}"
                     )
                 else:
                     logger.debug(
-                        f"Resolved call {call_node.name} -> "
-                        f"{full_qname} (scope_id={callee_scope.id})"
-                    )
-                break
-            else:
+                        f"Callee not found for ID {resolution.callee_id}")
+
+            # Priority 2: Fall back to qname-based lookup if ID not available or failed
+            if not callee_scope and resolution.callee_qname:
+                jedi_qname = resolution.callee_qname
+                candidates = self._candidate_qnames(caller_scope, jedi_qname)
+
+                # Debug: Log what Jedi returned
                 logger.debug(
-                    f"Callee not registered locally for {call_node.name} "
-                    f"(Jedi qname candidates: {candidates})"
+                    f"Resolving call {call_node.name} at "
+                    f"{call_node.position.line}:{call_node.position.column} "
+                    f"using qname: Jedi qname={jedi_qname}, "
+                    f"is_class_inst={resolution.is_class_instantiation}, "
+                    f"candidates={candidates}"
                 )
+
+                for full_qname in candidates:
+                    t0 = time.time()
+                    callee_scope = self.scope_manager.get_scope_by_qname(
+                        full_qname)
+                    _timings["get_scope_by_qname"].append(time.time() - t0)
+                    if not callee_scope:
+                        logger.debug(f"Callee not found for {full_qname}")
+                        continue
+
+                    # Debug: Log what scope was found
+                    logger.debug(
+                        f"Found callee scope via qname: qname={callee_scope.qname}, "
+                        f"type={callee_scope.type}, name={callee_scope.name}"
+                    )
+
+                    if resolution.is_class_instantiation:
+                        logger.debug(
+                            f"Resolved class instantiation {call_node.name} -> "
+                            f"{full_qname} (scope_id={callee_scope.id})"
+                        )
+                    else:
+                        logger.debug(
+                            f"Resolved call {call_node.name} -> "
+                            f"{full_qname} (scope_id={callee_scope.id})"
+                        )
+                    break
+                else:
+                    logger.debug(
+                        f"Callee not registered locally for {call_node.name} "
+                        f"(Jedi qname candidates: {candidates})"
+                    )
         else:
             logger.debug(
                 f"Could not resolve call {call_node.name} at "
@@ -185,30 +208,29 @@ class CallChainBuilder:
 
         # Generate call site ID (will be created in batch)
         import uuid
+
         call_site_id = str(uuid.uuid4())
-        
+
         # Add to batch buffer instead of creating immediately
         call_line = call_node.position.line
         call_col = call_node.position.column + (len(call_node.name))
-        
-        self._call_site_buffer.append({
-            "caller_id": caller_scope.id,
-            "line": call_line,
-            "col": call_col,
-            "name": call_name,
-            "callee_id": callee_scope.id,
-            "prev_call_site_id": current_call_id,
-            "_temp_id": call_site_id,  # Temporary ID for chaining
-        })
-        
+
+        self._call_site_buffer.append(
+            {
+                "caller_id": caller_scope.id,
+                "line": call_line,
+                "col": call_col,
+                "name": call_name,
+                "callee_id": callee_scope.id,
+                "prev_call_site_id": current_call_id,
+                "_temp_id": call_site_id,  # Temporary ID for chaining
+            }
+        )
+
         # Note: call_site_id is stored in the buffer item as _temp_id
 
-        print(f"Call site (buffered): {caller_scope.qname} -> {callee_scope.qname}")
-
         # Extract execution context for recursion
-        execution_context = (
-            resolution.execution_context if resolution else None
-        )
+        execution_context = resolution.execution_context if resolution else None
 
         self._process_scope_body(
             callee_scope, depth + 1, call_site_id, execution_context
@@ -244,9 +266,7 @@ class CallChainBuilder:
         if normalized.startswith(f"{project_prefix}."):
             candidates.append(normalized)
 
-        candidates.append(
-            f"{project_prefix}.{normalized}"
-        )
+        candidates.append(f"{project_prefix}.{normalized}")
 
         # Deduplicate while preserving order
         seen = set()
@@ -257,9 +277,7 @@ class CallChainBuilder:
                 ordered.append(candidate)
         return ordered
 
-    def _normalize_call_name(
-        self, raw_name: Optional[str]
-    ) -> Optional[str]:
+    def _normalize_call_name(self, raw_name: Optional[str]) -> Optional[str]:
         """
         Normalize the call site name for comparisons (use last attribute
         segment).
@@ -279,7 +297,7 @@ class CallChainBuilder:
         scope: ScopeModel,
         depth: int,
         current_call_id,
-            parent_context: Optional[object] = None,
+        parent_context: Optional[object] = None,
     ):
         """
         Process all calls within a function/method scope.
@@ -305,7 +323,7 @@ class CallChainBuilder:
         except OSError as e:
             logger.error(f"Could not read file {file_path}: {e}")
             return
-        _timings['read_file_body'].append(time.time() - t0)
+        _timings["read_file_body"].append(time.time() - t0)
 
         # Parse the AST
         t0 = time.time()
@@ -314,12 +332,12 @@ class CallChainBuilder:
         except Exception as e:
             logger.error(f"Failed to scan AST for {file_path}: {e}")
             return
-        _timings['scan_ast'].append(time.time() - t0)
+        _timings["scan_ast"].append(time.time() - t0)
 
         # Find the function/class node that corresponds to this scope
         t0 = time.time()
         target_node = self._find_scope_node(nodes, scope)
-        _timings['find_scope_node'].append(time.time() - t0)
+        _timings["find_scope_node"].append(time.time() - t0)
 
         if not target_node:
             logger.warning(f"Could not find AST node for scope {scope.qname}")
@@ -328,17 +346,23 @@ class CallChainBuilder:
         # Extract all call nodes from this scope's body
         t0 = time.time()
         call_nodes = self._extract_calls(target_node)
-        _timings['extract_calls'].append(time.time() - t0)
+        _timings["extract_calls"].append(time.time() - t0)
 
         logger.debug(f"Found {len(call_nodes)} call(s) in {scope.qname}")
 
         # Process each call recursively
         # Note: Call sites are buffered and flushed per file, not per scope
+        # When processing nested calls within a callee's body (current_call_id is not None),
+        # all nested calls should be chained to the parent call site that invoked this scope.
+        # Calls within the same scope are siblings and share the same parent (current_call_id),
+        # but are not chained to each other sequentially.
         for call_node in call_nodes:
-            current_call_id = self.build_chain(
+            # Chain nested calls to the parent call site (if we're processing a callee's body)
+            # If current_call_id is None, this is a top-level call with no parent
+            self.build_chain(
                 call_node,
                 scope,
-                current_call_id,
+                current_call_id,  # Pass through the parent call site ID for chaining
                 depth,
                 parent_context=parent_context,
             )
@@ -355,10 +379,7 @@ class CallChainBuilder:
             # Check if this node matches the scope
             if isinstance(node, (FunctionNode, ClassNode)):
                 # Match by position (line)
-                if (
-                    node.position.line == scope.start_line
-                    and node.name == scope.name
-                ):
+                if node.position.line == scope.start_line and node.name == scope.name:
                     return node
 
             # Recurse into children
@@ -393,7 +414,7 @@ class CallChainBuilder:
     def _flush_all_buffered_call_sites(self) -> None:
         """
         Flush all call sites in the buffer.
-        
+
         This is called per file to batch all call sites from all scopes
         in that file together for maximum performance.
         """
@@ -401,18 +422,22 @@ class CallChainBuilder:
             return
 
         # Collect temp IDs in this batch
-        batch_temp_ids = {item.get("_temp_id") for item in self._call_site_buffer if item.get("_temp_id")}
+        batch_temp_ids = {
+            item.get("_temp_id")
+            for item in self._call_site_buffer
+            if item.get("_temp_id")
+        }
 
         # Resolve prev_call_site_id references:
         # - If it's a temp ID from a previous batch, resolve it
         # - If it's a temp ID from this batch, we'll handle it after creation
         # - Otherwise, it's already an actual ID
         deferred_chain_links = []  # Store (temp_prev_id, temp_curr_id) pairs
-        
+
         for item in self._call_site_buffer:
             prev_id = item.get("prev_call_site_id")
             temp_id = item.get("_temp_id")
-            
+
             if prev_id:
                 if prev_id in self._temp_id_to_actual_id:
                     # Resolve from previous batch (from previous file)
@@ -420,24 +445,28 @@ class CallChainBuilder:
                 elif prev_id in batch_temp_ids:
                     # Defer: this is a temp ID in the same batch
                     deferred_chain_links.append((prev_id, temp_id))
-                    item["prev_call_site_id"] = None  # Remove for now, add relationship later
+                    item["prev_call_site_id"] = (
+                        None  # Remove for now, add relationship later
+                    )
 
         # Prepare batch data (without _temp_id and with resolved prev_call_site_id)
         batch_data = []
         for item in self._call_site_buffer:
-            batch_data.append({
-                "caller_id": item["caller_id"],
-                "line": item["line"],
-                "col": item["col"],
-                "name": item.get("name"),
-                "callee_id": item.get("callee_id"),
-                "prev_call_site_id": item.get("prev_call_site_id"),
-            })
+            batch_data.append(
+                {
+                    "caller_id": item["caller_id"],
+                    "line": item["line"],
+                    "col": item["col"],
+                    "name": item.get("name"),
+                    "callee_id": item.get("callee_id"),
+                    "prev_call_site_id": item.get("prev_call_site_id"),
+                }
+            )
 
         # Batch create call sites
         t0 = time.time()
         created_call_sites = self.scope_manager.batch_create_calls(batch_data)
-        _timings['create_call_site'].append(time.time() - t0)
+        _timings["create_call_site"].append(time.time() - t0)
 
         # Map temp IDs from this batch to actual IDs
         for i, item in enumerate(self._call_site_buffer):
@@ -449,18 +478,21 @@ class CallChainBuilder:
         # Create deferred NEXT_IN_CHAIN relationships
         if deferred_chain_links:
             from app.core.parser.scope_manager.repository import ScopeRepository
+
             repo: ScopeRepository = self.scope_manager.repository
-            
+
             chain_data = []
             for prev_temp_id, curr_temp_id in deferred_chain_links:
                 prev_actual_id = self._temp_id_to_actual_id.get(prev_temp_id)
                 curr_actual_id = self._temp_id_to_actual_id.get(curr_temp_id)
                 if prev_actual_id and curr_actual_id:
-                    chain_data.append({
-                        "prev_id": prev_actual_id,
-                        "curr_id": curr_actual_id,
-                    })
-            
+                    chain_data.append(
+                        {
+                            "prev_id": prev_actual_id,
+                            "curr_id": curr_actual_id,
+                        }
+                    )
+
             if chain_data:
                 repo.conn.execute(
                     """
@@ -469,13 +501,12 @@ class CallChainBuilder:
                     MATCH (curr:CallSite {id: c.curr_id})
                     CREATE (prev)-[:NEXT_IN_CHAIN]->(curr)
                     """,
-                    {"chains": chain_data}
+                    {"chains": chain_data},
                 )
 
         logger.debug(
-            f"Flushed {len(self._call_site_buffer)} call site(s) for file"
-        )
-        
+            f"Flushed {len(self._call_site_buffer)} call site(s) for file")
+
         # Clear the buffer
         self._call_site_buffer.clear()
 

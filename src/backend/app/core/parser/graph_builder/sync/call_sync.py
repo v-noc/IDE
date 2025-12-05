@@ -121,6 +121,14 @@ class CallSyncService:
             call_info_map = {}
             batch_size = min(500, len(queue))
 
+            # Buffers for batch operations
+            contains_edges_buffer = []  # (parent_id, child_id)
+            targets_edges_buffer = []   # (call_id, callee_id)
+            recursive_lookup_ids = []   # call_site_ids to lookup children for
+
+            # 1. Process queue to build batch lookup keys
+            current_batch_items = []
+            
             for _ in range(batch_size):
                 if not queue:
                     break
@@ -136,6 +144,8 @@ class CallSyncService:
                 process_key = (parent_node.id, call_site.id)
                 if process_key in processed_pairs:
                     continue
+                
+                processed_pairs.add(process_key)
 
                 # Resolve callee node
                 callee_node = (
@@ -148,11 +158,13 @@ class CallSyncService:
                 if pair not in call_info_map:
                     call_info_map[pair] = []
                     batch_pairs.append(pair)
+                
+                # Store item for processing after lookup
                 call_info_map[pair].append(
-                    (call_info, parent_node, callee_node, process_key)
+                    (call_info, parent_node, callee_node)
                 )
 
-            # Batch lookup existing call nodes
+            # 2. Batch lookup existing call nodes
             if batch_pairs:
                 t0 = time.time()
                 call_repo = self.call_service.repos.call_repo
@@ -163,83 +175,48 @@ class CallSyncService:
                     time.time() - t0
                 )
 
-                # Process each pair - track call_node across iterations
+                # 3. Process each pair to create/update nodes and collect edges
                 for pair in batch_pairs:
                     call_node = existing_calls.get(pair)
                     
-                    for call_info, parent_node, callee_node, process_key in call_info_map[pair]:
+                    for call_info, parent_node, callee_node in call_info_map[pair]:
                         # Sync and get back the (possibly created) call_node
-                        call_node, recursive = self._sync_node_calls_with_node(
-                            call_info, parent_node, callee_node, call_node
+                        call_node = self._sync_node_calls_with_node_batch(
+                            call_info, 
+                            parent_node, 
+                            callee_node, 
+                            call_node,
+                            contains_edges_buffer,
+                            targets_edges_buffer
                         )
                         
-                        processed_pairs.add(process_key)
+                        # Add to recursive lookup list
+                        if call_node:
+                             recursive_lookup_ids.append((call_info.get("call_site").id, call_node))
 
-                        # Add recursive calls to queue
-                        if recursive:
-                            for nested_call_info, nested_parent in recursive:
-                                nested_call_site = nested_call_info.get("call_site")
-                                if nested_call_site and nested_parent:
-                                    nested_key = (nested_parent.id, nested_call_site.id)
-                                    if nested_key not in processed_pairs:
-                                        queue.append((nested_call_info, nested_parent))
+            # 4. Flush edge buffers
+            if contains_edges_buffer:
+                self.helpers.ensure_contains_edges_batch(contains_edges_buffer)
+            
+            if targets_edges_buffer:
+                self.helpers.ensure_targets_edges_batch(targets_edges_buffer)
 
-    def _sync_node_calls(
-        self, call_info: dict, parent_node: BaseNode
-    ):
-        """
-        Sync calls from a scope (calls that originated in this scope).
-        This method resolves callee and looks up call node individually.
-        """
-        call_site = call_info.get("call_site")
-        callee_scope = call_info.get("callee")
+            # 5. Batch lookup recursive calls
+            if recursive_lookup_ids:
+                self._process_recursive_calls_batch(recursive_lookup_ids, queue)
 
-        if not call_site or not callee_scope:
-            return
-
-        # Resolve callee node in the main graph
-        t0 = time.time()
-        callee_node = self.helpers.get_graph_node_for_scope(callee_scope)
-        _timings['get_graph_node_for_scope_callee'].append(
-            time.time() - t0
-        )
-        if not callee_node:
-            return
-
-        # Find existing CallNode by (parent container, target)
-        t0 = time.time()
-        call_node = self.call_service.get_call_with_parent_and_target(
-            parent_id=parent_node.id,
-            target_id=callee_node.id,
-        )
-        _timings['get_call_with_parent_and_target'].append(
-            time.time() - t0
-        )
-
-        self._sync_node_calls_with_node(
-            call_info, parent_node, callee_node, call_node
-        )
-
-    def _sync_node_calls_with_node(
+    def _sync_node_calls_with_node_batch(
         self,
         call_info: dict,
         parent_node: BaseNode,
         callee_node: BaseNode,
         call_node: Optional[CallNode],
-    ) -> tuple[Optional[CallNode], list]:
+        contains_edges_buffer: list,
+        targets_edges_buffer: list,
+    ) -> Optional[CallNode]:
         """
         Sync calls from a scope (calls that originated in this scope).
-
-        Args:
-            call_info: Dictionary with 'call_site' and 'callee' keys
-            parent_node: The parent node (file/function/class)
-            callee_node: The callee node (already resolved)
-            call_node: Existing call node (if found) or None
-
-        Returns:
-            Tuple of (call_node, recursive_calls). call_node is the created
-            or existing CallNode (for reuse across multiple call sites with
-            the same parent/target pair).
+        Collects edges into buffers instead of executing immediately.
         """
         try:
             call_site = call_info.get("call_site")
@@ -247,7 +224,7 @@ class CallSyncService:
 
             # We only care about resolved calls (have a callee scope)
             if not call_site or not callee_scope:
-                return call_node, []
+                return call_node
 
             # If no CallNode exists yet, this is a new call site → create it
             if not call_node:
@@ -255,6 +232,7 @@ class CallSyncService:
                     parent_qname = parent_node.qname
                     if parent_node.node_type == "call":
                         # For call nodes, get the target via edges
+                        # Note: This is still a single lookup, could be optimized but rare for new nodes
                         t0 = time.time()
                         target_node = (
                             self.helpers.repos.call_repo.get_target(
@@ -264,6 +242,7 @@ class CallSyncService:
                         _timings['get_target'].append(time.time() - t0)
                         if target_node:
                             parent_qname = target_node.qname
+                            
                     call_node = CallNode(
                         name=call_site.name or "call",
                         qname=f"{parent_qname}::{callee_scope.qname}",
@@ -287,7 +266,7 @@ class CallSyncService:
                         call_site.col,
                         e,
                     )
-                    return call_node, []
+                    return call_node
 
             # Update call node version only (CallNode is the call site)
             try:
@@ -304,54 +283,56 @@ class CallSyncService:
                     call_node.id,
                     e,
                 )
-                return call_node, []
+                return call_node
 
-            # Ensure contains edge from parent container -> call
-            t0 = time.time()
-            self.helpers.ensure_contains_edge(
-                parent_node.id,
-                call_node.id,
-                self.helpers.sync_version
-            )
-            _timings['ensure_contains_edge'].append(time.time() - t0)
+            # Add edges to buffer
+            contains_edges_buffer.append((parent_node.id, call_node.id))
+            targets_edges_buffer.append((call_node.id, callee_node.id))
 
-            # Ensure / update targets edge call -> callee
-            t0 = time.time()
-            self.helpers.ensure_targets_edge(call_node.id, callee_node.id)
-            _timings['ensure_targets_edge'].append(time.time() - t0)
-
-            # Collect recursive calls instead of processing immediately
-            recursive_calls = []
-
-            # Recursively sync calls inside the callee scope.
-            # Get calls made INSIDE the callee function/class.
-            t0 = time.time()
-            callee_call_infos = self.scope_manager.get_calls_inside_callee(
-                call_site.id
-            )
-            _timings['get_calls_inside_callee'].append(time.time() - t0)
-
-            for callee_call_info in callee_call_infos:
-                recursive_calls.append((callee_call_info, call_node))
-
-            # Also sync NEXT_IN_CHAIN call sites (method chaining)
-            t0 = time.time()
-            chain_children = self.scope_manager.get_call_chain_children(
-                call_site.id
-            )
-            _timings['get_call_chain_children'].append(time.time() - t0)
-
-            for chain_child_info in chain_children:
-                recursive_calls.append((chain_child_info, call_node))
-
-            return call_node, recursive_calls
+            return call_node
 
         except Exception as e:
             logger.error(
                 f"Error syncing call node: {e}"
             )
-            return call_node, []
+            return call_node
 
+    def _process_recursive_calls_batch(self, recursive_lookup_ids: list, queue: list):
+        """
+        Batch lookup recursive calls and add to queue.
+        recursive_lookup_ids is list of (call_site_id, call_node)
+        """
+        if not recursive_lookup_ids:
+            return
+
+        call_site_ids = [cid for cid, _ in recursive_lookup_ids]
+        
+        # 1. Get calls inside callee (batch)
+        # Since we don't have a batch method in ScopeManager yet, we iterate
+        # But we can optimize this later. For now, we just iterate but since
+        # we are not doing edge creation, it's faster.
+        # TODO: Add batch method to ScopeManager
+        
+        for call_site_id, call_node in recursive_lookup_ids:
+            # Recursively sync calls inside the callee scope.
+            t0 = time.time()
+            callee_call_infos = self.scope_manager.get_calls_inside_callee(
+                call_site_id
+            )
+            _timings['get_calls_inside_callee'].append(time.time() - t0)
+
+            for callee_call_info in callee_call_infos:
+                queue.append((callee_call_info, call_node))
+
+            # Also sync NEXT_IN_CHAIN call sites (method chaining)
+            t0 = time.time()
+            chain_children = self.scope_manager.get_call_chain_children(
+                call_site_id
+            )
+            _timings['get_call_chain_children'].append(time.time() - t0)
+
+            for chain_child_info in chain_children:
+                queue.append((chain_child_info, call_node))
     def _print_timing_summary(self):
         """Print timing statistics for performance analysis."""
         global _timings

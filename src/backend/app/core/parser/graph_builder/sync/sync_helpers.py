@@ -89,6 +89,76 @@ class SyncHelpers:
             # Create new
             return repo.create(node)
 
+    def ensure_targets_edges_batch(self, edges: list[tuple[str, str]]):
+        """
+        Batch ensure targets edges exist.
+        edges is list of (call_id, callee_id) tuples.
+        """
+        if not edges:
+            return
+
+        t0 = time.time()
+        try:
+            query = """
+            FOR edge IN @edges
+                UPSERT { _from: edge.from_id, _to: edge.to_id }
+                INSERT { _from: edge.from_id, _to: edge.to_id, version: @version }
+                UPDATE { version: @version }
+                IN targets_edges
+            """
+            bind_vars = {
+                "edges": [{"from_id": f, "to_id": t} for f, t in edges],
+                "version": self.sync_version
+            }
+            self.repos.targets_edges.db.aql.execute(query, bind_vars=bind_vars)
+        except Exception as e:
+            logger.error(f"Error ensuring targets edges batch: {e}")
+        finally:
+            _timings.setdefault('ensure_targets_edge_total', []).append(
+                time.time() - t0
+            )
+
+    def ensure_contains_edges_batch(self, edges: list[tuple[str, str]]):
+        """
+        Batch ensure contains edges exist.
+        edges is list of (parent_id, child_id) tuples.
+        """
+        if not edges:
+            return
+
+        t0 = time.time()
+        try:
+            # We use a simplified query that assumes we can just link them.
+            # Ideally we'd want the contain_type, but for batch performance
+            # we might skip it or derive it if critical.
+            # For now, let's use a generic type or try to derive it in AQL if possible,
+            # but AQL DOCUMENT() is fast enough.
+            
+            query = """
+            FOR edge IN @edges
+                UPSERT { _from: edge.from_id, _to: edge.to_id }
+                INSERT { 
+                    _from: edge.from_id, 
+                    _to: edge.to_id, 
+                    version: @version,
+                    contain_type: CONCAT(DOCUMENT(edge.from_id).node_type, "_to_", DOCUMENT(edge.to_id).node_type)
+                }
+                UPDATE { version: @version }
+                IN contains_edges
+            """
+            bind_vars = {
+                "edges": [{"from_id": f, "to_id": t} for f, t in edges],
+                "version": self.sync_version
+            }
+            self.repos.contains_edges.db.aql.execute(query, bind_vars=bind_vars)
+
+        except Exception as e:
+            logger.error(f"Error ensuring contains edges batch: {e}")
+        finally:
+            _timings.setdefault('ensure_contains_edge_total', []).append(
+                time.time() - t0
+            )
+
     def ensure_targets_edge(self, call_id: str, callee_id: str):
         """
         Ensure a targets edge exists between call node and callee.

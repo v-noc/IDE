@@ -167,7 +167,7 @@ class GraphBuilderOrchestrator:
             # Parse the full AST tree
             # BodyParser traverses descendants and clears their calls en route
             self.body_parser.process_ast(result.file_scope)
-            
+
             # Flush any remaining call sites in the buffer for this file
             self.body_parser.call_chain_builder.flush_all_call_sites()
 

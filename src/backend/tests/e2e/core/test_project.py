@@ -138,7 +138,7 @@ def test_delete_project(client, sample_project_path, create_repos):
     response = client.post(
         "/api/v1/projects",
         json={
-            "name": "test_project_to_delete",
+            "name": "sample_project",
             "description": "A project to test deletion",
             "path": sample_project_path,
         },
@@ -149,8 +149,8 @@ def test_delete_project(client, sample_project_path, create_repos):
 
     # 2. Verify that some child files exist in the database
     file_repo = create_repos.file_repo
-    main_py_node = file_repo.find_by_qname("test_project_to_delete.main")
-    child_py_node = file_repo.find_by_qname("test_project_to_delete.core.model.child")
+    main_py_node = file_repo.find_by_qname("sample_project.main")
+    child_py_node = file_repo.find_by_qname("sample_project.core.model.child")
 
     assert main_py_node is not None
     assert child_py_node is not None
@@ -165,9 +165,9 @@ def test_delete_project(client, sample_project_path, create_repos):
     assert response.status_code == 404
 
     # 5. Verify that the child files are also gone from the database
-    main_py_node_after_delete = file_repo.find_by_qname("test_project_to_delete.main")
+    main_py_node_after_delete = file_repo.find_by_qname("sample_project.main")
     child_py_node_after_delete = file_repo.find_by_qname(
-        "test_project_to_delete.core.model.child"
+        "sample_project.core.model.child"
     )
 
     assert main_py_node_after_delete is None
