@@ -1,12 +1,14 @@
 import shutil
-from fastapi.testclient import TestClient
 from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
-from app.core.builder.tree_builder import TreeBuilder
 
 current_file_path = Path(__file__).resolve()
 print("Current file path:", current_file_path)
@@ -14,6 +16,16 @@ print("Current file path:", current_file_path)
 # Get the directory of the current file
 current_dir = current_file_path.parent
 PROJECT_PATH = Path(current_dir, "./sample_project").absolute()
+
+
+def find_by_qname(nodes, qname: str):
+    for node in nodes:
+        if node.qname == qname:
+            return node
+        res = find_by_qname(node.children, qname)
+        if res:
+            return res
+    return None
 
 
 def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
@@ -50,17 +62,19 @@ def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    main_py_node = tree[0]
+    main_py_node = tree[1]
 
-    assert main_py_node.name == "main.py"
-
+    assert main_py_node.name == "main"
+    create_call_node = find_by_qname(
+        tree, "sample_import.core.utils.helper.create_child"
+    )
     # Create call
     create_resp = client.post(
         f"/api/v1/calls/{main_py_node.key}/add-call",
         json={
             "name": "Call1",
             "description": "Desc",
-            "callee_target_id": main_py_node.children[0].key,
+            "callee_target_id": create_call_node.key,
         },
     )
 
@@ -72,7 +86,7 @@ def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    main_py_node = tree[0]
+    main_py_node = tree[1]
 
     assert len(main_py_node.children) == 3
 
@@ -111,9 +125,9 @@ def test_remove_call(client: TestClient, arangodb_client, create_repos, tmp_path
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    main_py_node = tree[0]
+    main_py_node = tree[1]
 
-    assert main_py_node.name == "main.py"
+    assert main_py_node.name == "main"
 
     call_key = None
 
@@ -138,8 +152,8 @@ def test_remove_call(client: TestClient, arangodb_client, create_repos, tmp_path
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    main_py_node = tree[0]
+    main_py_node = tree[1]
 
-    assert main_py_node.name == "main.py"
+    assert main_py_node.name == "main"
     assert len(main_py_node.children) == 1
     assert main_py_node.children[0].node_type == "function"

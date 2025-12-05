@@ -3,6 +3,7 @@ from app.core.repository import Repositories
 from app.core.model.nodes import CallNode
 from app.core.model.properties import CodePosition
 from app.core.model.edges import TargetsEdge
+from typing import Optional
 
 
 class CallService(ContainerService):
@@ -17,6 +18,7 @@ class CallService(ContainerService):
         position: CodePosition,
         target_id: str,
         manually_created: bool = False,
+        current_version: Optional[int] = None,
     ):
         call = CallNode(
             name=name,
@@ -24,6 +26,7 @@ class CallService(ContainerService):
             description=description,
             position=position,
             manually_created=manually_created,
+            current_version=current_version if current_version is not None else 0,
         )
 
         new_call = self.repos.call_repo.create(call)
