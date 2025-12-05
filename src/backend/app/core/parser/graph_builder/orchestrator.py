@@ -168,6 +168,9 @@ class GraphBuilderOrchestrator:
             # BodyParser traverses descendants and clears their calls en route
             self.body_parser.process_ast(result.file_scope)
 
+        # Print call chain builder timing summary
+        self.body_parser.call_chain_builder.print_timing_summary()
+
         # Debugger: Visualize scope and call site graph
         self._print_call_site_tree()
         # self._visualize_graph()

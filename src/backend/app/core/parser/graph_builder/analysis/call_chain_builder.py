@@ -1,28 +1,37 @@
 """
-CallChainBuilder - Recursively constructs call graphs by resolving and traversing function calls.
+CallChainBuilder - Recursively constructs call graphs by resolving and
+traversing function calls.
 
 This module:
 1. Resolves calls using CallResolver
 2. Checks if resolved callees are local/registered functions
 3. Recursively processes function bodies to build complete call chains
-4. Handles class instantiation edge case (links to class, processes __init__ if present)
+4. Handles class instantiation edge case (links to class, processes
+   __init__ if present)
 """
 
 import logging
+import time
+from collections import defaultdict
 from pathlib import Path
 from typing import List, Optional
 
-from app.core.parser.ast.models import BaseNode, CallNode, ClassNode, FunctionNode
-from app.core.parser.ast.scanner import scan
-from app.core.parser.jedi_adapter.call_resolver import (
-    CallResolutionResult,
-    CallResolver,
+from app.core.parser.ast.models import (
+    BaseNode,
+    CallNode,
+    ClassNode,
+    FunctionNode,
 )
+from app.core.parser.ast.scanner import scan
+from app.core.parser.jedi_adapter.call_resolver import CallResolver
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import CallSiteModel, ScopeModel
+from app.core.parser.scope_manager.models import ScopeModel
 
 logger = logging.getLogger(__name__)
+
+# Performance tracking
+_timings = defaultdict(list)
 
 
 class CallChainBuilder:
@@ -54,6 +63,10 @@ class CallChainBuilder:
         # Track visited scopes to prevent infinite recursion
         self._visited_scopes = set()
 
+        # Clear timings on initialization
+        global _timings
+        _timings.clear()
+
     def build_chain(
         self,
         call_node: CallNode,
@@ -70,8 +83,8 @@ class CallChainBuilder:
         2. Creates a call site linking caller -> callee
         3. Returns the call site ID for chaining
 
-        Note: Does NOT recursively process callee bodies - BodyParser handles that
-              during its traversal of the AST.
+        Note: Does NOT recursively process callee bodies - BodyParser
+              handles that during its traversal of the AST.
 
         Args:
             call_node: The AST CallNode to resolve
@@ -88,14 +101,17 @@ class CallChainBuilder:
         if not file_path.is_absolute():
             file_path = self.project_path / file_path
 
+        t0 = time.time()
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 source = f.read()
         except OSError as e:
             logger.error(f"Could not read file {file_path}: {e}")
             return None
+        _timings['read_file'].append(time.time() - t0)
 
         # Resolve the call using Jedi with context preservation
+        t0 = time.time()
         resolution = self.call_resolver.resolve_call(
             str(file_path),
             source,
@@ -104,6 +120,7 @@ class CallChainBuilder:
             call_trailer_index=getattr(call_node, "call_index", None),
             parent_context=parent_context,
         )
+        _timings['resolve_call'].append(time.time() - t0)
 
         # Determine callee_id based on resolution
         callee_scope = None
@@ -114,14 +131,18 @@ class CallChainBuilder:
 
             # Debug: Log what Jedi returned
             logger.debug(
-                f"Resolving call {call_node.name} at {call_node.position.line}:{call_node.position.column}: "
-                f"Jedi qname={jedi_qname}, is_class_inst={resolution.is_class_instantiation}, "
+                f"Resolving call {call_node.name} at "
+                f"{call_node.position.line}:{call_node.position.column}: "
+                f"Jedi qname={jedi_qname}, "
+                f"is_class_inst={resolution.is_class_instantiation}, "
                 f"candidates={candidates}"
             )
 
             for full_qname in candidates:
+                t0 = time.time()
                 callee_scope = self.scope_manager.get_scope_by_qname(
                     full_qname)
+                _timings['get_scope_by_qname'].append(time.time() - t0)
                 if not callee_scope:
                     logger.debug(f"Callee not found for {full_qname}")
                     continue
@@ -159,6 +180,7 @@ class CallChainBuilder:
         call_name = self._normalize_call_name(call_node.name)
 
         # Create the call site
+        t0 = time.time()
         call_site = self.scope_manager.create_call(
             caller_id=caller_scope.id,
             line=call_node.position.line,
@@ -167,11 +189,14 @@ class CallChainBuilder:
             callee_id=callee_scope.id,
             prev_call_site_id=current_call_id,
         )
+        _timings['create_call_site'].append(time.time() - t0)
 
         print(f"Call site: {caller_scope.qname} -> {callee_scope.qname}")
 
         # Extract execution context for recursion
-        execution_context = resolution.execution_context if resolution else None
+        execution_context = (
+            resolution.execution_context if resolution else None
+        )
 
         self._process_scope_body(
             callee_scope, depth + 1, call_site.id, execution_context
@@ -185,7 +210,8 @@ class CallChainBuilder:
         jedi_qname: str,
     ) -> List[str]:
         """
-        Generate possible fully-qualified qnames for a callee based on the caller scope.
+        Generate possible fully-qualified qnames for a callee based on the
+        caller scope.
 
         Jedi often returns module-relative names. This method tries:
         1. The raw qname (if already project-qualified)
@@ -206,7 +232,9 @@ class CallChainBuilder:
         if normalized.startswith(f"{project_prefix}."):
             candidates.append(normalized)
 
-        candidates.append(f"{project_prefix}.{normalized}")
+        candidates.append(
+            f"{project_prefix}.{normalized}"
+        )
 
         # Deduplicate while preserving order
         seen = set()
@@ -217,8 +245,13 @@ class CallChainBuilder:
                 ordered.append(candidate)
         return ordered
 
-    def _normalize_call_name(self, raw_name: Optional[str]) -> Optional[str]:
-        """Normalize the call site name for comparisons (use last attribute segment)."""
+    def _normalize_call_name(
+        self, raw_name: Optional[str]
+    ) -> Optional[str]:
+        """
+        Normalize the call site name for comparisons (use last attribute
+        segment).
+        """
         if not raw_name:
             return raw_name
 
@@ -234,7 +267,7 @@ class CallChainBuilder:
         scope: ScopeModel,
         depth: int,
         current_call_id,
-        parent_context: Optional[object] = None,
+            parent_context: Optional[object] = None,
     ):
         """
         Process all calls within a function/method scope.
@@ -243,7 +276,8 @@ class CallChainBuilder:
             scope: The scope to process
             depth: Current recursion depth
             current_call_id: ID of the previous call
-            parent_context: Optional Jedi context to use for resolution within this body
+            parent_context: Optional Jedi context to use for resolution
+                within this body
         """
         logger.debug(f"Processing body of {scope.qname}")
 
@@ -252,29 +286,37 @@ class CallChainBuilder:
         if not file_path.is_absolute():
             file_path = self.project_path / file_path
 
+        t0 = time.time()
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 source = f.read()
         except OSError as e:
             logger.error(f"Could not read file {file_path}: {e}")
             return
+        _timings['read_file_body'].append(time.time() - t0)
 
         # Parse the AST
+        t0 = time.time()
         try:
             nodes = scan(source, str(file_path))
         except Exception as e:
             logger.error(f"Failed to scan AST for {file_path}: {e}")
             return
+        _timings['scan_ast'].append(time.time() - t0)
 
         # Find the function/class node that corresponds to this scope
+        t0 = time.time()
         target_node = self._find_scope_node(nodes, scope)
+        _timings['find_scope_node'].append(time.time() - t0)
 
         if not target_node:
             logger.warning(f"Could not find AST node for scope {scope.qname}")
             return
 
         # Extract all call nodes from this scope's body
+        t0 = time.time()
         call_nodes = self._extract_calls(target_node)
+        _timings['extract_calls'].append(time.time() - t0)
 
         logger.debug(f"Found {len(call_nodes)} call(s) in {scope.qname}")
 
@@ -282,7 +324,11 @@ class CallChainBuilder:
 
         for call_node in call_nodes:
             current_call_id = self.build_chain(
-                call_node, scope, current_call_id, depth, parent_context=parent_context
+                call_node,
+                scope,
+                current_call_id,
+                depth,
+                parent_context=parent_context,
             )
 
     def _find_scope_node(
@@ -297,7 +343,10 @@ class CallChainBuilder:
             # Check if this node matches the scope
             if isinstance(node, (FunctionNode, ClassNode)):
                 # Match by position (line)
-                if node.position.line == scope.start_line and node.name == scope.name:
+                if (
+                    node.position.line == scope.start_line
+                    and node.name == scope.name
+                ):
                     return node
 
             # Recurse into children
@@ -332,3 +381,37 @@ class CallChainBuilder:
     def reset_visited(self):
         """Reset the visited scopes tracker."""
         self._visited_scopes.clear()
+
+    def print_timing_summary(self):
+        """Print timing statistics for performance analysis."""
+        global _timings
+
+        if not _timings:
+            return
+
+        print("\n" + "=" * 80)
+        print("CALL CHAIN BUILDER PERFORMANCE TIMING SUMMARY")
+        print("=" * 80)
+
+        total_time = 0.0
+        for operation, times in sorted(_timings.items()):
+            if times:
+                count = len(times)
+                total = sum(times)
+                avg = total / count
+                max_time = max(times)
+                min_time = min(times)
+                total_time += total
+
+                print(
+                    f"{operation:40s} "
+                    f"count: {count:6d} "
+                    f"total: {total:8.4f}s "
+                    f"avg: {avg:8.6f}s "
+                    f"max: {max_time:8.6f}s "
+                    f"min: {min_time:8.6f}s"
+                )
+
+        print("=" * 80)
+        print(f"TOTAL TIME IN TRACKED OPERATIONS: {total_time:.4f}s")
+        print("=" * 80 + "\n")

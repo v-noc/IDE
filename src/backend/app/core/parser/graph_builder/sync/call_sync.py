@@ -80,18 +80,12 @@ class CallSyncService:
                 if graph_node:
                     scope_to_node_map[scope.id] = graph_node
 
-                    # Only collect calls from FILE scopes initially.
-                    # Calls from FUNCTION/CLASS scopes are discovered via
-                    # get_calls_inside_callee during recursive processing,
-                    # ensuring they become children of the CallNode that
-                    # invokes them (not direct children of the scope).
-                    if scope.type == ScopeType.FILE:
-                        t0 = time.time()
-                        call_infos = self.scope_manager.get_calls_from(scope.id)
-                        _timings['get_calls_from'].append(time.time() - t0)
+                    t0 = time.time()
+                    call_infos = self.scope_manager.get_calls_from(scope.id)
+                    _timings['get_calls_from'].append(time.time() - t0)
 
-                        for call_info in call_infos:
-                            all_call_infos.append((call_info, graph_node))
+                    for call_info in call_infos:
+                        all_call_infos.append((call_info, graph_node))
 
             t0 = time.time()
             children = self.scope_manager.get_children(scope.id)
@@ -113,22 +107,19 @@ class CallSyncService:
         Batch sync calls to reduce database round trips.
         Processes calls iteratively, collecting recursive calls for next batch.
 
-        Note: Multiple call sites can map to the same (parent_id, target_id)
-        pair. We need to process ALL of them to collect all nested calls as
-        siblings.
+        Dedup: Within the same parent, siblings with same target are merged.
+        Across different parents, the same call_site can create separate CallNodes.
         """
         # Queue of call infos to process
         queue = list(all_call_infos)
-        processed_call_sites = set()
+        # Track (parent_id, call_site_id) to allow same call_site under different parents
+        processed_pairs = set()
 
         while queue:
             # Collect batch of (parent_id, target_id) pairs
-            # Use a list to store all call infos for each pair
-            # (multiple call sites can share the same pair)
             batch_pairs = []
-            # Maps pair -> list of (call_info, parent_node, callee_node)
             call_info_map = {}
-            batch_size = min(500, len(queue))  # Process in chunks
+            batch_size = min(500, len(queue))
 
             for _ in range(batch_size):
                 if not queue:
@@ -141,8 +132,9 @@ class CallSyncService:
                 if not call_site or not callee_scope:
                     continue
 
-                # Skip if already processed
-                if call_site.id in processed_call_sites:
+                # Skip if this (parent, call_site) was already processed
+                process_key = (parent_node.id, call_site.id)
+                if process_key in processed_pairs:
                     continue
 
                 # Resolve callee node
@@ -157,7 +149,7 @@ class CallSyncService:
                     call_info_map[pair] = []
                     batch_pairs.append(pair)
                 call_info_map[pair].append(
-                    (call_info, parent_node, callee_node)
+                    (call_info, parent_node, callee_node, process_key)
                 )
 
             # Batch lookup existing call nodes
@@ -171,58 +163,26 @@ class CallSyncService:
                     time.time() - t0
                 )
 
-                # Process each call and collect recursive calls
-                # Process ALL call infos for each pair to collect all nested
-                # calls
-                # Track processed nested call sites to avoid processing the
-                # same nested call site multiple times when multiple parent
-                # call sites share the same call node
-                nested_call_sites_seen = set()
+                # Process each pair - track call_node across iterations
                 for pair in batch_pairs:
                     call_node = existing_calls.get(pair)
-                    # Process all call infos that map to this pair
-                    # Track the call_node across iterations so that if created
-                    # in the first iteration, subsequent iterations reuse it
-                    for call_info, parent_node, callee_node in (
-                        call_info_map[pair]
-                    ):
+                    
+                    for call_info, parent_node, callee_node, process_key in call_info_map[pair]:
+                        # Sync and get back the (possibly created) call_node
                         call_node, recursive = self._sync_node_calls_with_node(
                             call_info, parent_node, callee_node, call_node
                         )
-                        call_site = call_info.get("call_site")
-                        if call_site:
-                            processed_call_sites.add(call_site.id)
+                        
+                        processed_pairs.add(process_key)
 
-                        # Add recursive calls to queue for next batch
-                        # Deduplicate by (parent_call_node.id,
-                        # nested_call_site.id) to avoid processing the same
-                        # nested call site multiple times when multiple parent
-                        # call sites share the same call node. The sync process
-                        # will handle deduplication by (parent_id, target_id)
-                        # when creating/updating call nodes.
+                        # Add recursive calls to queue
                         if recursive:
                             for nested_call_info, nested_parent in recursive:
-                                nested_call_site = nested_call_info.get(
-                                    "call_site"
-                                )
+                                nested_call_site = nested_call_info.get("call_site")
                                 if nested_call_site and nested_parent:
-                                    # Deduplicate by (parent_id, call_site_id)
-                                    # to avoid processing the same nested call
-                                    # site multiple times per parent call node
-                                    nested_key = (
-                                        nested_parent.id,
-                                        nested_call_site.id,
-                                    )
-                                    if nested_key not in (
-                                        nested_call_sites_seen
-                                    ):
-                                        nested_call_sites_seen.add(nested_key)
-                                        queue.append(
-                                            (
-                                                nested_call_info,
-                                                nested_parent,
-                                            )
-                                        )
+                                    nested_key = (nested_parent.id, nested_call_site.id)
+                                    if nested_key not in processed_pairs:
+                                        queue.append((nested_call_info, nested_parent))
 
     def _sync_node_calls(
         self, call_info: dict, parent_node: BaseNode
