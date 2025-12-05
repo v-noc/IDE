@@ -261,6 +261,96 @@ class ScopeRepository:
                 {"prev_id": prev_call_site_id, "curr_id": call_site.id}
             )
 
+    def batch_create_call_sites(
+        self,
+        call_sites: List[dict],
+    ) -> None:
+        """
+        Batch create multiple call sites efficiently using Neo4j UNWIND.
+        
+        Args:
+            call_sites: List of dicts with keys:
+                - call_site: CallSiteModel
+                - caller_id: str
+                - callee_id: Optional[str]
+                - prev_call_site_id: Optional[str]
+        """
+        if not call_sites:
+            return
+
+        # Prepare data for UNWIND
+        call_site_data = []
+        for item in call_sites:
+            call_site = item["call_site"]
+            call_site_data.append({
+                "id": call_site.id,
+                "line": call_site.line,
+                "col": call_site.col,
+                "name": call_site.name,
+                "caller_id": item["caller_id"],
+                "callee_id": item.get("callee_id"),
+                "prev_call_site_id": item.get("prev_call_site_id"),
+            })
+
+        # Batch create all CallSite nodes
+        self.conn.execute(
+            """
+            UNWIND $call_sites AS cs_data
+            CREATE (cs:CallSite {
+                id: cs_data.id,
+                line: cs_data.line,
+                col: cs_data.col,
+                name: cs_data.name
+            })
+            """,
+            {"call_sites": call_site_data}
+        )
+
+        # Batch create HAS_CALL_SITE relationships
+        self.conn.execute(
+            """
+            UNWIND $call_sites AS cs_data
+            MATCH (caller:Scope {id: cs_data.caller_id})
+            MATCH (cs:CallSite {id: cs_data.id})
+            CREATE (caller)-[:HAS_CALL_SITE]->(cs)
+            """,
+            {"call_sites": call_site_data}
+        )
+
+        # Batch create TARGETS relationships (only for those with callee_id)
+        targets_data = [
+            {"cs_id": cs["id"], "callee_id": cs["callee_id"]}
+            for cs in call_site_data
+            if cs["callee_id"]
+        ]
+        if targets_data:
+            self.conn.execute(
+                """
+                UNWIND $targets AS t
+                MATCH (cs:CallSite {id: t.cs_id})
+                MATCH (callee:Scope {id: t.callee_id})
+                CREATE (cs)-[:TARGETS]->(callee)
+                """,
+                {"targets": targets_data}
+            )
+
+        # Batch create NEXT_IN_CHAIN relationships (only for those with prev_call_site_id)
+        chain_data = [
+            {"prev_id": cs["prev_call_site_id"], "curr_id": cs["id"]}
+            for cs in call_site_data
+            if cs["prev_call_site_id"]
+        ]
+        if chain_data:
+            self.conn.execute(
+                """
+                UNWIND $chains AS c
+                MATCH (prev:CallSite {id: c.prev_id})
+                MATCH (curr:CallSite {id: c.curr_id})
+                CREATE (prev)-[:NEXT_IN_CHAIN]->(curr)
+                """,
+                {"chains": chain_data}
+            )
+
     def clear_calls_from_scope(self, scope_id: str) -> None:
         """Delete all call sites originating from the given scope."""
         self.conn.execute(

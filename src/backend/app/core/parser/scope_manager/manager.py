@@ -113,6 +113,50 @@ class ScopeManager:
             caller_id, callee_id, call_site, prev_call_site_id)
         return call_site
 
+    def batch_create_calls(
+        self,
+        call_sites: List[dict],
+    ) -> List[CallSiteModel]:
+        """
+        Batch create multiple call sites efficiently.
+        
+        Args:
+            call_sites: List of dicts with keys:
+                - caller_id: str
+                - line: int
+                - col: int
+                - name: Optional[str]
+                - callee_id: Optional[str]
+                - prev_call_site_id: Optional[str]
+        
+        Returns:
+            List of created CallSiteModel instances
+        """
+        if not call_sites:
+            return []
+
+        # Create CallSiteModel instances
+        created_call_sites = []
+        batch_data = []
+        for item in call_sites:
+            call_site = CallSiteModel(
+                id=str(uuid.uuid4()),
+                line=item["line"],
+                col=item["col"],
+                name=item.get("name"),
+            )
+            created_call_sites.append(call_site)
+            batch_data.append({
+                "call_site": call_site,
+                "caller_id": item["caller_id"],
+                "callee_id": item.get("callee_id"),
+                "prev_call_site_id": item.get("prev_call_site_id"),
+            })
+
+        # Batch insert
+        self.repository.batch_create_call_sites(batch_data)
+        return created_call_sites
+
     def get_calls_from(self, caller_id: str) -> List[dict]:
         """Get all calls made from a scope (including unresolved callees)."""
         result = self.repository.conn.execute(

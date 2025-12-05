@@ -63,6 +63,10 @@ class CallChainBuilder:
         # Track visited scopes to prevent infinite recursion
         self._visited_scopes = set()
 
+        # Batch processing for call sites
+        self._call_site_buffer: List[dict] = []
+        self._temp_id_to_actual_id: dict = {}  # Maps temp_id -> actual_id for resolved call sites
+
         # Clear timings on initialization
         global _timings
         _timings.clear()
@@ -179,19 +183,27 @@ class CallChainBuilder:
             return
         call_name = self._normalize_call_name(call_node.name)
 
-        # Create the call site
-        t0 = time.time()
-        call_site = self.scope_manager.create_call(
-            caller_id=caller_scope.id,
-            line=call_node.position.line,
-            col=call_node.position.column + (len(call_node.name)),
-            name=call_name,
-            callee_id=callee_scope.id,
-            prev_call_site_id=current_call_id,
-        )
-        _timings['create_call_site'].append(time.time() - t0)
+        # Generate call site ID (will be created in batch)
+        import uuid
+        call_site_id = str(uuid.uuid4())
+        
+        # Add to batch buffer instead of creating immediately
+        call_line = call_node.position.line
+        call_col = call_node.position.column + (len(call_node.name))
+        
+        self._call_site_buffer.append({
+            "caller_id": caller_scope.id,
+            "line": call_line,
+            "col": call_col,
+            "name": call_name,
+            "callee_id": callee_scope.id,
+            "prev_call_site_id": current_call_id,
+            "_temp_id": call_site_id,  # Temporary ID for chaining
+        })
+        
+        # Note: call_site_id is stored in the buffer item as _temp_id
 
-        print(f"Call site: {caller_scope.qname} -> {callee_scope.qname}")
+        print(f"Call site (buffered): {caller_scope.qname} -> {callee_scope.qname}")
 
         # Extract execution context for recursion
         execution_context = (
@@ -199,10 +211,10 @@ class CallChainBuilder:
         )
 
         self._process_scope_body(
-            callee_scope, depth + 1, call_site.id, execution_context
+            callee_scope, depth + 1, call_site_id, execution_context
         )
 
-        return call_site.id
+        return call_site_id
 
     def _candidate_qnames(
         self,
@@ -321,7 +333,7 @@ class CallChainBuilder:
         logger.debug(f"Found {len(call_nodes)} call(s) in {scope.qname}")
 
         # Process each call recursively
-
+        # Note: Call sites are buffered and flushed per file, not per scope
         for call_node in call_nodes:
             current_call_id = self.build_chain(
                 call_node,
@@ -378,9 +390,104 @@ class CallChainBuilder:
 
         return calls
 
+    def _flush_all_buffered_call_sites(self) -> None:
+        """
+        Flush all call sites in the buffer.
+        
+        This is called per file to batch all call sites from all scopes
+        in that file together for maximum performance.
+        """
+        if not self._call_site_buffer:
+            return
+
+        # Collect temp IDs in this batch
+        batch_temp_ids = {item.get("_temp_id") for item in self._call_site_buffer if item.get("_temp_id")}
+
+        # Resolve prev_call_site_id references:
+        # - If it's a temp ID from a previous batch, resolve it
+        # - If it's a temp ID from this batch, we'll handle it after creation
+        # - Otherwise, it's already an actual ID
+        deferred_chain_links = []  # Store (temp_prev_id, temp_curr_id) pairs
+        
+        for item in self._call_site_buffer:
+            prev_id = item.get("prev_call_site_id")
+            temp_id = item.get("_temp_id")
+            
+            if prev_id:
+                if prev_id in self._temp_id_to_actual_id:
+                    # Resolve from previous batch (from previous file)
+                    item["prev_call_site_id"] = self._temp_id_to_actual_id[prev_id]
+                elif prev_id in batch_temp_ids:
+                    # Defer: this is a temp ID in the same batch
+                    deferred_chain_links.append((prev_id, temp_id))
+                    item["prev_call_site_id"] = None  # Remove for now, add relationship later
+
+        # Prepare batch data (without _temp_id and with resolved prev_call_site_id)
+        batch_data = []
+        for item in self._call_site_buffer:
+            batch_data.append({
+                "caller_id": item["caller_id"],
+                "line": item["line"],
+                "col": item["col"],
+                "name": item.get("name"),
+                "callee_id": item.get("callee_id"),
+                "prev_call_site_id": item.get("prev_call_site_id"),
+            })
+
+        # Batch create call sites
+        t0 = time.time()
+        created_call_sites = self.scope_manager.batch_create_calls(batch_data)
+        _timings['create_call_site'].append(time.time() - t0)
+
+        # Map temp IDs from this batch to actual IDs
+        for i, item in enumerate(self._call_site_buffer):
+            temp_id = item.get("_temp_id")
+            if temp_id and i < len(created_call_sites):
+                actual_id = created_call_sites[i].id
+                self._temp_id_to_actual_id[temp_id] = actual_id
+
+        # Create deferred NEXT_IN_CHAIN relationships
+        if deferred_chain_links:
+            from app.core.parser.scope_manager.repository import ScopeRepository
+            repo: ScopeRepository = self.scope_manager.repository
+            
+            chain_data = []
+            for prev_temp_id, curr_temp_id in deferred_chain_links:
+                prev_actual_id = self._temp_id_to_actual_id.get(prev_temp_id)
+                curr_actual_id = self._temp_id_to_actual_id.get(curr_temp_id)
+                if prev_actual_id and curr_actual_id:
+                    chain_data.append({
+                        "prev_id": prev_actual_id,
+                        "curr_id": curr_actual_id,
+                    })
+            
+            if chain_data:
+                repo.conn.execute(
+                    """
+                    UNWIND $chains AS c
+                    MATCH (prev:CallSite {id: c.prev_id})
+                    MATCH (curr:CallSite {id: c.curr_id})
+                    CREATE (prev)-[:NEXT_IN_CHAIN]->(curr)
+                    """,
+                    {"chains": chain_data}
+                )
+
+        logger.debug(
+            f"Flushed {len(self._call_site_buffer)} call site(s) for file"
+        )
+        
+        # Clear the buffer
+        self._call_site_buffer.clear()
+
+    def flush_all_call_sites(self) -> None:
+        """Flush all remaining call sites in the buffer."""
+        self._flush_all_buffered_call_sites()
+
     def reset_visited(self):
         """Reset the visited scopes tracker."""
         self._visited_scopes.clear()
+        self._call_site_buffer.clear()
+        self._temp_id_to_actual_id.clear()
 
     def print_timing_summary(self):
         """Print timing statistics for performance analysis."""
