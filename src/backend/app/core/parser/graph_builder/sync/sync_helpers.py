@@ -19,6 +19,7 @@ class SyncHelpers:
         self.repos = repos
         self.sync_version = sync_version
         self.node_cache = {}
+        _timings.clear()
 
     def get_graph_node_for_scope(
         self, scope: ScopeModel
@@ -133,7 +134,7 @@ class SyncHelpers:
             # we might skip it or derive it if critical.
             # For now, let's use a generic type or try to derive it in AQL if possible,
             # but AQL DOCUMENT() is fast enough.
-            
+
             query = """
             FOR edge IN @edges
                 UPSERT { _from: edge.from_id, _to: edge.to_id }
@@ -150,7 +151,8 @@ class SyncHelpers:
                 "edges": [{"from_id": f, "to_id": t} for f, t in edges],
                 "version": self.sync_version
             }
-            self.repos.contains_edges.db.aql.execute(query, bind_vars=bind_vars)
+            self.repos.contains_edges.db.aql.execute(
+                query, bind_vars=bind_vars)
 
         except Exception as e:
             logger.error(f"Error ensuring contains edges batch: {e}")
@@ -250,6 +252,6 @@ class SyncHelpers:
                 f"{child_id}: {e}"
             )
         finally:
-            _timings.setdefault('ensure_contains_edge_total', []).append(
+            _timings.setdefault('ensure_contains_edge_total single', []).append(
                 time.time() - t0
             )

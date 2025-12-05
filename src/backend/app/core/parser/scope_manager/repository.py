@@ -267,7 +267,7 @@ class ScopeRepository:
     ) -> None:
         """
         Batch create multiple call sites efficiently using Neo4j UNWIND.
-        
+
         Args:
             call_sites: List of dicts with keys:
                 - call_site: CallSiteModel
