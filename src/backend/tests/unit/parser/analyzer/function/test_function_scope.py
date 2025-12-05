@@ -55,27 +55,23 @@ def test_function_scope_hierarchy(setup_project):
     assert add.start_line == 3
 
     # factory.build function
-    build = scope_manager.get_scope_by_qname(
-        f"{PROJECT_NAME}.main.factory.build")
+    build = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory.build")
     assert build is not None
     assert build.type.value == "function"
     assert build.start_line == 8
 
     # call_back function
-    call_back = scope_manager.get_scope_by_qname(
-        f"{PROJECT_NAME}.main.call_back")
+    call_back = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.call_back")
     assert call_back is not None
     assert call_back.start_line == 14
 
     # factory_call function
-    factory_call = scope_manager.get_scope_by_qname(
-        f"{PROJECT_NAME}.main.factory_call")
+    factory_call = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory_call")
     assert factory_call is not None
     assert factory_call.start_line == 19
 
     # curry_call function
-    curry_call = scope_manager.get_scope_by_qname(
-        f"{PROJECT_NAME}.main.curry_call")
+    curry_call = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.curry_call")
     assert curry_call is not None
     assert curry_call.start_line == 25
 
@@ -109,62 +105,61 @@ def test_call_chain_construction(setup_project):
     # Get scopes
     main = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.main")
     factory = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory")
-    factory_call = scope_manager.get_scope_by_qname(
-        f"{PROJECT_NAME}.main.factory_call")
-    curry_call = scope_manager.get_scope_by_qname(
-        f"{PROJECT_NAME}.main.curry_call")
+    factory_call = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory_call")
+    curry_call = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.curry_call")
     add = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory.add")
-    build = scope_manager.get_scope_by_qname(
-        f"{PROJECT_NAME}.main.factory.build")
-    call_back = scope_manager.get_scope_by_qname(
-        f"{PROJECT_NAME}.main.call_back")
+    build = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.factory.build")
+    call_back = scope_manager.get_scope_by_qname(f"{PROJECT_NAME}.main.call_back")
 
     curry_call_calls = scope_manager.get_call_chain_roots(curry_call.id)
     assert len(curry_call_calls) == 2, "curry_call should have calls"
 
     # Test 1: Verify calls from main()
-    main_calls = scope_manager.get_call_chain_roots(main.id)
+    main_calls = scope_manager.get_root_calls_from(main.id)
     assert len(main_calls) == 4, "main should have calls"
 
     # main() calls factory_call()
     factory_call_calls = [
-        c for c in main_calls if c['call_site'].name == 'factory_call']
+        c for c in main_calls if c["call_site"].name == "factory_call"
+    ]
     assert len(factory_call_calls) == 1
-    if factory_call_calls[0]['callee']:
-        assert factory_call_calls[0]['callee'].qname == f"{PROJECT_NAME}.main.factory_call"
+    if factory_call_calls[0]["callee"]:
+        assert (
+            factory_call_calls[0]["callee"].qname == f"{PROJECT_NAME}.main.factory_call"
+        )
 
     # Test 2: Verify calls from factory_call()
-    factory_call_calls_list = scope_manager.get_calls_from(factory_call.id)
+    factory_call_calls_list = scope_manager.get_root_calls_from(factory_call.id)
     assert len(factory_call_calls_list) == 2
 
     # factory_call() calls factory()
     factory_calls = [
-        c for c in factory_call_calls_list if c['call_site'].name == 'factory']
+        c for c in factory_call_calls_list if c["call_site"].name == "factory"
+    ]
     assert len(factory_calls) == 1
-    if factory_calls[0]['callee']:
-        assert factory_calls[0]['callee'].qname == f"{PROJECT_NAME}.main.factory"
+    if factory_calls[0]["callee"]:
+        assert factory_calls[0]["callee"].qname == f"{PROJECT_NAME}.main.factory"
 
     # factory_call() calls add()
-    add_calls = [
-        c for c in factory_call_calls_list if c['call_site'].name == 'add']
+    add_calls = [c for c in factory_call_calls_list if c["call_site"].name == "add"]
     assert len(add_calls) == 1
 
     # Test 3: Verify calls from add() - nested function
-    add_calls_list = scope_manager.get_calls_from(add.id)
+    add_calls_list = scope_manager.get_root_calls_from(add.id)
     assert len(add_calls_list) == 1
 
     # add() calls build()
-    build_calls = [c for c in add_calls_list if c['call_site'].name == 'build']
+    build_calls = [c for c in add_calls_list if c["call_site"].name == "build"]
     assert len(build_calls) == 1
-    if build_calls[0]['callee']:
-        assert build_calls[0]['callee'].qname == f"{PROJECT_NAME}.main.factory.build"
+    if build_calls[0]["callee"]:
+        assert build_calls[0]["callee"].qname == f"{PROJECT_NAME}.main.factory.build"
 
     # Test 4: Verify calls from call_back()
-    call_back_calls = scope_manager.get_calls_from(call_back.id)
+    call_back_calls = scope_manager.get_root_calls_from(call_back.id)
     # call_back() calls call_back_func() parameter - may not be resolved to a specific scope
     assert len(call_back_calls) == 1
-    if call_back_calls[0]['callee']:
-        assert call_back_calls[0]['callee'].qname == f"{PROJECT_NAME}.main.factory.add"
+    if call_back_calls[0]["callee"]:
+        assert call_back_calls[0]["callee"].qname == f"{PROJECT_NAME}.main.factory.add"
 
     factory_root_calls = scope_manager.get_call_chain_roots(factory.id)
 

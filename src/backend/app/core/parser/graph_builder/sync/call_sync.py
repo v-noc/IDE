@@ -30,6 +30,55 @@ class CallSyncService:
         self.call_service = call_service
         self.helpers = helpers
 
+    def clear_call_nodes_for_scope(self, scope_id: str):
+        """
+        Clear CallNodes from ArangoDB that belong to a scope.
+        This should be called before syncing to remove old CallNodes
+        and prevent duplicate edges.
+
+        Args:
+            scope_id: The scope ID to clear CallNodes for
+        """
+        graph_node = self.helpers.get_graph_node_for_scope(
+            self.scope_manager.get_scope(scope_id)
+        )
+        if not graph_node:
+            return
+
+        # Find all CallNodes contained by this scope
+        # We traverse down the contains edges to find all call nodes
+        query = """
+        FOR v, e, p IN 1..100 OUTBOUND @scope_id @@contains
+            FILTER v.node_type == "call"
+            RETURN v._key
+        """
+        bind_vars = {
+            "scope_id": graph_node.id,
+            "@contains": "contains_edges",
+        }
+
+        try:
+            # Use call_repo's db to execute AQL query
+            call_node_keys = list(
+                self.helpers.repos.call_repo.db.aql.execute(
+                    query, bind_vars=bind_vars
+                )
+            )
+
+            # Delete all found CallNodes (this will also delete their edges)
+            for key in call_node_keys:
+                try:
+                    self.call_service.delete(key)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to delete CallNode {key} "
+                        f"for scope {scope_id}: {e}"
+                    )
+        except Exception as e:
+            logger.warning(
+                f"Failed to clear CallNodes for scope {scope_id}: {e}"
+            )
+
     def sync_call_chains(self, root_scope_id: str):
         """
         Sync call chains AFTER scopes are fully synced and
@@ -57,9 +106,31 @@ class CallSyncService:
             )
             return
 
+        # First, clear CallNodes from ArangoDB for all scopes to prevent
+        # duplicate edges on resync
+        logger.info("Clearing old CallNodes from ArangoDB")
+        scope_ids_to_clear = set()
+        stack_clear = [root_scope]
+        while stack_clear:
+            scope = stack_clear.pop()
+            if scope.type in (
+                ScopeType.FILE,
+                ScopeType.FUNCTION,
+                ScopeType.CLASS,
+            ):
+                scope_ids_to_clear.add(scope.id)
+            children = self.scope_manager.get_children(scope.id)
+            stack_clear.extend(children)
+
+        # Clear CallNodes for all scopes
+        for scope_id in scope_ids_to_clear:
+            self.clear_call_nodes_for_scope(scope_id)
+
         # Collect all call infos first, then batch process
         all_call_infos = []
         scope_to_node_map = {}
+        # Store children keyed by call_site_id for later processing
+        root_call_children = {}
 
         # Simple DFS over scope tree rooted at root_scope
         stack = [root_scope]
@@ -81,11 +152,21 @@ class CallSyncService:
                     scope_to_node_map[scope.id] = graph_node
 
                     t0 = time.time()
-                    call_infos = self.scope_manager.get_calls_from(scope.id)
+                    call_infos = self.scope_manager.get_root_calls_from(
+                        scope.id, include_children=True)
                     _timings['get_calls_from'].append(time.time() - t0)
 
-                    for call_info in call_infos:
-                        all_call_infos.append((call_info, graph_node))
+                    # Handle None or empty results
+                    if call_infos:
+                        for call_info in call_infos:
+                            all_call_infos.append((call_info, graph_node))
+
+                            # Store children for later processing after
+                            # call_node is created
+                            children = call_info.get("children", [])
+                            if children:
+                                call_site_id = call_info["call_site"].id
+                                root_call_children[call_site_id] = children
 
             t0 = time.time()
             children = self.scope_manager.get_children(scope.id)
@@ -93,7 +174,9 @@ class CallSyncService:
             stack.extend(children)
 
         # Batch process calls
-        self._batch_sync_calls(all_call_infos, scope_to_node_map)
+        self._batch_sync_calls(
+            all_call_infos, scope_to_node_map, root_call_children
+        )
 
         # Print timing summary
         self._print_timing_summary()
@@ -102,17 +185,20 @@ class CallSyncService:
         self,
         all_call_infos: list,
         scope_to_node_map: dict,
+        root_call_children: dict = None,
     ):
         """
         Batch sync calls to reduce database round trips.
         Processes calls iteratively, collecting recursive calls for next batch.
 
-        Dedup: Within the same parent, siblings with same target are merged.
-        Across different parents, the same call_site can create separate CallNodes.
+        Dedup: Within the same parent, siblings with same target
+        are merged. Across different parents, the same call_site
+        can create separate CallNodes.
         """
         # Queue of call infos to process
         queue = list(all_call_infos)
-        # Track (parent_id, call_site_id) to allow same call_site under different parents
+        # Track (parent_id, call_site_id) to allow same call_site
+        # under different parents
         processed_pairs = set()
 
         while queue:
@@ -124,11 +210,11 @@ class CallSyncService:
             # Buffers for batch operations
             contains_edges_buffer = []  # (parent_id, child_id)
             targets_edges_buffer = []   # (call_id, callee_id)
-            recursive_lookup_ids = []   # call_site_ids to lookup children for
+            # (call_info, call_node) for recursive processing
+            recursive_lookup_ids = []
 
             # 1. Process queue to build batch lookup keys
-            current_batch_items = []
-            
+
             for _ in range(batch_size):
                 if not queue:
                     break
@@ -144,7 +230,7 @@ class CallSyncService:
                 process_key = (parent_node.id, call_site.id)
                 if process_key in processed_pairs:
                     continue
-                
+
                 processed_pairs.add(process_key)
 
                 # Resolve callee node
@@ -158,7 +244,7 @@ class CallSyncService:
                 if pair not in call_info_map:
                     call_info_map[pair] = []
                     batch_pairs.append(pair)
-                
+
                 # Store item for processing after lookup
                 call_info_map[pair].append(
                     (call_info, parent_node, callee_node)
@@ -178,32 +264,45 @@ class CallSyncService:
                 # 3. Process each pair to create/update nodes and collect edges
                 for pair in batch_pairs:
                     call_node = existing_calls.get(pair)
-                    
-                    for call_info, parent_node, callee_node in call_info_map[pair]:
+
+                    items = call_info_map[pair]
+                    for call_info, parent_node, callee_node in items:
                         # Sync and get back the (possibly created) call_node
                         call_node = self._sync_node_calls_with_node_batch(
-                            call_info, 
-                            parent_node, 
-                            callee_node, 
+                            call_info,
+                            parent_node,
+                            callee_node,
                             call_node,
                             contains_edges_buffer,
                             targets_edges_buffer
                         )
-                        
+
                         # Add to recursive lookup list
                         if call_node:
-                             recursive_lookup_ids.append((call_info.get("call_site").id, call_node))
+                            call_site_id = call_info.get("call_site").id
+                            recursive_lookup_ids.append(
+                                (call_site_id, call_node))
+
+                            # Process children from root calls if they exist
+                            if (root_call_children and
+                                    call_site_id in root_call_children):
+                                children = root_call_children[call_site_id]
+                                for child_call_info in children:
+                                    queue.append(
+                                        (child_call_info, call_node)
+                                    )
 
             # 4. Flush edge buffers
             if contains_edges_buffer:
                 self.helpers.ensure_contains_edges_batch(contains_edges_buffer)
-            
+
             if targets_edges_buffer:
                 self.helpers.ensure_targets_edges_batch(targets_edges_buffer)
 
             # 5. Batch lookup recursive calls
             if recursive_lookup_ids:
-                self._process_recursive_calls_batch(recursive_lookup_ids, queue)
+                self._process_recursive_calls_batch(
+                    recursive_lookup_ids, queue)
 
     def _sync_node_calls_with_node_batch(
         self,
@@ -232,7 +331,8 @@ class CallSyncService:
                     parent_qname = parent_node.qname
                     if parent_node.node_type == "call":
                         # For call nodes, get the target via edges
-                        # Note: This is still a single lookup, could be optimized but rare for new nodes
+                        # Note: This is still a single lookup, could be
+                        # optimized but rare for new nodes
                         t0 = time.time()
                         target_node = (
                             self.helpers.repos.call_repo.get_target(
@@ -242,7 +342,7 @@ class CallSyncService:
                         _timings['get_target'].append(time.time() - t0)
                         if target_node:
                             parent_qname = target_node.qname
-                            
+
                     call_node = CallNode(
                         name=call_site.name or "call",
                         qname=f"{parent_qname}::{callee_scope.qname}",
@@ -297,7 +397,9 @@ class CallSyncService:
             )
             return call_node
 
-    def _process_recursive_calls_batch(self, recursive_lookup_ids: list, queue: list):
+    def _process_recursive_calls_batch(
+        self, recursive_lookup_ids: list, queue: list
+    ):
         """
         Batch lookup recursive calls and add to queue.
         recursive_lookup_ids is list of (call_site_id, call_node)
@@ -306,33 +408,20 @@ class CallSyncService:
             return
 
         call_site_ids = [cid for cid, _ in recursive_lookup_ids]
-        
-        # 1. Get calls inside callee (batch)
-        # Since we don't have a batch method in ScopeManager yet, we iterate
-        # But we can optimize this later. For now, we just iterate but since
-        # we are not doing edge creation, it's faster.
-        # TODO: Add batch method to ScopeManager
-        
-        for call_site_id, call_node in recursive_lookup_ids:
-            # Recursively sync calls inside the callee scope.
-            t0 = time.time()
-            callee_call_infos = self.scope_manager.get_calls_inside_callee(
-                call_site_id
-            )
-            _timings['get_calls_inside_callee'].append(time.time() - t0)
 
+        # Batch fetch all calls inside callees in one query
+        t0 = time.time()
+        calls_map = (
+            self.scope_manager.batch_get_calls_inside_callee(call_site_ids)
+        )
+        _timings['get_calls_inside_callee'].append(time.time() - t0)
+
+        # Process results and add to queue
+        for call_site_id, call_node in recursive_lookup_ids:
+            callee_call_infos = calls_map.get(call_site_id, [])
             for callee_call_info in callee_call_infos:
                 queue.append((callee_call_info, call_node))
 
-            # Also sync NEXT_IN_CHAIN call sites (method chaining)
-            t0 = time.time()
-            chain_children = self.scope_manager.get_call_chain_children(
-                call_site_id
-            )
-            _timings['get_call_chain_children'].append(time.time() - t0)
-
-            for chain_child_info in chain_children:
-                queue.append((chain_child_info, call_node))
     def _print_timing_summary(self):
         """Print timing statistics for performance analysis."""
         global _timings

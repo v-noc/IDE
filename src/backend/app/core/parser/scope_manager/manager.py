@@ -119,7 +119,7 @@ class ScopeManager:
     ) -> List[CallSiteModel]:
         """
         Batch create multiple call sites efficiently.
-        
+
         Args:
             call_sites: List of dicts with keys:
                 - caller_id: str
@@ -128,7 +128,7 @@ class ScopeManager:
                 - name: Optional[str]
                 - callee_id: Optional[str]
                 - prev_call_site_id: Optional[str]
-        
+
         Returns:
             List of created CallSiteModel instances
         """
@@ -156,6 +156,125 @@ class ScopeManager:
         # Batch insert
         self.repository.batch_create_call_sites(batch_data)
         return created_call_sites
+
+    def get_root_calls_from(
+        self, caller_id: str, include_children: bool = False
+    ) -> List[dict]:
+        """
+        Get root calls made from a scope (calls with no previous call site
+        parent).
+
+        Args:
+            caller_id: The scope ID to get root calls from
+            include_children: If True, also fetch calls inside each callee
+                             scope and attach them as a 'children' attribute
+
+        Returns:
+            List of call info dicts with 'call_site' and 'callee' keys.
+            If include_children=True, each dict also has a 'children' key
+            containing calls inside the callee scope.
+        """
+        if include_children:
+            # Fetch root calls with their nested children in one query
+            result = self.repository.conn.execute(
+                """
+                MATCH (caller:Scope {id: $caller_id})
+                    -[:HAS_CALL_SITE]->(cs:CallSite)
+                WHERE NOT EXISTS {
+                    MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(cs)
+                }
+                OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
+                WITH cs, callee
+                OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
+                    -[:HAS_CALL_SITE]->(inner_call:CallSite)
+                OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
+                WITH cs, callee,
+                    collect(DISTINCT {
+                        inner_call: inner_call,
+                        inner_callee: inner_callee
+                    }) AS children_data
+                RETURN cs, callee, children_data
+                """,
+                {"caller_id": caller_id}
+            )
+        else:
+            result = self.repository.conn.execute(
+                """
+                MATCH (caller:Scope {id: $caller_id})-[:HAS_CALL_SITE]->(cs:CallSite)
+                WHERE NOT EXISTS { MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(cs) }
+                OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
+                RETURN cs, callee
+                """,
+                {"caller_id": caller_id}
+            )
+
+        calls = []
+        for row in result:
+            cs_node = row[0]
+            callee_node = row[1] if len(row) > 1 else None
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
+
+            call_info = {
+                "call_site": CallSiteModel(
+                    id=cs_node["id"],
+                    line=cs_node["line"],
+                    col=cs_node["col"],
+                    name=cs_node.get("name"),
+                ),
+                "callee": callee,
+            }
+
+            # If include_children, process children data
+            if include_children and len(row) > 2:
+                children_data = row[2]
+                children = []
+                for child_item in children_data:
+                    inner_call_node = child_item.get("inner_call")
+                    inner_callee_node = child_item.get("inner_callee")
+
+                    if inner_call_node:
+                        inner_callee = None
+                        if inner_callee_node:
+                            inner_callee = ScopeModel(
+                                id=inner_callee_node["id"],
+                                name=inner_callee_node["name"],
+                                qname=inner_callee_node["qname"],
+                                type=inner_callee_node["type"],
+                                file_path=inner_callee_node["file_path"],
+                                start_line=inner_callee_node["start_line"],
+                                start_col=inner_callee_node["start_col"],
+                                end_line=inner_callee_node["end_line"],
+                                end_col=inner_callee_node["end_col"],
+                                mro=inner_callee_node.get("mro", []),
+                            )
+
+                        children.append({
+                            "call_site": CallSiteModel(
+                                id=inner_call_node["id"],
+                                line=inner_call_node["line"],
+                                col=inner_call_node["col"],
+                                name=inner_call_node.get("name"),
+                            ),
+                            "callee": inner_callee,
+                        })
+                call_info["children"] = children
+
+            calls.append(call_info)
+        return calls
 
     def get_calls_from(self, caller_id: str) -> List[dict]:
         """Get all calls made from a scope (including unresolved callees)."""
@@ -290,6 +409,74 @@ class ScopeManager:
                 "callee": callee,
             })
         return calls
+
+    def batch_get_calls_inside_callee(
+        self, call_site_ids: List[str]
+    ) -> dict:
+        """
+        Batch fetch calls made INSIDE the scopes targeted by multiple call
+        sites.
+
+        Args:
+            call_site_ids: List of call site IDs to fetch calls for
+
+        Returns:
+            Dictionary mapping call_site_id -> List[dict] of call infos
+        """
+        if not call_site_ids:
+            return {}
+
+        result = self.repository.conn.execute(
+            """
+            UNWIND $call_site_ids AS call_site_id
+            MATCH (cs:CallSite {id: call_site_id})-[:TARGETS]->(callee:Scope)
+            MATCH (callee)-[:HAS_CALL_SITE]->(inner_call:CallSite)
+            OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
+            RETURN call_site_id, inner_call, inner_callee
+            """,
+            {"call_site_ids": call_site_ids}
+        )
+
+        calls_map = {}
+        for row in result:
+            call_site_id = row[0]
+            call_node = row[1]
+            callee_node = row[2] if len(row) > 2 else None
+
+            if call_site_id not in calls_map:
+                calls_map[call_site_id] = []
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
+
+            calls_map[call_site_id].append({
+                "call_site": CallSiteModel(
+                    id=call_node["id"],
+                    line=call_node["line"],
+                    col=call_node["col"],
+                    name=call_node.get("name"),
+                ),
+                "callee": callee,
+            })
+
+        # Ensure all call_site_ids have entries (even if empty)
+        for call_site_id in call_site_ids:
+            if call_site_id not in calls_map:
+                calls_map[call_site_id] = []
+
+        return calls_map
 
     def get_calls_to(self, callee_id: str) -> List[dict]:
         """Get all calls made to a scope."""

@@ -126,6 +126,7 @@ def test_function_collector(setup_project):
 
     # 2. Function definitions in main.py
     func_names = sorted([child.name for child in file_node.children])
+
     expected_func_names = sorted(
         ['factory', 'call_back', 'factory_call', 'curry_call', 'main'])
     for func_name in func_names:
@@ -159,6 +160,9 @@ def test_function_collector(setup_project):
 
     # 4.1 Check `factory_call()` in `main`
     assert main_factory_call.target.id == factory_call_func.id
+    children = [{child.name: child.node_type}
+                for child in main_factory_call.children]
+
     assert len(main_factory_call.children) == 2
     inner_factory_call = find_node_by_name(
         main_factory_call.children, 'factory')
