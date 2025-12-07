@@ -72,7 +72,6 @@ class CallResolver:
         source: str,
         line: int,
         column: int,
-        call_trailer_index: Optional[int] = None,
         parent_context: Optional[Any] = None,
     ) -> Optional[CallResolutionResult]:
         """
@@ -83,7 +82,6 @@ class CallResolver:
             source: Source code content
             line: Line number (1-indexed)
             column: Column number (0-indexed in Jedi)
-            call_trailer_index: Optional index of the call trailer
             parent_context: Optional Jedi context from the caller (for recursion)
 
         Returns:
@@ -207,6 +205,8 @@ class CallResolver:
         try:
             # Try to get docstring from the Jedi value
             docstring = None
+            if hasattr(value, "_original_value"):
+                value = value._original_value
 
             # Method 1: Use tree_node.get_doc_node() for parso nodes
             if hasattr(value, 'tree_node') and value.tree_node:

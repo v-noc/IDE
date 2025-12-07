@@ -30,55 +30,6 @@ class CallSyncService:
         self.call_service = call_service
         self.helpers = helpers
 
-    def clear_call_nodes_for_scope(self, scope_id: str):
-        """
-        Clear CallNodes from ArangoDB that belong to a scope.
-        This should be called before syncing to remove old CallNodes
-        and prevent duplicate edges.
-
-        Args:
-            scope_id: The scope ID to clear CallNodes for
-        """
-        graph_node = self.helpers.get_graph_node_for_scope(
-            self.scope_manager.get_scope(scope_id)
-        )
-        if not graph_node:
-            return
-
-        # Find all CallNodes contained by this scope
-        # We traverse down the contains edges to find all call nodes
-        query = """
-        FOR v, e, p IN 1..100 OUTBOUND @scope_id @@contains
-            FILTER v.node_type == "call"
-            RETURN v._key
-        """
-        bind_vars = {
-            "scope_id": graph_node.id,
-            "@contains": "contains_edges",
-        }
-
-        try:
-            # Use call_repo's db to execute AQL query
-            call_node_keys = list(
-                self.helpers.repos.call_repo.db.aql.execute(
-                    query, bind_vars=bind_vars
-                )
-            )
-
-            # Delete all found CallNodes (this will also delete their edges)
-            for key in call_node_keys:
-                try:
-                    self.call_service.delete(key)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to delete CallNode {key} "
-                        f"for scope {scope_id}: {e}"
-                    )
-        except Exception as e:
-            logger.warning(
-                f"Failed to clear CallNodes for scope {scope_id}: {e}"
-            )
-
     def sync_call_chains(self, root_scope_id: str):
         """
         Sync call chains AFTER scopes are fully synced and
@@ -121,10 +72,6 @@ class CallSyncService:
                 scope_ids_to_clear.add(scope.id)
             children = self.scope_manager.get_children(scope.id)
             stack_clear.extend(children)
-
-        # Clear CallNodes for all scopes
-        for scope_id in scope_ids_to_clear:
-            self.clear_call_nodes_for_scope(scope_id)
 
         # Collect all call infos first, then batch process
         all_call_infos = []

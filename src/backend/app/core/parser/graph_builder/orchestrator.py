@@ -34,6 +34,7 @@ class GraphBuilderOrchestrator:
         db: Optional[StandardDatabase] = None,
         scope_manager: Optional[ScopeManager] = None,
         ignore_file_name: str = ".gitignore",
+        batch_size: int = 200,
     ):
         self.project_node = project_node
         self.project_path = project_node.path
@@ -70,6 +71,7 @@ class GraphBuilderOrchestrator:
             self.project_node.name,
             self.scope_manager,
             self.jedi_manager,
+            batch_size=batch_size,
         )
 
         # Initialize Sync components
@@ -136,6 +138,7 @@ class GraphBuilderOrchestrator:
             checksum = scan_result.files.get(file_path)
             if checksum:
                 logger.info(f"Collecting structure for: {file_path}")
+
                 result = self.collector.process_file(file_path, checksum)
                 if result:
                     collection_results.append(result)
@@ -145,7 +148,7 @@ class GraphBuilderOrchestrator:
                     )
 
         # Phase 2: Analysis (Bodies)
-        logger.info("Starting Phase 2: Analysis")
+
         for result in collection_results:
             logger.info(
                 "Analyzing changes for: %s",

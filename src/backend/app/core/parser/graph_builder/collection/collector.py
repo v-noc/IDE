@@ -100,8 +100,10 @@ class Collector:
         # 4. Process AST Nodes to build current scope hierarchy
         # ASTProcessor will check each scope by ID and update if path/pos/name
         # changed
+
         current_scopes_nodes = self.ast_processor.process_ast_nodes(
             ast_nodes, file_scope, content)
+
         # 5. Determine which scopes are new or modified (Internal Update)
         # We still need to iterate to find removed scopes and update DB
         current_ids = set()

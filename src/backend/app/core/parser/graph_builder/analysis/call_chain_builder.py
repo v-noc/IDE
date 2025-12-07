@@ -132,38 +132,15 @@ class CallChainBuilder:
         if resolution:
             # Priority 1: Try ID-based lookup (most direct and accurate)
             if resolution.callee_id:
-                logger.debug(
-                    f"Resolving call {call_node.name} at "
-                    f"{call_node.position.line}:{call_node.position.column} "
-                    f"using ID: {resolution.callee_id}"
-                )
                 t0 = time.time()
                 callee_scope = self.scope_manager.get_scope(
                     resolution.callee_id)
                 _timings["get_scope_by_id"].append(time.time() - t0)
 
-                if callee_scope:
-                    logger.debug(
-                        f"Found callee scope via ID: qname={callee_scope.qname}, "
-                        f"type={callee_scope.type}, name={callee_scope.name}"
-                    )
-                else:
-                    logger.debug(
-                        f"Callee not found for ID {resolution.callee_id}")
-
             # Priority 2: Fall back to qname-based lookup if ID not available or failed
             if not callee_scope and resolution.callee_qname:
                 jedi_qname = resolution.callee_qname
                 candidates = self._candidate_qnames(caller_scope, jedi_qname)
-
-                # Debug: Log what Jedi returned
-                logger.debug(
-                    f"Resolving call {call_node.name} at "
-                    f"{call_node.position.line}:{call_node.position.column} "
-                    f"using qname: Jedi qname={jedi_qname}, "
-                    f"is_class_inst={resolution.is_class_instantiation}, "
-                    f"candidates={candidates}"
-                )
 
                 for full_qname in candidates:
                     t0 = time.time()
@@ -174,28 +151,7 @@ class CallChainBuilder:
                         logger.debug(f"Callee not found for {full_qname}")
                         continue
 
-                    # Debug: Log what scope was found
-                    logger.debug(
-                        f"Found callee scope via qname: qname={callee_scope.qname}, "
-                        f"type={callee_scope.type}, name={callee_scope.name}"
-                    )
-
-                    if resolution.is_class_instantiation:
-                        logger.debug(
-                            f"Resolved class instantiation {call_node.name} -> "
-                            f"{full_qname} (scope_id={callee_scope.id})"
-                        )
-                    else:
-                        logger.debug(
-                            f"Resolved call {call_node.name} -> "
-                            f"{full_qname} (scope_id={callee_scope.id})"
-                        )
-                    break
-                else:
-                    logger.debug(
-                        f"Callee not registered locally for {call_node.name} "
-                        f"(Jedi qname candidates: {candidates})"
-                    )
+                    
         else:
             logger.debug(
                 f"Could not resolve call {call_node.name} at "

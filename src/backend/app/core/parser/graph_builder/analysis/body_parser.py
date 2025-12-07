@@ -19,11 +19,13 @@ class BodyParser:
         project_name: str,
         scope_manager: ScopeManager,
         jedi_manager: JediProjectManager,
+        batch_size: int = 1000,
     ):
         self.project_path = project_path
         self.project_name = project_name
         self.manager = scope_manager
         self.jedi_manager = jedi_manager
+        self.batch_size = batch_size
 
         # Initialize CallChainBuilder for recursive call resolution
         self.call_chain_builder = CallChainBuilder(
@@ -77,10 +79,16 @@ class BodyParser:
         """
 
         for node in nodes:
+            # Auto-flush if buffer exceeds batch size
+            if len(self.call_chain_builder._call_site_buffer) >= self.batch_size:
+
+                self.call_chain_builder.flush_all_call_sites()
+
             if isinstance(node, (ClassNode, FunctionNode)):
                 # Enter child scope (function or class)
                 if not node.id:
-                    logger.warning(f"Node {node.name} has no ID in Phase 2. Skipping.")
+                    logger.warning(
+                        f"Node {node.name} has no ID in Phase 2. Skipping.")
                     continue
 
                 child_scope = self.manager.get_scope(node.id)
@@ -96,7 +104,8 @@ class BodyParser:
                 # Recurse into the scope to process its calls
                 # All calls in child scope are root calls (prev_call_id=None)
                 if hasattr(node, "children"):
-                    self._traverse(node.children, child_scope, prev_call_id=None)
+                    self._traverse(node.children, child_scope,
+                                   prev_call_id=None)
 
             elif isinstance(node, CallNode):
                 # Create call site (this is a root call at this scope level)
@@ -114,10 +123,12 @@ class BodyParser:
                 # Recurse into call arguments
                 # Calls within arguments chain to this call site
                 if hasattr(node, "children"):
-                    self._traverse(node.children, current_scope, prev_call_id=None)
+                    self._traverse(node.children, current_scope,
+                                   prev_call_id=None)
 
             else:
                 # Other nodes (If, For, etc.) - Recurse staying in current scope
                 # Preserve prev_call_id context
                 if hasattr(node, "children"):
-                    self._traverse(node.children, current_scope, prev_call_id=None)
+                    self._traverse(node.children, current_scope,
+                                   prev_call_id=None)
