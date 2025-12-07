@@ -17,10 +17,25 @@
     "request": "launch",
     "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
     "module": "pytest",
-    "args": ["-s", "tests/unit/parser/analyzer/calls/test_call_sync.py"],
+    "args": [
+      "-s",
+      "tests/unit/parser/analyzer/calls/test_call_sync.py::test_call_sync_add_and_remove"
+    ],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
       "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"
+    }
+  },
+  {
+    "label": "prototype",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "python": "/Users/yared/Documents/Programing/ide/v-noc/.venv/bin/python",
+    "module": "prototype_walker",
+
+    "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
+    "env": {
+      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/"
     }
   }
 ]

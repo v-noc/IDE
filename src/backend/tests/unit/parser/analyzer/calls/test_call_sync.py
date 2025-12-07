@@ -113,6 +113,13 @@ def _get_call_child_by_name(node: AnyTreeNode, name: str) -> AnyTreeNode | None:
     return None
 
 
+def _get_call_child_by_qname(node: AnyTreeNode, qname: str) -> AnyTreeNode | None:
+    for c in _get_call_children(node):
+        if getattr(c, "qname", None) == qname:
+            return c
+    return None
+
+
 def _has_nested_call_with_name(node: AnyTreeNode, name_pred: str) -> bool:
     for c in _get_call_children(node):
         for gc in getattr(c, "children", []) or []:
@@ -185,7 +192,8 @@ def test_call_sync_add_and_remove(setup_project):
         # Still only one 'reader' call under file (no duplicates)
         calls_after_add = _get_call_children(file_after_add)
         count_reader = len(
-            [c for c in calls_after_add if getattr(c, "name", None) == "reader"]
+            [c for c in calls_after_add if getattr(
+                c, "name", None) == "reader"]
         )
         assert count_reader == 1, "Duplicate 'reader' call created"
 
@@ -198,7 +206,9 @@ def test_call_sync_add_and_remove(setup_project):
 
         # Reader call should have two nested calls now: Document.read and
         # FileReader.read
-        reader_call = _get_call_child_by_name(file_after_add, "reader")
+        reader_call = _get_call_child_by_qname(
+            file_after_add, "simple_calls.main::simple_calls.main.reader"
+        )
         assert reader_call is not None, "reader call node not found"
         reader_nested_calls = [
             gc
@@ -242,7 +252,8 @@ def test_call_sync_add_and_remove(setup_project):
         # Still exactly one top-level 'reader' call
         calls_after_remove = _get_call_children(file_after_remove)
         remaining_reader = len(
-            [c for c in calls_after_remove if getattr(c, "name", None) == "reader"]
+            [c for c in calls_after_remove if getattr(
+                c, "name", None) == "reader"]
         )
         assert remaining_reader == 1
     finally:

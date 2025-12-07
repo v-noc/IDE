@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
     Handles startup and shutdown events.
     """
     # Startup
-    setup_logging()
+    # setup_logging()
     db = get_db()
     try:
         db.properties()

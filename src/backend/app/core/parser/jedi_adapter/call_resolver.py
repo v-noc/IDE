@@ -19,6 +19,8 @@ import jedi
 from jedi.inference.arguments import TreeArguments
 from jedi.inference.helpers import infer_call_of_leaf
 from jedi.inference.syntax_tree import infer_trailer
+from jedi.inference.value import BoundMethod
+from jedi.inference.value.instance import TreeInstance
 
 from .manager import JediProjectManager
 
@@ -91,6 +93,9 @@ class CallResolver:
             script = self.jedi_manager.get_script(file_path, source)
 
             # Use provided parent context or fall back to module context
+            position_context = script.get_context(line, column)
+            if position_context.in_builtin_module() or position_context.is_stub():
+                return None
             context = parent_context or script._get_module_context()
 
             # Find the leaf at this position
@@ -132,49 +137,43 @@ class CallResolver:
                 # Extract qualified name - ALWAYS includes module
                 result.callee_qname = self._extract_qualified_name(callee)
 
-                trailer = leaf.parent
-                while trailer and trailer.type != 'trailer':
-                    trailer = trailer.parent
-                if callee.is_function():
-                    if trailer and len(trailer.children) >= 2:
-                        # trailer.children[0] is '(' and trailer.children[-1] is ')'
-                        # argument_node is in between (could be None if no args)
-                        if len(trailer.children) == 3:
-                            argument_node = trailer.children[1]
-                        else:
-                            argument_node = None
+                bracket = leaf.get_next_leaf()
+                trailer = bracket.parent
 
-                        # Create TreeArguments to preserve argument context
-                        arguments = TreeArguments(
-                            callee.inference_state,
-                            call_context,
-                            argument_node,
-                            trailer=trailer
-                        )
+                while trailer and trailer.type != "trailer":
+                    trailer = trailer.parent
+
+                if hasattr(callee, "_original_value"):
+                    callee = callee._original_value
+                arguments = self.create_args(
+                    callee, trailer, script._inference_state, call_context)
+
+                if callee.is_function():
+                    if arguments:
                         result.execution_context = callee.as_context(arguments)
+
                     else:
                         # No trailer found, fallback to anonymous context
                         result.execution_context = callee.as_context()
 
                 if callee.api_type == "class":
                     result.is_class_instantiation = True
-                    trailer = leaf.parent
-                    while trailer and trailer.type != 'trailer':
-                        trailer = trailer.parent
-
-                    if trailer and len(trailer.children) >= 2:
-                        if len(trailer.children) == 3:
-                            argument_node = trailer.children[1]
+                    inits = callee.py__getattribute__("__init__")
+                    created_instance = TreeInstance(
+                        script._inference_state, callee.parent_context, callee, arguments)
+                    if inits:
+                        init_method = list(inits)[0]
+                        if hasattr(init_method, "_original_value"):
+                            init_method = init_method._original_value
+                        bound_method = BoundMethod(
+                            created_instance, callee, init_method)
+                        if arguments:
+                            result.execution_context = bound_method.as_context(
+                                arguments)
                         else:
-                            argument_node = None
-
-                        arguments = TreeArguments(
-                            callee.inference_state,
-                            call_context,
-                            argument_node,
-                            trailer=trailer
-                        )
-                        # Execute the class with arguments to get instance
+                            result.execution_context = bound_method.as_context()
+                            # Execute the class with arguments to get instance
+                    else:
                         result.execution_context = callee.as_context()
                     logger.debug(
                         f"Resolved class instantiation: {result.callee_qname}")
@@ -189,7 +188,8 @@ class CallResolver:
             return result if (result.callee_qname or result.callee_id) else None
 
         except Exception as e:
-            print(f"Error resolving call at {source} {line}:{column}: {e}")
+            print(
+                f"Error resolving call at {file_path} {line}:{column}: {leaf} {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -197,17 +197,17 @@ class CallResolver:
     def _extract_id_from_docstring(self, value) -> Optional[str]:
         """
         Extract ID from docstring using the same logic as parser.py.
-        
+
         Args:
             value: Jedi value object
-            
+
         Returns:
             Extracted ID or None
         """
         try:
             # Try to get docstring from the Jedi value
             docstring = None
-            
+
             # Method 1: Use tree_node.get_doc_node() for parso nodes
             if hasattr(value, 'tree_node') and value.tree_node:
                 tree_node = value.tree_node
@@ -220,20 +220,20 @@ class CallResolver:
                             docstring = val[3:-3]
                         elif val.startswith('"') or val.startswith("'"):
                             docstring = val[1:-1]
-            
+
             # Method 2: Use py__doc__() if available
             if not docstring and hasattr(value, 'py__doc__'):
                 try:
                     docstring = value.py__doc__()
                 except:
                     pass
-            
+
             # Extract ID from docstring
             if docstring:
                 match = re.search(r"ID:\s*([^\s]+)", docstring)
                 if match:
                     return match.group(1).strip()
-            
+
             return None
         except Exception as e:
             logger.debug(f"Could not extract ID from docstring: {e}")
@@ -244,110 +244,20 @@ class CallResolver:
         Extract fully qualified name.
         """
         try:
-            module_name = self._get_module_name(value)
+            value = value
 
-            if hasattr(value, 'qualified_name'):
-                return f"{module_name}.{value.qualified_name}"
-
-            if hasattr(value, 'get_qualified_names'):
-                qnames = value.get_qualified_names()
-                if qnames:
-                    return f"{module_name}.{'.'.join(qnames)}"
-
-            # Special handling for BoundMethod if standard ways fail
-            if hasattr(value, 'is_bound_method') and value.is_bound_method():
-                if hasattr(value, 'py__name__'):
-                    method_name = value.py__name__()
-                    # Try to get class name
-                    if hasattr(value, 'py__class__'):
-                        cls = value.py__class__()
-                        if cls and hasattr(cls, 'qualified_name'):
-                            return f"{module_name}.{cls.qualified_name}.{method_name}"
-
-            # Fallback for some Jedi versions or types
-            if hasattr(value, 'py__name__'):
-                name = value.py__name__()
-                if name:
-                    if module_name:
-                        return f"{module_name}.{name}"
-                    return name
-
+            if hasattr(value, "_original_value"):
+                value = value._original_value
+            if hasattr(value, "name") and hasattr(value.name, "get_qualified_names"):
+                return ".".join(value.name.get_qualified_names(True))
             return None
         except Exception as e:
             logger.warning(f"Could not extract qualified name: {e}")
             return None
 
-    def _get_module_name(self, value) -> Optional[str]:
-        """Get the module name for a value."""
-        try:
-            if hasattr(value, 'get_root_context'):
-                root = value.get_root_context()
-                if root and self._is_module_context(root):
-                    if hasattr(root, 'py__name__'):
-                        return root.py__name__()
-                    if hasattr(root, 'string_name'):
-                        return root.string_name
-        except:
-            pass
-        return None
-
-    def _find_call_expression(self, leaf):
-        """Navigate up the AST to find the atom_expr or power node."""
-        curr = leaf
-        while curr.parent and curr.type not in ("atom_expr", "power"):
-            curr = curr.parent
-
-        if curr.type in ("atom_expr", "power"):
-            return curr
-        return None
-
-    def _infer_before_trailer(self, context, power_node, trailer_index):
-        """
-        Infer everything before the given trailer index.
-
-        For example:
-        - power_node: [name 'p', trailer '.wake_up', trailer '()']
-        - trailer_index: 2 (the call trailer)
-        - Returns: inference of 'p.wake_up' (the bound method)
-        """
-        from jedi.inference.syntax_tree import infer_trailer
-
-        try:
-            # Start with the base (first child) - returns ValueSet
-            values = context.infer_node(power_node.children[0])
-
-            # Apply each trailer BEFORE the call trailer
-            # infer_trailer expects a ValueSet and returns a ValueSet
-            for i in range(1, trailer_index):
-                child = power_node.children[i]
-                if child.type == 'trailer':
-                    # Apply this trailer (values is already a ValueSet)
-                    values = infer_trailer(context, values, child)
-
-            return list(values)  # Convert ValueSet to list for consistency
-        except Exception as e:
-            logger.debug(f"Error in _infer_before_trailer: {e}")
-            import traceback
-            traceback.print_exc()
-            return []
-
-    def _is_module_context(self, context: Any) -> bool:
-        """Detect whether a Jedi context represents a module."""
-        # Check class name
-        if context.__class__.__name__ in ('ModuleContext', 'CompiledModuleContext'):
-            return True
-
-        # Check if it's a module via is_module method
-        if hasattr(context, 'is_module') and callable(context.is_module):
-            try:
-                if context.is_module():
-                    return True
-            except:
-                pass
-
-        # Check tree_node type
-        tree_node = getattr(context, 'tree_node', None)
-        if tree_node and getattr(tree_node, 'type', None) == 'file_input':
-            return True
-
-        return False
+    def create_args(self, value, trailer, inference_state, context):
+        arglist = trailer.children[1]
+        if arglist == ")":
+            arglist = None
+        args = TreeArguments(inference_state, context, arglist, trailer)
+        return args

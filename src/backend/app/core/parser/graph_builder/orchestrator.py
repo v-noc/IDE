@@ -175,7 +175,7 @@ class GraphBuilderOrchestrator:
         self.body_parser.call_chain_builder.print_timing_summary()
 
         # Debugger: Visualize scope and call site graph
-        self._print_call_site_tree()
+        # self._print_call_site_tree()
         # self._visualize_graph()
 
         # Process Deleted folders before files to avoid orphan references
