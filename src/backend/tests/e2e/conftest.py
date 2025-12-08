@@ -1,4 +1,5 @@
 import pytest
+import shutil
 from fastapi.testclient import TestClient
 from arango.database import StandardDatabase
 
@@ -26,13 +27,13 @@ def client(arangodb_client: StandardDatabase) -> TestClient:
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(scope="session")
-def sample_project_path():
-    """Returns the path to the sample project directory for E2E tests."""
-    return str(
-        Path(__file__).parent
-        / "core/sample_project"
-    )
+@pytest.fixture
+def sample_project_path(tmp_path):
+    """Returns the path to a temporary copy of the sample project directory for E2E tests."""
+    source_path = Path(__file__).parent / "core/sample_project"
+    project_path = tmp_path / "sample_project"
+    shutil.copytree(source_path, project_path)
+    return str(project_path)
 
 
 @pytest.fixture

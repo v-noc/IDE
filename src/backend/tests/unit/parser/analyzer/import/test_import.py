@@ -18,13 +18,14 @@ def find_file_node(nodes: list[AnyTreeNode], file_name: str) -> FileTreeNode | N
 
 
 def test_absolute_path_import(project_tree: ProjectNode):
-    file_node = find_file_node(project_tree.children, "import_absolute.py")
+    file_node = find_file_node(project_tree.children, "import_absolute")
 
     assert file_node is not None
     assert len(file_node.children) == 2
 
     # Check for helper.create_user() call
-    create_user_call = file_node.children[0]
+    create_user_call = [
+        node for node in file_node.children if node.name == "create_user"][0]
     assert isinstance(create_user_call, CallTreeNode)
     assert create_user_call.name == "create_user"
     assert create_user_call.target is not None
@@ -33,8 +34,9 @@ def test_absolute_path_import(project_tree: ProjectNode):
     )
 
     # Check for User() instantiation
-    user_call = file_node.children[1]
+    user_call = [
+        node for node in file_node.children if node.name == "User"][0]
     assert isinstance(user_call, CallTreeNode)
-    assert user_call.name == "(User).__init__"
+    assert user_call.name == "User"
     assert user_call.target is not None
-    assert user_call.target.qname == "sample_import.utils.data.user.User.__init__"
+    assert user_call.target.qname == "sample_import.utils.data.user.User"

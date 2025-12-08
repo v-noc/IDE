@@ -1,29 +1,58 @@
+import shutil
 from pathlib import Path
 from typing import List
 
+import pytest
+
+from app.core.model.nodes import ProjectNode
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
-from app.core.parser.graph_builder import GraphBuilder
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.schemas.tree import AnyTreeNode
 
-
-# Locate sample project directory used by other tests
-CURRENT_FILE = Path(__file__).resolve()
-PROJECT_PATH = (CURRENT_FILE.parent / "./simple_function").absolute()
-TARGET_FILE = PROJECT_PATH / "main.py"
+FIXTURE_PROJECT = Path(__file__).parent / "simple_function"
+PROJECT_NAME = "simple_function"
 
 
-def _find_node_by_name(nodes: List[AnyTreeNode], name: str):
-    return next((node for node in nodes if getattr(node, "name", None) == name), None)
+@pytest.fixture
+def setup_project(tmp_path, arangodb_client):
+    project_path = tmp_path / "project"
+    shutil.copytree(FIXTURE_PROJECT, project_path)
+
+    db_path = tmp_path / "db" / PROJECT_NAME
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    project_node = ProjectNode(
+        name=PROJECT_NAME,
+        path=str(project_path),
+        qname=PROJECT_NAME,
+        description="Test Project",
+    )
+    scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
+    repos = Repositories(arangodb_client)
+    project_service = ProjectService(repos)
+    project_node = project_service.create_node(project_node)
+
+    return project_node, scope_manager, arangodb_client, project_path
 
 
-def _find_node_by_name_recursive(nodes: List[AnyTreeNode], name: str) -> AnyTreeNode:
+def find_node_by_name(nodes: List[AnyTreeNode], name: str):
+    return next(
+        (node for node in nodes if node.qname.split('.')[-1] == name),
+        None
+    )
+
+
+def find_node_by_name_recursive(
+    nodes: List[AnyTreeNode], name: str
+) -> AnyTreeNode:
     for node in nodes:
         if getattr(node, "name", None) == name:
             return node
         if hasattr(node, "children") and node.children:
-            found = _find_node_by_name_recursive(node.children, name)
+            found = find_node_by_name_recursive(node.children, name)
             if found:
                 return found
     return None
@@ -39,7 +68,8 @@ def _write_file(path: Path, content: str) -> None:
 
 def _append_sync_block(path: Path) -> None:
     block = (
-        "\n\n# SYNC_TEST_START\n\ndef sync_added():\n    return 42\n# SYNC_TEST_END\n"
+        "\n\n# SYNC_TEST_START\n\ndef sync_added():\n    "
+        "return 42\n# SYNC_TEST_END\n"
     )
     with path.open("a", encoding="utf-8") as f:
         f.write(block)
@@ -58,14 +88,13 @@ def _remove_sync_block(content: str, start_str: str, end_str: str) -> str:
     return content[:start] + content[end_line:]
 
 
-def _build_and_get_tree(db):
-    # Initial or incremental build; when a project already exists we pass its node
-    builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        project_node=None,
+def _build_and_get_tree(project_node, scope_manager, db):
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
         db=db,
+        scope_manager=scope_manager,
     )
-    builder.build("Protector", "Protector is a tool for protecting your code.")
+    orchestrator.resync()
 
     repos = Repositories(db)
     project_service = ProjectService(repos)
@@ -77,54 +106,60 @@ def _build_and_get_tree(db):
     return tree_builder.build()
 
 
-def _resync_and_get_tree(db):
-    # Fetch existing project node and run a resync build using existing node
+def _resync_and_get_tree(project_node, scope_manager, db):
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
+        db=db,
+        scope_manager=scope_manager,
+    )
+    orchestrator.resync()
+
     repos = Repositories(db)
     project_service = ProjectService(repos)
     projects = project_service.get_all()
     assert projects, "No project found before resync"
-
-    builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        project_node=projects[0],
-        db=db,
-    )
-    builder.build(projects[0].name, projects[0].description)
 
     children = project_service.get_children(projects[0].id)
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
-def test_function_sync_add_and_remove(arangodb_client):
+def test_function_sync_add_and_remove(setup_project):
+    project_node, scope_manager, arangodb_client, project_path = setup_project
+    target_file = project_path / "main.py"
+
     # 1) Build once
-    tree = _build_and_get_tree(arangodb_client)
+    tree = _build_and_get_tree(project_node, scope_manager, arangodb_client)
     assert tree, "No tree nodes built"
 
-    file_node = tree[0]
-
-    # Snapshot current children names
-    initial_children = [getattr(c, "name", None) for c in file_node.children]
-
-    original = _read_file(TARGET_FILE)
+    original = _read_file(target_file)
     try:
         # 2) Append a function to the file
-        _append_sync_block(TARGET_FILE)
+        _append_sync_block(target_file)
 
         # 3) Resync and verify function is present
-        tree_after_add = _resync_and_get_tree(arangodb_client)
+        tree_after_add = _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
         file_node_after_add = tree_after_add[0]
         names_after_add = [
             getattr(c, "name", None) for c in file_node_after_add.children
         ]
-        assert "sync_added" in names_after_add, "New function not detected after resync"
+        assert "sync_added" in names_after_add, (
+            "New function not detected after resync"
+        )
 
         # 4) Remove the function and resync
-        updated = _remove_sync_block(_read_file(
-            TARGET_FILE), start_str="def sync_added():", end_str="return 42")
-        _write_file(TARGET_FILE, updated)
+        updated = _remove_sync_block(
+            _read_file(target_file),
+            start_str="def sync_added():",
+            end_str="return 42"
+        )
+        _write_file(target_file, updated)
 
-        tree_after_remove = _resync_and_get_tree(arangodb_client)
+        tree_after_remove = _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
         file_node_after_remove = tree_after_remove[0]
         names_after_remove = [
             getattr(c, "name", None) for c in file_node_after_remove.children
@@ -135,18 +170,21 @@ def test_function_sync_add_and_remove(arangodb_client):
 
     finally:
         # Restore original content
-        _write_file(TARGET_FILE, original)
+        _write_file(target_file, original)
         # Final resync to leave DB in original state
-        _resync_and_get_tree(arangodb_client)
+        _resync_and_get_tree(project_node, scope_manager, arangodb_client)
 
 
-def test_function_sync_add_and_remove_inside_function(arangodb_client):
+def test_function_sync_add_and_remove_inside_function(setup_project):
+    project_node, scope_manager, arangodb_client, project_path = setup_project
+    target_file = project_path / "main.py"
+
     # 1) Build once to ensure project is in the DB
-    tree = _build_and_get_tree(arangodb_client)
+    tree = _build_and_get_tree(project_node, scope_manager, arangodb_client)
     assert tree, "No tree nodes built"
 
     # 2) Find the target function to modify
-    add_func_node = _find_node_by_name_recursive(tree, "add")
+    add_func_node = find_node_by_name_recursive(tree, "add")
     assert add_func_node is not None, "'add' function not found"
     assert hasattr(add_func_node, "position"), "Node has no position attribute"
 
@@ -166,26 +204,34 @@ def test_function_sync_add_and_remove_inside_function(arangodb_client):
         lines[end_line - 1: end_line - 1] = block
         _write_file(path, "\n".join(lines))
 
-    original_content = _read_file(TARGET_FILE)
+    original_content = _read_file(target_file)
     try:
         # 3) Insert new function and resync
-        _insert_block(TARGET_FILE)
+        _insert_block(target_file)
 
-        tree_after_add = _resync_and_get_tree(arangodb_client)
-        add_func_after_add = _find_node_by_name_recursive(
-            tree_after_add, "add")
+        tree_after_add = _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
+        add_func_after_add = find_node_by_name_recursive(
+            tree_after_add, "add"
+        )
         assert "sync_added_inside" in [
             getattr(c, "name", None) for c in add_func_after_add.children
         ], "New function not detected in 'add'"
 
         # 4) Remove the new function and resync
-        content_with_block = _read_file(TARGET_FILE)
+        content_with_block = _read_file(target_file)
         content_without_block = _remove_sync_block(
-            content_with_block, start_str="def sync_added_inside():", end_str="pass")
-        _write_file(TARGET_FILE, content_without_block)
+            content_with_block,
+            start_str="def sync_added_inside():",
+            end_str="pass"
+        )
+        _write_file(target_file, content_without_block)
 
-        tree_after_remove = _resync_and_get_tree(arangodb_client)
-        add_func_after_remove = _find_node_by_name_recursive(
+        tree_after_remove = _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
+        add_func_after_remove = find_node_by_name_recursive(
             tree_after_remove, "add")
         assert "sync_added_inside" not in [
             getattr(c, "name", None) for c in add_func_after_remove.children
@@ -193,5 +239,5 @@ def test_function_sync_add_and_remove_inside_function(arangodb_client):
 
     finally:
         # 5) Restore original content and resync
-        _write_file(TARGET_FILE, original_content)
-        _resync_and_get_tree(arangodb_client)
+        _write_file(target_file, original_content)
+        _resync_and_get_tree(project_node, scope_manager, arangodb_client)

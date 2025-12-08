@@ -24,7 +24,7 @@ class ContainerService:
         container_id: str,
         child_id: str,
         contain_type: Optional[str] = None,
-
+        version: Optional[int] = None,
     ):
         container = self.repos.nodes.get_by_id(container_id)
         if not container:
@@ -39,11 +39,16 @@ class ContainerService:
                 f"{container.node_type.lower()}_to_{child.node_type.lower()}"
             )
 
+        # Use parent's current_version if version not provided
+        if version is None:
+            version = getattr(container, 'current_version', 0) or 0
+
         contains_edge = ContainsEdge(
             from_id=container_id,
             to_id=child_id,
             relationship="contains_edges",
-            contain_type=contain_type
+            contain_type=contain_type,
+            version=version,
         )
         self.repos.contains_edges.create(contains_edge)
         return True

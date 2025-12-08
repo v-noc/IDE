@@ -28,7 +28,7 @@ def test_get_function(create_repos, create_function):
     assert function is not None
     assert function.name == "Test Function"
     assert function.qname == "test_project.test_function"
-    assert function.description == "This is a test function"
+    assert function.description == "This is test function"
 
 
 def test_update_function(create_repos, create_function):

@@ -3,10 +3,12 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
-from app.core.parser.graph_builder import GraphBuilder
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.builder.tree_builder import TreeBuilder
 from app.db.client import get_db
 from arango.database import StandardDatabase
+from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 from app.api.dependencies import get_project_service
 from pathlib import Path
@@ -52,8 +54,23 @@ def create_project(
         )
 
     try:
-        graph_builder = GraphBuilder(project.path,  db=db)
-        graph_builder.build(project.name, project.description)
+        project_node = ProjectNode(
+            name=project.name,
+            description=project.description or "",
+            qname=project.name.lower().replace(" ", "_"),
+            path=project.path,
+        )
+        repos = Repositories(db)
+        project_service_create = ProjectService(repos)
+        project_node = project_service_create.create_node(project_node)
+
+        scope_manager = ScopeManager(project_node.name)
+        orchestrator = GraphBuilderOrchestrator(
+            project_node=project_node,
+            db=db,
+            scope_manager=scope_manager,
+        )
+        orchestrator.resync()
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -69,7 +86,6 @@ def create_project(
             detail="Failed to build project graph",
         )
 
-    project_node = graph_builder.project_node
     children = project_service.get_children(project_node.id)
 
     tree_builder = TreeBuilder(children)
@@ -153,6 +169,8 @@ def delete_project(
         result = project_service.delete(project)
         if result is False:
             return False
+        scope_manager = ScopeManager(project.name)
+        scope_manager.delete_cache()
         return True
     else:
         raise HTTPException(

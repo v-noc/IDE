@@ -1,24 +1,28 @@
+import shutil
 from pathlib import Path
 from typing import List
 
-from app.core.repository import Repositories
-from app.core.services.project_service import ProjectService
-from app.core.parser.graph_builder import GraphBuilder
+import pytest
+
 from app.core.builder.tree_builder import TreeBuilder
+from app.core.model.nodes import ProjectNode
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.repository import Repositories
 from app.core.schemas.tree import AnyTreeNode
+from app.core.services.project_service import ProjectService
 
-
-# Locate sample project directory used by other tests
-CURRENT_FILE = Path(__file__).resolve()
-PROJECT_PATH = (CURRENT_FILE.parent / "./sample_class").absolute()
-TARGET_FILE = PROJECT_PATH / "main.py"
+SAMPLES_PATH = Path(__file__).parent / "sample_class"
+PROJECT_NAME = "sample_class"
 
 
 def _find_node_by_name(nodes: List[AnyTreeNode], name: str):
     return next((n for n in nodes if getattr(n, "name", None) == name), None)
 
 
-def _find_node_by_name_recursive(nodes: List[AnyTreeNode], name: str) -> AnyTreeNode:
+def _find_node_by_name_recursive(
+    nodes: List[AnyTreeNode], name: str
+) -> AnyTreeNode:
     for node in nodes:
         if getattr(node, "name", None) == name:
             return node
@@ -27,6 +31,28 @@ def _find_node_by_name_recursive(nodes: List[AnyTreeNode], name: str) -> AnyTree
             if found:
                 return found
     return None
+
+
+@pytest.fixture
+def setup_project(tmp_path, arangodb_client):
+    project_path = tmp_path / "sample_class"
+    shutil.copytree(SAMPLES_PATH, project_path)
+
+    db_path = tmp_path / "db" / PROJECT_NAME
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    project_node = ProjectNode(
+        name=PROJECT_NAME,
+        path=str(project_path),
+        qname=PROJECT_NAME,
+        description="Protector is a tool for protecting your code.",
+    )
+    scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
+    repos = Repositories(arangodb_client)
+    project_service = ProjectService(repos)
+    project_node = project_service.create_node(project_node)
+
+    return project_node, scope_manager, arangodb_client, project_path
 
 
 def _read_file(path: Path) -> str:
@@ -39,7 +65,8 @@ def _write_file(path: Path, content: str) -> None:
 
 def _append_sync_block(path: Path) -> None:
     block = (
-        "\n\n# SYNC_TEST_START\n\nclass SyncAddedClass:\n    pass\n# SYNC_TEST_END\n"
+        "\n\n# SYNC_TEST_START\n\nclass SyncAddedClass:\n    pass\n"
+        "# SYNC_TEST_END\n"
     )
     with path.open("a", encoding="utf-8") as f:
         f.write(block)
@@ -58,14 +85,13 @@ def _remove_sync_block(content: str, start_str: str, end_str: str) -> str:
     return content[:start] + content[end_line:]
 
 
-def _build_and_get_tree(db):
-    # Initial or incremental build; when a project already exists we pass its node
-    builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        project_node=None,
+def _build_and_get_tree(project_node, scope_manager, db):
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
         db=db,
+        scope_manager=scope_manager,
     )
-    builder.build("Protector", "Protector is a tool for protecting your code.")
+    orchestrator.resync()
 
     repos = Repositories(db)
     project_service = ProjectService(repos)
@@ -77,28 +103,30 @@ def _build_and_get_tree(db):
     return tree_builder.build()
 
 
-def _resync_and_get_tree(db):
-    # Fetch existing project node and run a resync build using existing node
+def _resync_and_get_tree(project_node, scope_manager, db):
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
+        db=db,
+        scope_manager=scope_manager,
+    )
+    orchestrator.resync()
+
     repos = Repositories(db)
     project_service = ProjectService(repos)
     projects = project_service.get_all()
     assert projects, "No project found before resync"
-
-    builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        project_node=projects[0],
-        db=db,
-    )
-    builder.build(projects[0].name, projects[0].description)
 
     children = project_service.get_children(projects[0].id)
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
-def test_class_sync_add_and_remove(arangodb_client):
+def test_class_sync_add_and_remove(setup_project):
+    project_node, scope_manager, arangodb_client, project_path = setup_project
+    target_file = project_path / "main.py"
+
     # 1) Build once
-    tree = _build_and_get_tree(arangodb_client)
+    tree = _build_and_get_tree(project_node, scope_manager, arangodb_client)
     assert tree, "No tree nodes built"
 
     file_node = tree[0]
@@ -106,13 +134,15 @@ def test_class_sync_add_and_remove(arangodb_client):
     # Snapshot current children names (unused, but ensures access is valid)
     _ = [getattr(c, "name", None) for c in file_node.children]
 
-    original = _read_file(TARGET_FILE)
+    original = _read_file(target_file)
     try:
         # 2) Append a class to the file
-        _append_sync_block(TARGET_FILE)
+        _append_sync_block(target_file)
 
         # 3) Resync and verify class is present
-        tree_after_add = _resync_and_get_tree(arangodb_client)
+        tree_after_add = _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
         file_node_after_add = tree_after_add[0]
         names_after_add = [
             getattr(c, "name", None) for c in file_node_after_add.children
@@ -123,11 +153,15 @@ def test_class_sync_add_and_remove(arangodb_client):
 
         # 4) Remove the class and resync
         updated = _remove_sync_block(
-            _read_file(TARGET_FILE), start_str="class SyncAddedClass:", end_str="pass"
+            _read_file(target_file),
+            start_str="class SyncAddedClass:",
+            end_str="pass",
         )
-        _write_file(TARGET_FILE, updated)
+        _write_file(target_file, updated)
 
-        tree_after_remove = _resync_and_get_tree(arangodb_client)
+        tree_after_remove = _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
         file_node_after_remove = tree_after_remove[0]
         names_after_remove = [
             getattr(c, "name", None) for c in file_node_after_remove.children
@@ -138,14 +172,17 @@ def test_class_sync_add_and_remove(arangodb_client):
 
     finally:
         # Restore original content
-        _write_file(TARGET_FILE, original)
+        _write_file(target_file, original)
         # Final resync to leave DB in original state
-        _resync_and_get_tree(arangodb_client)
+        _resync_and_get_tree(project_node, scope_manager, arangodb_client)
 
 
-def test_class_sync_add_and_remove_inside_class(arangodb_client):
+def test_class_sync_add_and_remove_inside_class(setup_project):
+    project_node, scope_manager, arangodb_client, project_path = setup_project
+    target_file = project_path / "main.py"
+
     # 1) Build once to ensure project is in the DB
-    tree = _build_and_get_tree(arangodb_client)
+    tree = _build_and_get_tree(project_node, scope_manager, arangodb_client)
     assert tree, "No tree nodes built"
 
     # 2) Find the target class to modify
@@ -169,31 +206,39 @@ def test_class_sync_add_and_remove_inside_class(arangodb_client):
         lines[end_line:end_line] = block
         _write_file(path, "\n".join(lines))
 
-    original_content = _read_file(TARGET_FILE)
+    original_content = _read_file(target_file)
     try:
         # 3) Insert new inner class and resync
-        _insert_block(TARGET_FILE)
+        _insert_block(target_file)
 
-        tree_after_add = _resync_and_get_tree(arangodb_client)
-        parent_after_add = _find_node_by_name_recursive(tree_after_add, "Parent")
+        tree_after_add = _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
+        parent_after_add = _find_node_by_name_recursive(
+            tree_after_add, "Parent")
         assert "SyncAddedInner" in [
             getattr(c, "name", None) for c in parent_after_add.children
         ], "New inner class not detected in 'Parent'"
 
         # 4) Remove the inner class and resync
-        content_with_block = _read_file(TARGET_FILE)
+        content_with_block = _read_file(target_file)
         content_without_block = _remove_sync_block(
-            content_with_block, start_str="class SyncAddedInner:", end_str="pass"
+            content_with_block,
+            start_str="class SyncAddedInner:",
+            end_str="pass",
         )
-        _write_file(TARGET_FILE, content_without_block)
+        _write_file(target_file, content_without_block)
 
-        tree_after_remove = _resync_and_get_tree(arangodb_client)
-        parent_after_remove = _find_node_by_name_recursive(tree_after_remove, "Parent")
+        tree_after_remove = _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
+        parent_after_remove = _find_node_by_name_recursive(
+            tree_after_remove, "Parent")
         assert "SyncAddedInner" not in [
             getattr(c, "name", None) for c in parent_after_remove.children
         ], "Removed inner class still present"
 
     finally:
         # 5) Restore original content and resync
-        _write_file(TARGET_FILE, original_content)
-        _resync_and_get_tree(arangodb_client)
+        _write_file(target_file, original_content)
+        _resync_and_get_tree(project_node, scope_manager, arangodb_client)

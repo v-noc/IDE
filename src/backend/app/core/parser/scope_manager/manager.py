@@ -1,370 +1,543 @@
-from typing import Dict, List, Optional, Any
-
-
-from app.core.parser.scope_manager.class_analysis.mro import MROCalculator
-from app.core.parser.scope_manager.class_analysis.method_resolver import MethodResolver
-from app.core.parser.scope_manager.class_analysis.model import InheritanceGraph
-from app.core.parser.scope_manager.call_context.tracker import CallGraphTracker
-from app.core.parser.scope_manager.call_context.resolver import ExecutionContextResolver
-from app.core.parser.scope_manager.call_context.instantiation import (
-    ClassInstantiationHandler,
-)
-from app.core.parser.scope_manager.core import SymbolType, Scope, ScopeType, Symbol
-from app.core.parser.scope_manager.call_context.models import CallFrame, CallGraph
-from app.core.parser.scope_manager.storage.symbol_table import SymbolTable
+from .db import DBConnectionManager
+from .repository import ScopeRepository
+from .models import ScopeModel, CallSiteModel, ScopeType
+from typing import Optional, List
+import uuid
 
 
 class ScopeManager:
     """
-    Manages the creation and navigation of a scope hierarchy and provides
-    class analysis and context-sensitive analysis capabilities.
+    Facade/Service layer for managing scopes and call sites.
+    Provides high-level operations for creating, querying, and managing code structure.
     """
 
-    def __init__(self, db_name: str = "scope_manager"):
-        self.table = SymbolTable(db_name)
-        self.current_scope: Optional[Scope] = None
-        self.root_scope: Optional[Scope] = None
+    def __init__(self, project_name: str, db_path: Optional[str] = None):
+        self.db_manager = DBConnectionManager(project_name, db_path)
+        self.repository = ScopeRepository(self.db_manager)
 
-        self._scope_index: Dict[str, str] = {}
+    # Scope Management
 
-        self._root_symbols: Optional[Symbol] = None
-
-        # --- Class Analysis Components ---
-        self.inheritance_graph = InheritanceGraph()
-        self.mro_calculator = MROCalculator(self.inheritance_graph)
-        self.method_resolver = MethodResolver(
-            self.inheritance_graph, self.table)
-
-        # A map to track what symbol an alias points to.
-
-        # self.current_frame_stack = []
-
-    # Class Analysis Methods
-
-    def register_class(self, base_qnames: List[str]):
-        """
-        Registers a new class in the inheritance graph.
-        """
-        if not self.current_scope or self.current_scope.scope_type != ScopeType.CLASS:
-            raise TypeError("Can only register a class scope.")
-
-        self.inheritance_graph.add_class(self.current_scope, base_qnames)
-
-    def calculate_all_mro(self):
-        """
-        Calculates the MRO for all classes in the inheritance graph.
-        """
-        self.mro_calculator.calculate_all()
-
-    def get_mro(self, class_qname: str) -> List[str]:
-        """
-        Gets the MRO for a specific class.
-        """
-        return self.mro_calculator.get_mro(class_qname)
-
-    def resolve_method(self, class_qname: str, method_name: str) -> Optional[Symbol]:
-        """
-        Resolves a method on a class using its MRO.
-        """
-        return self.method_resolver.resolve_method(class_qname, method_name)
-
-    def resolve_super_call(
-        self, method_scope: Scope, method_name: str
-    ) -> Optional[Symbol]:
-        """
-        Resolves a super().method() call from within a method's scope.
-        """
-
-        if not method_scope.parent or method_scope.parent.scope_type != ScopeType.CLASS:
-            raise ValueError(
-                "super() can only be resolved within a method of a class.")
-
-        class_qname = method_scope.parent.qualified_name
-        return self.method_resolver.resolve_super_call(class_qname, method_name)
-
-    # ---
-
-    # Symbol Management Methods
-
-    def add_symbol(self, symbol: Symbol):
-        """
-        Adds a symbol to the current scope.
-        """
-        self.current_scope.add_symbol(symbol)
-
-    def track_static_assignment(self, alias: Symbol, target: Symbol):
-        """
-        Creates a static assignment relationship between symbols.
-        This uses the enhanced Symbol assignment tracking.
-        """
-        alias.assign_to(target)
-
-    def resolve_final_symbol(self, name: str) -> Optional[Symbol]:
-        """
-        Resolves a symbol by name and follows any alias chains to find the
-        final, underlying symbol (e.g., a class or function).
-        """
-        immediate_symbol = self.lookup_symbol(name)
-        if not immediate_symbol:
-            return None
-
-        # Use the enhanced symbol resolution
-        return immediate_symbol.resolve_final()
-
-    def define_symbol(
-        self, name: str, symbol_type: SymbolType, **kwargs: Any
-    ) -> Symbol:
-        """
-        Defines a new symbol in the current scope.
-        """
-        if not self.current_scope:
-            raise ValueError("Cannot define a symbol without an active scope.")
-
-        symbol = Symbol(
-            name=name,
-            symbol_type=symbol_type,
-            defining_scope_id=self.current_scope.id,
-            **kwargs,
-        )
-        symbol.bind_table(self.table)
-        self.table.save_symbol(symbol)
-
-        self.current_scope.add_symbol(symbol)
-        return symbol
-
-    def define_runtime_variable(
-        self, name: str, symbol_type: SymbolType, **kwargs: Any
-    ) -> Symbol:
-        """
-        Defines a new symbol in the CURRENT EXECUTION FRAME's scope.
-        This is the correct way to handle local variable assignments during dynamic analysis.
-        """
-        if not self.call_tracker or not self.call_tracker.current_frame:
-            raise RuntimeError(
-                "Cannot define a runtime variable without an active call frame."
-            )
-
-        # Delegate directly to the current frame's execution scope
-        execution_scope = self.call_tracker.current_frame.execution_scope
-
-        symbol = Symbol(
-            name=name,
-            symbol_type=symbol_type,
-            # CRITICAL: Defined in the execution scope
-            defining_scope_id=execution_scope.id,
-            **kwargs,
-        )
-        symbol.bind_table(self.table)
-        self.table.save_symbol(symbol)
-
-        execution_scope.add_symbol(symbol)
-        return symbol
-
-    def lookup_symbol(self, name: str) -> Optional[Symbol]:
-        """
-        Looks up a symbol by name, starting from the current scope and
-        walking up the parent chain according to LEGB rules (Local, Enclosing, Global).
-
-        Note: Built-in scope is not checked here.
-        """
-        scope = self.table.get_scope(self.current_scope.id)
-        scope.bind_table(self.table)
-        while scope:
-            # Direct symbol in scope
-            if name in scope.symbols:
-                return scope.symbols[name]
-
-            # Wildcard-imported module scopes (last-import wins)
-            for module_scope in reversed(scope.wildcard_import_scopes):
-                if name in module_scope.symbols:
-                    return module_scope.symbols[name]
-
-            scope = scope.parent
-
-        return None
-
-    # Scope Management Methods
-
-    def create_root_scope(self, name: str = "__main__") -> Scope:
-        """
-        Creates the root (module-level) scope. This must be the first call.
-        """
-        if self.root_scope:
-            raise ValueError("Root scope has already been created.")
-
-        root = Scope(name=name, scope_type=ScopeType.PROJECT)
-        root.bind_table(self.table)
-        self._root_symbols = Symbol(
-            name=name, symbol_type=SymbolType.PROJECT, defining_scope_id=root.id
-        )
-        self.table.save_scope(root)
-        self._root_symbols.bind_table(self.table)
-
-        self.root_scope = root
-        self.current_scope = root
-        self._scope_index[name] = root.id
-
-        # --- Initialize Dynamic Analysis Components ---
-        # Now that we have a root scope, we can initialize the components.
-
-        self.call_tracker = CallGraphTracker(self)
-        self.context_resolver = ExecutionContextResolver(self)
-        self.class_instantiator = ClassInstantiationHandler(self, self.table)
-
-        return root
-
-    def enter_scope(self, name: str, scope_type: ScopeType) -> Scope:
-        """
-        Enters a new nested scope and creates a corresponding symbol
-        in the parent scope if necessary (for functions and classes).
-        """
-        if not self.current_scope:
-            raise ValueError(
-                "Cannot enter scope without a root. Call create_root_scope() first."
-            )
-
-        # --- KEY CHANGE ---
-        # Create a symbol in the current scope for the new scope-creating entity.
-        if scope_type in (ScopeType.FUNCTION, ScopeType.CLASS, ScopeType.MODULE):
-            symbol_type = {
-                ScopeType.FUNCTION: SymbolType.FUNCTION,
-                ScopeType.CLASS: SymbolType.CLASS,
-                ScopeType.MODULE: SymbolType.MODULE,
-            }[scope_type]
-            # This defines the symbol in the *current* scope, before we descend.
-            self.define_symbol(name, symbol_type)
-        # --- END KEY CHANGE ---
-
-        new_scope = Scope(name=name, scope_type=scope_type)
-        new_scope.bind_table(self.table)
-        self.table.save_scope(new_scope)
-        self.current_scope.add_child_scope(new_scope)
-        self.current_scope = new_scope
-        self._scope_index[new_scope.qualified_name] = new_scope.id
-        return new_scope
-
-    def exit_scope(self) -> Optional[Scope]:
-        """
-        Exits the current scope and moves to its parent.
-        Returns the scope that was exited.
-        """
-        if not self.current_scope:
-            return None
-
-        exited_scope = self.current_scope
-        self.current_scope = self.current_scope.parent
-        return exited_scope
-
-    def get_scope_by_qname(self, qualified_name: str) -> Optional[Scope]:
-        """
-        Retrieves a scope directly by its qualified name.
-        """
-
-        scope = self.table.get_scope(self._scope_index.get(qualified_name))
-        scope.bind_table(self.table)
-        return scope
-
-    def register_wildcard_import(
-        self, target_scope_qname: Optional[str], module_qname: str
-    ):
-        """
-        Register that `from module_qname import *` is in effect in `target_scope_qname`.
-        If target_scope_qname is None, use the current scope.
-        """
-        target_scope = (
-            self.current_scope
-            if target_scope_qname is None
-            else self.get_scope_by_qname(target_scope_qname)
-        )
-        module_scope = self.get_scope_by_qname(module_qname)
-
-        if not target_scope or not module_scope:
-            return
-
-        target_scope.add_wildcard_import(module_scope)
-
-    def enter_scope_by_scope(self, scope: Scope) -> Scope:
-        """
-        Enters a new scope by name.
-        """
-
-        if not scope:
-            raise ValueError("Please provide a scope")
-        self.current_scope = scope
-        return scope
-
-    # --- Call Context Methods ---
-
-    def instantiate(self, class_name: str) -> Symbol:
-        """
-        High-level API to find a class and create an instance of it.
-        Note: This does NOT call __init__. Invoke it explicitly if needed.
-        """
-        class_symbol = self.lookup_symbol(class_name)
-        class_symbol_final = class_symbol.resolve_final()
-
-        if class_symbol_final.symbol_type == SymbolType.OBJECT_INSTANCE:
-            return class_symbol_final
-        # class_symbol = class_symbol.resolve_final()
-        if not class_symbol_final or class_symbol_final.symbol_type != SymbolType.CLASS:
-            raise NameError(f"Unknown class: {class_name}")
-
-        # The class_instantiator does the work and returns the new instance symbol
-        instance_symbol = self.class_instantiator.instantiate_class(
-            class_symbol_final)
-        return instance_symbol  # <-- RETURN THE INSTANCE SYMBOL
-
-    def invoke(
+    def create_scope(
         self,
-        callee_name: str | Symbol,
-        args: Dict[str, Any],
-    ) -> CallFrame:
-        """
-        High-level API to simulate a function call.
-        Note: For class instantiation, use the `instantiate()` method.
-        """
-        callee_symbol = callee_name
-        if isinstance(callee_symbol, str):
-            callee_symbol = self.lookup_symbol(callee_symbol)
-        if not callee_symbol:
-            raise NameError(f"Unknown function: {callee_name}")
+        name: str,
+        qname: str,
+        scope_type: ScopeType,
+        file_path: str,
+        start_line: int,
+        start_col: int,
+        end_line: int,
+        end_col: int,
+        mro: List[str] = None,
+        scope_id: Optional[str] = None,
+        checksum: Optional[str] = None,
+    ) -> ScopeModel:
+        """Create a new scope."""
+        scope = ScopeModel(
+            id=scope_id or str(uuid.uuid4()),
+            name=name,
+            qname=qname,
+            type=scope_type,
+            file_path=file_path,
+            start_line=start_line,
+            start_col=start_col,
+            end_line=end_line,
+            end_col=end_col,
+            mro=mro or [],
+            checksum=checksum,
+        )
+        self.repository.create_scope(scope)
+        return scope
 
-        if callee_symbol.symbol_type == SymbolType.CLASS:
-            raise TypeError(
-                f"'{callee_name}' is a class. Use the .instantiate() method to create an object."
+    def update_scope(self, scope: ScopeModel) -> ScopeModel:
+        """Update an existing scope."""
+        self.repository.update_scope(scope)
+        return scope
+
+    def get_scope(self, scope_id: str) -> Optional[ScopeModel]:
+        """Get a scope by ID."""
+        return self.repository.get_scope_by_id(scope_id)
+
+    def get_scope_by_qname(self, qname: str) -> Optional[ScopeModel]:
+        """Get a scope by qualified name."""
+        return self.repository.get_scope_by_qname(qname)
+
+    def delete_scope(self, scope_id: str) -> None:
+        """Delete a scope and its relationships."""
+        self.repository.delete_scope(scope_id)
+
+    def delete_file_scope(self, file_path: str) -> None:
+        """Delete a file scope by its path."""
+        self.repository.delete_file_scope(file_path)
+
+    def get_all_scopes(self) -> List[ScopeModel]:
+        """Get all scopes."""
+        return self.repository.get_all_scopes()
+
+    def get_all_file_scopes(self) -> List[ScopeModel]:
+        """Get all scopes of type FILE."""
+        return self.repository.get_all_file_scopes()
+
+    def get_all_folder_scopes(self) -> List[ScopeModel]:
+        """Get all scopes of type FOLDER."""
+        return self.repository.get_all_folder_scopes()
+
+    # Hierarchy Management
+
+    def link_parent_child(self, parent_id: str, child_id: str) -> None:
+        """Link a parent scope to a child scope (e.g., Class contains Function)."""
+        self.repository.link_parent_child(parent_id, child_id)
+
+    def get_children(self, parent_id: str) -> List[ScopeModel]:
+        """Get all children of a scope."""
+        return self.repository.get_children(parent_id)
+
+    # Call Site Management
+
+    def create_call(
+        self,
+        caller_id: str,
+        line: int,
+        col: int,
+        name: Optional[str] = None,
+        callee_id: Optional[str] = None,
+        prev_call_site_id: Optional[str] = None,
+    ) -> CallSiteModel:
+        """Create a call site linking caller to callee (if resolved), optionally chained."""
+        call_site = CallSiteModel(
+            id=str(uuid.uuid4()),
+            line=line,
+            col=col,
+            name=name,
+        )
+        self.repository.create_call_site(
+            caller_id, callee_id, call_site, prev_call_site_id)
+        return call_site
+
+    def batch_create_calls(
+        self,
+        call_sites: List[dict],
+    ) -> List[CallSiteModel]:
+        """
+        Batch create multiple call sites efficiently.
+
+        Args:
+            call_sites: List of dicts with keys:
+                - caller_id: str
+                - line: int
+                - col: int
+                - name: Optional[str]
+                - callee_id: Optional[str]
+                - prev_call_site_id: Optional[str]
+
+        Returns:
+            List of created CallSiteModel instances
+        """
+        if not call_sites:
+            return []
+
+        # Create CallSiteModel instances
+        created_call_sites = []
+        batch_data = []
+        for item in call_sites:
+            call_site = CallSiteModel(
+                id=str(uuid.uuid4()),
+                line=item["line"],
+                col=item["col"],
+                name=item.get("name"),
+            )
+            created_call_sites.append(call_site)
+            batch_data.append({
+                "call_site": call_site,
+                "caller_id": item["caller_id"],
+                "callee_id": item.get("callee_id"),
+                "prev_call_site_id": item.get("prev_call_site_id"),
+            })
+
+        # Batch insert
+        self.repository.batch_create_call_sites(batch_data)
+        return created_call_sites
+
+    def get_root_calls_from(
+        self, caller_id: str, include_children: bool = False
+    ) -> List[dict]:
+        """
+        Get root calls made from a scope (calls with no previous call site
+        parent).
+
+        Args:
+            caller_id: The scope ID to get root calls from
+            include_children: If True, also fetch calls inside each callee
+                             scope and attach them as a 'children' attribute
+
+        Returns:
+            List of call info dicts with 'call_site' and 'callee' keys.
+            If include_children=True, each dict also has a 'children' key
+            containing calls inside the callee scope.
+        """
+        if include_children:
+            # Fetch root calls with their nested children in one query
+            result = self.repository.conn.execute(
+                """
+                MATCH (caller:Scope {id: $caller_id})
+                    -[:HAS_CALL_SITE]->(cs:CallSite)
+                WHERE NOT EXISTS {
+                    MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(cs)
+                }
+                OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
+                WITH cs, callee
+                OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
+                    -[:HAS_CALL_SITE]->(inner_call:CallSite)
+                OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
+                WITH cs, callee,
+                    collect(DISTINCT {
+                        inner_call: inner_call,
+                        inner_callee: inner_callee
+                    }) AS children_data
+                RETURN cs, callee, children_data
+                """,
+                {"caller_id": caller_id}
+            )
+        else:
+            result = self.repository.conn.execute(
+                """
+                MATCH (caller:Scope {id: $caller_id})-[:HAS_CALL_SITE]->(cs:CallSite)
+                WHERE NOT EXISTS { MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(cs) }
+                OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
+                RETURN cs, callee
+                """,
+                {"caller_id": caller_id}
             )
 
-        # Now invoke is ONLY for function/method calls
-        frame = self.call_tracker.start_call(callee_symbol, args)
-        # if len(self.current_frame_stack) == 0:
-        #     self.current_scope.children[frame.id] = frame.execution_scope
-        # else:
-        #     self.current_frame_stack[-1].execution_scope.children[frame.id] = (
-        #         frame.execution_scope
-        #     )
-        # self.current_frame_stack.append(frame)
-        return frame
+        calls = []
+        for row in result:
+            cs_node = row[0]
+            callee_node = row[1] if len(row) > 1 else None
 
-    def resolve_symbol_in_context(self, name: str) -> Optional[Symbol]:
-        """
-        Context-aware symbol resolution.
-        """
-        resolver = getattr(self, "context_resolver", None)
-        if resolver is None:
-            return None
-        return resolver.resolve(name)
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
 
-    def end_current_call(
-        self, return_value: Optional[Symbol] = None
-    ) -> Optional[Symbol]:
-        """
-        End the current function call.
-        """
-        # self.current_frame_stack.pop()
-        return self.call_tracker.end_call(return_value)
+            call_info = {
+                "call_site": CallSiteModel(
+                    id=cs_node["id"],
+                    line=cs_node["line"],
+                    col=cs_node["col"],
+                    name=cs_node.get("name"),
+                ),
+                "callee": callee,
+            }
 
-    def get_call_graph(self) -> CallGraph:
+            # If include_children, process children data
+            if include_children and len(row) > 2:
+                children_data = row[2]
+                children = []
+                for child_item in children_data:
+                    inner_call_node = child_item.get("inner_call")
+                    inner_callee_node = child_item.get("inner_callee")
+
+                    if inner_call_node:
+                        inner_callee = None
+                        if inner_callee_node:
+                            inner_callee = ScopeModel(
+                                id=inner_callee_node["id"],
+                                name=inner_callee_node["name"],
+                                qname=inner_callee_node["qname"],
+                                type=inner_callee_node["type"],
+                                file_path=inner_callee_node["file_path"],
+                                start_line=inner_callee_node["start_line"],
+                                start_col=inner_callee_node["start_col"],
+                                end_line=inner_callee_node["end_line"],
+                                end_col=inner_callee_node["end_col"],
+                                mro=inner_callee_node.get("mro", []),
+                            )
+
+                        children.append({
+                            "call_site": CallSiteModel(
+                                id=inner_call_node["id"],
+                                line=inner_call_node["line"],
+                                col=inner_call_node["col"],
+                                name=inner_call_node.get("name"),
+                            ),
+                            "callee": inner_callee,
+                        })
+                call_info["children"] = children
+
+            calls.append(call_info)
+        return calls
+
+    def get_calls_from(self, caller_id: str) -> List[dict]:
+        """Get all calls made from a scope (including unresolved callees)."""
+        result = self.repository.conn.execute(
+            """
+            MATCH (caller:Scope {id: $caller_id})-[:HAS_CALL_SITE]->(cs:CallSite)
+            OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
+            RETURN cs, callee
+            """,
+            {"caller_id": caller_id}
+        )
+
+        calls = []
+        for row in result:
+            cs_node = row[0]
+            callee_node = row[1] if len(row) > 1 else None
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
+
+            calls.append({
+                "call_site": CallSiteModel(
+                    id=cs_node["id"],
+                    line=cs_node["line"],
+                    col=cs_node["col"],
+                    name=cs_node.get("name"),
+                ),
+                "callee": callee,
+            })
+        return calls
+
+    def get_call_chain_children(self, call_site_id: str) -> List[dict]:
+        """Get NEXT_IN_CHAIN children for a call site, plus their target scope."""
+        result = self.repository.conn.execute(
+            """
+            MATCH (cs:CallSite {id: $call_site_id})-[:NEXT_IN_CHAIN]->(child:CallSite)
+            OPTIONAL MATCH (child)-[:TARGETS]->(callee:Scope)
+            RETURN child, callee
+            """,
+            {"call_site_id": call_site_id}
+        )
+
+        children = []
+        for row in result:
+            child_node = row[0]
+            callee_node = row[1] if len(row) > 1 else None
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
+
+            children.append({
+                "call_site": CallSiteModel(
+                    id=child_node["id"],
+                    line=child_node["line"],
+                    col=child_node["col"],
+                    name=child_node.get("name"),
+                ),
+                "callee": callee,
+            })
+        return children
+
+    def get_calls_inside_callee(self, call_site_id: str) -> List[dict]:
         """
-        Get the current call graph.
+        Get calls made INSIDE the scope targeted by this call site.
+
+        This follows the pattern:
+        CallSite -[:TARGETS]-> Scope -[:HAS_CALL_SITE]-> CallSite
+
+        Returns calls that are executed within the callee function's body.
         """
-        return self.call_tracker.call_graph
+        result = self.repository.conn.execute(
+            """
+            MATCH (cs:CallSite {id: $call_site_id})-[:TARGETS]->(callee:Scope)
+            MATCH (callee)-[:HAS_CALL_SITE]->(inner_call:CallSite)
+            OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
+            RETURN inner_call, inner_callee
+            """,
+            {"call_site_id": call_site_id}
+        )
+
+        calls = []
+        for row in result:
+            call_node = row[0]
+            callee_node = row[1] if len(row) > 1 else None
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
+
+            calls.append({
+                "call_site": CallSiteModel(
+                    id=call_node["id"],
+                    line=call_node["line"],
+                    col=call_node["col"],
+                    name=call_node.get("name"),
+                ),
+                "callee": callee,
+            })
+        return calls
+
+    def batch_get_calls_inside_callee(
+        self, call_site_ids: List[str]
+    ) -> dict:
+        """
+        Batch fetch calls made INSIDE the scopes targeted by multiple call
+        sites.
+
+        Args:
+            call_site_ids: List of call site IDs to fetch calls for
+
+        Returns:
+            Dictionary mapping call_site_id -> List[dict] of call infos
+        """
+        if not call_site_ids:
+            return {}
+
+        result = self.repository.conn.execute(
+            """
+            UNWIND $call_site_ids AS call_site_id
+            MATCH (cs:CallSite {id: call_site_id})-[:TARGETS]->(callee:Scope)
+            MATCH (callee)-[:HAS_CALL_SITE]->(inner_call:CallSite)
+            OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
+            RETURN call_site_id, inner_call, inner_callee
+            """,
+            {"call_site_ids": call_site_ids}
+        )
+
+        calls_map = {}
+        for row in result:
+            call_site_id = row[0]
+            call_node = row[1]
+            callee_node = row[2] if len(row) > 2 else None
+
+            if call_site_id not in calls_map:
+                calls_map[call_site_id] = []
+
+            callee = None
+            if callee_node:
+                callee = ScopeModel(
+                    id=callee_node["id"],
+                    name=callee_node["name"],
+                    qname=callee_node["qname"],
+                    type=callee_node["type"],
+                    file_path=callee_node["file_path"],
+                    start_line=callee_node["start_line"],
+                    start_col=callee_node["start_col"],
+                    end_line=callee_node["end_line"],
+                    end_col=callee_node["end_col"],
+                    mro=callee_node.get("mro", []),
+                )
+
+            calls_map[call_site_id].append({
+                "call_site": CallSiteModel(
+                    id=call_node["id"],
+                    line=call_node["line"],
+                    col=call_node["col"],
+                    name=call_node.get("name"),
+                ),
+                "callee": callee,
+            })
+
+        # Ensure all call_site_ids have entries (even if empty)
+        for call_site_id in call_site_ids:
+            if call_site_id not in calls_map:
+                calls_map[call_site_id] = []
+
+        return calls_map
+
+    def get_calls_to(self, callee_id: str) -> List[dict]:
+        """Get all calls made to a scope."""
+        result = self.repository.conn.execute(
+            """
+            MATCH (caller:Scope)-[:HAS_CALL_SITE]->(cs:CallSite)-[:TARGETS]->(callee:Scope {id: $callee_id})
+            RETURN cs, caller
+            """,
+            {"callee_id": callee_id}
+        )
+
+        calls = []
+        for row in result:
+            cs_node = row[0]
+            caller_node = row[1]
+            calls.append({
+                "call_site": CallSiteModel(
+                    id=cs_node["id"],
+                    line=cs_node["line"],
+                    col=cs_node["col"],
+                    name=cs_node.get("name"),
+                ),
+                "caller": ScopeModel(
+                    id=caller_node["id"],
+                    name=caller_node["name"],
+                    qname=caller_node["qname"],
+                    type=caller_node["type"],
+                    file_path=caller_node["file_path"],
+                    start_line=caller_node["start_line"],
+                    start_col=caller_node["start_col"],
+                    end_line=caller_node["end_line"],
+                    end_col=caller_node["end_col"],
+                    mro=caller_node.get("mro", []),
+                ),
+            })
+        return calls
+
+    def get_call_chain(self, call_site_id: str) -> List[CallSiteModel]:
+        """Get the full call chain starting from a call site."""
+        return self.repository.get_call_chain(call_site_id)
+
+    def get_call_chain_roots(self, target_scope_id: Optional[str] = None) -> List[CallSiteModel]:
+        """
+        Get all call sites that are roots of call chains.
+
+        If `target_scope_id` is provided, only return those root call sites for which
+        there exists a path along `NEXT_IN_CHAIN` that contains a call site targeting
+        the given scope.
+        """
+        return self.repository.get_call_chain_roots(target_scope_id)
+
+    def clear_calls(self, scope_id: str) -> None:
+        """Clear all calls originating from a scope."""
+        self.repository.clear_calls_from_scope(scope_id)
+
+    # Utility
+
+    def clear_all(self) -> None:
+        """Clear all data from the database."""
+        self.repository.clear_db()
+
+    def delete_cache(self) -> None:
+        """Delete the cache."""
+        self.db_manager.delete_db()

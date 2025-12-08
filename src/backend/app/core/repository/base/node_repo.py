@@ -90,13 +90,37 @@ class NodeRepository(BaseRepository[T]):
         # skip virtual nodes (e.g., group) and attach children to the nearest
         # non-excluded ancestor while still traversing through excluded nodes.
         query = """
+        // Get the start node's current_version for version filtering
+        LET start_node = DOCUMENT(@start_node_id)
+        LET start_version = start_node.current_version != null ?
+            start_node.current_version : 0
+
         FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id
             @@contains_collection
             OPTIONS { order: "bfs" }
+            // Get immediate parent from path (second-to-last vertex)
+            // For depth 1, parent is start_node; for deeper, it's
+            // p.vertices[-2]
+            LET parent_vertex = LENGTH(p.vertices) >= 2 ?
+                p.vertices[LENGTH(p.vertices) - 2] : start_node
+            LET parent_version = parent_vertex.current_version != null ?
+                parent_vertex.current_version : 0
+            // Filter edges: only traverse edges with version >= parent's
+            // Treat missing version as 0 (for backward compatibility)
+            FILTER (e.version != null ? e.version : 0) >= parent_version
+            // Filter vertices: only include nodes with current_version >=
+            // parent's version (each parent controls minimum version)
+            FILTER (v.current_version != null ?
+                v.current_version : 0) >= parent_version
             // Use a LET statement to conditionally find the target
             LET target_node = (
                 // This subquery only runs IF v is a call node
                 FOR target IN 1..1 OUTBOUND v @@targets_collection
+                    // Filter target nodes by version against current vertex
+                    FILTER (target.current_version != null ?
+                        target.current_version : 0) >= (
+                        v.current_version != null ? v.current_version : 0
+                    )
                     LIMIT 1
                     RETURN target
             )

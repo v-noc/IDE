@@ -49,6 +49,12 @@ def add_call(
             ),
         )
 
+    # Get parent's current_version for version inheritance
+    # Use parent's version, defaulting to 0 if not set
+    parent_version = getattr(parent_node, 'current_version', None)
+    if parent_version is None:
+        parent_version = 0
+
     call = call_service.create(
         name=add_call.name,
         qname=f"{callee_function_node.qname}L{0}C{0}",
@@ -61,12 +67,14 @@ def add_call(
         ),
         target_id=callee_function_node.id,
         manually_created=True,
+        current_version=parent_version,
     )
 
     container_service.add_child_to_container(
         parent_node.id,
         call.id,
         f"{parent_node.node_type}_to_call",
+        version=parent_version,
     )
 
     # Clone callee's internal call graph (calls and groups) under the new call

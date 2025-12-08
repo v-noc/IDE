@@ -1,11 +1,17 @@
 import pytest
+import shutil
 from pathlib import Path
-from app.core.parser.graph_builder import GraphBuilder
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.services.project_service import ProjectService
 from app.core.repository import Repositories
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.schemas.tree import ProjectTreeNode
-from app.core.schemas.tree import ProjectNode
+from app.core.model.nodes import ProjectNode
+from app.core.parser.scope_manager.manager import ScopeManager
+
+
+FIXTURE_PROJECT = Path(__file__).parent / "sample_import"
+PROJECT_NAME = "sample_import"
 
 
 @pytest.fixture
@@ -16,11 +22,40 @@ def project_path() -> Path:
 
 
 @pytest.fixture
-def project_tree(arangodb_client, project_path) -> ProjectNode:
-    graph_builder = GraphBuilder(
-        project_path=project_path.as_posix(), ignore_file_name="v-noc.toml", db=arangodb_client
+def setup_project(tmp_path, arangodb_client, project_path):
+    project_path = tmp_path / "sample_import"
+    shutil.copytree(FIXTURE_PROJECT, project_path)
+
+    db_path = tmp_path / "db" / PROJECT_NAME
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    project_node = ProjectNode(
+        name=PROJECT_NAME,
+        path=str(project_path),
+        qname=PROJECT_NAME,
+        description="Test Project",
     )
-    graph_builder.build("sample_import", "A test project for imports.")
+    scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
+
+    # Create project node in database (matching test_function.py pattern)
+    repos = Repositories(arangodb_client)
+    project_service = ProjectService(repos)
+    project_node = project_service.create_node(project_node)
+
+    return project_node, scope_manager, arangodb_client
+
+
+@pytest.fixture
+def project_tree(setup_project) -> ProjectNode:
+    project_node, scope_manager, arangodb_client = setup_project
+
+    orchestrator = GraphBuilderOrchestrator(
+        project_node=project_node,
+        scope_manager=scope_manager,
+        ignore_file_name="v-noc.toml",
+        db=arangodb_client,
+    )
+    orchestrator.resync()
 
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)

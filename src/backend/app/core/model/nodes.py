@@ -1,7 +1,7 @@
 from .base import BaseNode
-from .properties import TypeKeyValuesProperties, CodePosition, ThemeConfig
+from .properties import CodePosition, ThemeConfig
 from typing import List, Optional, Literal
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 
 
 class ContainerNode(BaseNode):
@@ -10,6 +10,8 @@ class ContainerNode(BaseNode):
         default=None, description="Container theme configuration."
     )
     icon: Optional[str] = Field(default=None, description="Container icon.")
+    current_version: int = Field(default=0,
+                                 description="The current version of the node.")
 
     documents: List[str] = Field(
         default_factory=list, description="Documents held by the container."
@@ -33,7 +35,8 @@ class FunctionNode(ContainerNode):
 
 class ClassNode(ContainerNode):
     node_type: Literal["class"] = "class"
-    implements: List[str] = Field(default_factory=list, description="Class implements.")
+    implements: List[str] = Field(
+        default_factory=list, description="Class implements.")
     position: CodePosition = Field(..., description="Function position")
 
 

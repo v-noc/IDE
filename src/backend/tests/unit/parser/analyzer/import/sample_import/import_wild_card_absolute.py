@@ -1,4 +1,4 @@
-from sample_import.utils.helper import *
+from utils.helper import *
 
 
 u_wc_abs = create_user()

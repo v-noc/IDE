@@ -1,35 +1,86 @@
-import pytest
-from app.core.services.project_service import ProjectService
-from app.core.repository import Repositories
-from app.core.services.folder_service import FolderService
-from app.core.services.file_service import FileService
-from app.core.services.function_service import FunctionService
-from app.core.model.properties import CodePosition
-from app.core.services.class_service import ClassService
-from app.core.services.call_service import CallService
-
-import pytest
-
 from pathlib import Path
+import time
 
-from app.core.parser.graph_builder import GraphBuilder
+import pytest
+import shutil
+from app.core.model.properties import CodePosition
+from app.core.model.nodes import ProjectNode
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.services.call_service import CallService
+from app.core.services.class_service import ClassService
+from app.core.services.file_service import FileService
+from app.core.services.folder_service import FolderService
+from app.core.services.function_service import FunctionService
+from app.core.services.project_service import ProjectService
+from app.core.parser.scope_manager.manager import ScopeManager
 
 
-current_file_path = Path(__file__).resolve()
-print("Current file path:", current_file_path)
-current_dir = current_file_path.parent
-PROJECT_PATH = Path(current_dir, "./sample_project").absolute()
+PROJECT_PATH = Path(__file__).resolve().parent / "sample_project"
+DEFAULT_POSITION = CodePosition(
+    line_no=1,
+    col_offset=0,
+    end_line_no=1,
+    end_col_offset=0,
+)
+
+
+def _create_function(function_service: FunctionService, name: str, qname: str):
+    return function_service.create(
+        name,
+        qname,
+        f"This is {name.lower()}",
+        DEFAULT_POSITION,
+    )
+
+
+def _create_class(class_service: ClassService, name: str, qname: str):
+    return class_service.create(
+        name,
+        qname,
+        f"This is {name.lower()}",
+        DEFAULT_POSITION,
+    )
+
+
+def _create_call(call_service: CallService, name: str, qname: str, target_id: str):
+    return call_service.create(
+        name,
+        qname,
+        f"This is {name.lower()}",
+        DEFAULT_POSITION,
+        target_id,
+    )
 
 
 @pytest.fixture()
-def create_sample_project(arangodb_client):
-    builder = GraphBuilder(
-        project_path=PROJECT_PATH.as_posix(),
-        ignore_file_name=None,
-        db=arangodb_client
+def create_sample_project(arangodb_client, create_repos, tmp_path):
+    project_path = tmp_path / "project"
+    shutil.copytree(PROJECT_PATH, project_path)
+    project_node = ProjectNode(
+        name="Protector",
+        description="Protector is a tool for protecting your code.",
+        qname="protector",
+        current_version=int(time.time_ns()),
+        path=project_path.as_posix(),
     )
-    builder.build(
-        "Protector", "Protector is a tool for protecting your code.")
+
+    db_path = tmp_path / "db" / project_node.name
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    project_service = ProjectService(create_repos)
+    project_node = project_service.create_node(
+        project_node
+    )
+
+    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
+
+    orchestrator = GraphBuilderOrchestrator(
+        project_node=project_node,
+        db=arangodb_client,
+        ignore_file_name=None,
+        scope_manager=scope_manager,
+    )
+    orchestrator.resync()
 
 
 @pytest.fixture
@@ -66,127 +117,80 @@ def create_file(create_repos):
 
 
 @pytest.fixture
-def create_function(create_repos):
-    function_service = FunctionService(create_repos)
-    position = CodePosition(
-        line_no=1,
-        col_offset=0,
-        end_line_no=1,
-        end_col_offset=0
-    )
-    return function_service.create(
+def function_service(create_repos):
+    return FunctionService(create_repos)
+
+
+@pytest.fixture
+def class_service(create_repos):
+    return ClassService(create_repos)
+
+
+@pytest.fixture
+def call_service(create_repos):
+    return CallService(create_repos)
+
+
+@pytest.fixture
+def create_function(function_service):
+    return _create_function(
+        function_service,
         "Test Function",
         "test_project.test_function",
-        "This is a test function",
-
-        position
     )
 
 
 @pytest.fixture
-def create_function2(create_repos):
-    function_service = FunctionService(create_repos)
-    position = CodePosition(
-        line_no=1,
-        col_offset=0,
-        end_line_no=1,
-        end_col_offset=0
-    )
-    return function_service.create(
+def create_function2(function_service):
+    return _create_function(
+        function_service,
         "Test Function 2",
         "test_project.test_function2",
-        "This is a test function",
-
-        position
     )
 
 
 @pytest.fixture
-def create_function3(create_repos):
-    function_service = FunctionService(create_repos)
-    position = CodePosition(
-        line_no=1,
-        col_offset=0,
-        end_line_no=1,
-        end_col_offset=0
-    )
-    return function_service.create(
+def create_function3(function_service):
+    return _create_function(
+        function_service,
         "Test Function 3",
         "test_project.test_function3",
-        "This is a test function",
-
-        position
     )
 
 
 @pytest.fixture
-def create_class(create_repos):
-    class_service = ClassService(create_repos)
-    position = CodePosition(
-        line_no=1,
-        col_offset=0,
-        end_line_no=1,
-        end_col_offset=0
-    )
-    return class_service.create(
+def create_class(class_service):
+    return _create_class(
+        class_service,
         "Test Class",
         "test_project.test_class",
-        "This is a test class",
-
-        position
     )
 
 
 @pytest.fixture
-def create_class2(create_repos):
-    class_service = ClassService(create_repos)
-    position = CodePosition(
-        line_no=1,
-        col_offset=0,
-        end_line_no=1,
-        end_col_offset=0
-    )
-    return class_service.create(
+def create_class2(class_service):
+    return _create_class(
+        class_service,
         "Test Class 2",
         "test_project.test_class2",
-        "This is a test class",
-
-        position
     )
 
 
 @pytest.fixture
-def create_call(create_repos, create_function):
-    call_service = CallService(create_repos)
-    position = CodePosition(
-        line_no=1,
-        col_offset=0,
-        end_line_no=1,
-        end_col_offset=0
-    )
-    return call_service.create(
+def create_call(call_service, create_function):
+    return _create_call(
+        call_service,
         "Test Call",
         "test_project.test_call",
-        "This is a test call",
-        position,
-        create_function.id
-
+        create_function.id,
     )
 
 
 @pytest.fixture
-def create_call2(create_repos, create_function2):
-    call_service = CallService(create_repos)
-    position = CodePosition(
-        line_no=1,
-        col_offset=0,
-        end_line_no=1,
-        end_col_offset=0
-    )
-    return call_service.create(
+def create_call2(call_service, create_function2):
+    return _create_call(
+        call_service,
         "Test Call 2",
         "test_project.test_call2",
-        "This is a test call",
-        position,
-        create_function2.id
+        create_function2.id,
     )
