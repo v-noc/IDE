@@ -94,3 +94,8 @@ class DBConnectionManager:
 
     def get_connection(self):
         return self.conn
+
+    def delete_db(self) -> None:
+        """Delete the database."""
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)

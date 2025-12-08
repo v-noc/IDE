@@ -169,6 +169,8 @@ def delete_project(
         result = project_service.delete(project)
         if result is False:
             return False
+        scope_manager = ScopeManager(project.name)
+        scope_manager.delete_cache()
         return True
     else:
         raise HTTPException(

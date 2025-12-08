@@ -537,3 +537,7 @@ class ScopeManager:
     def clear_all(self) -> None:
         """Clear all data from the database."""
         self.repository.clear_db()
+
+    def delete_cache(self) -> None:
+        """Delete the cache."""
+        self.db_manager.delete_db()
