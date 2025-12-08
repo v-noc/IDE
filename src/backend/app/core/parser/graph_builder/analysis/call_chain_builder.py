@@ -59,6 +59,7 @@ class CallChainBuilder:
         self.jedi_manager = jedi_manager
         self.call_resolver = CallResolver(jedi_manager)
         self.max_depth = max_depth
+
         # for recursive detection
         self.call_chain_scope_ids: Dict[str, int] = {}
 
@@ -103,7 +104,7 @@ class CallChainBuilder:
         Returns:
             The ID of the created call site
         """
-        # Get the source code for this file
+        # If we are at the top level, clear the call chain scope ids
         if parent_context is None:
 
             self.call_chain_scope_ids.clear()
@@ -123,7 +124,7 @@ class CallChainBuilder:
 
         # Resolve the call using Jedi with context preservation
         t0 = time.time()
-        resolution = self.call_resolver.resolve_call(
+        resolutions = self.call_resolver.resolve_call(
             str(file_path),
             source,
             call_node.position.line,
@@ -132,10 +133,23 @@ class CallChainBuilder:
         )
         _timings["resolve_call"].append(time.time() - t0)
 
-        # Determine callee_id based on resolution
-        callee_scope = None
+        if not resolutions:
+            logger.debug(
+                f"Could not resolve call {call_node.name} at "
+                f"{call_node.position.line}:{call_node.position.column}"
+            )
+            return None
 
-        if resolution:
+        call_site_ids = []
+        call_name = self._normalize_call_name(call_node.name)
+        call_line = call_node.position.line
+        call_col = call_node.position.column + (len(call_node.name))
+
+        # Process each resolution separately
+        for resolution in resolutions:
+            # Determine callee_id based on resolution
+            callee_scope = None
+
             # Priority 1: Try ID-based lookup (most direct and accurate)
             if resolution.callee_id:
                 t0 = time.time()
@@ -143,62 +157,54 @@ class CallChainBuilder:
                     resolution.callee_id)
 
                 _timings["get_scope_by_id"].append(time.time() - t0)
+
             else:
                 print(
                     f"Could not resolve call {call_node.name} at {call_node.position.line}:{call_node.position.column}")
+                continue
 
-        else:
-            logger.debug(
-                f"Could not resolve call {call_node.name} at "
-                f"{call_node.position.line}:{call_node.position.column}"
+            if not callee_scope:
+                continue
+
+            if callee_scope.id not in self.call_chain_scope_ids:
+                self.call_chain_scope_ids[callee_scope.id] = 0
+            else:
+                self.call_chain_scope_ids[callee_scope.id] += 1
+
+            if self.call_chain_scope_ids[callee_scope.id] >= self.max_depth:
+                print(
+                    f"Max depth reached for {callee_scope.qname} {caller_scope.qname} {self.call_chain_scope_ids[callee_scope.id]}")
+                continue
+
+            # Generate call site ID (will be created in batch)
+            import uuid
+
+            call_site_id = str(uuid.uuid4())
+
+            # Add to batch buffer instead of creating immediately
+            self._call_site_buffer.append(
+                {
+                    "caller_id": caller_scope.id,
+                    "line": call_line,
+                    "col": call_col,
+                    "name": call_name,
+                    "callee_id": callee_scope.id,
+                    "prev_call_site_id": current_call_id,
+                    "_temp_id": call_site_id,  # Temporary ID for chaining
+                }
             )
-            return
-        if not callee_scope:
-            return
 
-        if callee_scope.id not in self.call_chain_scope_ids:
-            self.call_chain_scope_ids[callee_scope.id] = 0
-        else:
-            self.call_chain_scope_ids[callee_scope.id] += 1
+            # Extract execution context for recursion
+            execution_context = resolution.execution_context if resolution else None
 
-        call_name = self._normalize_call_name(call_node.name)
-        if self.call_chain_scope_ids[callee_scope.id] >= self.max_depth:
-            return None
-            print(
-                f"Max depth reached for {callee_scope.qname} {caller_scope.qname} {self.call_chain_scope_ids[callee_scope.id]}")
-            # return
+            # Process each body separately
+            self._process_scope_body(
+                callee_scope, depth + 1, call_site_id, execution_context
+            )
 
-        # Generate call site ID (will be created in batch)
-        import uuid
+            call_site_ids.append(call_site_id)
 
-        call_site_id = str(uuid.uuid4())
-
-        # Add to batch buffer instead of creating immediately
-        call_line = call_node.position.line
-        call_col = call_node.position.column + (len(call_node.name))
-
-        self._call_site_buffer.append(
-            {
-                "caller_id": caller_scope.id,
-                "line": call_line,
-                "col": call_col,
-                "name": call_name,
-                "callee_id": callee_scope.id,
-                "prev_call_site_id": current_call_id,
-                "_temp_id": call_site_id,  # Temporary ID for chaining
-            }
-        )
-
-        # Note: call_site_id is stored in the buffer item as _temp_id
-
-        # Extract execution context for recursion
-        execution_context = resolution.execution_context if resolution else None
-
-        self._process_scope_body(
-            callee_scope, depth + 1, call_site_id, execution_context
-        )
-
-        return call_site_id
+        return call_site_ids if call_site_ids else None
 
     def _candidate_qnames(
         self,
@@ -475,6 +481,7 @@ class CallChainBuilder:
     def flush_all_call_sites(self) -> None:
         """Flush all remaining call sites in the buffer."""
         self._flush_all_buffered_call_sites()
+        self.reset_visited()
 
     def reset_visited(self):
         """Reset the visited scopes tracker."""

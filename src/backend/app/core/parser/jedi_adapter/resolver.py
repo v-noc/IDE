@@ -1,5 +1,6 @@
 import logging
 from typing import List, Optional
+
 from .manager import JediProjectManager
 
 logger = logging.getLogger(__name__)
@@ -13,7 +14,9 @@ class MROResolver:
     def __init__(self, project_manager: JediProjectManager):
         self.project_manager = project_manager
 
-    def resolve_mro(self, file_path: str, source: str, line: int, column: int) -> List[str]:
+    def resolve_mro(
+        self, file_path: str, source: str, line: int, column: int
+    ) -> List[str]:
         """
         Resolve the MRO for a class definition at the given position.
         Returns a list of fully qualified names representing the MRO.
@@ -27,7 +30,8 @@ class MROResolver:
 
             if not defs:
                 logger.warning(
-                    f"Could not infer definition at {file_path}:{line}:{column}")
+                    f"Could not infer definition at {file_path}:{line}:{column}"
+                )
                 return []
 
             d_def = defs[0]
@@ -40,17 +44,16 @@ class MROResolver:
                 # The path to the value may differ slightly between Jedi versions.
                 # We iterate over inferred values (usually just one for a class def)
                 for infer in d_def._name.infer():
-                    if hasattr(infer, 'py__mro__'):
+                    if hasattr(infer, "py__mro__"):
                         contexts = infer.py__mro__()
 
                         # Extract qualified names
                         for c in contexts:
-                            qnames = c.name.get_qualified_names()
+                            qnames = c.name.get_qualified_names(True)
                             if qnames:
                                 mro_qnames.append(".".join(qnames))
                             else:
-                                mro_qnames.append(
-                                    c.name.string_name)  # Fallback
+                                mro_qnames.append(c.name.string_name)  # Fallback
 
                         # We only need the MRO from the first valid inference
                         if mro_qnames:
@@ -65,5 +68,5 @@ class MROResolver:
             return mro_qnames
 
         except Exception as e:
-            logger.error(f"Failed to resolve MRO for {file_path}: {e}")
+            logger.error(f"Failed to resolve MRO for {line}:{column} {file_path}: {e} ")
             return []

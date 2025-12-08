@@ -26,7 +26,8 @@ class BodyParser:
         self.manager = scope_manager
         self.jedi_manager = jedi_manager
         self.batch_size = batch_size
-
+        self.call_sync_service = None
+        self.processed_scope_ids = set()
         # Initialize CallChainBuilder for recursive call resolution
         self.call_chain_builder = CallChainBuilder(
             project_path=project_path,
@@ -34,6 +35,14 @@ class BodyParser:
             scope_manager=scope_manager,
             jedi_manager=jedi_manager,
         )
+
+    def flush_all_call_sites(self):
+        self.call_chain_builder.flush_all_call_sites()
+        self.call_sync_service(self.processed_scope_ids)
+        self.processed_scope_ids.clear()
+
+    def set_call_sync_service(self, call_sync_service):
+        self.call_sync_service = call_sync_service
 
     def process_ast(self, file_scope: ScopeModel):
         """
@@ -47,6 +56,7 @@ class BodyParser:
         try:
             with open(file_path, "r", encoding="utf-8") as source:
                 content = source.read()
+
         except OSError as exc:
             logger.error("Failed to read file %s: %s", file_path, exc)
             return
@@ -59,12 +69,13 @@ class BodyParser:
 
         # Start traversal from file scope
         self._traverse(nodes, file_scope)
+        self.processed_scope_ids.add(file_scope.id)
 
     def _traverse(
         self,
         nodes: List[BaseNode],
         current_scope: ScopeModel,
-        prev_call_id: Optional[str] = None,
+
     ):
         """
         Traverse AST nodes in the current scope.
@@ -81,8 +92,7 @@ class BodyParser:
         for node in nodes:
             # Auto-flush if buffer exceeds batch size
             if len(self.call_chain_builder._call_site_buffer) >= self.batch_size:
-
-                self.call_chain_builder.flush_all_call_sites()
+                self.flush_all_call_sites()
 
             if isinstance(node, (ClassNode, FunctionNode)):
                 # Enter child scope (function or class)
@@ -104,8 +114,9 @@ class BodyParser:
                 # Recurse into the scope to process its calls
                 # All calls in child scope are root calls (prev_call_id=None)
                 if hasattr(node, "children"):
-                    self._traverse(node.children, child_scope,
-                                   prev_call_id=None)
+                    self._traverse(node.children, child_scope)
+
+                self.processed_scope_ids.add(node.id)
 
             elif isinstance(node, CallNode):
                 # Create call site (this is a root call at this scope level)
@@ -118,17 +129,5 @@ class BodyParser:
                     current_call_id=None,  # Chain to previous if in nested context
                     depth=0,
                 )
+
                 logger.debug(f"Created call site with ID: {call_site_id}")
-
-                # Recurse into call arguments
-                # Calls within arguments chain to this call site
-                if hasattr(node, "children"):
-                    self._traverse(node.children, current_scope,
-                                   prev_call_id=None)
-
-            else:
-                # Other nodes (If, For, etc.) - Recurse staying in current scope
-                # Preserve prev_call_id context
-                if hasattr(node, "children"):
-                    self._traverse(node.children, current_scope,
-                                   prev_call_id=None)

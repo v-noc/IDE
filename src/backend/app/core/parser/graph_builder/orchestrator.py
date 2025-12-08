@@ -34,7 +34,7 @@ class GraphBuilderOrchestrator:
         db: Optional[StandardDatabase] = None,
         scope_manager: Optional[ScopeManager] = None,
         ignore_file_name: str = ".gitignore",
-        batch_size: int = 200,
+        batch_size: int = 500,
     ):
         self.project_node = project_node
         self.project_path = project_node.path
@@ -78,7 +78,6 @@ class GraphBuilderOrchestrator:
         # Will create sync service with version when needed in _process_changes
 
         self.repos = Repositories(self.db) if self.db else None
-        self._pending_folder_changes: list[FolderChange] = []
 
     def resync(self) -> ChangeSet:
         """
@@ -146,42 +145,11 @@ class GraphBuilderOrchestrator:
                     touched_folder_ids.update(
                         fc.scope.id for fc in result.folder_changes
                     )
-
-        # Phase 2: Analysis (Bodies)
-
-        for result in collection_results:
-            logger.info(
-                "Analyzing changes for: %s",
-                result.file_scope.file_path,
-            )
-
-            # 1. Delete Removed Scopes
-            for scope_id in result.removed_scope_ids:
-                logger.info(f"Deleting removed scope ID: {scope_id}")
-                self.scope_manager.delete_scope(scope_id)
-
-            # 2. Process File Body (Full Analysis)
-            # We process the entire file AST every time it changes
-            logger.info("Processing file body: %s", result.file_scope.qname)
-
-            # Clear file-scope calls; children clear during traversal
-            self.scope_manager.clear_calls(result.file_scope.id)
-
-            # Parse the full AST tree
-            # BodyParser traverses descendants and clears their calls en route
-            self.body_parser.process_ast(result.file_scope)
-
-            # Flush any remaining call sites in the buffer for this file
-            self.body_parser.call_chain_builder.flush_all_call_sites()
-
-        # Print call chain builder timing summary
-        self.body_parser.call_chain_builder.print_timing_summary()
-
-        # Debugger: Visualize scope and call site graph
-        # self._print_call_site_tree()
-        # self._visualize_graph()
-
-        # Process Deleted folders before files to avoid orphan references
+                    # 1. Delete Removed Scopes
+                    for scope_id in result.removed_scope_ids:
+                        logger.info(f"Deleting removed scope ID: {scope_id}")
+                        self.scope_manager.delete_scope(scope_id)
+         # Process Deleted folders before files to avoid orphan references
         for folder_path in change_set.deleted_folders:
             logger.info(f"Processing folder deletion: {folder_path}")
             self._handle_folder_deletion(
@@ -203,12 +171,37 @@ class GraphBuilderOrchestrator:
             )
 
             sync_service.sync_scope_hierarchy(self.project_node.id)
+            self.body_parser.set_call_sync_service(
+                sync_service.call_sync.sync_call_chain_scopes)
         else:
             logger.warning("No database connection for sync; skipping")
+        # Phase 2: Analysis (Bodies)
+        for result in collection_results:
+            logger.info(
+                "Analyzing changes for: %s",
+                result.file_scope.file_path,
+            )
 
-        logger.info("Folder changes prepared for sync: %d",
-                    len(folder_changes))
-        self._pending_folder_changes = folder_changes
+            # 2. Process File Body (Full Analysis)
+            # We process the entire file AST every time it changes
+            logger.info("Processing file body: %s", result.file_scope.qname)
+
+            # Clear file-scope calls; children clear during traversal
+            self.scope_manager.clear_calls(result.file_scope.id)
+
+            # Parse the full AST tree
+            # BodyParser traverses descendants and clears their calls en route
+            self.body_parser.process_ast(result.file_scope)
+
+            # Flush any remaining call sites in the buffer for this file
+            self.body_parser.flush_all_call_sites()
+
+        # Print call chain builder timing summary
+        self.body_parser.call_chain_builder.print_timing_summary()
+
+        # Debugger: Visualize scope and call site graph
+        self._print_call_site_tree()
+        # self._visualize_graph()
 
     def _handle_folder_deletion(
         self,

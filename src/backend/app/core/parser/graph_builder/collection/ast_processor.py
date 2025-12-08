@@ -60,7 +60,7 @@ class ASTProcessor:
                     file_path=parent_scope.file_path,
                     source=content,
                     line=node.position.line,
-                    column=name_column
+                    column=node.position.column + (len(node.name))
                 )
                 if mro:
                     logger.debug(f"Resolved MRO for {node.name}: {mro}")

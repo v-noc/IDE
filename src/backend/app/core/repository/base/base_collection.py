@@ -129,7 +129,7 @@ class BaseRepository(Generic[T]):
         key = doc_id.split("/")[-1] if "/" in doc_id else doc_id
         return self.get_by_key(key)
 
-    def create(self, entity: T) -> T:
+    def create(self, entity: T, sync: bool = False) -> T:
         """Create a document and return the newly created version."""
         dump = entity.model_dump(by_alias=True, exclude_none=True, mode="json")
         # Get the full created document back in one call
@@ -137,6 +137,7 @@ class BaseRepository(Generic[T]):
             dump,
             return_new=True,
             overwrite=True,
+            sync=True
         )
         return self._validate(meta["new"])
 
@@ -162,6 +163,7 @@ class BaseRepository(Generic[T]):
         meta = self.collection.update(
             document,
             return_new=True,
+
         )
         return self._validate(meta["new"])
 

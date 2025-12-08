@@ -72,7 +72,7 @@ class MainGraphSyncService:
         self.scope_sync.sync_scope_hierarchy(
             root_scope_id, self.project_node.id
         )
-        self.sync_call_chains(root_scope_id)
+        # self.sync_call_chains(root_scope_id)
         time_end = time.time()
         print(
             f"Time taken to sync call chains: {time_end - time_start} seconds")

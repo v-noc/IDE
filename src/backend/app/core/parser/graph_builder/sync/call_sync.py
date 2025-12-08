@@ -1,15 +1,15 @@
 import logging
 import time
 from collections import defaultdict
-from typing import Optional
+from typing import List, Optional
 
+from app.core.model.base import BaseNode
 from app.core.model.nodes import CallNode
 from app.core.model.properties import CodePosition
+from app.core.parser.graph_builder.sync.sync_helpers import SyncHelpers
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeType
 from app.core.services.call_service import CallService
-from app.core.model.base import BaseNode
-from app.core.parser.graph_builder.sync.sync_helpers import SyncHelpers
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,63 @@ class CallSyncService:
         self.scope_manager = scope_manager
         self.call_service = call_service
         self.helpers = helpers
+
+    def sync_call_chain_scopes(self, scope_ids: List[str]):
+        # Analytics tracking
+        scope_call_counts = defaultdict(int)  # scope_id -> number of calls
+        # scope_id -> list of db operation times
+        scope_db_times = defaultdict(list)
+        total_start_time = time.time()
+
+        # Collect all call infos first, then batch process
+        all_call_infos = []
+        for scope_id in scope_ids:
+            scope = self.scope_manager.get_scope(scope_id)
+
+            if scope.type in (
+                ScopeType.FILE,
+                ScopeType.FUNCTION,
+                ScopeType.CLASS,
+            ):
+                # Track database access for get_graph_node_for_scope
+                t0 = time.time()
+                graph_node = self.helpers.get_graph_node_for_scope(scope)
+                db_time = time.time() - t0
+                _timings["get_graph_node_for_scope"].append(db_time)
+                scope_db_times[scope_id].append(
+                    ("get_graph_node_for_scope", db_time))
+
+                if graph_node:
+                    # Track database access for get_root_calls_from
+                    t0 = time.time()
+                    call_infos = self.scope_manager.get_root_calls_from(
+                        scope.id, include_children=True
+                    )
+                    db_time = time.time() - t0
+                    _timings["get_calls_from"].append(db_time)
+                    scope_db_times[scope_id].append(
+                        ("get_calls_from", db_time))
+
+                    # Handle None or empty results
+                    if call_infos:
+                        call_count = len(call_infos)
+                        scope_call_counts[scope_id] = call_count
+                        for call_info in call_infos:
+                            all_call_infos.append((call_info, graph_node))
+
+        # Track batch sync database operations
+        batch_sync_start = time.time()
+        self._batch_sync_calls(all_call_infos)
+        batch_sync_time = time.time() - batch_sync_start
+        _timings["batch_sync_calls_total"].append(batch_sync_time)
+
+        # total_time = time.time() - total_start_time
+
+        # Print analytics summary
+        # self._print_sync_call_chain_analytics(
+        #     scope_ids, scope_call_counts, scope_db_times,
+        #     len(all_call_infos), total_time, batch_sync_time
+        # )
 
     def sync_call_chains(self, root_scope_id: str):
         """
@@ -53,25 +110,8 @@ class CallSyncService:
         root_scope = self.scope_manager.get_scope(root_scope_id)
         if not root_scope:
             logger.error(
-                "Root scope %s not found for call sync", root_scope_id
-            )
+                "Root scope %s not found for call sync", root_scope_id)
             return
-
-        # First, clear CallNodes from ArangoDB for all scopes to prevent
-        # duplicate edges on resync
-        logger.info("Clearing old CallNodes from ArangoDB")
-        scope_ids_to_clear = set()
-        stack_clear = [root_scope]
-        while stack_clear:
-            scope = stack_clear.pop()
-            if scope.type in (
-                ScopeType.FILE,
-                ScopeType.FUNCTION,
-                ScopeType.CLASS,
-            ):
-                scope_ids_to_clear.add(scope.id)
-            children = self.scope_manager.get_children(scope.id)
-            stack_clear.extend(children)
 
         # Collect all call infos first, then batch process
         all_call_infos = []
@@ -88,16 +128,14 @@ class CallSyncService:
             ):
                 t0 = time.time()
                 graph_node = self.helpers.get_graph_node_for_scope(scope)
-                _timings['get_graph_node_for_scope'].append(
-                    time.time() - t0
-                )
+                _timings["get_graph_node_for_scope"].append(time.time() - t0)
 
                 if graph_node:
-
                     t0 = time.time()
                     call_infos = self.scope_manager.get_root_calls_from(
-                        scope.id, include_children=True)
-                    _timings['get_calls_from'].append(time.time() - t0)
+                        scope.id, include_children=True
+                    )
+                    _timings["get_calls_from"].append(time.time() - t0)
 
                     # Handle None or empty results
                     if call_infos:
@@ -113,13 +151,11 @@ class CallSyncService:
 
             t0 = time.time()
             children = self.scope_manager.get_children(scope.id)
-            _timings['get_children'].append(time.time() - t0)
+            _timings["get_children"].append(time.time() - t0)
             stack.extend(children)
 
         # Batch process calls
-        self._batch_sync_calls(
-            all_call_infos
-        )
+        self._batch_sync_calls(all_call_infos)
 
         # Print timing summary
         self._print_timing_summary()
@@ -127,7 +163,6 @@ class CallSyncService:
     def _batch_sync_calls(
         self,
         all_call_infos: list,
-
     ):
         """
         Batch sync calls to reduce database round trips.
@@ -151,7 +186,7 @@ class CallSyncService:
 
             # Buffers for batch operations
             contains_edges_buffer = []  # (parent_id, child_id)
-            targets_edges_buffer = []   # (call_id, callee_id)
+            targets_edges_buffer = []  # (call_id, callee_id)
             # (call_info, call_node) for recursive processing
             recursive_lookup_ids = []
 
@@ -176,9 +211,8 @@ class CallSyncService:
                 processed_pairs.add(process_key)
 
                 # Resolve callee node
-                callee_node = (
-                    self.helpers.get_graph_node_for_scope(callee_scope)
-                )
+                callee_node = self.helpers.get_graph_node_for_scope(
+                    callee_scope)
                 if not callee_node:
                     continue
 
@@ -189,17 +223,16 @@ class CallSyncService:
 
                 # Store item for processing after lookup
                 call_info_map[pair].append(
-                    (call_info, parent_node, callee_node)
-                )
+                    (call_info, parent_node, callee_node))
 
             # 2. Batch lookup existing call nodes
             if batch_pairs:
                 t0 = time.time()
                 call_repo = self.call_service.repos.call_repo
-                existing_calls = (
-                    call_repo.find_calls_by_target_parent_batch(batch_pairs)
+                existing_calls = call_repo.find_calls_by_target_parent_batch(
+                    batch_pairs
                 )
-                _timings['get_call_with_parent_and_target_batch'].append(
+                _timings["get_call_with_parent_and_target_batch"].append(
                     time.time() - t0
                 )
 
@@ -209,20 +242,16 @@ class CallSyncService:
                     items = call_info_map[pair]
                     for call_info, parent_node, callee_node in items:
                         recursion_check_pairs.append(
-                            (parent_node.id, callee_node.id)
-                        )
+                            (parent_node.id, callee_node.id))
 
                 recursion_counts = {}
                 if recursion_check_pairs:
                     t0 = time.time()
-                    recursion_counts = (
-                        call_repo.count_recursive_calls_upward_batch(
-                            recursion_check_pairs
-                        )
+                    recursion_counts = call_repo.count_recursive_calls_upward_batch(
+                        recursion_check_pairs
                     )
-                    _timings['count_recursive_calls_upward'].append(
-                        time.time() - t0
-                    )
+                    _timings["count_recursive_calls_upward"].append(
+                        time.time() - t0)
 
                 # 4. Process each pair to create/update nodes and collect edges
                 for pair in batch_pairs:
@@ -232,12 +261,9 @@ class CallSyncService:
                     for call_info, parent_node, callee_node in items:
                         # Check for recursion: if target appears twice or more
                         # in upward call chain, skip to prevent infinite recursion
-                        recursion_key = (
-                            parent_node.id, callee_node.id
-                        )
+                        recursion_key = (parent_node.id, callee_node.id)
                         recursion_count = recursion_counts.get(
-                            recursion_key, 0
-                        )
+                            recursion_key, 0)
 
                         if recursion_count >= 2:
                             logger.debug(
@@ -256,7 +282,7 @@ class CallSyncService:
                             callee_node,
                             call_node,
                             contains_edges_buffer,
-                            targets_edges_buffer
+                            targets_edges_buffer,
                         )
 
                         # Add to recursive lookup list
@@ -267,10 +293,15 @@ class CallSyncService:
 
             # 4. Flush edge buffers
             if contains_edges_buffer:
+                t0 = time.time()
                 self.helpers.ensure_contains_edges_batch(contains_edges_buffer)
+                _timings["ensure_contains_edges_batch"].append(
+                    time.time() - t0)
 
             if targets_edges_buffer:
+                t0 = time.time()
                 self.helpers.ensure_targets_edges_batch(targets_edges_buffer)
+                _timings["ensure_targets_edges_batch"].append(time.time() - t0)
 
             # 5. Batch lookup recursive calls
             if recursive_lookup_ids:
@@ -307,12 +338,10 @@ class CallSyncService:
                         # Note: This is still a single lookup, could be
                         # optimized but rare for new nodes
                         t0 = time.time()
-                        target_node = (
-                            self.helpers.repos.call_repo.get_target(
-                                parent_node.id
-                            )
+                        target_node = self.helpers.repos.call_repo.get_target(
+                            parent_node.id
                         )
-                        _timings['get_target'].append(time.time() - t0)
+                        _timings["get_target"].append(time.time() - t0)
                         if target_node:
                             parent_qname = target_node.qname
 
@@ -329,8 +358,9 @@ class CallSyncService:
                         current_version=self.helpers.sync_version,
                     )
                     t0 = time.time()
-                    call_node = self.helpers.repos.call_repo.create(call_node)
-                    _timings['create_call_node'].append(time.time() - t0)
+                    call_node = self.helpers.repos.call_repo.create(
+                        call_node)
+                    _timings["create_call_node"].append(time.time() - t0)
                 except Exception as e:
                     logger.error(
                         "Error creating call node for %s at %s:%s: %s",
@@ -347,9 +377,8 @@ class CallSyncService:
                     call_node.current_version = self.helpers.sync_version
                     t0 = time.time()
                     self.helpers.repos.call_repo.update(
-                        call_node.key, call_node
-                    )
-                    _timings['update_call_node'].append(time.time() - t0)
+                        call_node.key, call_node)
+                    _timings["update_call_node"].append(time.time() - t0)
             except Exception as e:
                 logger.error(
                     "Error updating call node %s version: %s",
@@ -365,14 +394,10 @@ class CallSyncService:
             return call_node
 
         except Exception as e:
-            logger.error(
-                f"Error syncing call node: {e}"
-            )
+            logger.error(f"Error syncing call node: {e}")
             return call_node
 
-    def _process_recursive_calls_batch(
-        self, recursive_lookup_ids: list, queue: list
-    ):
+    def _process_recursive_calls_batch(self, recursive_lookup_ids: list, queue: list):
         """
         Batch lookup recursive calls and add to queue.
         recursive_lookup_ids is list of (call_site_id, call_node)
@@ -384,10 +409,9 @@ class CallSyncService:
 
         # Batch fetch all calls inside callees in one query
         t0 = time.time()
-        calls_map = (
-            self.scope_manager.batch_get_calls_inside_callee(call_site_ids)
-        )
-        _timings['get_calls_inside_callee'].append(time.time() - t0)
+        calls_map = self.scope_manager.batch_get_calls_inside_callee(
+            call_site_ids)
+        _timings["get_calls_inside_callee"].append(time.time() - t0)
 
         # Process results and add to queue
         for call_site_id, call_node in recursive_lookup_ids:
@@ -399,7 +423,7 @@ class CallSyncService:
         """Print timing statistics for performance analysis."""
         global _timings
         from app.core.parser.graph_builder.sync.sync_helpers import (
-            _timings as helper_timings
+            _timings as helper_timings,
         )
 
         # Merge timings from sync_helpers
@@ -438,4 +462,116 @@ class CallSyncService:
 
         print("=" * 80)
         print(f"TOTAL TIME IN TRACKED OPERATIONS: {total_time:.4f}s")
+        print("=" * 80 + "\n")
+
+    def _print_sync_call_chain_analytics(
+        self,
+        scope_ids: List[str],
+        scope_call_counts: dict,
+        scope_db_times: dict,
+        total_calls: int,
+        total_time: float,
+        batch_sync_time: float,
+    ):
+        """Print analytics for sync_call_chain_scopes including call counts and database performance."""
+        print("\n" + "=" * 80)
+        print("SYNC CALL CHAIN SCOPES ANALYTICS")
+        print("=" * 80)
+
+        # Overall statistics
+        print(f"\nOverall Statistics:")
+        print(f"  Total scopes processed: {len(scope_ids)}")
+        print(f"  Total calls processed: {total_calls}")
+        print(f"  Total execution time: {total_time:.4f}s")
+        print(f"  Batch sync time: {batch_sync_time:.4f}s")
+        print(
+            f"  Batch sync % of total: {(batch_sync_time / total_time * 100) if total_time > 0 else 0:.2f}%")
+
+        # Call counts per scope
+        print(f"\nCall Counts per Scope:")
+        if scope_call_counts:
+            sorted_scopes = sorted(
+                scope_call_counts.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )
+            for scope_id, call_count in sorted_scopes:
+                scope = self.scope_manager.get_scope(scope_id)
+                scope_name = scope.qname if scope else scope_id
+                scope_type = scope.type.value if scope else "UNKNOWN"
+                print(f"  {scope_name} ({scope_type}): {call_count} calls")
+        else:
+            print("  No calls found in any scope")
+
+        # Database access performance per scope
+        print(f"\nDatabase Access Performance per Scope:")
+        if scope_db_times:
+            for scope_id in scope_ids:
+                if scope_id in scope_db_times:
+                    scope = self.scope_manager.get_scope(scope_id)
+                    scope_name = scope.qname if scope else scope_id
+                    scope_type = scope.type.value if scope else "UNKNOWN"
+
+                    db_ops = scope_db_times[scope_id]
+                    total_db_time = sum(time for _, time in db_ops)
+                    avg_db_time = total_db_time / len(db_ops) if db_ops else 0
+                    max_db_time = max(
+                        time for _, time in db_ops) if db_ops else 0
+
+                    print(f"\n  {scope_name} ({scope_type}):")
+                    print(f"    Total DB operations: {len(db_ops)}")
+                    print(f"    Total DB time: {total_db_time:.6f}s")
+                    print(f"    Average DB time: {avg_db_time:.6f}s")
+                    print(f"    Max DB time: {max_db_time:.6f}s")
+
+                    # Breakdown by operation type
+                    op_times = defaultdict(list)
+                    for op_name, op_time in db_ops:
+                        op_times[op_name].append(op_time)
+
+                    for op_name, times in sorted(op_times.items()):
+                        op_total = sum(times)
+                        op_avg = op_total / len(times)
+                        op_max = max(times)
+                        print(
+                            f"      {op_name}: count={len(times)}, total={op_total:.6f}s, avg={op_avg:.6f}s, max={op_max:.6f}s")
+        else:
+            print("  No database operations tracked")
+
+        # Database access summary from _timings
+        print(f"\nDatabase Access Summary (from batch operations):")
+        db_operations = [
+            "get_call_with_parent_and_target_batch",
+            "count_recursive_calls_upward",
+            "create_call_node",
+            "update_call_node",
+            "get_target",
+            "ensure_contains_edges_batch",
+            "ensure_targets_edges_batch",
+            "get_calls_inside_callee",
+        ]
+
+        db_total_time = 0.0
+        for op_name in db_operations:
+            if op_name in _timings and _timings[op_name]:
+                times = _timings[op_name]
+                op_total = sum(times)
+                op_avg = op_total / len(times)
+                op_max = max(times)
+                op_min = min(times)
+                db_total_time += op_total
+                print(
+                    f"  {op_name:45s} "
+                    f"count: {len(times):6d} "
+                    f"total: {op_total:10.6f}s "
+                    f"avg: {op_avg:10.6f}s "
+                    f"max: {op_max:10.6f}s "
+                    f"min: {op_min:10.6f}s"
+                )
+
+        if db_total_time > 0:
+            print(f"\n  Total database time: {db_total_time:.6f}s")
+            print(
+                f"  Database time % of total: {(db_total_time / total_time * 100) if total_time > 0 else 0:.2f}%")
+
         print("=" * 80 + "\n")

@@ -17,7 +17,7 @@ class JediProjectManager:
         self.project_path = project_path
         # Disable dynamic resolution features as they can be unstable/slow
         jedi.settings.dynamic_params_for_other_modules = False
-        jedi.settings.dynamic_flow_information = False
+
         self.project = jedi.Project(path=str(project_path))
         logger.info(f"Initialized Jedi Project at: {project_path}")
 

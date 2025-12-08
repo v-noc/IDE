@@ -70,7 +70,7 @@ class CallResolver:
         line: int,
         column: int,
         parent_context: Optional[Any] = None,
-    ) -> Optional[CallResolutionResult]:
+    ) -> List[CallResolutionResult]:
         """
         Resolve a call at the given position.
 
@@ -82,7 +82,7 @@ class CallResolver:
             parent_context: Optional Jedi context from the caller (for recursion)
 
         Returns:
-            CallResolutionResult if successful, None otherwise
+            List of CallResolutionResult objects, one for each possible callee
         """
         try:
             script = self.jedi_manager.get_script(file_path, source)
@@ -90,7 +90,7 @@ class CallResolver:
             # Use provided parent context or fall back to module context
             position_context = script.get_context(line, column)
             if position_context.in_builtin_module() or position_context.is_stub():
-                return None
+                return []
             context = parent_context or script._get_module_context()
 
             # Find the leaf at this position
@@ -120,71 +120,76 @@ class CallResolver:
 
             if not callee_values:
                 logger.debug(f"Could not infer callee at {line}:{column}")
-                return None
+                return []
 
-            result = CallResolutionResult(callee_values=list(callee_values))
+            results = []
+            bracket = leaf.get_next_leaf()
+            trailer = bracket.parent if bracket else None
+
+            while trailer and trailer.type != "trailer":
+                trailer = trailer.parent
 
             for callee in callee_values:
+                # Create a new result for each callee
+                result = CallResolutionResult(callee_values=[callee])
 
                 # Extract ID from docstring - PRIORITY for direct lookup
                 result.callee_id = self._extract_id_from_docstring(callee)
 
-                bracket = leaf.get_next_leaf()
-                trailer = bracket.parent
-
-                while trailer and trailer.type != "trailer":
-                    trailer = trailer.parent
-
+                callee_for_args = callee
                 if hasattr(callee, "_original_value"):
-                    callee = callee._original_value
-                arguments = self.create_args(
-                    callee, trailer, script._inference_state, call_context)
+                    callee_for_args = callee._original_value
 
-                if callee.is_function():
+                arguments = None
+                if trailer:
+                    arguments = self.create_args(
+                        callee_for_args, trailer, script._inference_state, call_context)
+
+                if callee_for_args.is_function():
                     if arguments:
-                        result.execution_context = callee.as_context(arguments)
-
+                        result.execution_context = callee_for_args.as_context(
+                            arguments)
                     else:
                         # No trailer found, fallback to anonymous context
-                        result.execution_context = callee.as_context()
+                        result.execution_context = callee_for_args.as_context()
 
-                if callee.api_type == "class":
+                if callee_for_args.api_type == "class":
                     result.is_class_instantiation = True
-                    inits = callee.py__getattribute__("__init__")
+                    inits = callee_for_args.py__getattribute__("__init__")
                     created_instance = TreeInstance(
-                        script._inference_state, callee.parent_context, callee, arguments)
+                        script._inference_state, callee_for_args.parent_context, callee_for_args, arguments)
                     if inits:
                         init_method = list(inits)[0]
                         if hasattr(init_method, "_original_value"):
                             init_method = init_method._original_value
                         bound_method = BoundMethod(
-                            created_instance, callee, init_method)
+                            created_instance, callee_for_args, init_method)
                         if arguments:
                             result.execution_context = bound_method.as_context(
                                 arguments)
                         else:
                             result.execution_context = bound_method.as_context()
-                            # Execute the class with arguments to get instance
                     else:
-                        result.execution_context = callee.as_context()
+                        result.execution_context = callee_for_args.as_context()
                     logger.debug(
                         f"Resolved class instantiation: {result.callee_id}")
                 else:
                     logger.debug(f"Resolved call to: {result.callee_id}")
-                    result.execution_context = callee.as_context()
+                    if not result.execution_context:
+                        result.execution_context = callee_for_args.as_context()
 
-                # We only need the first successful resolution
+                # Only add results with valid callee_id
                 if result.callee_id:
-                    break
+                    results.append(result)
 
-            return result if result.callee_id else None
+            return results
 
         except Exception as e:
             print(
                 f"Error resolving call at {file_path} {line}:{column}: {leaf} {e}")
             import traceback
             traceback.print_exc()
-            return None
+            return []
 
     def _extract_id_from_docstring(self, value) -> Optional[str]:
         """
