@@ -75,9 +75,6 @@ class CallSyncService:
 
         # Collect all call infos first, then batch process
         all_call_infos = []
-        scope_to_node_map = {}
-        # Store children keyed by call_site_id for later processing
-        root_call_children = {}
 
         # Simple DFS over scope tree rooted at root_scope
         stack = [root_scope]
@@ -96,7 +93,6 @@ class CallSyncService:
                 )
 
                 if graph_node:
-                    scope_to_node_map[scope.id] = graph_node
 
                     t0 = time.time()
                     call_infos = self.scope_manager.get_root_calls_from(
@@ -108,12 +104,12 @@ class CallSyncService:
                         for call_info in call_infos:
                             all_call_infos.append((call_info, graph_node))
 
-                            # Store children for later processing after
-                            # call_node is created
-                            children = call_info.get("children", [])
-                            if children:
-                                call_site_id = call_info["call_site"].id
-                                root_call_children[call_site_id] = children
+                            # # Store children for later processing after
+                            # # call_node is created
+                            # children = call_info.get("children", [])
+                            # if children:
+                            #     call_site_id = call_info["call_site"].id
+                            #     root_call_children[call_site_id] = children
 
             t0 = time.time()
             children = self.scope_manager.get_children(scope.id)
@@ -122,7 +118,7 @@ class CallSyncService:
 
         # Batch process calls
         self._batch_sync_calls(
-            all_call_infos, scope_to_node_map, root_call_children
+            all_call_infos
         )
 
         # Print timing summary
@@ -131,8 +127,7 @@ class CallSyncService:
     def _batch_sync_calls(
         self,
         all_call_infos: list,
-        scope_to_node_map: dict,
-        root_call_children: dict = None,
+
     ):
         """
         Batch sync calls to reduce database round trips.
@@ -208,12 +203,52 @@ class CallSyncService:
                     time.time() - t0
                 )
 
-                # 3. Process each pair to create/update nodes and collect edges
+                # 3. Batch check recursion for all pairs
+                recursion_check_pairs = []
+                for pair in batch_pairs:
+                    items = call_info_map[pair]
+                    for call_info, parent_node, callee_node in items:
+                        recursion_check_pairs.append(
+                            (parent_node.id, callee_node.id)
+                        )
+
+                recursion_counts = {}
+                if recursion_check_pairs:
+                    t0 = time.time()
+                    recursion_counts = (
+                        call_repo.count_recursive_calls_upward_batch(
+                            recursion_check_pairs
+                        )
+                    )
+                    _timings['count_recursive_calls_upward'].append(
+                        time.time() - t0
+                    )
+
+                # 4. Process each pair to create/update nodes and collect edges
                 for pair in batch_pairs:
                     call_node = existing_calls.get(pair)
 
                     items = call_info_map[pair]
                     for call_info, parent_node, callee_node in items:
+                        # Check for recursion: if target appears twice or more
+                        # in upward call chain, skip to prevent infinite recursion
+                        recursion_key = (
+                            parent_node.id, callee_node.id
+                        )
+                        recursion_count = recursion_counts.get(
+                            recursion_key, 0
+                        )
+
+                        if recursion_count >= 2:
+                            logger.debug(
+                                "Skipping recursive call: %s -> %s "
+                                "(recursion depth: %d)",
+                                parent_node.id,
+                                callee_node.id,
+                                recursion_count,
+                            )
+                            continue
+
                         # Sync and get back the (possibly created) call_node
                         call_node = self._sync_node_calls_with_node_batch(
                             call_info,
@@ -229,15 +264,6 @@ class CallSyncService:
                             call_site_id = call_info.get("call_site").id
                             recursive_lookup_ids.append(
                                 (call_site_id, call_node))
-
-                            # Process children from root calls if they exist
-                            if (root_call_children and
-                                    call_site_id in root_call_children):
-                                children = root_call_children[call_site_id]
-                                for child_call_info in children:
-                                    queue.append(
-                                        (child_call_info, call_node)
-                                    )
 
             # 4. Flush edge buffers
             if contains_edges_buffer:

@@ -14,7 +14,7 @@ import logging
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from app.core.parser.ast.models import (
     BaseNode,
@@ -51,7 +51,7 @@ class CallChainBuilder:
         project_name: str,
         scope_manager: ScopeManager,
         jedi_manager: JediProjectManager,
-        max_depth: int = 50,
+        max_depth: int = 1,
     ):
         self.project_path = project_path
         self.project_name = project_name
@@ -59,6 +59,8 @@ class CallChainBuilder:
         self.jedi_manager = jedi_manager
         self.call_resolver = CallResolver(jedi_manager)
         self.max_depth = max_depth
+        # for recursive detection
+        self.call_chain_scope_ids: Dict[str, int] = {}
 
         # Track visited scopes to prevent infinite recursion
         self._visited_scopes = set()
@@ -77,7 +79,7 @@ class CallChainBuilder:
         call_node: CallNode,
         caller_scope: ScopeModel,
         current_call_id: Optional[str] = None,
-        depth: int = 0,
+        depth: int = 2,
         parent_context: Optional[object] = None,
     ) -> Optional[str]:
         """
@@ -102,6 +104,10 @@ class CallChainBuilder:
             The ID of the created call site
         """
         # Get the source code for this file
+        if parent_context is None:
+
+            self.call_chain_scope_ids.clear()
+
         file_path = Path(caller_scope.file_path)
         if not file_path.is_absolute():
             file_path = self.project_path / file_path
@@ -135,23 +141,12 @@ class CallChainBuilder:
                 t0 = time.time()
                 callee_scope = self.scope_manager.get_scope(
                     resolution.callee_id)
+
                 _timings["get_scope_by_id"].append(time.time() - t0)
+            else:
+                print(
+                    f"Could not resolve call {call_node.name} at {call_node.position.line}:{call_node.position.column}")
 
-            # Priority 2: Fall back to qname-based lookup if ID not available or failed
-            if not callee_scope and resolution.callee_qname:
-                jedi_qname = resolution.callee_qname
-                candidates = self._candidate_qnames(caller_scope, jedi_qname)
-
-                for full_qname in candidates:
-                    t0 = time.time()
-                    callee_scope = self.scope_manager.get_scope_by_qname(
-                        full_qname)
-                    _timings["get_scope_by_qname"].append(time.time() - t0)
-                    if not callee_scope:
-                        logger.debug(f"Callee not found for {full_qname}")
-                        continue
-
-                    
         else:
             logger.debug(
                 f"Could not resolve call {call_node.name} at "
@@ -160,7 +155,18 @@ class CallChainBuilder:
             return
         if not callee_scope:
             return
+
+        if callee_scope.id not in self.call_chain_scope_ids:
+            self.call_chain_scope_ids[callee_scope.id] = 0
+        else:
+            self.call_chain_scope_ids[callee_scope.id] += 1
+
         call_name = self._normalize_call_name(call_node.name)
+        if self.call_chain_scope_ids[callee_scope.id] >= self.max_depth:
+            return None
+            print(
+                f"Max depth reached for {callee_scope.qname} {caller_scope.qname} {self.call_chain_scope_ids[callee_scope.id]}")
+            # return
 
         # Generate call site ID (will be created in batch)
         import uuid

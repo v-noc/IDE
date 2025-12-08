@@ -2,12 +2,11 @@ def factory():
     """ID: 4443bd2b-bcdc-4135-a8d3-16705dc8da11"""
     def add():
         """ID: 6cfe906e-80c1-4f9a-a984-e7154c91a767"""
-
         build()
 
     def build():
         """ID: 0af37d95-b990-4aa8-a6d8-f227f080aa11"""
-        pass
+        build()
     return add
 
 

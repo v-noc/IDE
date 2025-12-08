@@ -3,6 +3,7 @@ from uuid import uuid4
 import re
 from typing import Optional, Tuple, Dict
 
+
 class IDInjector(cst.CSTTransformer):
     def __init__(self):
         self.modified = False
@@ -15,10 +16,10 @@ class IDInjector(cst.CSTTransformer):
 
     def _build_docstring(self, original_doc: Optional[str], new_metadata: Dict[str, str]) -> str:
         content = (original_doc or "").rstrip()
-        
+
         # Strip legacy metadata block if present (keeping this logic from legacy for safety)
         if content:
-             content = re.sub(
+            content = re.sub(
                 r"\s*---\s*metadata:\s*.*?\s*---\s*$",
                 "",
                 content,
@@ -27,15 +28,15 @@ class IDInjector(cst.CSTTransformer):
 
         # Remove existing keys we are about to update
         for key in new_metadata.keys():
-             pattern = re.compile(
+            pattern = re.compile(
                 rf"(^|(?<=\s)){re.escape(key)}\s*:\s*\S+(?=\s|$)",
                 re.MULTILINE,
             )
-             content = pattern.sub("", content).strip()
+            content = pattern.sub("", content).strip()
 
         kv_lines = [f"{k}: {v}" for k, v in new_metadata.items()]
         kv_text = "\n".join(kv_lines)
-        
+
         return f"{content}\n\n{kv_text}".strip() if content else kv_text
 
     def _add_id_to_docstring(self, body: cst.IndentedBlock, current_doc: str | None) -> cst.IndentedBlock:
@@ -43,24 +44,24 @@ class IDInjector(cst.CSTTransformer):
         if current_doc:
             metadata = self._extract_metadata(current_doc)
             if "ID" in metadata:
-                return body # ID exists, do nothing
+                return body  # ID exists, do nothing
 
         # ID missing, we need to modify
         self.modified = True
         id_value = str(uuid4())
         new_doc_content = self._build_docstring(current_doc, {"ID": id_value})
-        
+
         statements = body.body
-        
+
         # Replace existing docstring
         if current_doc is not None:
-             if (
-                statements
-                and isinstance(statements[0], cst.SimpleStatementLine)
-                and len(statements[0].body) == 1
-                and isinstance(statements[0].body[0], cst.Expr)
-                and isinstance(statements[0].body[0].value, cst.SimpleString)
-            ):
+            if (
+               statements
+               and isinstance(statements[0], cst.SimpleStatementLine)
+               and len(statements[0].body) == 1
+               and isinstance(statements[0].body[0], cst.Expr)
+               and isinstance(statements[0].body[0].value, cst.SimpleString)
+               ):
                 old_expr = statements[0].body[0]
                 # Use triple quotes for docstrings
                 new_expr = old_expr.with_changes(
@@ -68,10 +69,10 @@ class IDInjector(cst.CSTTransformer):
                 )
                 new_stmt = statements[0].with_changes(body=(new_expr,))
                 new_body_statements = (new_stmt,) + statements[1:]
-             else:
-                 # Fallback if structure is weird, but we detected a docstring earlier?
-                 # If get_docstring found it, it should be here.
-                 return body
+            else:
+                # Fallback if structure is weird, but we detected a docstring earlier?
+                # If get_docstring found it, it should be here.
+                return body
         else:
             # Insert new docstring at start
             new_stmt = cst.SimpleStatementLine(
@@ -95,6 +96,7 @@ class IDInjector(cst.CSTTransformer):
     def leave_FunctionDef(self, original_node: cst.FunctionDef, updated_node: cst.FunctionDef) -> cst.FunctionDef:
         current_doc = original_node.get_docstring(clean=True)
         return updated_node.with_changes(body=self._add_id_to_docstring(updated_node.body, current_doc))
+
 
 def inject_ids(content: str) -> Tuple[str, bool]:
     """

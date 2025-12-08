@@ -142,6 +142,142 @@ class CallRepo(NodeRepository[CallNode]):
                 (p, t): None for p, t in parent_target_pairs
             }
 
+    def count_recursive_calls_upward(
+        self,
+        parent_id: str,
+        target_id: str,
+        max_depth: int = 50,
+    ) -> int:
+        """
+        Count how many times the same target (function/class) appears
+        in the call chain **upwards** from a given parent node.
+
+        Logic:
+        - Start from the given parent node id.
+        - Walk INBOUND on ``contains_edges`` while the current vertex is a
+          ``call`` node.
+        - For every such call, look at its target via ``targets_edges``.
+        - If the target's ``_id`` matches ``target_id``, increment the count.
+        - Stop as soon as we reach a non-call node or ``max_depth``.
+
+        Args:
+            parent_id: Node id to start from (usually the parent of a call).
+            target_id: The function/class node id we consider "the same" for
+                       recursion purposes.
+            max_depth: Safety limit on how far up the chain we walk.
+
+        Returns:
+            Integer count of recursive calls found on the upward chain.
+        """
+        query = """
+        LET matches = (
+            FOR v IN 0..@max_depth INBOUND @start_parent_id @@contains
+                PRUNE v.node_type != "call"
+                FILTER v.node_type == "call"
+                LET target = FIRST(
+                    FOR t IN 1..1 OUTBOUND v @@targets
+                        RETURN t
+                )
+                FILTER target != null && target._id == @target_id
+                RETURN 1
+        )
+        RETURN LENGTH(matches)
+        """
+
+        bind_vars = {
+            "start_parent_id": str(parent_id),
+            "target_id": str(target_id),
+            "@contains": "contains_edges",
+            "@targets": "targets_edges",
+            "max_depth": max_depth,
+        }
+
+        try:
+            cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+            result = next(cursor, 0)
+            return int(result or 0)
+        except Exception as e:
+            logger.error(
+                "Error counting recursive calls upward for %s -> %s: %s",
+                parent_id,
+                target_id,
+                e,
+            )
+            return 0
+
+    def count_recursive_calls_upward_batch(
+        self,
+        parent_target_pairs: List[tuple[str, str]],
+        max_depth: int = 50,
+    ) -> Dict[tuple[str, str], int]:
+        """
+        Batch version of count_recursive_calls_upward.
+        Counts recursion for multiple (parent_id, target_id) pairs at once.
+
+        Args:
+            parent_target_pairs: List of (parent_id, target_id) tuples to check.
+            max_depth: Safety limit on how far up the chain we walk.
+
+        Returns:
+            Dict mapping (parent_id, target_id) -> recursion count.
+        """
+        if not parent_target_pairs:
+            return {}
+
+        query = """
+        FOR pair IN @pairs
+            LET matches = (
+                FOR v IN 0..@max_depth INBOUND pair.parent_id @@contains
+                    PRUNE v.node_type != "call"
+                    FILTER v.node_type == "call"
+                    LET target = FIRST(
+                        FOR t IN 1..1 OUTBOUND v @@targets
+                            RETURN t
+                    )
+                    FILTER target != null && target._id == pair.target_id
+                    RETURN 1
+            )
+            RETURN {
+                parent_id: pair.parent_id,
+                target_id: pair.target_id,
+                count: LENGTH(matches)
+            }
+        """
+
+        bind_vars = {
+            "pairs": [
+                {"parent_id": str(p), "target_id": str(t)}
+                for p, t in parent_target_pairs
+            ],
+            "@contains": "contains_edges",
+            "@targets": "targets_edges",
+            "max_depth": max_depth,
+        }
+
+        try:
+            cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+            results = {}
+
+            # Initialize all pairs to 0
+            for parent_id, target_id in parent_target_pairs:
+                results[(parent_id, target_id)] = 0
+
+            # Fill in found counts
+            for row in cursor:
+                key = (row["parent_id"], row["target_id"])
+                results[key] = int(row["count"] or 0)
+
+            return results
+
+        except Exception as e:
+            logger.error(
+                "Error batch counting recursive calls upward: %s", e
+            )
+            # Fallback: return 0 for all
+            return {
+                (p, t): 0 for p, t in parent_target_pairs
+            }
+
     def get_downward_call_chain(self, node_id: str) -> List[Dict[str, Any]]:
         query = """
         FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id @@contains

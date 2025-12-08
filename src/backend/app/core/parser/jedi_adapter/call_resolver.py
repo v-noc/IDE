@@ -31,9 +31,6 @@ logger = logging.getLogger(__name__)
 class CallResolutionResult:
     """Result of resolving a call site."""
 
-    callee_qname: Optional[str] = None
-    """Fully qualified name of the resolved callee"""
-
     callee_id: Optional[str] = None
     """ID extracted from the callee's docstring"""
 
@@ -132,9 +129,6 @@ class CallResolver:
                 # Extract ID from docstring - PRIORITY for direct lookup
                 result.callee_id = self._extract_id_from_docstring(callee)
 
-                # Extract qualified name - ALWAYS includes module
-                result.callee_qname = self._extract_qualified_name(callee)
-
                 bracket = leaf.get_next_leaf()
                 trailer = bracket.parent
 
@@ -174,16 +168,16 @@ class CallResolver:
                     else:
                         result.execution_context = callee.as_context()
                     logger.debug(
-                        f"Resolved class instantiation: {result.callee_qname}")
+                        f"Resolved class instantiation: {result.callee_id}")
                 else:
-                    logger.debug(f"Resolved call to: {result.callee_qname}")
+                    logger.debug(f"Resolved call to: {result.callee_id}")
                     result.execution_context = callee.as_context()
 
                 # We only need the first successful resolution
-                if result.callee_qname or result.callee_id:
+                if result.callee_id:
                     break
 
-            return result if (result.callee_qname or result.callee_id) else None
+            return result if result.callee_id else None
 
         except Exception as e:
             print(
@@ -249,7 +243,7 @@ class CallResolver:
             if hasattr(value, "_original_value"):
                 value = value._original_value
             if hasattr(value, "name") and hasattr(value.name, "get_qualified_names"):
-                return ".".join(value.name.get_qualified_names(True))
+                return ".".join(value.name.get_qualified_names())
             return None
         except Exception as e:
             logger.warning(f"Could not extract qualified name: {e}")
