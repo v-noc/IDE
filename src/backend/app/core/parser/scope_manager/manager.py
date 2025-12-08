@@ -53,6 +53,14 @@ class ScopeManager:
         self.repository.update_scope(scope)
         return scope
 
+    def batch_get_scopes_by_ids(self, scope_ids: List[str]) -> dict[str, ScopeModel]:
+        """Batch get scopes by their IDs. Returns a dict mapping id -> ScopeModel."""
+        return self.repository.batch_get_scopes_by_ids(scope_ids)
+
+    def batch_update_scopes(self, scopes: List[ScopeModel]) -> None:
+        """Batch update multiple scopes efficiently."""
+        self.repository.batch_update_scopes(scopes)
+
     def get_scope(self, scope_id: str) -> Optional[ScopeModel]:
         """Get a scope by ID."""
         return self.repository.get_scope_by_id(scope_id)
@@ -86,6 +94,18 @@ class ScopeManager:
     def link_parent_child(self, parent_id: str, child_id: str) -> None:
         """Link a parent scope to a child scope (e.g., Class contains Function)."""
         self.repository.link_parent_child(parent_id, child_id)
+
+    def batch_get_scopes_by_qnames(self, qnames: List[str]) -> dict[str, ScopeModel]:
+        """Batch get scopes by their qualified names. Returns a dict mapping qname -> ScopeModel."""
+        return self.repository.batch_get_scopes_by_qnames(qnames)
+
+    def batch_create_scopes(self, scopes: List[ScopeModel]) -> None:
+        """Batch create multiple scopes efficiently."""
+        self.repository.batch_create_scopes(scopes)
+
+    def batch_link_parent_child(self, relationships: List[dict[str, str]]) -> None:
+        """Batch link parent-child relationships. relationships is a list of dicts with 'parent_id' and 'child_id' keys."""
+        self.repository.batch_link_parent_child(relationships)
 
     def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all children of a scope."""

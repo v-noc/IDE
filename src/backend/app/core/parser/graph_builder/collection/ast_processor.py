@@ -3,7 +3,7 @@ import logging
 import uuid
 import hashlib
 import json
-from typing import List, Tuple, Any, Optional
+from typing import List, Tuple, Any, Optional, Dict
 
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel, ScopeType
@@ -20,24 +20,141 @@ class ASTProcessor:
     def process_ast_nodes(self, nodes: List[BaseNode], parent_scope: ScopeModel, content: Optional[str] = None) -> List[tuple[ScopeModel, BaseNode]]:
         """
         Recursively create scopes for AST nodes and return created scopes with their AST nodes.
+        Uses batch operations for efficiency.
         """
-        results = []
-        for node in nodes:
-            if isinstance(node, (ClassNode, FunctionNode)):
-                scope = self._create_node_scope(node, parent_scope, content)
-                results.append((scope, node))
+        # First pass: collect all nodes and their metadata
+        node_data_list = []
+        self._collect_nodes_recursive(
+            nodes, parent_scope, content, node_data_list)
 
-                # Recurse
-                if hasattr(node, "children"):
-                    child_results = self.process_ast_nodes(
-                        node.children, scope, content)
-                    results.extend(child_results)
+        if not node_data_list:
+            return []
+
+        # Extract all scope IDs that need to be checked
+        scope_ids_to_check = [data["node_id"] for data in node_data_list]
+
+        # Batch check all existing scopes
+        existing_scopes = self.manager.batch_get_scopes_by_ids(
+            scope_ids_to_check)
+
+        # Collect scopes to create, update, and relationships to link
+        scopes_to_create: List[ScopeModel] = []
+        scopes_to_update: List[ScopeModel] = []
+        relationships_to_link: List[dict[str, str]] = []
+        scope_map: Dict[str, ScopeModel] = {}  # node_id -> scope
+
+        # Process each node data
+        for data in node_data_list:
+            node = data["node"]
+            node_id = data["node_id"]
+            scope = data["scope"]
+            parent_scope_obj = data["parent_scope"]
+
+            existing = existing_scopes.get(node_id)
+
+            if not existing:
+                # New scope - mark for creation
+                scopes_to_create.append(scope)
+                relationships_to_link.append({
+                    "parent_id": parent_scope_obj.id,
+                    "child_id": node_id
+                })
+                logger.debug(f"Will create new scope: {scope.qname}")
+            else:
+                # Existing scope - check if it needs updating
+                needs_update = False
+                needs_relink = False
+
+                # Check if checksum changed (content change)
+                if existing.checksum != scope.checksum:
+                    needs_update = True
+                    logger.debug(f"Scope content changed: {scope.qname}")
+
+                # Check if position changed
+                if (existing.start_line != scope.start_line or
+                    existing.start_col != scope.start_col or
+                    existing.end_line != scope.end_line or
+                        existing.end_col != scope.end_col):
+                    needs_update = True
+                    logger.debug(f"Scope position changed: {scope.qname}")
+
+                # Check if qname changed (moved to different parent or renamed)
+                if existing.qname != scope.qname:
+                    needs_update = True
+                    needs_relink = True
+                    logger.debug(
+                        f"Scope moved or renamed: {existing.qname} -> {scope.qname}")
+
+                # Check if MRO changed (if we have new MRO)
+                if scope.mro and existing.mro != scope.mro:
+                    needs_update = True
+                    logger.debug(f"Scope MRO changed: {scope.qname}")
+
+                if needs_update:
+                    scopes_to_update.append(scope)
+
+                if needs_relink:
+                    # TODO: Handle parent change - need to remove old parent link
+                    relationships_to_link.append({
+                        "parent_id": parent_scope_obj.id,
+                        "child_id": node_id
+                    })
+                    pass
+
+                # Use existing scope for the result
+                scope = existing
+
+            scope_map[node_id] = scope
+
+        # Batch create all scopes
+        if scopes_to_create:
+            self.manager.batch_create_scopes(scopes_to_create)
+
+        # Batch update all scopes
+        if scopes_to_update:
+            self.manager.batch_update_scopes(scopes_to_update)
+
+        # Batch link all parent-child relationships
+        if relationships_to_link:
+            self.manager.batch_link_parent_child(relationships_to_link)
+
+        # Build results list
+        results = []
+        for data in node_data_list:
+            node_id = data["node_id"]
+            node = data["node"]
+            scope = scope_map[node_id]
+            results.append((scope, node))
+
         return results
 
-    def _create_node_scope(self, node: BaseNode, parent_scope: ScopeModel, content: Optional[str] = None):
+    def _collect_nodes_recursive(
+        self,
+        nodes: List[BaseNode],
+        parent_scope: ScopeModel,
+        content: Optional[str],
+        node_data_list: List[dict]
+    ) -> None:
+        """Recursively collect all nodes and build their scope models."""
+        for node in nodes:
+            if isinstance(node, (ClassNode, FunctionNode)):
+                node_data = self._prepare_node_scope(
+                    node, parent_scope, content)
+                node_data_list.append(node_data)
+
+                # Get the scope for recursion
+                scope = node_data["scope"]
+
+                # Recurse into children
+                if hasattr(node, "children"):
+                    self._collect_nodes_recursive(
+                        node.children, scope, content, node_data_list
+                    )
+
+    def _prepare_node_scope(self, node: BaseNode, parent_scope: ScopeModel, content: Optional[str] = None) -> dict:
         """
-        Create or update a scope for an AST node.
-        Handles new scopes, modified scopes, and scope moves.
+        Prepare scope data for an AST node without creating it yet.
+        Returns a dict with node, node_id, scope, and parent_scope.
         """
         # Determine ID: Use injected ID if available, else generate
         node_id = node.id if node.id else str(uuid.uuid4())
@@ -90,66 +207,12 @@ class ASTProcessor:
             parent_id=parent_scope.id
         )
 
-        # Check if scope exists
-        existing = self.manager.get_scope(node_id)
-
-        if not existing:
-            # New scope - create it
-            self.manager.create_scope(
-                name=node.name,
-                qname=qname,
-                scope_type=scope_type,
-                file_path=parent_scope.file_path,
-                start_line=node.position.line,
-                start_col=node.position.column,
-                end_line=node.position.end_line,
-                end_col=node.position.end_column,
-                scope_id=node_id,
-                mro=mro,
-                checksum=checksum
-            )
-            # Link to parent
-            self.manager.link_parent_child(parent_scope.id, node_id)
-            logger.debug(f"Created new scope: {qname}")
-        else:
-            # Existing scope - check if it needs updating
-            needs_update = False
-            needs_relink = False
-
-            # Check if checksum changed (content change)
-            if existing.checksum != checksum:
-                needs_update = True
-                logger.debug(f"Scope content changed: {qname}")
-
-            # Check if position changed
-            if (existing.start_line != node.position.line or
-                existing.start_col != node.position.column or
-                existing.end_line != node.position.end_line or
-                    existing.end_col != node.position.end_column):
-                needs_update = True
-                logger.debug(f"Scope position changed: {qname}")
-
-            # Check if qname changed (moved to different parent or renamed)
-            if existing.qname != qname:
-                needs_update = True
-                needs_relink = True
-                logger.debug(
-                    f"Scope moved or renamed: {existing.qname} -> {qname}")
-
-            # Check if MRO changed (if we have new MRO)
-            if mro and existing.mro != mro:
-                needs_update = True
-                logger.debug(f"Scope MRO changed: {qname}")
-
-            if needs_update:
-                # Update the scope in database
-                self.manager.update_scope(scope)
-
-            if needs_relink:
-                # TODO: Handle parent change - need to remove old parent link
-                pass
-
-        return scope
+        return {
+            "node": node,
+            "node_id": node_id,
+            "scope": scope,
+            "parent_scope": parent_scope
+        }
 
     def _get_name_column(self, content: str, node: BaseNode) -> int:
         """

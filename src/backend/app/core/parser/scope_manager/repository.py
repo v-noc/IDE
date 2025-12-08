@@ -76,6 +76,45 @@ class ScopeRepository:
             }
         )
 
+    def batch_update_scopes(self, scopes: List[ScopeModel]) -> None:
+        """Batch update multiple scopes efficiently using Neo4j UNWIND."""
+        if not scopes:
+            return
+
+        scope_data = []
+        for scope in scopes:
+            scope_data.append({
+                "id": scope.id,
+                "name": scope.name,
+                "qname": scope.qname,
+                "type": scope.type.value,
+                "file_path": scope.file_path,
+                "start_line": scope.start_line,
+                "start_col": scope.start_col,
+                "end_line": scope.end_line,
+                "end_col": scope.end_col,
+                "mro": scope.mro or [],
+                "checksum": scope.checksum,
+            })
+
+        self.conn.execute(
+            """
+            UNWIND $scopes AS scope_data
+            MATCH (s:Scope {id: scope_data.id})
+            SET s.name = scope_data.name,
+                s.qname = scope_data.qname,
+                s.type = scope_data.type,
+                s.file_path = scope_data.file_path,
+                s.start_line = scope_data.start_line,
+                s.start_col = scope_data.start_col,
+                s.end_line = scope_data.end_line,
+                s.end_col = scope_data.end_col,
+                s.mro = scope_data.mro,
+                s.checksum = scope_data.checksum
+            """,
+            {"scopes": scope_data}
+        )
+
     def get_scope_by_id(self, scope_id: str) -> Optional[ScopeModel]:
         """Get a Scope by ID."""
         result = self.conn.execute(
@@ -174,6 +213,127 @@ class ScopeRepository:
             CREATE (p)-[:CONTAINS]->(c)
             """,
             {"parent_id": parent_id, "child_id": child_id}
+        )
+
+    def batch_get_scopes_by_qnames(self, qnames: List[str]) -> dict[str, ScopeModel]:
+        """Batch get scopes by their qualified names. Returns a dict mapping qname -> ScopeModel."""
+        if not qnames:
+            return {}
+
+        result = self.conn.execute(
+            """
+            UNWIND $qnames AS qname
+            MATCH (s:Scope {qname: qname})
+            RETURN s.qname AS qname, s
+            """,
+            {"qnames": qnames}
+        )
+
+        scopes_map = {}
+        for row in result:
+            qname = row[0]
+            node = row[1]
+            scopes_map[qname] = ScopeModel(
+                id=node["id"],
+                name=node["name"],
+                qname=node["qname"],
+                type=node["type"],
+                file_path=node["file_path"],
+                start_line=node["start_line"],
+                start_col=node["start_col"],
+                end_line=node["end_line"],
+                end_col=node["end_col"],
+                mro=node.get("mro", []),
+                checksum=node.get("checksum"),
+            )
+        return scopes_map
+
+    def batch_get_scopes_by_ids(self, scope_ids: List[str]) -> dict[str, ScopeModel]:
+        """Batch get scopes by their IDs. Returns a dict mapping id -> ScopeModel."""
+        if not scope_ids:
+            return {}
+
+        result = self.conn.execute(
+            """
+            UNWIND $scope_ids AS scope_id
+            MATCH (s:Scope {id: scope_id})
+            RETURN s.id AS id, s
+            """,
+            {"scope_ids": scope_ids}
+        )
+
+        scopes_map = {}
+        for row in result:
+            scope_id = row[0]
+            node = row[1]
+            scopes_map[scope_id] = ScopeModel(
+                id=node["id"],
+                name=node["name"],
+                qname=node["qname"],
+                type=node["type"],
+                file_path=node["file_path"],
+                start_line=node["start_line"],
+                start_col=node["start_col"],
+                end_line=node["end_line"],
+                end_col=node["end_col"],
+                mro=node.get("mro", []),
+                checksum=node.get("checksum"),
+            )
+        return scopes_map
+
+    def batch_create_scopes(self, scopes: List[ScopeModel]) -> None:
+        """Batch create multiple scopes efficiently using Neo4j UNWIND."""
+        if not scopes:
+            return
+
+        scope_data = []
+        for scope in scopes:
+            scope_data.append({
+                "id": scope.id,
+                "name": scope.name,
+                "qname": scope.qname,
+                "type": scope.type.value,
+                "file_path": scope.file_path,
+                "start_line": scope.start_line,
+                "start_col": scope.start_col,
+                "end_line": scope.end_line,
+                "end_col": scope.end_col,
+                "mro": scope.mro or [],
+                "checksum": scope.checksum,
+            })
+
+        self.conn.execute(
+            """
+            UNWIND $scopes AS scope_data
+            CREATE (s:Scope {
+                id: scope_data.id,
+                name: scope_data.name,
+                qname: scope_data.qname,
+                type: scope_data.type,
+                file_path: scope_data.file_path,
+                start_line: scope_data.start_line,
+                start_col: scope_data.start_col,
+                end_line: scope_data.end_line,
+                end_col: scope_data.end_col,
+                mro: scope_data.mro,
+                checksum: scope_data.checksum
+            })
+            """,
+            {"scopes": scope_data}
+        )
+
+    def batch_link_parent_child(self, relationships: List[dict[str, str]]) -> None:
+        """Batch create CONTAINS relationships. relationships is a list of dicts with 'parent_id' and 'child_id' keys."""
+        if not relationships:
+            return
+
+        self.conn.execute(
+            """
+            UNWIND $relationships AS rel
+            MATCH (p:Scope {id: rel.parent_id}), (c:Scope {id: rel.child_id})
+            CREATE (p)-[:CONTAINS]->(c)
+            """,
+            {"relationships": relationships}
         )
 
     def get_children(self, parent_id: str) -> List[ScopeModel]:
