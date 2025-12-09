@@ -63,9 +63,6 @@ class CallChainBuilder:
         # for recursive detection
         self.call_chain_scope_ids: Dict[str, int] = {}
 
-        # Track visited scopes to prevent infinite recursion
-        self._visited_scopes = set()
-
         # Batch processing for call sites
         self._call_site_buffer: List[dict] = []
         # Maps temp_id -> actual_id for resolved call sites
@@ -485,7 +482,7 @@ class CallChainBuilder:
 
     def reset_visited(self):
         """Reset the visited scopes tracker."""
-        self._visited_scopes.clear()
+
         self._call_site_buffer.clear()
         self._temp_id_to_actual_id.clear()
 

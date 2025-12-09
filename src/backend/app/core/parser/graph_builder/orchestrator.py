@@ -1,5 +1,6 @@
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
@@ -65,14 +66,8 @@ class GraphBuilderOrchestrator:
             self.jedi_manager,
         )
 
-        # Initialize Analysis components
-        self.body_parser = BodyParser(
-            self.project_path,
-            self.project_node.name,
-            self.scope_manager,
-            self.jedi_manager,
-            batch_size=batch_size,
-        )
+        # Analysis components will be created per-thread
+        self.batch_size = batch_size
 
         # Initialize Sync components
         # Will create sync service with version when needed in _process_changes
@@ -133,23 +128,44 @@ class GraphBuilderOrchestrator:
 
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")
-        for file_path in files_to_process:
-            checksum = scan_result.files.get(file_path)
-            if checksum:
-                logger.info(f"Collecting structure for: {file_path}")
 
-                result = self.collector.process_file(file_path, checksum)
+        def _process_single_file(file_path: str):
+            checksum = scan_result.files.get(file_path)
+            if not checksum:
+                return None
+            logger.info(f"Collecting structure for: {file_path}")
+            return self.collector.process_file(file_path, checksum)
+
+        # Run file collection in parallel to improve throughput
+        with ThreadPoolExecutor() as executor:
+            future_to_file = {
+                executor.submit(_process_single_file, file_path): file_path
+                for file_path in files_to_process
+            }
+            for future in as_completed(future_to_file):
+                file_path = future_to_file[future]
+                try:
+                    result = future.result()
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    logger.error(
+                        "Error collecting structure for %s: %s",
+                        file_path,
+                        exc,
+                    )
+                    continue
+
                 if result:
                     collection_results.append(result)
                     folder_changes.extend(result.folder_changes)
                     touched_folder_ids.update(
                         fc.scope.id for fc in result.folder_changes
                     )
-                    # 1. Delete Removed Scopes
+                    # 1. Delete Removed Scopes (sequential to avoid races)
                     for scope_id in result.removed_scope_ids:
-                        logger.info(f"Deleting removed scope ID: {scope_id}")
+                        logger.info("Deleting removed scope ID: %s", scope_id)
                         self.scope_manager.delete_scope(scope_id)
-         # Process Deleted folders before files to avoid orphan references
+
+        # Process Deleted folders before files to avoid orphan references
         for folder_path in change_set.deleted_folders:
             logger.info(f"Processing folder deletion: {folder_path}")
             self._handle_folder_deletion(
@@ -165,25 +181,34 @@ class GraphBuilderOrchestrator:
         # Phase 3: Sync scopes to graph database
         # Generate version at project level
         sync_version = int(time.time_ns())
+        call_sync_service = None
         if self.repos:
             sync_service = MainGraphSyncService(
                 self.repos, self.scope_manager, self.project_node, sync_version
             )
 
             sync_service.sync_scope_hierarchy(self.project_node.id)
-            self.body_parser.set_call_sync_service(
-                sync_service.call_sync.sync_call_chain_scopes)
+            call_sync_service = sync_service.call_sync.sync_call_chain_scopes
         else:
             logger.warning("No database connection for sync; skipping")
-        # Phase 2: Analysis (Bodies)
-        for result in collection_results:
+
+        def _process_single_file_analysis(result):
+            """Process a single file's AST analysis in a thread."""
             logger.info(
                 "Analyzing changes for: %s",
                 result.file_scope.file_path,
             )
 
-            # 2. Process File Body (Full Analysis)
-            # We process the entire file AST every time it changes
+            # Create a new BodyParser and CallChainBuilder for this thread/file
+            body_parser = BodyParser(
+                self.project_path,
+                self.project_node.name,
+                self.scope_manager,
+                self.jedi_manager,
+                batch_size=self.batch_size,
+            )
+
+            # Process File Body (Full Analysis)
             logger.info("Processing file body: %s", result.file_scope.qname)
 
             # Clear file-scope calls; children clear during traversal
@@ -191,16 +216,45 @@ class GraphBuilderOrchestrator:
 
             # Parse the full AST tree
             # BodyParser traverses descendants and clears their calls en route
-            self.body_parser.process_ast(result.file_scope)
+            body_parser.process_ast(result.file_scope)
 
             # Flush any remaining call sites in the buffer for this file
-            self.body_parser.flush_all_call_sites()
+            processed_scope_ids = body_parser.flush_all_call_sites()
 
-        # Print call chain builder timing summary
-        self.body_parser.call_chain_builder.print_timing_summary()
+            # Return timing summary
+            return processed_scope_ids
+
+        # Run file analysis in parallel threads
+        with ThreadPoolExecutor() as executor:
+            future_to_result = {
+                executor.submit(_process_single_file_analysis, result): result
+                for result in collection_results
+            }
+            for future in as_completed(future_to_result):
+                result = future_to_result[future]
+
+                try:
+                    processed_scope_ids = future.result()
+
+                    # Run sync immediately after processing this file
+                    if call_sync_service and processed_scope_ids:
+                        logger.info(
+                            "Syncing call chains for %d processed scopes from file %s",
+                            len(processed_scope_ids),
+                            result.file_scope.file_path,
+                        )
+                        call_sync_service(list(processed_scope_ids))
+
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    logger.error(
+                        "Error analyzing file %s: %s",
+                        result.file_scope.file_path,
+                        exc,
+                    )
+                    continue
 
         # Debugger: Visualize scope and call site graph
-        self._print_call_site_tree()
+        # self._print_call_site_tree()
         # self._visualize_graph()
 
     def _handle_folder_deletion(

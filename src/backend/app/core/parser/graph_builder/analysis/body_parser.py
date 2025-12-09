@@ -26,7 +26,6 @@ class BodyParser:
         self.manager = scope_manager
         self.jedi_manager = jedi_manager
         self.batch_size = batch_size
-        self.call_sync_service = None
         self.processed_scope_ids = set()
         # Initialize CallChainBuilder for recursive call resolution
         self.call_chain_builder = CallChainBuilder(
@@ -37,12 +36,9 @@ class BodyParser:
         )
 
     def flush_all_call_sites(self):
+        """Flush call sites and return processed scope IDs."""
         self.call_chain_builder.flush_all_call_sites()
-        self.call_sync_service(self.processed_scope_ids)
-        self.processed_scope_ids.clear()
-
-    def set_call_sync_service(self, call_sync_service):
-        self.call_sync_service = call_sync_service
+        return self.processed_scope_ids.copy()
 
     def process_ast(self, file_scope: ScopeModel):
         """
@@ -92,7 +88,7 @@ class BodyParser:
         for node in nodes:
             # Auto-flush if buffer exceeds batch size
             if len(self.call_chain_builder._call_site_buffer) >= self.batch_size:
-                self.flush_all_call_sites()
+                self.flush_all_call_sites()  # Returns scope IDs but we don't need them here
 
             if isinstance(node, (ClassNode, FunctionNode)):
                 # Enter child scope (function or class)
