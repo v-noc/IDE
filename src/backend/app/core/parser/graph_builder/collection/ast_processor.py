@@ -199,7 +199,7 @@ class ASTProcessor:
             type=scope_type,
             file_path=parent_scope.file_path,
             start_line=node.position.line,
-            start_col=name_column if scope_type == ScopeType.CLASS else node.position.column,
+            start_col=node.position.column,
             end_line=node.position.end_line,
             end_col=node.position.end_column,
             mro=mro,

@@ -58,6 +58,7 @@ class BodyParser:
             return
 
         try:
+
             nodes = scan(content, str(file_path))
         except Exception as exc:
             logger.error("Failed to re-scan AST for %s: %s", file_path, exc)

@@ -198,12 +198,12 @@ def test_class_sync_add_and_remove_inside_class(setup_project):
         lines = _read_file(path).splitlines()
         block = [
             f"{' ' * indent}# SYNC_TEST_START\n\n",
-            f"{' ' * indent}class SyncAddedInner:",
-            f"{' ' * indent}    pass",
+            f"{' ' * indent}class SyncAddedInner: pass",
             f"{' ' * indent}# SYNC_TEST_END",
         ]
         # Insert before the last line of the class's body
         lines[end_line:end_line] = block
+
         _write_file(path, "\n".join(lines))
 
     original_content = _read_file(target_file)

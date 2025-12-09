@@ -110,5 +110,4 @@ def inject_ids(content: str) -> Tuple[str, bool]:
             return new_module.code, True
         return content, False
     except Exception as e:
-        print(f"Error in ID injection: {e}")
         return content, False

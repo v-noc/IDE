@@ -1,9 +1,10 @@
 import logging
+from typing import Any, Dict, List, Optional
+
+from arango.database import StandardDatabase
 
 from app.core.model.nodes import CallNode, ClassNode, FunctionNode
 from app.core.repository.base.node_repo import NodeRepository
-from arango.database import StandardDatabase
-from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +13,7 @@ class CallRepo(NodeRepository[CallNode]):
     def __init__(self, db: StandardDatabase):
         super().__init__(db, "nodes", CallNode)
 
-    def get_target(
-        self, call_node_id: str
-    ) -> Optional[ClassNode | FunctionNode]:
+    def get_target(self, call_node_id: str) -> Optional[ClassNode | FunctionNode]:
         """Find the function or class that this CallNode targets.
 
         Avoids truthiness/len checks on Arango Cursor to prevent
@@ -60,10 +59,7 @@ class CallRepo(NodeRepository[CallNode]):
             RETURN c
         """
 
-        bind_vars = {
-            "target_id": str(target_id),
-            "parent_id": str(parent_id)
-        }
+        bind_vars = {"target_id": str(target_id), "parent_id": str(parent_id)}
 
         try:
             cursor = self.db.aql.execute(
@@ -78,9 +74,7 @@ class CallRepo(NodeRepository[CallNode]):
             return CallNode(**doc)
 
         except Exception as e:
-            logger.error(
-                "Error finding call by target/parent: %s", e
-            )
+            logger.error("Error finding call by target/parent: %s", e)
             return None
 
     def find_calls_by_target_parent_batch(
@@ -96,19 +90,21 @@ class CallRepo(NodeRepository[CallNode]):
 
         query = """
         FOR pair IN @pairs
-            FOR call IN 1..1 OUTBOUND pair.parent_id contains_edges
-                FILTER call.node_type == "call"
-                LET target = FIRST(
-                    FOR t IN 1..1 OUTBOUND call targets_edges
-                        RETURN t
-                )
-                FILTER target != null && target._id == pair.target_id
-                LIMIT 1
-                RETURN {
-                    parent_id: pair.parent_id,
-                    target_id: pair.target_id,
-                    call: call
-                }
+            LET result = FIRST(
+                FOR call IN 1..1 OUTBOUND pair.parent_id contains_edges
+                    FILTER call.node_type == "call"
+                    LET target = FIRST(
+                        FOR t IN 1..1 OUTBOUND call targets_edges
+                            RETURN t
+                    )
+                    FILTER target != null && target._id == pair.target_id
+                    RETURN {
+                        parent_id: pair.parent_id,
+                        target_id: pair.target_id,
+                        call: call
+                    }
+            )
+            RETURN result
         """
 
         bind_vars = {
@@ -134,13 +130,9 @@ class CallRepo(NodeRepository[CallNode]):
             return results
 
         except Exception as e:
-            logger.error(
-                "Error batch finding calls by target/parent: %s", e
-            )
+            logger.error("Error batch finding calls by target/parent: %s", e)
             # Fallback: return None for all
-            return {
-                (p, t): None for p, t in parent_target_pairs
-            }
+            return {(p, t): None for p, t in parent_target_pairs}
 
     def count_recursive_calls_upward(
         self,
@@ -270,13 +262,9 @@ class CallRepo(NodeRepository[CallNode]):
             return results
 
         except Exception as e:
-            logger.error(
-                "Error batch counting recursive calls upward: %s", e
-            )
+            logger.error("Error batch counting recursive calls upward: %s", e)
             # Fallback: return 0 for all
-            return {
-                (p, t): 0 for p, t in parent_target_pairs
-            }
+            return {(p, t): 0 for p, t in parent_target_pairs}
 
     def get_downward_call_chain(self, node_id: str) -> List[Dict[str, Any]]:
         query = """

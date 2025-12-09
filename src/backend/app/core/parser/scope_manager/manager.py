@@ -73,9 +73,17 @@ class ScopeManager:
         """Delete a scope and its relationships."""
         self.repository.delete_scope(scope_id)
 
+    def batch_delete_scopes(self, root_scope_ids: List[str]) -> None:
+        """Batch delete multiple scopes and all their children/relationships."""
+        self.repository.batch_delete_scopes(root_scope_ids)
+
     def delete_file_scope(self, file_path: str) -> None:
         """Delete a file scope by its path."""
         self.repository.delete_file_scope(file_path)
+
+    def batch_delete_file_scopes(self, file_paths: List[str]) -> None:
+        """Batch delete multiple file scopes and all their children/relationships."""
+        self.repository.batch_delete_file_scopes(file_paths)
 
     def get_all_scopes(self) -> List[ScopeModel]:
         """Get all scopes."""

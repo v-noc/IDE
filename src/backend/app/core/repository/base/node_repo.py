@@ -90,57 +90,59 @@ class NodeRepository(BaseRepository[T]):
         # skip virtual nodes (e.g., group) and attach children to the nearest
         # non-excluded ancestor while still traversing through excluded nodes.
         query = """
-        // Get the start node's current_version for version filtering
-        LET start_node = DOCUMENT(@start_node_id)
-        LET start_version = start_node.current_version != null ?
-            start_node.current_version : 0
+            // 1. Setup Start Node
+            LET start_node = DOCUMENT(@start_node_id)
+            LET start_ver = start_node.current_version != null ? start_node.current_version : 0
 
-        FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id
-            @@contains_collection
-            OPTIONS { order: "bfs" }
-            // Get immediate parent from path (second-to-last vertex)
-            // For depth 1, parent is start_node; for deeper, it's
-            // p.vertices[-2]
-            LET parent_vertex = LENGTH(p.vertices) >= 2 ?
-                p.vertices[LENGTH(p.vertices) - 2] : start_node
-            LET parent_version = parent_vertex.current_version != null ?
-                parent_vertex.current_version : 0
-            // Filter edges: only traverse edges with version >= parent's
-            // Treat missing version as 0 (for backward compatibility)
-            FILTER (e.version != null ? e.version : 0) >= parent_version
-            // Filter vertices: only include nodes with current_version >=
-            // parent's version (each parent controls minimum version)
-            FILTER (v.current_version != null ?
-                v.current_version : 0) >= parent_version
-            // Use a LET statement to conditionally find the target
-            LET target_node = (
-                // This subquery only runs IF v is a call node
-                FOR target IN 1..1 OUTBOUND v @@targets_collection
-                    // Filter target nodes by version against current vertex
-                    FILTER (target.current_version != null ?
-                        target.current_version : 0) >= (
-                        v.current_version != null ? v.current_version : 0
-                    )
-                    LIMIT 1
-                    RETURN target
-            )
-            // Determine effective parent by walking ancestors until a
-            // non-excluded node_type is found
-            LET parent_candidates = (
-                FOR i IN 2..LENGTH(p.vertices)
-                    LET candidate = p.vertices[LENGTH(p.vertices) - i]
-                    FILTER candidate.node_type NOT IN @exclude_types
-                    LIMIT 1
-                    RETURN candidate._id
-            )
-            // Optionally skip returning excluded node types while preserving
-            // traversal
-            FILTER v.node_type NOT IN @exclude_types
-            RETURN {
-                "vertex": v,
-                "parent_id": FIRST(parent_candidates),
-                "target": FIRST(target_node)
-            }
+            FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id
+                @@contains_collection
+                OPTIONS { order: "bfs", uniqueVertices: "global" }
+
+                // 2. GET IMMEDIATE PARENT (The node strictly above 'v' in the path)
+                // If we are at depth 1, the parent is the start_node.
+                // If we are deeper, it is the second-to-last vertex in the path.
+                LET immediate_parent = LENGTH(p.vertices) >= 2 ? p.vertices[-2] : start_node
+                
+                // 3. GET VERSIONS
+                LET imm_parent_ver = immediate_parent.current_version != null ? immediate_parent.current_version : 0
+                LET v_ver = v.current_version != null ? v.current_version : 0
+
+         
+
+                // 5. FILTER CURRENT NODE
+                // We also hide this specific node from results.
+                FILTER v_ver >= imm_parent_ver
+                
+                // (Optional) If edges act as the "pointer" update, check edge version too
+                FILTER (e.version != null ? e.version : 0) >= imm_parent_ver
+
+                // 6. OUTPUT CALCULATIONS 
+                // Now that we know the PATH is valid, we calculate who the "Logical Parent" is
+                // (This is purely for your JSON output, NOT for validity checks)
+                LET parent_candidates = (
+                    FOR i IN 2..LENGTH(p.vertices)
+                        LET candidate = p.vertices[LENGTH(p.vertices) - i]
+                        FILTER candidate.node_type NOT IN @exclude_types
+                        LIMIT 1
+                        RETURN candidate._id
+                )
+
+                // 7. EXCLUDE TYPES FROM OUTPUT (But keep traversing through them if valid)
+                FILTER v.node_type NOT IN @exclude_types
+
+                // 8. TARGET LOGIC (Unchanged)
+                LET target_node = (
+                    FOR target IN 1..1 OUTBOUND v @@targets_collection
+                        FILTER (target.current_version != null ? target.current_version : 0) >= v_ver
+                        LIMIT 1
+                        RETURN target
+                )
+
+                RETURN {
+                    "vertex": v,
+                    "parent_id": FIRST(parent_candidates), // For UI/Structure
+                    "target": FIRST(target_node)
+                }
         """
         bind_vars = {
             "start_node_id": start_node_id,
