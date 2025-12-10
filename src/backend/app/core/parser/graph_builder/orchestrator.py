@@ -43,7 +43,7 @@ class GraphBuilderOrchestrator:
         db: Optional[StandardDatabase] = None,
         scope_manager: Optional[ScopeManager] = None,
         ignore_file_name: str = ".gitignore",
-        batch_size: int = 500,
+        batch_size: int = 1000,
     ):
         self.project_node = project_node
         self.project_path = project_node.path
@@ -180,6 +180,7 @@ class GraphBuilderOrchestrator:
         # Generate version at project level
         sync_version = int(time.time_ns())
         call_sync_service = None
+        sync_service = None
         if self.repos:
             sync_service = MainGraphSyncService(
                 self.repos,
@@ -198,6 +199,8 @@ class GraphBuilderOrchestrator:
         self.phase_processor.process_analysis_phase(
             collection_results, call_sync_service
         )
+        if sync_service:
+            sync_service.call_sync.batch_sync_calls()
 
         # Debugger: Visualize scope and call site graph
         # from app.core.parser.graph_builder.visualization import (

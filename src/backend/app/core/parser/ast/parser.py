@@ -65,37 +65,6 @@ class JediParser:
 
     def _scan_children(self, scope_node) -> List[BaseNode]:
         children = []
-        # Parso `iter_funcdefs` etc are useful but we want everything in order?
-        # Or just hierarchy.
-        # We can walk the children of the node.
-
-        # For a Class or Function, the body is in `node.children[-1]` usually (Suite)
-        # But parso has `iter_classdefs`, `iter_funcdefs`.
-        # We also want Calls. Calls are expressions.
-
-        # Let's define a recursive walker for the scope.
-        # We only want top-level items in this scope (direct children in the hierarchy sense).
-        # But Calls can be deep inside expressions.
-
-        # Strategy:
-        # 1. Iterate over all children of the current scope.
-        # 2. If it's a Class/Function, recurse into it (it becomes a child node).
-        # 3. If it's a Call, it becomes a child node (but we don't recurse *into* the call for more defs usually, though we might find calls in args).
-
-        # We need a way to walk the tree *within* this scope but stop at nested scopes (inner functions/classes).
-
-        # This walker is a bit aggressive. `walk_scope` will return a list of nodes found.
-        # If it hits a Class/Function, it returns that Node and DOES NOT recurse into it (because `_visit_class` will handle that).
-        # If it hits a Call, it returns that Call Node AND recurses into it to find nested calls?
-        # The user wants "hierarchy".
-        # Class -> Function -> Call.
-        # Does Class -> Call exist? Yes (class attributes).
-        # Does Function -> Class exist? Yes.
-
-        # Refined Strategy:
-        # We are inside `_visit_class` or `_visit_function`.
-        # We want to find all direct children that are Classes, Functions, or Calls.
-        # But "direct" in the sense of "not inside another Class/Function".
 
         nodes = []
 
@@ -161,6 +130,8 @@ class JediParser:
         )
 
     def _visit_function(self, node: Function) -> FunctionNode:
+        if node.type == 'lambdef':
+            return None
         return FunctionNode(
             id=self._extract_id(node),
             name=node.name.value,
@@ -212,6 +183,7 @@ class JediParser:
                 end_line, end_col = child.end_pos
                 call_nodes.append(
                     CallNode(
+                        call_col_pos=child.start_pos[1],
                         name=name,
                         position=NodePosition(
                             line=start_line,

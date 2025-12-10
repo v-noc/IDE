@@ -22,6 +22,7 @@ class BaseNode(BaseModel):
 class CallNode(BaseNode):
     type: Literal["call"] = "call"
     call_index: int = 0  # Order of the call trailer within a chained expression
+    call_col_pos: int = 0
 
 
 class FunctionNode(BaseNode):

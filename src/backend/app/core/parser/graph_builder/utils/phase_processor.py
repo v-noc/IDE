@@ -1,6 +1,6 @@
 """Processes collection and analysis phases."""
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from typing import Callable, List, Optional
 
 from app.core.model.nodes import ProjectNode
@@ -12,6 +12,11 @@ from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.scope_manager.manager import ScopeManager
 
 logger = logging.getLogger(__name__)
+
+# Timeout for individual file processing (in seconds)
+FILE_PROCESSING_TIMEOUT = 300  # 5 minutes per file
+# Limit workers to reduce database connection contention
+MAX_WORKERS = 4
 
 
 class PhaseProcessor:
@@ -52,16 +57,28 @@ class PhaseProcessor:
         files_to_process = change_set.new_files + change_set.modified_files
 
         collection_results = []
+        removed_scope_ids_to_delete = []
 
         def _process_single_file(file_path: str):
             checksum = scan_result.files.get(file_path)
             if not checksum:
                 return None
             logger.info(f"Collecting structure for: {file_path}")
-            return self.collector.process_file(file_path, checksum)
+            try:
+                return self.collector.process_file(file_path, checksum)
+            except Exception as exc:
+                # Log error but don't let it propagate to avoid deadlocks
+                logger.error(
+                    "Error in collector.process_file for %s: %s",
+                    file_path,
+                    exc,
+                    exc_info=True,
+                )
+                return None
 
         # Run file collection in parallel to improve throughput
-        with ThreadPoolExecutor() as executor:
+        # Limit workers to reduce database connection contention
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             future_to_file = {
                 executor.submit(_process_single_file, file_path): file_path
                 for file_path in files_to_process
@@ -69,21 +86,44 @@ class PhaseProcessor:
             for future in as_completed(future_to_file):
                 file_path = future_to_file[future]
                 try:
-                    result = future.result()
+                    # Add timeout to prevent indefinite hanging
+                    result = future.result(timeout=FILE_PROCESSING_TIMEOUT)
+                except FutureTimeoutError:
+                    logger.error(
+                        "Timeout collecting structure for %s (exceeded %d seconds)",
+                        file_path,
+                        FILE_PROCESSING_TIMEOUT,
+                    )
+                    continue
                 except Exception as exc:  # pragma: no cover - defensive logging
                     logger.error(
                         "Error collecting structure for %s: %s",
                         file_path,
                         exc,
+                        exc_info=True,
                     )
                     continue
 
                 if result:
                     collection_results.append(result)
-                    # Delete Removed Scopes (sequential to avoid races)
-                    for scope_id in result.removed_scope_ids:
-                        logger.info("Deleting removed scope ID: %s", scope_id)
-                        self.scope_manager.delete_scope(scope_id)
+                    # Collect removed scope IDs to delete after parallel processing
+                    removed_scope_ids_to_delete.extend(
+                        result.removed_scope_ids)
+
+        # Delete Removed Scopes sequentially after all parallel work is done
+        # This avoids race conditions and database connection contention
+        for scope_id in removed_scope_ids_to_delete:
+            try:
+                logger.info("Deleting removed scope ID: %s", scope_id)
+                self.scope_manager.delete_scope(scope_id)
+            except Exception as exc:
+                logger.error(
+                    "Error deleting scope ID %s: %s",
+                    scope_id,
+                    exc,
+                    exc_info=True,
+                )
+                # Continue with other deletions even if one fails
 
         return collection_results
 
@@ -131,7 +171,8 @@ class PhaseProcessor:
             return processed_scope_ids
 
         # Run file analysis in parallel threads
-        with ThreadPoolExecutor() as executor:
+        # Limit workers to reduce database connection contention
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             future_to_result = {
                 executor.submit(_process_single_file_analysis, result): result
                 for result in collection_results
@@ -140,7 +181,9 @@ class PhaseProcessor:
                 result = future_to_result[future]
 
                 try:
-                    processed_scope_ids = future.result()
+                    # Add timeout to prevent indefinite hanging
+                    processed_scope_ids = future.result(
+                        timeout=FILE_PROCESSING_TIMEOUT)
 
                     # Run sync immediately after processing this file
                     if call_sync_service and processed_scope_ids:
@@ -149,12 +192,28 @@ class PhaseProcessor:
                             len(processed_scope_ids),
                             result.file_scope.file_path,
                         )
-                        call_sync_service(list(processed_scope_ids))
+                        try:
+                            call_sync_service(list(processed_scope_ids))
+                        except Exception as sync_exc:
+                            logger.error(
+                                "Error syncing call chains for file %s: %s",
+                                result.file_scope.file_path,
+                                sync_exc,
+                                exc_info=True,
+                            )
 
+                except FutureTimeoutError:
+                    logger.error(
+                        "Timeout analyzing file %s (exceeded %d seconds)",
+                        result.file_scope.file_path,
+                        FILE_PROCESSING_TIMEOUT,
+                    )
+                    continue
                 except Exception as exc:  # pragma: no cover - defensive logging
                     logger.error(
                         "Error analyzing file %s: %s",
                         result.file_scope.file_path,
                         exc,
+                        exc_info=True,
                     )
                     continue

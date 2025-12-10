@@ -29,6 +29,7 @@ class CallSyncService:
         self.scope_manager = scope_manager
         self.call_service = call_service
         self.helpers = helpers
+        self.all_call_infos = []
 
     def sync_call_chain_scopes(self, scope_ids: List[str]):
         # Analytics tracking
@@ -37,8 +38,6 @@ class CallSyncService:
         scope_db_times = defaultdict(list)
         total_start_time = time.time()
 
-        # Collect all call infos first, then batch process
-        all_call_infos = []
         for scope_id in scope_ids:
             scope = self.scope_manager.get_scope(scope_id)
 
@@ -71,21 +70,23 @@ class CallSyncService:
                         call_count = len(call_infos)
                         scope_call_counts[scope_id] = call_count
                         for call_info in call_infos:
-                            all_call_infos.append((call_info, graph_node))
-
-        # Track batch sync database operations
-        batch_sync_start = time.time()
-        self._batch_sync_calls(all_call_infos)
-        batch_sync_time = time.time() - batch_sync_start
-        _timings["batch_sync_calls_total"].append(batch_sync_time)
-
-        # total_time = time.time() - total_start_time
+                            self.all_call_infos.append((call_info, graph_node))
 
         # Print analytics summary
+        if len(self.all_call_infos) > 1000:
+            self.batch_sync_calls()
         # self._print_sync_call_chain_analytics(
         #     scope_ids, scope_call_counts, scope_db_times,
         #     len(all_call_infos), total_time, batch_sync_time
         # )
+
+    def batch_sync_calls(self):
+        # Track batch sync database operations
+        batch_sync_start = time.time()
+        self._batch_sync_calls(self.all_call_infos)
+        self.all_call_infos = []
+        batch_sync_time = time.time() - batch_sync_start
+        _timings["batch_sync_calls_total"].append(batch_sync_time)
 
     def sync_call_chains(self, root_scope_id: str):
         """
@@ -182,7 +183,7 @@ class CallSyncService:
             # Collect batch of (parent_id, target_id) pairs
             batch_pairs = []
             call_info_map = {}
-            batch_size = min(500, len(queue))
+            batch_size = min(1000, len(queue))
 
             # Buffers for batch operations
             contains_edges_buffer = []  # (parent_id, child_id)

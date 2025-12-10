@@ -125,11 +125,10 @@ class CallChainBuilder:
             str(file_path),
             source,
             call_node.position.line,
-            call_node.position.column + (len(call_node.name)),
+            call_node.call_col_pos,
             parent_context=parent_context,
         )
         _timings["resolve_call"].append(time.time() - t0)
-
         if not resolutions:
             logger.debug(
                 f"Could not resolve call {call_node.name} at "
@@ -140,7 +139,7 @@ class CallChainBuilder:
         call_site_ids = []
         call_name = self._normalize_call_name(call_node.name)
         call_line = call_node.position.line
-        call_col = call_node.position.column + (len(call_node.name))
+        call_col = call_node.call_col_pos
 
         # Process each resolution separately
         for resolution in resolutions:
