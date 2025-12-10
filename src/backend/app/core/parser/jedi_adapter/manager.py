@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
 import logging
+import threading
 import jedi
 from pathlib import Path
 from typing import Optional
@@ -20,12 +22,20 @@ class JediProjectManager:
 
         self.project = jedi.Project(path=str(project_path))
         logger.info(f"Initialized Jedi Project at: {project_path}")
+        self.project = jedi.Project(path=str(project_path))
+        # Single-threaded executor forces sequential access
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        # Thread lock for Jedi operations (Jedi is not thread-safe)
+        # Using RLock to allow reentrant locking from same thread
+        self._lock = threading.RLock()
+
+    def get_script(self, path: str, source: str) -> jedi.Script:
+        # Acquire lock for thread-safe Jedi operations
+        # Using RLock allows reentrant access if called from resolve_call
+        with self._lock:
+            def _get():
+                return jedi.Script(code=source, path=path, project=self.project)
+            return self.executor.submit(_get).result()
 
     def get_project(self) -> jedi.Project:
         return self.project
-
-    def get_script(self, path: str, source: str) -> jedi.Script:
-        """
-        Create a Jedi Script for a file with the project context.
-        """
-        return jedi.Script(code=source, path=path, project=self.project)

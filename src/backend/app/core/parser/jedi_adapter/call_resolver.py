@@ -8,14 +8,15 @@ This module provides accurate call resolution by:
 4. Extracting qualified names from resolved callees
 5. Extracting IDs from docstrings for direct scope lookup
 """
-import re
-from jedi.api import helpers
+
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional
 
 import jedi
+from jedi.api import helpers
 from jedi.inference.arguments import TreeArguments
 from jedi.inference.helpers import infer_call_of_leaf
 from jedi.inference.syntax_tree import infer_trailer
@@ -84,112 +85,135 @@ class CallResolver:
         Returns:
             List of CallResolutionResult objects, one for each possible callee
         """
-        try:
-            script = self.jedi_manager.get_script(file_path, source)
+        # Acquire lock for thread-safe Jedi operations
+        with self.jedi_manager._lock:
+            try:
+                script = self.jedi_manager.get_script(file_path, source)
 
-            # Use provided parent context or fall back to module context
-            position_context = script.get_context(line, column)
-            if position_context.in_builtin_module() or position_context.is_stub():
-                return []
-            context = parent_context or script._get_module_context()
+                # Use provided parent context or fall back to module context
 
-            # Find the leaf at this position
-            leaf = script._module_node.get_name_of_position((line, column))
-
-            if leaf is None:
-                leaf = script._module_node.get_leaf_for_position(
-                    (line, column))
-                if leaf is None or leaf.type == 'string':
+                position_context = script.get_context(line, column)
+                if position_context.in_builtin_module() or position_context.is_stub():
                     return []
-                if leaf.end_pos == (line, column) and leaf.type == 'operator':
-                    next_ = leaf.get_next_leaf()
-                    if next_.start_pos == leaf.end_pos \
-                            and next_.type in ('number', 'string', 'keyword'):
-                        leaf = next_
 
-            # Create context at call site
-            call_context = context.create_context(leaf)
+                context = parent_context or script._get_module_context()
 
-            # Use Jedi's infer_call_of_leaf to get the callee
-            # cut_own_trailer=True gives us the function/class being called
-            callee_values = helpers.infer(
-                script._inference_state,
-                call_context,
-                leaf,
-            )
+                # Find the leaf at this position
+                leaf = script._module_node.get_name_of_position((line, column))
 
-            if not callee_values:
-                logger.debug(f"Could not infer callee at {line}:{column}")
-                return []
+                if leaf is None:
+                    leaf = script._module_node.get_leaf_for_position(
+                        (line, column))
+                    if leaf is None or leaf.type == "string":
+                        return []
+                    if leaf.end_pos == (line, column) and leaf.type == "operator":
+                        next_ = leaf.get_next_leaf()
+                        if next_.start_pos == leaf.end_pos and next_.type in (
+                            "number",
+                            "string",
+                            "keyword",
+                        ):
+                            leaf = next_
+                try:
+                    # Create context at call site
+                    call_context = context.create_context(leaf)
+                except:
+                    call_context = script._get_module_context().create_context(leaf)
 
-            results = []
-            bracket = leaf.get_next_leaf()
-            trailer = bracket.parent if bracket else None
+                # Use Jedi's infer_call_of_leaf to get the callee
+                # cut_own_trailer=True gives us the function/class being called
+                callee_values = helpers.infer(
+                    script._inference_state,
+                    call_context,
+                    leaf,
+                )
 
-            while trailer and trailer.type != "trailer":
-                trailer = trailer.parent
+                if not callee_values:
+                    logger.debug(f"Could not infer callee at {line}:{column}")
+                    return []
 
-            for callee in callee_values:
-                # Create a new result for each callee
-                result = CallResolutionResult(callee_values=[callee])
+                results = []
+                bracket = leaf.get_next_leaf()
+                trailer = bracket.parent if bracket else None
 
-                # Extract ID from docstring - PRIORITY for direct lookup
-                result.callee_id = self._extract_id_from_docstring(callee)
+                while trailer and trailer.type != "trailer":
+                    trailer = trailer.parent
 
-                callee_for_args = callee
-                if hasattr(callee, "_original_value"):
-                    callee_for_args = callee._original_value
+                for callee in callee_values:
+                    # Create a new result for each callee
+                    result = CallResolutionResult(callee_values=[callee])
 
-                arguments = None
-                if trailer:
-                    arguments = self.create_args(
-                        callee_for_args, trailer, script._inference_state, call_context)
+                    # Extract ID from docstring - PRIORITY for direct lookup
+                    result.callee_id = self._extract_id_from_docstring(callee)
 
-                if callee_for_args.is_function():
-                    if arguments:
-                        result.execution_context = callee_for_args.as_context(
-                            arguments)
-                    else:
-                        # No trailer found, fallback to anonymous context
-                        result.execution_context = callee_for_args.as_context()
+                    callee_for_args = callee
+                    if hasattr(callee, "_original_value"):
+                        callee_for_args = callee._original_value
 
-                if callee_for_args.api_type == "class":
-                    result.is_class_instantiation = True
-                    inits = callee_for_args.py__getattribute__("__init__")
-                    created_instance = TreeInstance(
-                        script._inference_state, callee_for_args.parent_context, callee_for_args, arguments)
-                    if inits:
-                        init_method = list(inits)[0]
-                        if hasattr(init_method, "_original_value"):
-                            init_method = init_method._original_value
-                        bound_method = BoundMethod(
-                            created_instance, callee_for_args, init_method)
+                    arguments = None
+                    if trailer:
+                        arguments = self.create_args(
+                            callee_for_args,
+                            trailer,
+                            script._inference_state,
+                            call_context,
+                        )
+
+                    if callee_for_args.is_function():
                         if arguments:
-                            result.execution_context = bound_method.as_context(
-                                arguments)
+                            result.execution_context = callee_for_args.as_context(
+                                arguments
+                            )
                         else:
-                            result.execution_context = bound_method.as_context()
+                            # No trailer found, fallback to anonymous context
+                            result.execution_context = callee_for_args.as_context()
+
+                    if callee_for_args.api_type == "class":
+                        result.is_class_instantiation = True
+                        inits = callee_for_args.py__getattribute__("__init__")
+                        created_instance = TreeInstance(
+                            script._inference_state,
+                            callee_for_args.parent_context,
+                            callee_for_args,
+                            arguments,
+                        )
+                        if inits:
+                            init_method = list(inits)[0]
+                            if hasattr(init_method, "_original_value"):
+                                init_method = init_method._original_value
+                            bound_method = BoundMethod(
+                                created_instance, callee_for_args, init_method
+                            )
+                            if arguments:
+                                result.execution_context = bound_method.as_context(
+                                    arguments
+                                )
+                            else:
+                                result.execution_context = bound_method.as_context()
+                        else:
+                            result.execution_context = callee_for_args.as_context()
+                        logger.debug(
+                            f"Resolved class instantiation: {result.callee_id}"
+                        )
                     else:
-                        result.execution_context = callee_for_args.as_context()
-                    logger.debug(
-                        f"Resolved class instantiation: {result.callee_id}")
-                else:
-                    logger.debug(f"Resolved call to: {result.callee_id}")
-                    if not result.execution_context:
-                        result.execution_context = callee_for_args.as_context()
+                        logger.debug(f"Resolved call to: {result.callee_id}")
+                        if not result.execution_context and result.callee_id:
+                            result.execution_context = callee_for_args.as_context()
 
-                # Only add results with valid callee_id
-                if result.callee_id:
-                    results.append(result)
+                    # Only add results with valid callee_id
+                    if result.callee_id:
+                        results.append(result)
 
-            return results
+                return results
 
-        except Exception as e:
-            print(
-                f"Error resolving call at {file_path} {line}:{column}: {leaf} {e}")
-            import traceback
-            traceback.print_exc()
-            return []
+            except Exception as e:
+                print(
+                    f"Error resolving call at {file_path} {line}:{column}: {leaf} {e}"
+                )
+                import traceback
+
+                traceback.print_exc()
+                return []
 
     def _extract_id_from_docstring(self, value) -> Optional[str]:
         """
@@ -208,9 +232,9 @@ class CallResolver:
                 value = value._original_value
 
             # Method 1: Use tree_node.get_doc_node() for parso nodes
-            if hasattr(value, 'tree_node') and value.tree_node:
+            if hasattr(value, "tree_node") and value.tree_node:
                 tree_node = value.tree_node
-                if hasattr(tree_node, 'get_doc_node'):
+                if hasattr(tree_node, "get_doc_node"):
                     doc_node = tree_node.get_doc_node()
                     if doc_node:
                         val = doc_node.value
@@ -221,7 +245,7 @@ class CallResolver:
                             docstring = val[1:-1]
 
             # Method 2: Use py__doc__() if available
-            if not docstring and hasattr(value, 'py__doc__'):
+            if not docstring and hasattr(value, "py__doc__"):
                 try:
                     docstring = value.py__doc__()
                 except:
