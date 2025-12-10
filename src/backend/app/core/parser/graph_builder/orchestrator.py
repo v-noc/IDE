@@ -196,11 +196,32 @@ class GraphBuilderOrchestrator:
 
         # Phase 2: Analysis (Body parsing and call chain building)
         logger.info("Starting Phase 2: Analysis")
-        self.phase_processor.process_analysis_phase(
-            collection_results, call_sync_service
-        )
+        print("Starting Phase 2: Analysis", flush=True)
+        try:
+            self.phase_processor.process_analysis_phase(
+                collection_results, call_sync_service
+            )
+            logger.info("Phase 2: Analysis completed")
+            print("Phase 2: Analysis completed", flush=True)
+        finally:
+            # Ensure cleanup happens even if there's an error
+            logger.debug("Phase 2 cleanup complete")
+
         if sync_service:
-            sync_service.call_sync.batch_sync_calls()
+            logger.info("Syncing call chains to graph database...")
+            print("Syncing call chains to graph database...", flush=True)
+            try:
+                sync_service.call_sync.batch_sync_calls()
+                logger.info("Call chain sync completed")
+                print("Call chain sync completed", flush=True)
+            except Exception as sync_exc:
+                logger.error(
+                    f"Error during batch sync: {sync_exc}", exc_info=True)
+                print(f"Error during batch sync: {sync_exc}", flush=True)
+                raise
+
+        logger.info("All phases completed successfully")
+        print("All phases completed successfully", flush=True)
 
         # Debugger: Visualize scope and call site graph
         # from app.core.parser.graph_builder.visualization import (

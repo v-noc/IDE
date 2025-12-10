@@ -68,6 +68,14 @@ class CallChainBuilder:
         # Maps temp_id -> actual_id for resolved call sites
         self._temp_id_to_actual_id: dict = {}
 
+        # Instance-level statistics tracking
+        self._instance_stats = {
+            "resolve_call_count": 0,
+            "resolve_call_time": 0.0,
+            "get_scope_count": 0,
+            "get_scope_time": 0.0,
+        }
+
         # Clear timings on initialization
         global _timings
         _timings.clear()
@@ -178,7 +186,11 @@ class CallChainBuilder:
             call_node.call_col_pos,
             parent_context=parent_context,
         )
-        _timings["resolve_call"].append(time.time() - t0)
+        resolve_time = time.time() - t0
+        _timings["resolve_call"].append(resolve_time)
+        # Track instance-level stats
+        self._instance_stats["resolve_call_count"] += 1
+        self._instance_stats["resolve_call_time"] += resolve_time
         if not resolutions:
             logger.debug(
                 f"Could not resolve call {call_node.name} at "
@@ -201,7 +213,11 @@ class CallChainBuilder:
                 scope_id=resolution.callee_id,
                 qname=resolution.qname,
             )
-            _timings["get_scope_with_retry"].append(time.time() - t0)
+            get_scope_time = time.time() - t0
+            _timings["get_scope_with_retry"].append(get_scope_time)
+            # Track instance-level stats
+            self._instance_stats["get_scope_count"] += 1
+            self._instance_stats["get_scope_time"] += get_scope_time
 
             # If still not found, log and skip this resolution
             if not callee_scope:
@@ -537,6 +553,10 @@ class CallChainBuilder:
 
         self._call_site_buffer.clear()
         self._temp_id_to_actual_id.clear()
+
+    def get_stats(self) -> dict:
+        """Get instance-level statistics."""
+        return self._instance_stats.copy()
 
     def print_timing_summary(self):
         """Print timing statistics for performance analysis."""

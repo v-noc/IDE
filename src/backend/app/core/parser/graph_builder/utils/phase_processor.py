@@ -2,7 +2,7 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from typing import Callable, List, Optional
-
+import time
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.analysis.body_parser import BodyParser
 from app.core.parser.graph_builder.collection.collector import Collector
@@ -141,38 +141,60 @@ class PhaseProcessor:
         """
         def _process_single_file_analysis(result):
             """Process a single file's AST analysis in a thread."""
-            logger.info(
-                "Analyzing changes for: %s",
-                result.file_scope.file_path,
-            )
+            try:
+                logger.info(
+                    "Analyzing changes for: %s",
+                    result.file_scope.file_path,
+                )
 
-            # Create a new BodyParser for this thread/file
-            body_parser = BodyParser(
-                self.project_path,
-                self.project_node.name,
-                self.scope_manager,
-                self.jedi_manager,
-                batch_size=self.batch_size,
-            )
+                # Create a new BodyParser for this thread/file
+                body_parser = BodyParser(
+                    self.project_path,
+                    self.project_node.name,
+                    self.scope_manager,
+                    self.jedi_manager,
+                    batch_size=self.batch_size,
+                )
 
-            # Process File Body (Full Analysis)
-            logger.info("Processing file body: %s", result.file_scope.qname)
+                # Process File Body (Full Analysis)
+                logger.info("Processing file body: %s",
+                            result.file_scope.qname)
 
-            # Clear file-scope calls; children clear during traversal
-            self.scope_manager.clear_calls(result.file_scope.id)
+                # Clear file-scope calls; children clear during traversal
+                self.scope_manager.clear_calls(result.file_scope.id)
 
-            # Parse the full AST tree
-            # BodyParser traverses descendants and clears their calls en route
-            body_parser.process_ast(result.file_scope)
+                # Parse the full AST tree
+                # BodyParser traverses descendants and clears their calls en route
+                body_parser.process_ast(result.file_scope)
 
-            # Flush any remaining call sites in the buffer for this file
-            processed_scope_ids = body_parser.flush_all_call_sites()
+                # Flush any remaining call sites in the buffer for this file
+                processed_scope_ids = body_parser.flush_all_call_sites()
 
-            return processed_scope_ids
+                # Get stats from this file's processing
+                stats = body_parser.get_stats()
+
+                return {
+                    "processed_scope_ids": processed_scope_ids,
+                    "stats": stats,
+                }
+            except Exception as exc:
+                print(
+                    f"Error processing file {result.file_scope.file_path}: {exc}")
+                return None
 
         # Run file analysis in parallel threads
         # Limit workers to reduce database connection contention
+        start_time = time.time()
         finshed = 0
+
+        # Aggregate statistics across all files
+        total_resolve_call_count = 0
+        total_resolve_call_time = 0.0
+        total_get_scope_count = 0
+        total_get_scope_time = 0.0
+
+        sync_executor = ThreadPoolExecutor(max_workers=1)
+
         with ThreadPoolExecutor() as executor:
             future_to_result = {
                 executor.submit(_process_single_file_analysis, result): result
@@ -181,28 +203,60 @@ class PhaseProcessor:
             for future in as_completed(future_to_result):
                 result = future_to_result[future]
                 finshed += 1
-                print(f"Finished {finshed} of {len(collection_results)}")
+
                 try:
                     # Add timeout to prevent indefinite hanging
-                    processed_scope_ids = future.result(
+                    file_result = future.result(
                         timeout=FILE_PROCESSING_TIMEOUT)
 
-                    # Run sync immediately after processing this file
-                    if call_sync_service and processed_scope_ids:
-                        logger.info(
-                            "Syncing call chains for %d processed scopes from file %s",
-                            len(processed_scope_ids),
-                            result.file_scope.file_path,
-                        )
-                        try:
-                            call_sync_service(list(processed_scope_ids))
-                        except Exception as sync_exc:
-                            print(
-                                "Error syncing call chains for file %s: %s",
+                    if file_result:
+                        processed_scope_ids = file_result.get(
+                            "processed_scope_ids")
+                        stats = file_result.get("stats", {})
+
+                        # Aggregate statistics
+                        total_resolve_call_count += stats.get(
+                            "resolve_call_count", 0)
+                        total_resolve_call_time += stats.get(
+                            "resolve_call_time", 0.0)
+                        total_get_scope_count += stats.get(
+                            "get_scope_count", 0)
+                        total_get_scope_time += stats.get(
+                            "get_scope_time", 0.0)
+
+                        # Run sync immediately after processing this file
+                        if call_sync_service and processed_scope_ids:
+                            logger.info(
+                                "Syncing call chains for %d processed scopes from file %s",
+                                len(processed_scope_ids),
                                 result.file_scope.file_path,
-                                sync_exc,
-                                exc_info=True,
                             )
+                            try:
+                                sync_executor.submit(
+                                    call_sync_service, list(processed_scope_ids))
+                            except Exception as sync_exc:
+                                print(
+                                    "Error syncing call chains for file %s: %s",
+                                    result.file_scope.file_path,
+                                    sync_exc,
+                                    exc_info=True,
+                                )
+
+                        # Calculate elapsed time and averages
+                        elapsed_time = time.time() - start_time
+                        avg_time_per_result = elapsed_time / finshed if finshed > 0 else 0.0
+                        avg_resolve_time = total_resolve_call_time / \
+                            total_resolve_call_count if total_resolve_call_count > 0 else 0.0
+                        avg_get_scope_time = total_get_scope_time / \
+                            total_get_scope_count if total_get_scope_count > 0 else 0.0
+
+                        print(
+                            f"Finished {finshed} of {len(collection_results)} | "
+                            f"Total time: {elapsed_time:.2f}s | "
+                            f"Avg time/result: {avg_time_per_result:.3f}s | "
+                            f"Resolve calls: {total_resolve_call_count} (avg: {avg_resolve_time:.4f}s) | "
+                            f"Get scope calls: {total_get_scope_count} (avg: {avg_get_scope_time:.4f}s)"
+                        )
 
                 except FutureTimeoutError:
                     print(
@@ -219,3 +273,36 @@ class PhaseProcessor:
                         exc_info=True,
                     )
                     continue
+
+        # Ensure all threads have completed
+        # The ThreadPoolExecutor context manager should handle this, but be explicit
+        logger.debug("Waiting for all analysis threads to complete...")
+        sync_executor.shutdown(wait=True)
+        # Print final summary
+        final_time = time.time() - start_time
+        final_avg_time = final_time / \
+            len(collection_results) if len(collection_results) > 0 else 0.0
+        final_avg_resolve = total_resolve_call_time / \
+            total_resolve_call_count if total_resolve_call_count > 0 else 0.0
+        final_avg_get_scope = total_get_scope_time / \
+            total_get_scope_count if total_get_scope_count > 0 else 0.0
+
+        import sys
+        print("\n" + "=" * 80, flush=True)
+        print("ANALYSIS PHASE SUMMARY", flush=True)
+        print("=" * 80, flush=True)
+        print(f"Total files processed: {finshed}", flush=True)
+        print(f"Total time: {final_time:.2f}s", flush=True)
+        print(f"Average time per file: {final_avg_time:.3f}s", flush=True)
+        print(f"Total resolve calls: {total_resolve_call_count}", flush=True)
+        print(
+            f"Total resolve call time: {total_resolve_call_time:.4f}s", flush=True)
+        print(
+            f"Average resolve call time: {final_avg_resolve:.4f}s", flush=True)
+        print(f"Total get scope calls: {total_get_scope_count}", flush=True)
+        print(f"Total get scope time: {total_get_scope_time:.4f}s", flush=True)
+        print(
+            f"Average get scope time: {final_avg_get_scope:.4f}s", flush=True)
+        print("=" * 80 + "\n", flush=True)
+
+        logger.info("Analysis phase completed successfully")

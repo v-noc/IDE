@@ -23,12 +23,11 @@ class JediProjectManager:
         logger.info(f"Initialized Jedi Project at: {project_path}")
 
         # Single-threaded executor forces sequential access
-        self.executor = ThreadPoolExecutor(max_workers=1)
+        # self.executor = ThreadPoolExecutor(max_workers=1)
         # Thread lock for Jedi operations (Jedi is not thread-safe)
         # Using RLock to allow reentrant locking from same thread
         self.project = jedi.Project(path=str(self.project_path.parent))
         self.env = jedi.InterpreterEnvironment()
-        self._lock = threading.RLock()
 
     def get_script(self, path: str, source: str) -> jedi.Script:
         # Acquire lock for thread-safe Jedi operations

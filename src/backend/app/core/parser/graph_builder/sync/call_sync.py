@@ -73,7 +73,7 @@ class CallSyncService:
                             self.all_call_infos.append((call_info, graph_node))
 
         # Print analytics summary
-        if len(self.all_call_infos) > 1000:
+        if len(self.all_call_infos) > 50:
             self.batch_sync_calls()
         # self._print_sync_call_chain_analytics(
         #     scope_ids, scope_call_counts, scope_db_times,
@@ -83,6 +83,8 @@ class CallSyncService:
     def batch_sync_calls(self):
         # Track batch sync database operations
         batch_sync_start = time.time()
+        print(
+            f"Batch syncing {len(self.all_call_infos)} call infos")
         self._batch_sync_calls(self.all_call_infos)
         self.all_call_infos = []
         batch_sync_time = time.time() - batch_sync_start

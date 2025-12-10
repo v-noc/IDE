@@ -22,56 +22,56 @@ class MROResolver:
         Returns a list of fully qualified names representing the MRO.
         """
         # Acquire lock for thread-safe Jedi operations
-        with self.project_manager._lock:
-            try:
-                script = self.project_manager.get_script(file_path, source)
 
-                # Infer the definition at the class name position
-                # Note: Jedi uses 1-based lines and 0-based columns
-                defs = script.infer(line=line, column=column)
+        try:
+            script = self.project_manager.get_script(file_path, source)
 
-                if not defs:
-                    logger.warning(
-                        f"Could not infer definition at {file_path}:{line}:{column}"
-                    )
-                    return []
+            # Infer the definition at the class name position
+            # Note: Jedi uses 1-based lines and 0-based columns
+            defs = script.infer(line=line, column=column)
 
-                d_def = defs[0]
-
-                # --- WARNING: Private API Usage ---
-                # Accessing _name (Jedi Name) -> value (Jedi Context/Value) -> py__mro__
-                # This returns a tuple of Jedi Contexts
-                mro_qnames = []
-                try:
-                    # The path to the value may differ slightly between Jedi versions.
-                    # We iterate over inferred values (usually just one for a class def)
-                    for infer in d_def._name.infer():
-                        if hasattr(infer, "py__mro__"):
-                            contexts = infer.py__mro__()
-
-                            # Extract qualified names
-                            for c in contexts:
-                                qnames = c.name.get_qualified_names(True)
-                                if qnames:
-                                    mro_qnames.append(".".join(qnames))
-                                else:
-                                    mro_qnames.append(
-                                        c.name.string_name)  # Fallback
-
-                            # We only need the MRO from the first valid inference
-                            if mro_qnames:
-                                break
-                except AttributeError as e:
-                    logger.warning(
-                        f"Could not access internal Jedi MRO API: {e}")
-                    return []
-                except Exception as e:
-                    logger.error(f"Error resolving MRO: {e}")
-                    return []
-
-                return mro_qnames
-
-            except Exception as e:
-                logger.error(
-                    f"Failed to resolve MRO for {line}:{column} {file_path}: {e} ")
+            if not defs:
+                logger.warning(
+                    f"Could not infer definition at {file_path}:{line}:{column}"
+                )
                 return []
+
+            d_def = defs[0]
+
+            # --- WARNING: Private API Usage ---
+            # Accessing _name (Jedi Name) -> value (Jedi Context/Value) -> py__mro__
+            # This returns a tuple of Jedi Contexts
+            mro_qnames = []
+            try:
+                # The path to the value may differ slightly between Jedi versions.
+                # We iterate over inferred values (usually just one for a class def)
+                for infer in d_def._name.infer():
+                    if hasattr(infer, "py__mro__"):
+                        contexts = infer.py__mro__()
+
+                        # Extract qualified names
+                        for c in contexts:
+                            qnames = c.name.get_qualified_names(True)
+                            if qnames:
+                                mro_qnames.append(".".join(qnames))
+                            else:
+                                mro_qnames.append(
+                                    c.name.string_name)  # Fallback
+
+                        # We only need the MRO from the first valid inference
+                        if mro_qnames:
+                            break
+            except AttributeError as e:
+                logger.warning(
+                    f"Could not access internal Jedi MRO API: {e}")
+                return []
+            except Exception as e:
+                logger.error(f"Error resolving MRO: {e}")
+                return []
+
+            return mro_qnames
+
+        except Exception as e:
+            logger.error(
+                f"Failed to resolve MRO for {line}:{column} {file_path}: {e} ")
+            return []

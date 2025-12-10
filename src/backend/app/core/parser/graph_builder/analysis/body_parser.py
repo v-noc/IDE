@@ -40,6 +40,10 @@ class BodyParser:
         self.call_chain_builder.flush_all_call_sites()
         return self.processed_scope_ids.copy()
 
+    def get_stats(self) -> dict:
+        """Get statistics from the CallChainBuilder."""
+        return self.call_chain_builder.get_stats()
+
     def process_ast(self, file_scope: ScopeModel):
         """
         Phase 2: Analyze the AST tree for calls.
