@@ -14,7 +14,7 @@ from app.core.parser.scope_manager.manager import ScopeManager
 logger = logging.getLogger(__name__)
 
 # Timeout for individual file processing (in seconds)
-FILE_PROCESSING_TIMEOUT = 300  # 5 minutes per file
+FILE_PROCESSING_TIMEOUT = 60  # 1 minute per file
 # Limit workers to reduce database connection contention
 MAX_WORKERS = 4
 
@@ -78,7 +78,7 @@ class PhaseProcessor:
 
         # Run file collection in parallel to improve throughput
         # Limit workers to reduce database connection contention
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        with ThreadPoolExecutor() as executor:
             future_to_file = {
                 executor.submit(_process_single_file, file_path): file_path
                 for file_path in files_to_process
@@ -172,14 +172,16 @@ class PhaseProcessor:
 
         # Run file analysis in parallel threads
         # Limit workers to reduce database connection contention
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        finshed = 0
+        with ThreadPoolExecutor() as executor:
             future_to_result = {
                 executor.submit(_process_single_file_analysis, result): result
                 for result in collection_results
             }
             for future in as_completed(future_to_result):
                 result = future_to_result[future]
-
+                finshed += 1
+                print(f"Finished {finshed} of {len(collection_results)}")
                 try:
                     # Add timeout to prevent indefinite hanging
                     processed_scope_ids = future.result(
@@ -195,7 +197,7 @@ class PhaseProcessor:
                         try:
                             call_sync_service(list(processed_scope_ids))
                         except Exception as sync_exc:
-                            logger.error(
+                            print(
                                 "Error syncing call chains for file %s: %s",
                                 result.file_scope.file_path,
                                 sync_exc,
@@ -203,14 +205,14 @@ class PhaseProcessor:
                             )
 
                 except FutureTimeoutError:
-                    logger.error(
+                    print(
                         "Timeout analyzing file %s (exceeded %d seconds)",
                         result.file_scope.file_path,
                         FILE_PROCESSING_TIMEOUT,
                     )
                     continue
                 except Exception as exc:  # pragma: no cover - defensive logging
-                    logger.error(
+                    print(
                         "Error analyzing file %s: %s",
                         result.file_scope.file_path,
                         exc,

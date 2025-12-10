@@ -20,22 +20,24 @@ class JediProjectManager:
         # Disable dynamic resolution features as they can be unstable/slow
         jedi.settings.dynamic_params_for_other_modules = False
 
-        self.project = jedi.Project(path=str(project_path))
         logger.info(f"Initialized Jedi Project at: {project_path}")
-        self.project = jedi.Project(path=str(project_path))
+
         # Single-threaded executor forces sequential access
         self.executor = ThreadPoolExecutor(max_workers=1)
         # Thread lock for Jedi operations (Jedi is not thread-safe)
         # Using RLock to allow reentrant locking from same thread
+        self.project = jedi.Project(path=str(self.project_path.parent))
+        self.env = jedi.InterpreterEnvironment()
         self._lock = threading.RLock()
 
     def get_script(self, path: str, source: str) -> jedi.Script:
         # Acquire lock for thread-safe Jedi operations
         # Using RLock allows reentrant access if called from resolve_call
-        with self._lock:
-            def _get():
-                return jedi.Script(code=source, path=path, project=self.project)
-            return self.executor.submit(_get).result()
+        # with self._lock:
+        #     def _get():
+
+        return jedi.Script(code=source, path=path, project=self.project, environment=self.env)
+        # return self.executor.submit(_get).result()
 
     def get_project(self) -> jedi.Project:
         return self.project

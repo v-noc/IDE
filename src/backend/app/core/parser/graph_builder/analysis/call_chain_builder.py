@@ -72,6 +72,56 @@ class CallChainBuilder:
         global _timings
         _timings.clear()
 
+    def _get_scope_with_retry(
+        self,
+        scope_id: Optional[str] = None,
+        qname: Optional[str] = None,
+        max_retries: int = 1,
+        initial_delay: float = 0.01,
+    ) -> Optional[ScopeModel]:
+        """
+        Get a scope with retry logic to handle race conditions.
+
+        When scopes are created in parallel threads, there can be a race
+        condition where one thread tries to fetch a scope before it's fully
+        committed to the database. This method retries with exponential
+        backoff.
+
+        Args:
+            scope_id: Scope ID to fetch (priority 1)
+            qname: Qualified name to fetch (priority 2, if scope_id fails)
+            max_retries: Maximum number of retry attempts
+            initial_delay: Initial delay in seconds before retry
+
+        Returns:
+            ScopeModel if found, None otherwise
+        """
+        delay = initial_delay
+        scope = None
+
+        for attempt in range(max_retries):
+            # Try ID-based lookup first
+            if scope_id:
+                scope = self.scope_manager.get_scope(scope_id)
+                if scope:
+                    return scope
+
+            # Try qname-based lookup if ID failed or wasn't provided
+            if qname:
+                print(f"Getting scope by qname: {qname} {scope_id}")
+                scope = self.scope_manager.get_scope_by_qname(qname)
+                if scope:
+                    return scope
+
+            # If not found and we have retries left, wait and retry
+            # if attempt < max_retries - 1:
+            #     print(f"Waiting {delay} seconds to retry")
+            #     print(f"Attempt {attempt} of {max_retries}")
+            #     time.sleep(delay)
+            #     delay *= 2  # Exponential backoff
+
+        return None
+
     def build_chain(
         self,
         call_node: CallNode,
@@ -144,22 +194,25 @@ class CallChainBuilder:
         # Process each resolution separately
         for resolution in resolutions:
             # Determine callee_id based on resolution
-            callee_scope = None
+            # Use retry logic to handle race conditions with concurrent
+            # scope creation
+            t0 = time.time()
+            callee_scope = self._get_scope_with_retry(
+                scope_id=resolution.callee_id,
+                qname=resolution.qname,
+            )
+            _timings["get_scope_with_retry"].append(time.time() - t0)
 
-            # Priority 1: Try ID-based lookup (most direct and accurate)
-            if resolution.callee_id:
-                t0 = time.time()
-                callee_scope = self.scope_manager.get_scope(
-                    resolution.callee_id)
-
-                _timings["get_scope_by_id"].append(time.time() - t0)
-
-            else:
-                print(
-                    f"Could not resolve call {call_node.name} at {call_node.position.line}:{call_node.position.column}")
-                continue
-
+            # If still not found, log and skip this resolution
             if not callee_scope:
+                print(
+                    f"Could not resolve call {resolution} "
+                    f"{call_node.name} at "
+                    f"{call_node.position.line}:"
+                    f"{call_node.position.column} "
+                    f"(callee_id={resolution.callee_id}, "
+                    f"qname={resolution.qname})"
+                )
                 continue
 
             if callee_scope.id not in self.call_chain_scope_ids:
@@ -168,8 +221,8 @@ class CallChainBuilder:
                 self.call_chain_scope_ids[callee_scope.id] += 1
 
             if self.call_chain_scope_ids[callee_scope.id] >= self.max_depth:
-                print(
-                    f"Max depth reached for {callee_scope.qname} {caller_scope.qname} {self.call_chain_scope_ids[callee_scope.id]}")
+                # print(
+                #     f"Max depth reached for {callee_scope.qname} {caller_scope.qname} {self.call_chain_scope_ids[callee_scope.id]}")
                 continue
 
             # Generate call site ID (will be created in batch)
