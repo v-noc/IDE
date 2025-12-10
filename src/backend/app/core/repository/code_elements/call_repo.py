@@ -124,13 +124,23 @@ class CallRepo(NodeRepository[CallNode]):
 
             # Fill in found calls
             for row in cursor:
+                # Skip null rows (when FIRST() returns null for no match)
+                if row is None:
+                    continue
+                # Ensure row has required fields
+                if "parent_id" not in row or "target_id" not in row:
+                    continue
+                # Skip if call is None or missing
+                if not row.get("call"):
+                    continue
                 key = (row["parent_id"], row["target_id"])
                 results[key] = CallNode(**row["call"])
 
             return results
 
         except Exception as e:
-            logger.error("Error batch finding calls by target/parent: %s", e)
+            logger.error(
+                f"Error batch finding calls by target/parent: {e} - {len(parent_target_pairs)}")
             # Fallback: return None for all
             return {(p, t): None for p, t in parent_target_pairs}
 
