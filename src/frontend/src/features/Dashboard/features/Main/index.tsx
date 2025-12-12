@@ -16,6 +16,7 @@ import { useGetDocuments, useUpdateDocument } from "./service/useDocuments";
 import { debounce } from "remeda";
 import Canvas from "./components/Canvas";
 import type { CallNodeTree } from "@/types/project";
+import { useSocketListener } from "../../hooks/useSocketListener";
 
 const MainCanvas = () => {
   const {
@@ -24,8 +25,16 @@ const MainCanvas = () => {
     setSelectedNode,
     setSecondarySelectedNode,
     selectedDocumentId,
+    projectData,
     setSelectedDocumentId,
   } = useProjectStore();
+
+  useSocketListener({
+    event: `${projectData?._key}`,
+    callback: (data) => {
+      console.log(data);
+    },
+  });
   const [tabValue, setTabValue] = useState("docs");
   const effectiveNode =
     (secondarySelectedNode as CallNodeTree)?.target ?? selectedNode;

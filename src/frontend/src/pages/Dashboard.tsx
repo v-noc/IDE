@@ -9,6 +9,7 @@ import MainWithRightSidebar from "@/features/Dashboard/features/Main/MainWithRig
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { initSocket, disconnectSocket } from "@/services/socket";
 
 // Recursively check if any Group node exists
 function containsGroup(node: AnyNodeTree): boolean {
@@ -142,6 +143,16 @@ const Dashboard = () => {
       setSelectedNode(projectData);
     }
   }, [selectedNode, projectData, setSelectedNode]);
+
+  // Initialize socket connection when Dashboard mounts
+  useEffect(() => {
+    initSocket();
+
+    // Cleanup: disconnect socket when Dashboard unmounts
+    return () => {
+      disconnectSocket();
+    };
+  }, []);
 
   return (
     <ResizablePanelGroup direction="horizontal">

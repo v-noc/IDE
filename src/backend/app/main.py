@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.core.socket.manager import get_socket_manager
+from app.core.socket.manager import get_socket_manager
 
 from .api import root
 from .db.client import get_db
@@ -34,6 +34,7 @@ async def lifespan(app: FastAPI):
 
     # Init Socket Manager (creates the server instance)
     _ = get_socket_manager()
+    print("🔌 Socket.IO server initialized and ready")
 
     yield
 
@@ -68,6 +69,6 @@ app.add_exception_handler(Exception, generic_exception_handler)
 # MOUNT SOCKET.IO
 # This handles the /socket.io/ path automatically
 socket_manager = get_socket_manager()
-app.mount("/", socket_manager.app)
+app.mount("/ws", socket_manager.app)
 # Include the main router
 app.include_router(root.router, prefix="/api/v1")
