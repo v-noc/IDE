@@ -133,7 +133,6 @@ class NodeRepository(BaseRepository[T]):
                 // 8. TARGET LOGIC (Unchanged)
                 LET target_node = (
                     FOR target IN 1..1 OUTBOUND v @@targets_collection
-                        FILTER (target.current_version != null ? target.current_version : 0) >= v_ver
                         LIMIT 1
                         RETURN target
                 )

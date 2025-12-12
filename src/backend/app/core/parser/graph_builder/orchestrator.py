@@ -16,7 +16,7 @@ from app.core.parser.graph_builder.discovery.scanner import (
     FileScanner,
     ScanResult,
 )
-from app.core.parser.graph_builder.utils import PathResolver, PhaseProcessor, DeletionHandler, CallSiteTreePrinter
+from app.core.parser.graph_builder.utils import GraphVisualizer, PathResolver, PhaseProcessor, DeletionHandler, CallSiteTreePrinter
 from app.core.parser.graph_builder.sync.graph_sync import (
     MainGraphSyncService,
 )
@@ -189,7 +189,7 @@ class GraphBuilderOrchestrator:
                 sync_version,
             )
 
-            sync_service.sync_scope_hierarchy(self.project_node.id)
+            sync_service.sync_scope_hierarchy(self.project_node.id, change_set)
             call_sync_service = sync_service.call_sync.sync_call_chain_scopes
         else:
             logger.warning("No database connection for sync; skipping")
@@ -224,11 +224,7 @@ class GraphBuilderOrchestrator:
         print("All phases completed successfully", flush=True)
 
         # Debugger: Visualize scope and call site graph
-        # from app.core.parser.graph_builder.visualization import (
-        #     CallSiteTreePrinter,
-        #     GraphVisualizer,
-        # )
         # visualizer = GraphVisualizer(self.scope_manager)
         # visualizer.visualize_graph()
-        printer = CallSiteTreePrinter(self.scope_manager)
-        printer.print_call_site_tree()
+        # printer = CallSiteTreePrinter(self.scope_manager)
+        # printer.print_call_site_tree()

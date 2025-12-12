@@ -43,8 +43,8 @@ class SyncHelpers:
             node = self.repos.class_repo.find_one({"qname": scope.qname})
         elif scope.type == ScopeType.FUNCTION:
             node = self.repos.function_repo.find_one({"qname": scope.qname})
-        if node:
-            self.node_cache[scope.id] = node
+        elif scope.type == ScopeType.FOLDER:
+            node = self.repos.folder_repo.find_one({"qname": scope.qname})
 
         return node
 
@@ -201,40 +201,17 @@ class SyncHelpers:
         """
         t0 = time.time()
         try:
-            # We need to know the contain_type for the INSERT part.
-            # However, fetching nodes to determine type adds a round trip.
-            # If we can assume a default or fetch only if needed, it's better.
-            # For now, let's try to fetch nodes only if we are inserting.
-            # Actually, UPSERT in Arango doesn't let us execute arbitrary logic in INSERT block easily
-            # without pre-calculating values.
-            # But we can do a check-free upsert if we don't strictly need contain_type or can derive it.
-            # The original code fetches nodes to get types.
-
-            # Optimization: Try to update first. If it fails (doesn't exist), then fetch nodes and insert.
-            # Or better: Just use the UPSERT and calculate type in AQL if possible? No, node types are on nodes.
-
-            # Let's stick to the original logic but optimized:
-            # 1. Try to find the edge.
-            # 2. If found, update version (1 round trip total if we use AQL UPDATE directly).
-            # 3. If not found, fetch nodes and create (2 round trips: fetch nodes, create edge).
-
-            # Even better: Use AQL to do it all?
-            # LET edge = FIRST(FOR e IN contains_edges FILTER e._from == @from AND e._to == @to RETURN e)
-            # IF edge THEN UPDATE edge WITH {version: @version} IN contains_edges
-            # ELSE ... (need node types)
-
-            # Let's use the Python logic but optimize the update case which is common.
 
             query = """
-            UPSERT { _from: @from_id, _to: @to_id }
-            INSERT { 
-                _from: @from_id, 
-                _to: @to_id, 
-                version: @version,
-                contain_type: CONCAT(DOCUMENT(@from_id).node_type, "_to_", DOCUMENT(@to_id).node_type)
-            }
-            UPDATE { version: @version }
-            IN contains_edges
+                UPSERT { _from: @from_id, _to: @to_id }
+                INSERT { 
+                    _from: @from_id, 
+                    _to: @to_id, 
+                    version: @version,
+                    contain_type: CONCAT(DOCUMENT(@from_id).node_type, "_to_", DOCUMENT(@to_id).node_type)
+                }
+                UPDATE { version: @version }
+                IN contains_edges
             """
             # Note: DOCUMENT() function allows us to get the node types inside the query!
 

@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import Optional
 
 from app.core.model.nodes import ProjectNode
 from app.core.parser.scope_manager.manager import ScopeManager
@@ -8,6 +9,7 @@ from app.core.services.call_service import CallService
 from app.core.parser.graph_builder.sync.sync_helpers import SyncHelpers
 from app.core.parser.graph_builder.sync.scope_sync import ScopeSyncService
 from app.core.parser.graph_builder.sync.call_sync import CallSyncService
+from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 
 logger = logging.getLogger(__name__)
 
@@ -44,16 +46,18 @@ class MainGraphSyncService:
             scope_manager, self.call_service, self.helpers
         )
 
-    def sync_scope_hierarchy(self, root_scope_id: str):
+    def sync_scope_hierarchy(
+        self, root_scope_id: str, change_set: Optional[ChangeSet] = None
+    ):
         """
         Phase 1: Sync scope hierarchy starting from root_scope_id.
 
-        Traverses all child scopes and:
-        - Creates/updates nodes (only version updated on existing nodes)
-        - Establishes contain edges
+        If change_set is provided and project has existing data, performs incremental sync.
+        Otherwise, syncs everything from root (new project).
 
         Args:
             root_scope_id: The scope ID to start traversal from
+            change_set: Optional ChangeSet for incremental syncing
         """
         logger.info(
             f"Phase 1: Syncing scope hierarchy from {root_scope_id} "
@@ -69,13 +73,16 @@ class MainGraphSyncService:
 
         print("Scope hierarchy synced")
         time_start = time.time()
+
+        # Pass change_set to sync_scope_hierarchy for incremental sync
+        # If change_set is None or project is new, it will do full sync
         self.scope_sync.sync_scope_hierarchy(
-            root_scope_id, self.project_node.id
+            root_scope_id, self.project_node.id, change_set
         )
-        # self.sync_call_chains(root_scope_id)
+
         time_end = time.time()
         print(
-            f"Time taken to sync call chains: {time_end - time_start} seconds")
+            f"Time taken to sync scope hierarchy: {time_end - time_start} seconds")
 
     def sync_call_chains(self, root_scope_id: str):
         """
