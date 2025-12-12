@@ -116,6 +116,7 @@ class ContainerService:
         # Limit the ascent to avoid infinite loops
         for _ in range(50):
             parent_info = self.repos.nodes.get_parent(current_id)
+
             if not parent_info:
                 break
 
@@ -133,7 +134,13 @@ class ContainerService:
             if not parent_id:
                 break
             current_id = parent_id
+        print(f"file_doc: {file_doc}")
+        if project_doc is None:
+            project_doc = self.repos.nodes.get_parent_project(
+                file_doc.get("_id"))
 
+            if project_doc is None:
+                return None, None
         return file_doc, project_doc
 
     def _build_abs_file_path(self, project_path: str, file_path: str) -> str:

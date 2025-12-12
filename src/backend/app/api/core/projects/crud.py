@@ -13,7 +13,7 @@ from app.core.services.project_service import ProjectService
 from app.api.dependencies import get_project_service
 from pathlib import Path
 from app.core.watcher.service import WatcherService, get_watcher_service
-
+import json
 from app.core.model.nodes import ProjectNode
 
 

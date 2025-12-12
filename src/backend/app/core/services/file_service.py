@@ -154,13 +154,19 @@ class FileService(ContainerService):
 
     def get_code(self, file_id: str):
         file = self.repos.file_repo.get_by_id(file_id)
+
         if not file:
             return None
 
         # Resolve project root by walking parents
-        file_doc, project_doc = self._resolve_file_and_project(
+        project_doc = self.repos.nodes.get_parent_project(
             file.id,
         )
+
+        file_doc = self.repos.file_repo.get_by_id(file.id)
+
+        print(file_doc)
+        print(project_doc)
         # When called on the file itself, file_doc may be None; use current
         # file
         effective_file = file_doc or file.model_dump()
@@ -168,7 +174,7 @@ class FileService(ContainerService):
             return None
 
         project_path = project_doc.get("path")
-        file_path = effective_file.get("path")
+        file_path = effective_file.path
         abs_path = self._build_abs_file_path(
             project_path,
             file_path,

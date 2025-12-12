@@ -64,12 +64,12 @@ class MainGraphSyncService:
             f"with version {self.sync_version}"
         )
 
-        # Update project node version so version filtering works correctly
-        if self.project_node:
-            self.project_node.current_version = self.sync_version
-            self.repos.project_repo.update(
-                self.project_node.key, self.project_node
-            )
+        # # Update project node version so version filtering works correctly
+        # if self.project_node:
+        #     self.project_node.current_version = self.sync_version
+        #     self.repos.project_repo.update(
+        #         self.project_node.key, self.project_node
+        #     )
 
         print("Scope hierarchy synced")
         time_start = time.time()

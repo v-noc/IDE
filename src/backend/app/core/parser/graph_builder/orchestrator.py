@@ -226,5 +226,5 @@ class GraphBuilderOrchestrator:
         # Debugger: Visualize scope and call site graph
         # visualizer = GraphVisualizer(self.scope_manager)
         # visualizer.visualize_graph()
-        # printer = CallSiteTreePrinter(self.scope_manager)
-        # printer.print_call_site_tree()
+        printer = CallSiteTreePrinter(self.scope_manager)
+        printer.print_call_site_tree()

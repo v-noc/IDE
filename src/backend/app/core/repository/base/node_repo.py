@@ -1,11 +1,12 @@
-from typing import Any, Optional, List, Dict
+from typing import Any, Dict, List, Optional, TypeVar
+
+from arango.exceptions import DocumentDeleteError, DocumentGetError
+from pydantic import BaseModel
 
 from app.core.model import AllNodes
-from .base_collection import BaseRepository
-from pydantic import BaseModel
-from typing import TypeVar
-from arango.exceptions import DocumentDeleteError, DocumentGetError
+from app.core.model.nodes import ProjectNode
 
+from .base_collection import BaseRepository
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -71,6 +72,27 @@ class NodeRepository(BaseRepository[T]):
             return results[0]
         return None
 
+    def get_parent_project(self, node_id: str) -> Optional[ProjectNode]:
+        """Finds the structural parent of a node via the 'contains' edge."""
+        query = """
+            FOR v IN 1..100 INBOUND @start_node_id @@contains_collection
+                OPTIONS { order: "bfs" }
+                FILTER v.node_type == "project"
+                LIMIT 1
+                RETURN v
+            """
+        bind_vars = {
+            "start_node_id": node_id,
+            "@contains_collection": "contains_edges",
+        }
+        # Note: This returns raw dicts, not Pydantic models directly,
+        # because the structure is custom ("vertex", "parent_id").
+        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+        results = list(cursor)
+        if results:
+            return results[0]
+        return None
+
     def get_containment_tree(
         self,
         start_node_id: str,
@@ -102,21 +124,21 @@ class NodeRepository(BaseRepository[T]):
                 // If we are at depth 1, the parent is the start_node.
                 // If we are deeper, it is the second-to-last vertex in the path.
                 LET immediate_parent = LENGTH(p.vertices) >= 2 ? p.vertices[-2] : start_node
-                
+
                 // 3. GET VERSIONS
                 LET imm_parent_ver = immediate_parent.current_version != null ? immediate_parent.current_version : 0
                 LET v_ver = v.current_version != null ? v.current_version : 0
 
-         
+
 
                 // 5. FILTER CURRENT NODE
                 // We also hide this specific node from results.
                 FILTER v_ver >= imm_parent_ver
-                
+
                 // (Optional) If edges act as the "pointer" update, check edge version too
                 FILTER (e.version != null ? e.version : 0) >= imm_parent_ver
 
-                // 6. OUTPUT CALCULATIONS 
+                // 6. OUTPUT CALCULATIONS
                 // Now that we know the PATH is valid, we calculate who the "Logical Parent" is
                 // (This is purely for your JSON output, NOT for validity checks)
                 LET parent_candidates = (
@@ -153,7 +175,8 @@ class NodeRepository(BaseRepository[T]):
         # Note: This returns raw dicts, not Pydantic models directly,
         # because the structure is custom ("vertex", "parent_id").
         cursor = self.db.aql.execute(query, bind_vars=bind_vars)
-        return list(cursor)
+        b = list(cursor)
+        return b
 
     def get_nearest_file_and_project(self, node_id: str) -> Dict[str, Any]:
         """Return nearest file and project ancestors in one traversal.
