@@ -33,6 +33,20 @@ const MainCanvas = () => {
     projectData,
     setSelectedDocumentId,
   } = useProjectStore();
+  const effectiveNode = useMemo(() => {
+    if (secondarySelectedNode) {
+      if ((secondarySelectedNode as CallNodeTree).target) {
+        return (secondarySelectedNode as CallNodeTree).target;
+      }
+      return secondarySelectedNode;
+    }
+    if (selectedNode?.node_type === "call") {
+      return selectedNode.target;
+    }
+    return selectedNode;
+  }, [secondarySelectedNode, selectedNode]);
+
+  const elementId = effectiveNode?._key ?? "";
 
   // Join the project room to receive project-specific events
   // Backend emits to rooms named by project ID (_id field)
@@ -52,6 +66,9 @@ const MainCanvas = () => {
       queryClient.invalidateQueries({
         queryKey: ["projectTree", projectData?._key],
       });
+      queryClient.refetchQueries({
+        queryKey: ["code", elementId],
+      });
     },
   });
 
@@ -62,8 +79,6 @@ const MainCanvas = () => {
     },
   });
   const [tabValue, setTabValue] = useState("docs");
-  const effectiveNode =
-    (secondarySelectedNode as CallNodeTree)?.target ?? selectedNode;
 
   const { suffixName, displayPath } = useMemo(() => {
     const base = selectedNode?.qname?.replace(/\./g, " / ") ?? "";

@@ -63,22 +63,12 @@ def write_code(
         if raw_node:
             current_id = raw_node.get("_id")
             # Walk up to find the project ancestor
-            for _ in range(50):
-                if not current_id:
-                    break
-                parent = node_repo.get_parent(current_id)
-                if not parent:
-                    break
-                parent_vertex = parent.get("vertex") or {}
-                if parent_vertex.get("node_type") == "project":
-                    project_id = parent_vertex.get("_id")
-                    if project_id:
-                        project_node = project_service.get(project_id)
-                        # TODO: do a syncer
-                        # if project_node:
-                        #     watcher_service.start_watching(project_node)
-                    break
-                current_id = parent_vertex.get("_id")
+            parent = node_repo.get_parent_project(current_id)
+            if parent:
+                project_node = project_service.get(parent.id)
+                # TODO: do a syncer
+                if project_node:
+                    watcher_service.start_watching(project_node)
     except Exception:
         # Non-fatal: failure to start watcher should not block write
         pass

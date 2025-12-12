@@ -35,29 +35,18 @@ class FileService(ContainerService):
             return {"success": False, "error": "Corrupted element data"}
 
         # Resolve enclosing file and project for absolute path
-        file_doc, project_doc = self._resolve_file_and_project(full_id)
         if node_type == "file":
-            # When targeting a file, file_doc may be None; use raw document
-            if not project_doc:
-                return {"success": False, "error": "Project not found for file"}
-            file_path = raw_node.get("path")
-            if not file_path:
-                return {"success": False, "error": "File path missing"}
-            abs_path = self._build_abs_file_path(
-                project_doc.get("path"), file_path)
-            try:
-                with open(abs_path, "w", encoding="utf-8") as f:
-                    f.write(code_block)
-                return {"success": True}
-            except IOError as e:
-                return {"success": False, "error": str(e)}
+            file_doc = self.repos.file_repo.get_by_id(full_id)
+            project_doc = self.repos.nodes.get_parent_project(full_id)
+        else:
+            file_doc, project_doc = self._resolve_file_and_project(full_id)
 
         # Non-file nodes must have enclosing file and project
         if not file_doc or not project_doc:
             return {"success": False, "error": "Enclosing file or project not found"}
 
         abs_path = self._build_abs_file_path(
-            project_doc.get("path"), file_doc.get("path"))
+            project_doc.get("path"), file_doc.path)
 
         # Load typed node to obtain position
         typed_node = self.repos.nodes.get_by_id(full_id)
@@ -165,8 +154,6 @@ class FileService(ContainerService):
 
         file_doc = self.repos.file_repo.get_by_id(file.id)
 
-        print(file_doc)
-        print(project_doc)
         # When called on the file itself, file_doc may be None; use current
         # file
         effective_file = file_doc or file.model_dump()
