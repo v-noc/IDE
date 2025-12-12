@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.core.socket.manager import get_socket_manager
+
 from .api import root
 from .db.client import get_db
 from .core.watcher.service import WatcherService
@@ -29,6 +31,9 @@ async def lifespan(app: FastAPI):
     watcher_service = WatcherService()
     watcher_service.set_db(db)
     app.state.watcher_service = watcher_service
+
+    # Init Socket Manager (creates the server instance)
+    _ = get_socket_manager()
 
     yield
 
@@ -60,5 +65,9 @@ app.add_middleware(
 # Add exception handlers
 app.add_exception_handler(Exception, generic_exception_handler)
 
+# MOUNT SOCKET.IO
+# This handles the /socket.io/ path automatically
+socket_manager = get_socket_manager()
+app.mount("/", socket_manager.app)
 # Include the main router
 app.include_router(root.router, prefix="/api/v1")

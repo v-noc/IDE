@@ -22,6 +22,7 @@ dependencies = [
   "kuzu>=0.11.3",
   "jedi>=0.19.2",
   "pyvis>=0.3.2",
+  "python-socketio>=5.15.0",
 ]
 
 [project.optional-dependencies]

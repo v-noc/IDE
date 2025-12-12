@@ -1,24 +1,21 @@
 from __future__ import annotations
 
 import logging
+import asyncio
 from typing import Dict
-
+from threading import Lock
 from arango.database import StandardDatabase
 from fastapi import Depends, Request
 
-
 from app.core.model.nodes import ProjectNode
 from app.core.watcher.project_watcher import ProjectWatcher
-from threading import Lock
-
+from app.core.socket.manager import get_socket_manager
 from app.db.client import get_db
 
 logger = logging.getLogger(__name__)
 
 
 class WatcherService:
-    """Manages file watchers for projects."""
-
     _instance = None
     _lock = Lock()
 
@@ -33,118 +30,113 @@ class WatcherService:
         if not hasattr(self, 'initialized'):
             self.watchers: Dict[str, ProjectWatcher] = {}
             self.db = db
+            self.socket_manager = get_socket_manager()
             self.initialized = True
-            logger.info("WatcherService initialized.")
 
     def set_db(self, db: StandardDatabase):
         if self.db is None:
             self.db = db
-            logger.info("Database connection set for WatcherService.")
 
     def start_watching(self, project_node: ProjectNode):
-        """Starts watching a project if not already watched."""
         project_id = project_node.id
+
+        # Helper to run async socket events from the sync thread
+        def emit_sync_event(event_type: str, message: str):
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(
+                    self.socket_manager.emit_to_project(
+                        project_id,
+                        event_type,
+                        {"message": message, "projectId": project_id}
+                    )
+                )
+                loop.close()
+            except Exception as e:
+                logger.error(f"Socket emit failed: {e}")
+
         if project_id in self.watchers:
             watcher = self.watchers[project_id]
-            # If watcher exists but not running, start it
-            if hasattr(watcher, "is_running") and not watcher.is_running():
-                logger.info(
-                    f"Project {project_id} watcher exists but not running. "
-                    f"Starting...")
+            if not watcher.is_running():
                 watcher.start()
-                return
-            # If paused, resume it
-            if hasattr(watcher, "is_paused") and watcher.is_paused():
-                logger.info(
-                    f"Project {project_id} watcher is paused. Resuming...")
+            elif watcher.is_paused():
                 watcher.resume()
-                return
-            logger.info(f"Project {project_id} is already being watched.")
             return
 
         def resync_project():
-            from app.core.parser.graph_builder import GraphBuilder
-            logger.info(f"Resyncing project {project_node.name}...")
+            logger.info(f"Triggering resync for {project_node.name}")
+
+            # 1. Notify Frontend: Sync Started
+            emit_sync_event("sync_started", "Detecting changes...")
+
             try:
                 if self.db is None:
-                    logger.error("Database not set in WatcherService.")
                     return
 
-                # Temporarily pause the watcher to avoid loops
+                # 2. Hard Pause to prevent loops/duplicate events
                 self.pause_watching(project_id)
 
-                graph_builder = GraphBuilder(
-                    project_node.path, project_node=project_node, db=self.db
+                from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+
+                # Re-initialize orchestrator for the specific job
+                # Note: We create a fresh one to ensure clean state
+                orchestrator = GraphBuilderOrchestrator(
+                    project_node=project_node,
+                    db=self.db
                 )
-                graph_builder.build(
-                    project_node.name,
-                    project_node.description,
-                )
-                logger.info(
-                    f"Project {project_node.name} resynced successfully."
-                )
+
+                # Perform the sync
+                changes = orchestrator.resync()
+
+                # 3. Notify Frontend: Sync Complete
+                msg = "Sync complete."
+                if changes and (changes.has_changes() or changes.has_folder_changes()):
+                    msg = f"Synced {len(changes.modified_files)} changes."
+
+                emit_sync_event("sync_complete", msg)
+                logger.info(f"Project {project_node.name} resynced.")
 
             except Exception as e:
-                logger.error(
-                    f"Error resyncing project {project_node.name}: {e}"
-                )
+                logger.error(f"Error resyncing {project_node.name}: {e}")
+                emit_sync_event("sync_error", str(e))
             finally:
-                # Always resume the watcher
+                # 4. Resume watching (only catch NEW events from now on)
                 self.resume_watching(project_id)
 
+        # Initialize and start
         watcher = ProjectWatcher(project_node.path, resync_project)
         watcher.start()
         self.watchers[project_id] = watcher
-        logger.info(
-            f"Started watching project {project_id} at {project_node.path}"
-        )
+        logger.info(f"Started watching project {project_id}")
 
     def stop_watching(self, project_id: str):
-        """Stops watching a project."""
         watcher = self.watchers.get(project_id)
         if watcher:
             watcher.stop()
             del self.watchers[project_id]
-            logger.info(f"Stopped watching project {project_id}")
 
     def stop_all(self):
-        """Stops all active watchers and clears registry."""
-        # Copy keys to avoid runtime mutation issues
-        for project_id in list(self.watchers.keys()):
-            try:
-                self.stop_watching(project_id)
-            except Exception as exc:
-                logger.error(
-                    f"Failed stopping watcher for project {project_id}: {exc}"
-                )
+        for pid in list(self.watchers.keys()):
+            self.stop_watching(pid)
 
     def pause_watching(self, project_id: str):
-        """Pause watching a project."""
         watcher = self.watchers.get(project_id)
         if watcher:
             watcher.pause()
-            logger.info(f"Paused watching project {project_id}")
 
     def resume_watching(self, project_id: str):
-        """Resume watching a project."""
         watcher = self.watchers.get(project_id)
         if watcher:
             watcher.resume()
-            logger.info(f"Resumed watching project {project_id}")
+
+# Dependency remains the same...
 
 
-def get_watcher_service(
-    request: Request, db: StandardDatabase = Depends(get_db)
-) -> WatcherService:
-    """Provides a process-wide singleton WatcherService stored in app.state."""
-    service: WatcherService | None = getattr(
-        request.app.state, "watcher_service", None
-    )
+def get_watcher_service(request: Request, db: StandardDatabase = Depends(get_db)) -> WatcherService:
+    service = getattr(request.app.state, "watcher_service", None)
     if service is None:
         service = WatcherService()
-        # attach to app state for subsequent requests
         request.app.state.watcher_service = service
-
-    # Ensure DB is set once
     service.set_db(db)
     return service
