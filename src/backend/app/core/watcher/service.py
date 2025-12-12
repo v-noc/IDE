@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
-from typing import Dict
+from typing import Dict, Optional
 from threading import Lock
 from arango.database import StandardDatabase
 from fastapi import Depends, Request
@@ -31,7 +31,12 @@ class WatcherService:
             self.watchers: Dict[str, ProjectWatcher] = {}
             self.db = db
             self.socket_manager = get_socket_manager()
+            self.main_event_loop: Optional[asyncio.AbstractEventLoop] = None
             self.initialized = True
+
+    def set_event_loop(self, loop: asyncio.AbstractEventLoop):
+        """Set the main event loop to use for async operations from sync threads."""
+        self.main_event_loop = loop
 
     def set_db(self, db: StandardDatabase):
         if self.db is None:
@@ -43,18 +48,58 @@ class WatcherService:
         # Helper to run async socket events from the sync thread
         def emit_sync_event(event_type: str, message: str):
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(
-                    self.socket_manager.emit_to_project(
-                        project_id,
-                        event_type,
-                        {"message": message, "projectId": project_id}
+                # Try to use the main event loop if available
+                if self.main_event_loop and self.main_event_loop.is_running():
+                    # Schedule coroutine to run in the main event loop
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.socket_manager.emit_to_project(
+                            project_id,
+                            event_type,
+                            {"message": message, "projectId": project_id}
+                        ),
+                        self.main_event_loop
                     )
-                )
-                loop.close()
+                    # Wait for the result (with timeout to avoid blocking forever)
+                    future.result(timeout=5.0)
+                else:
+                    # Fallback: create a new event loop in this thread
+                    # This works when called from a thread without an event loop
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            # If loop is running, we can't use run_until_complete
+                            # Create a task instead
+                            asyncio.create_task(
+                                self.socket_manager.emit_to_project(
+                                    project_id,
+                                    event_type,
+                                    {"message": message, "projectId": project_id}
+                                )
+                            )
+                        else:
+                            loop.run_until_complete(
+                                self.socket_manager.emit_to_project(
+                                    project_id,
+                                    event_type,
+                                    {"message": message, "projectId": project_id}
+                                )
+                            )
+                    except RuntimeError:
+                        # No event loop in this thread, create a new one
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            loop.run_until_complete(
+                                self.socket_manager.emit_to_project(
+                                    project_id,
+                                    event_type,
+                                    {"message": message, "projectId": project_id}
+                                )
+                            )
+                        finally:
+                            loop.close()
             except Exception as e:
-                logger.error(f"Socket emit failed: {e}")
+                logger.error(f"Socket emit failed: {e}", exc_info=True)
 
         if project_id in self.watchers:
             watcher = self.watchers[project_id]
@@ -75,6 +120,7 @@ class WatcherService:
                     return
 
                 # 2. Hard Pause to prevent loops/duplicate events
+                # Use pause() which unschedules without joining threads
                 self.pause_watching(project_id)
 
                 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
@@ -108,7 +154,7 @@ class WatcherService:
         watcher = ProjectWatcher(project_node.path, resync_project)
         watcher.start()
         self.watchers[project_id] = watcher
-        logger.info(f"Started watching project {project_id}")
+        print(f"Started watching project {project_id}")
 
     def stop_watching(self, project_id: str):
         watcher = self.watchers.get(project_id)
@@ -121,14 +167,16 @@ class WatcherService:
             self.stop_watching(pid)
 
     def pause_watching(self, project_id: str):
+        """Pause watching by unscheduling the watch (non-blocking)."""
         watcher = self.watchers.get(project_id)
         if watcher:
+            # Use pause() instead of stop() to avoid joining the thread from within callback
             watcher.pause()
 
     def resume_watching(self, project_id: str):
         watcher = self.watchers.get(project_id)
         if watcher:
-            watcher.resume()
+            watcher.start()
 
 # Dependency remains the same...
 

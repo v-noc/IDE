@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,6 +31,9 @@ async def lifespan(app: FastAPI):
     # Initialize a process-wide watcher service singleton
     watcher_service = WatcherService()
     watcher_service.set_db(db)
+    # Set the main event loop so watcher can emit socket events from sync threads
+    # Use get_running_loop() since we're in an async context
+    watcher_service.set_event_loop(asyncio.get_running_loop())
     app.state.watcher_service = watcher_service
 
     # Init Socket Manager (creates the server instance)

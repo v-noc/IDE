@@ -117,10 +117,6 @@ def get_project_children(
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    # project_tree = ProjectTreeNode(
-    #     **project_node.model_dump(),
-    #     children=tree
-    # )
     return tree
 
 
@@ -139,7 +135,7 @@ def get_project(
         )
 
     # TODO: reimplment
-    # watcher_service.start_watching(project_node)
+    watcher_service.start_watching(project_node)
 
     children = project_service.get_children(
         project_node.id, exclude_groups=exclude_groups)

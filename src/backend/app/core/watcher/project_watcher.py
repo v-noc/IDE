@@ -68,8 +68,30 @@ class ProjectWatcher:
     def stop(self):
         """Stops the observer completely."""
         if self.observer.is_alive():
+            # First unschedule to stop receiving events
+            if self._watch:
+                try:
+                    self.observer.unschedule(self._watch)
+                    self._watch = None
+                except Exception:
+                    pass
+
+            # Stop the observer
             self.observer.stop()
-            self.observer.join()
+
+            # Don't join from within the callback thread to avoid "cannot join current thread" error
+            # The observer will finish on its own
+            try:
+                import threading
+                current_thread = threading.current_thread()
+                # Only try to join if we're not in the observer thread itself
+                # The observer thread has a name like "Thread-*" or "Observer-*"
+                if current_thread is not self.observer and not current_thread.name.startswith("Observer"):
+                    self.observer.join(timeout=1.0)
+            except (RuntimeError, AttributeError):
+                # If we can't join (e.g., from callback thread), just stop without joining
+                # The observer will clean up on its own
+                pass
             logger.info(f"Stopped observer for {self.project_path}")
 
     def pause(self):

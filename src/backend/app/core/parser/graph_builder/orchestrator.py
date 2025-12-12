@@ -16,7 +16,7 @@ from app.core.parser.graph_builder.discovery.scanner import (
     FileScanner,
     ScanResult,
 )
-from app.core.parser.graph_builder.utils import PathResolver, PhaseProcessor, DeletionHandler
+from app.core.parser.graph_builder.utils import PathResolver, PhaseProcessor, DeletionHandler, CallSiteTreePrinter
 from app.core.parser.graph_builder.sync.graph_sync import (
     MainGraphSyncService,
 )
@@ -230,5 +230,5 @@ class GraphBuilderOrchestrator:
         # )
         # visualizer = GraphVisualizer(self.scope_manager)
         # visualizer.visualize_graph()
-        # printer = CallSiteTreePrinter(self.scope_manager)
-        # printer.print_call_site_tree()
+        printer = CallSiteTreePrinter(self.scope_manager)
+        printer.print_call_site_tree()
