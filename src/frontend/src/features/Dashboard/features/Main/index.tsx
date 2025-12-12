@@ -16,9 +16,14 @@ import { useGetDocuments, useUpdateDocument } from "./service/useDocuments";
 import { debounce } from "remeda";
 import Canvas from "./components/Canvas";
 import type { CallNodeTree } from "@/types/project";
-import { useSocketListener } from "../../hooks/useSocketListener";
+import {
+  useSocketListener,
+  useJoinProjectRoom,
+} from "../../hooks/useSocketListener";
+import { useQueryClient } from "@tanstack/react-query";
 
 const MainCanvas = () => {
+  const queryClient = useQueryClient();
   const {
     selectedNode,
     secondarySelectedNode,
@@ -29,10 +34,31 @@ const MainCanvas = () => {
     setSelectedDocumentId,
   } = useProjectStore();
 
+  // Join the project room to receive project-specific events
+  // Backend emits to rooms named by project ID (_id field)
+  useJoinProjectRoom(projectData?._id);
+
+  // Listen for sync events
   useSocketListener({
-    event: `${projectData?._key}`,
+    event: "sync_started",
     callback: (data) => {
-      console.log(data);
+      console.log("Sync started:", data);
+    },
+  });
+
+  useSocketListener({
+    event: "sync_complete",
+    callback: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["projectTree", projectData?._key],
+      });
+    },
+  });
+
+  useSocketListener({
+    event: "sync_error",
+    callback: (data) => {
+      console.error("Sync error:", data);
     },
   });
   const [tabValue, setTabValue] = useState("docs");
