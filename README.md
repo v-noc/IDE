@@ -3,7 +3,7 @@
 
 **A code editor that shows you how your code *works*, not just where it's saved.**
 
-**Community & Support:** Join our Discord — [discord.gg/NKhbU9gf](https://discord.gg/NKhbU9gf)
+**Community & Support:** Join our Discord — [discord.gg/NKhbU9gf](https://discord.gg/J5nfPHqyBr)
 
 ![V-NOC](/assets/logs.png)
 
