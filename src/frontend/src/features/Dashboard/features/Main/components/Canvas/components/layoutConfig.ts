@@ -5,10 +5,10 @@
 
 export const LAYOUT_CONFIG = {
   // Horizontal spacing between levels (left to right)
-  LEVEL_SPACING_X: 450,
+  LEVEL_SPACING_X: 250,
 
   // Vertical spacing between siblings
-  SPACING_Y: 180,
+  SPACING_Y: 90,
 
   // Starting position for the root node
   ROOT_X: -420,

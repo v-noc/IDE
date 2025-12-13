@@ -107,6 +107,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
         onInit={onInit}
         onNodeDoubleClick={onNodeDoubleClick}
         nodesDraggable={true}
+        minZoom={0.01}
         nodesConnectable={false}
         elementsSelectable={true}
         fitView

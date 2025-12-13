@@ -3177,6 +3177,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/dagre@npm:^0":
+  version: 0.7.53
+  resolution: "@types/dagre@npm:0.7.53"
+  checksum: 10c0/c2311e2c6f819e0c15531d265bde6359b131ca9788e323b4cf80feb03ecf4cdd442698a1dac35eed5bb43c5fffd575eb28fc2d3c5163936756dac5183ff3af43
+  languageName: node
+  linkType: hard
+
 "@types/debug@npm:^4.0.0":
   version: 4.1.12
   resolution: "@types/debug@npm:4.1.12"
@@ -4318,6 +4325,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"dagre@npm:^0.8.5":
+  version: 0.8.5
+  resolution: "dagre@npm:0.8.5"
+  dependencies:
+    graphlib: "npm:^2.1.8"
+    lodash: "npm:^4.17.15"
+  checksum: 10c0/1c021b66961aa9a700bb6ec51747bcc214720a661ad6cb1878eab7316ecb550a759664a6754081a315b37d0355e3c19ff162813b36f20cbeb2e37f7440364d62
+  languageName: node
+  linkType: hard
+
 "date-fns-jalali@npm:^4.1.0-0":
   version: 4.1.0-0
   resolution: "date-fns-jalali@npm:4.1.0-0"
@@ -4954,6 +4971,7 @@ __metadata:
     "@tailwindcss/vite": "npm:^4.1.11"
     "@tanstack/react-query": "npm:^5.83.0"
     "@tanstack/react-virtual": "npm:^3.13.12"
+    "@types/dagre": "npm:^0"
     "@types/hast": "npm:^3.0.4"
     "@types/node": "npm:^24.1.0"
     "@types/react": "npm:^19.1.8"
@@ -4964,6 +4982,7 @@ __metadata:
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
     cmdk: "npm:^1.1.1"
+    dagre: "npm:^0.8.5"
     date-fns: "npm:^4.1.0"
     eslint: "npm:^9.30.1"
     eslint-plugin-react-hooks: "npm:^5.2.0"
@@ -5107,6 +5126,15 @@ __metadata:
   version: 1.4.0
   resolution: "graphemer@npm:1.4.0"
   checksum: 10c0/e951259d8cd2e0d196c72ec711add7115d42eb9a8146c8eeda5b8d3ac91e5dd816b9cd68920726d9fd4490368e7ed86e9c423f40db87e2d8dfafa00fa17c3a31
+  languageName: node
+  linkType: hard
+
+"graphlib@npm:^2.1.8":
+  version: 2.1.8
+  resolution: "graphlib@npm:2.1.8"
+  dependencies:
+    lodash: "npm:^4.17.15"
+  checksum: 10c0/41c525e4d91a6d8b4e8da1883bf4e85689a547e908557ccc53f64db9141bdfb351b9162a79f13cae81c5b3a410027f59e4fc1edc1ea442234ec08e629859b188
   languageName: node
   linkType: hard
 
@@ -5824,6 +5852,13 @@ __metadata:
   version: 4.6.2
   resolution: "lodash.merge@npm:4.6.2"
   checksum: 10c0/402fa16a1edd7538de5b5903a90228aa48eb5533986ba7fa26606a49db2572bf414ff73a2c9f5d5fd36b31c46a5d5c7e1527749c07cbcf965ccff5fbdf32c506
+  languageName: node
+  linkType: hard
+
+"lodash@npm:^4.17.15":
+  version: 4.17.21
+  resolution: "lodash@npm:4.17.21"
+  checksum: 10c0/d8cbea072bb08655bb4c989da418994b073a608dffa608b09ac04b43a791b12aeae7cd7ad919aa4c925f33b48490b5cfe6c1f71d827956071dae2e7bb3a6b74c
   languageName: node
   linkType: hard
 

@@ -260,7 +260,7 @@ const EnhancedNode: React.FC<{ data: EnhancedNodeData }> = ({ data }) => {
             </div>
           </div>
           <div
-            className="h-[300px] overflow-hidden border-b"
+            className="h-[300px] mt-1 overflow-hidden border-b"
             style={{ borderColor: data.borderColor }}
           >
             <CodeEditor
