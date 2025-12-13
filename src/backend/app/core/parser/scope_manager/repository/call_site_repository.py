@@ -161,7 +161,10 @@ class CallSiteRepository:
         """Delete all call sites originating from the given scope."""
         self.conn.execute(
             """
-            MATCH (s:Scope {id: $id})-[:HAS_CALL_SITE]->(cs:CallSite)
+            MATCH (s:Scope {id: $id})-[:HAS_CALL_SITE]->(root:CallSite)
+            WHERE NOT EXISTS { MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(root) }
+            MATCH path = (root)-[:NEXT_IN_CHAIN*0..]->(cs:CallSite)
+            WITH DISTINCT cs
             DETACH DELETE cs
             """,
             {"id": scope_id}
@@ -233,4 +236,3 @@ class CallSiteRepository:
                 )
             )
         return roots
-

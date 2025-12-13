@@ -112,59 +112,59 @@ class NodeRepository(BaseRepository[T]):
         # skip virtual nodes (e.g., group) and attach children to the nearest
         # non-excluded ancestor while still traversing through excluded nodes.
         query = """
-            // 1. Setup Start Node
-            LET start_node = DOCUMENT(@start_node_id)
-            LET start_ver = start_node.current_version != null ? start_node.current_version : 0
+    // 1. Setup Start Node
+    LET start_node = DOCUMENT(@start_node_id)
+    LET start_ver = start_node.current_version != null ? start_node.current_version : 0
 
-            FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id
-                @@contains_collection
-                OPTIONS { order: "bfs", uniqueVertices: "global" }
+    FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id
+        @@contains_collection
+        
+        // --- FIX IS HERE ---
+        // PRUNE must be here (before loop body LETs).
+        // We must inline the logic because 'immediate_parent' is not defined yet.
+        PRUNE (
+            (v.current_version != null ? v.current_version : 0) 
+            < 
+            (LENGTH(p.vertices) >= 2 
+                ? (p.vertices[-2].current_version != null ? p.vertices[-2].current_version : 0)
+                : start_ver
+            )
+        )
+        
+        OPTIONS { order: "bfs", uniqueVertices: "global" }
 
-                // 2. GET IMMEDIATE PARENT (The node strictly above 'v' in the path)
-                // If we are at depth 1, the parent is the start_node.
-                // If we are deeper, it is the second-to-last vertex in the path.
-                LET immediate_parent = LENGTH(p.vertices) >= 2 ? p.vertices[-2] : start_node
+        // 2. GET IMMEDIATE PARENT (For Output/Calculations)
+        LET immediate_parent = LENGTH(p.vertices) >= 2 ? p.vertices[-2] : start_node
+        LET imm_parent_ver = immediate_parent.current_version != null ? immediate_parent.current_version : 0
+        
+        // 3. (Optional) Re-check Edge Version if needed for specific logic
+        FILTER (e.version != null ? e.version : 0) >= imm_parent_ver
 
-                // 3. GET VERSIONS
-                LET imm_parent_ver = immediate_parent.current_version != null ? immediate_parent.current_version : 0
-                LET v_ver = v.current_version != null ? v.current_version : 0
+        // 4. OUTPUT CALCULATIONS
+        LET parent_candidates = (
+            FOR i IN 2..LENGTH(p.vertices)
+                LET candidate = p.vertices[LENGTH(p.vertices) - i]
+                FILTER candidate.node_type NOT IN @exclude_types
+                LIMIT 1
+                RETURN candidate._id
+        )
 
+        // 5. EXCLUDE TYPES FROM OUTPUT
+        FILTER v.node_type NOT IN @exclude_types
 
+        // 6. TARGET LOGIC
+        LET target_node = (
+            FOR target IN 1..1 OUTBOUND v @@targets_collection
+                LIMIT 1
+                RETURN target
+        )
 
-                // 5. FILTER CURRENT NODE
-                // We also hide this specific node from results.
-                FILTER v_ver >= imm_parent_ver
-
-                // (Optional) If edges act as the "pointer" update, check edge version too
-                FILTER (e.version != null ? e.version : 0) >= imm_parent_ver
-
-                // 6. OUTPUT CALCULATIONS
-                // Now that we know the PATH is valid, we calculate who the "Logical Parent" is
-                // (This is purely for your JSON output, NOT for validity checks)
-                LET parent_candidates = (
-                    FOR i IN 2..LENGTH(p.vertices)
-                        LET candidate = p.vertices[LENGTH(p.vertices) - i]
-                        FILTER candidate.node_type NOT IN @exclude_types
-                        LIMIT 1
-                        RETURN candidate._id
-                )
-
-                // 7. EXCLUDE TYPES FROM OUTPUT (But keep traversing through them if valid)
-                FILTER v.node_type NOT IN @exclude_types
-
-                // 8. TARGET LOGIC (Unchanged)
-                LET target_node = (
-                    FOR target IN 1..1 OUTBOUND v @@targets_collection
-                        LIMIT 1
-                        RETURN target
-                )
-
-                RETURN {
-                    "vertex": v,
-                    "parent_id": FIRST(parent_candidates), // For UI/Structure
-                    "target": FIRST(target_node)
-                }
-        """
+        RETURN {
+            "vertex": v,
+            "parent_id": FIRST(parent_candidates),
+            "target": FIRST(target_node)
+        }
+"""
         bind_vars = {
             "start_node_id": start_node_id,
             "@contains_collection": "contains_edges",

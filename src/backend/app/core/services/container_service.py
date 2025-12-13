@@ -134,7 +134,7 @@ class ContainerService:
             if not parent_id:
                 break
             current_id = parent_id
-        print(f"file_doc: {file_doc}")
+
         if project_doc is None:
             project_doc = self.repos.nodes.get_parent_project(
                 file_doc.get("_id"))

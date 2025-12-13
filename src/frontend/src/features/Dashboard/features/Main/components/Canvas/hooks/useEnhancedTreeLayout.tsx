@@ -75,7 +75,7 @@ export const useEnhancedTreeLayout = ({
 
     // 2. Recursive Traversal to build the Graph Data (Nodes/Edges)
     const traverse = (node: SimpleTreeNode) => {
-      const nodeId = node.target ? node.target._key : node._key;
+      const nodeId = node._key;
 
       // Prepare Node Data
       const nodeStyle = getNodeStyle(node as unknown as ContainerNodeTree);
@@ -118,9 +118,7 @@ export const useEnhancedTreeLayout = ({
       if (isExpanded(nodeId) && node.children && node.children.length > 0) {
         node.children.forEach((child: AnyNodeTree) => {
           const simpleChild = child as unknown as SimpleTreeNode;
-          const childId = simpleChild.target
-            ? simpleChild.target._key
-            : simpleChild._key;
+          const childId = simpleChild._key;
 
           // Create Edge
           edges.push({
