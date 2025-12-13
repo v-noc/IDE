@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { NodeMetadata } from "./EnhancedNode";
+import type { NodeMetadata } from "../components/EnhancedNode";
 import type { BaseNode } from "@/types/project";
 
 /**
@@ -23,4 +23,3 @@ export const useNodeMetadata = (
     [code, description, node?.created_at, node?.name, node?.updated_at]
   );
 };
-

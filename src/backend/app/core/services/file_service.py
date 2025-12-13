@@ -38,20 +38,10 @@ class FileService(ContainerService):
         if node_type == "file":
             file_doc = self.repos.file_repo.get_by_id(full_id)
             project_doc = self.repos.nodes.get_parent_project(full_id)
-        else:
-            file_doc, project_doc = self._resolve_file_and_project(full_id)
 
-        # Non-file nodes must have enclosing file and project
-        if not file_doc or not project_doc:
-            return {"success": False, "error": "Enclosing file or project not found"}
+            abs_path = self._build_abs_file_path(
+                project_doc.get("path"), file_doc.path)
 
-        abs_path = self._build_abs_file_path(
-            project_doc.get("path"), file_doc.path)
-
-        # Load typed node to obtain position
-        typed_node = self.repos.nodes.get_by_id(full_id)
-        position: Optional[object] = getattr(typed_node, "position", None)
-        if position is None:
             # Fallback: overwrite full file if no position
             try:
                 with open(abs_path, "w", encoding="utf-8") as f:
@@ -59,44 +49,54 @@ class FileService(ContainerService):
                 return {"success": True}
             except IOError as e:
                 return {"success": False, "error": str(e)}
+        else:
+            file_doc, project_doc = self._resolve_file_and_project(full_id)
+            if not file_doc or not project_doc:
+                return {"success": False, "error": "Enclosing file or project not found"}
 
-        # Replace code slice defined by CodePosition
-        try:
-            with open(abs_path, "r+", encoding="utf-8") as f:
-                lines = f.readlines()
+            abs_path = self._build_abs_file_path(
+                project_doc.get("path"), file_doc.get("path"))
 
-                start_line = max(1, position.line_no) - 1
-                end_line = position.end_line_no
-                start_col = max(0, position.col_offset)
-                end_col = position.end_col_offset
+            typed_node = self.repos.nodes.get_by_id(full_id)
+            position: Optional[object] = getattr(typed_node, "position", None)
 
-                # Build replacement lines with indentation preserved from start column
-                prefix = lines[start_line][:start_col] if 0 <= start_line < len(
-                    lines) else ""
-                new_lines = [
-                    (prefix + l if i > 0 else (prefix + l))
-                    for i, l in enumerate(code_block.splitlines(True))
-                ]
+            # Replace code slice defined by CodePosition
+            try:
+                with open(abs_path, "r+", encoding="utf-8") as f:
+                    lines = f.readlines()
 
-                if end_line is None:
-                    # Replace from start_line to end of file
-                    lines[start_line:] = new_lines
-                else:
-                    # If selection ends mid-line, keep tail after end_col
-                    tail = ""
-                    if 0 <= (end_line - 1) < len(lines) and end_col is not None:
-                        original = lines[end_line - 1]
-                        tail = original[end_col:]
-                    lines[start_line:end_line] = new_lines
-                    if tail:
-                        lines.insert(start_line + len(new_lines), tail)
+                    start_line = max(1, position.line_no) - 1
+                    end_line = position.end_line_no
+                    start_col = max(0, position.col_offset)
+                    end_col = position.end_col_offset
 
-                f.seek(0)
-                f.writelines(lines)
-                f.truncate()
-            return {"success": True}
-        except IOError as e:
-            return {"success": False, "error": str(e)}
+                    # Build replacement lines with indentation preserved from start column
+                    prefix = lines[start_line][:start_col] if 0 <= start_line < len(
+                        lines) else ""
+                    new_lines = [
+                        (prefix + l if i > 0 else (prefix + l))
+                        for i, l in enumerate(code_block.splitlines(True))
+                    ]
+
+                    if end_line is None:
+                        # Replace from start_line to end of file
+                        lines[start_line:] = new_lines
+                    else:
+                        # If selection ends mid-line, keep tail after end_col
+                        tail = ""
+                        if 0 <= (end_line - 1) < len(lines) and end_col is not None:
+                            original = lines[end_line - 1]
+                            tail = original[end_col:]
+                        lines[start_line:end_line] = new_lines
+                        if tail:
+                            lines.insert(start_line + len(new_lines), tail)
+
+                    f.seek(0)
+                    f.writelines(lines)
+                    f.truncate()
+                return {"success": True}
+            except IOError as e:
+                return {"success": False, "error": str(e)}
 
     def get(self, file_id: str):
         return self.repos.file_repo.get_by_id(file_id)

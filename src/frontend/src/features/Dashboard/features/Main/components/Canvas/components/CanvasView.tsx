@@ -28,13 +28,8 @@ const fitViewOptions: FitViewOptions = {
 
 const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
   void _projectId;
-  const {
-    selectedNode,
-    expandedNodeIds,
-    toggleNodeExpansion,
-    setSelectedNode,
-    projectData,
-  } = useProjectStore();
+  const { selectedNode, expandedNodeIds, toggleNodeExpansion, projectData } =
+    useProjectStore();
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -62,6 +57,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
   React.useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
+    console.log(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const nodeTypes = useMemo(() => ({ enhanced: EnhancedNode }), []);

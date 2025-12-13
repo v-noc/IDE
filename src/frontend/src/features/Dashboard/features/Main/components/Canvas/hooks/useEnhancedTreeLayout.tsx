@@ -32,15 +32,12 @@ export const useEnhancedTreeLayout = ({
   expandedNodeIds,
   toggleNodeExpansion,
   nodeMetadataMap,
-  layoutConfig,
+  layoutConfig: _layoutConfig,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
 
-  // Merge user config with defaults
-  const config = useMemo(
-    () => ({ ...LAYOUT_CONFIG, ...layoutConfig }),
-    [layoutConfig]
-  );
+  // TODO: Use layoutConfig for dagre spacing configuration if needed
+  void _layoutConfig;
 
   return useMemo(() => {
     if (!centerNode) {
@@ -168,12 +165,13 @@ export const useEnhancedTreeLayout = ({
       };
     });
 
-    return { initialNodes: layoutedNodes, initialEdges: edges };
-  }, [
-    centerNode,
-    expandedNodeIds,
-    metadataMap,
-    toggleNodeExpansion,
-    config, // Dependencies
-  ]);
+    // 5. Filter edges to only include those where both source and target nodes exist
+    // This prevents "orphaned" edges when nodes are collapsed/removed
+    const nodeIds = new Set(layoutedNodes.map((node) => node.id));
+    const validEdges = edges.filter(
+      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
+    );
+
+    return { initialNodes: layoutedNodes, initialEdges: validEdges };
+  }, [centerNode, expandedNodeIds, metadataMap, toggleNodeExpansion]);
 };
