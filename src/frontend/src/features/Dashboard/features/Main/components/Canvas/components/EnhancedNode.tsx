@@ -79,7 +79,9 @@ const EnhancedNode: React.FC<{ data: EnhancedNodeData }> = ({ data }) => {
       ? data.target._key
       : data.nodeId || "";
 
-  const { data: codeData } = useEditorCode(effectiveNodeId);
+  const { data: codeData } = useEditorCode(
+    showCode ? effectiveNodeId : undefined
+  );
   const {
     editorValue,
     hasChanges,
