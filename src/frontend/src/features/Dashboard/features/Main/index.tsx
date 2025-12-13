@@ -239,7 +239,7 @@ const MainCanvas = () => {
                 value="docs"
                 className="flex flex-col overflow-hidden bg-white border-t"
               >
-                <div className="flex-1  pl-8  overflow-hidden">
+                <div className="flex-1  overflow-hidden">
                   <div className="h-full pt-2 w-full overflow-auto ">
                     <Documents
                       key={selectedDocument?._key || "new"}
@@ -267,8 +267,8 @@ const MainCanvas = () => {
                 value="canvas"
                 className="flex flex-col overflow-hidden bg-white border-t"
               >
-                <div className="flex-1  pl-8  overflow-hidden">
-                  <div className="h-full pt-2 w-full overflow-auto ">
+                <div className="flex-1    overflow-hidden">
+                  <div className="h-full w-full overflow-auto ">
                     <Canvas />
                   </div>
                 </div>

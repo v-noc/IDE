@@ -1,6 +1,6 @@
 import React from "react";
 import { ReactFlowProvider } from "@xyflow/react";
-import CanvasView from "./view/CanvasView";
+import CanvasView from "./components/CanvasView";
 // import useProjectStore from "@/features/Dashboard/store/useProjectStore";,
 
 interface CanvasProps {
