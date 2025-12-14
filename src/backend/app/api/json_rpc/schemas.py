@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional, List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LogEventType(str, Enum):
@@ -48,7 +48,7 @@ class RegisterLogsParams(BaseModel):
     error: Optional[Dict[str, Any]] = Field(
         None, description="Error details for 'error' events"
     )
-    parent_function_id: Optional[str] = Field(
+    function_id: Optional[str] = Field(
         None, description="Parent function ID"
     )
 

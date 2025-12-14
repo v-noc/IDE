@@ -1,10 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from typing import List
 
 import fastapi_jsonrpc as jsonrpc
 from fastapi import Depends, Body
 
-from .schemas import RegisterLogsParams, RegisterLogsResult
+from .schemas import RegisterLogsBatchParams, RegisterLogsParams, RegisterLogsResult
 from .dependencies import (
     get_function,
     get_project,
@@ -42,20 +43,19 @@ api_v1_logs = jsonrpc.Entrypoint(
 
 
 @api_v1_logs.method()
-def register_logs(
-    params: RegisterLogsParams = Body(...),
+def register_logs_batch(
+    params: RegisterLogsBatchParams = Body(...),
     project=Depends(get_project),
     log_service=Depends(get_log_service),
 ) -> RegisterLogsResult:
 
     # For now, simply acknowledge receipt. Integrations can be added later.
-
     if project is None:
         raise ProjectNotFoundError
 
     try:
 
-        _ = log_service.create_batch(params)
+        _ = log_service.create_batch(params.logs)
     except Exception as ex:
         print(ex)
 

@@ -214,10 +214,11 @@ class LogRepository(BaseRepository[LogNode]):
         errors = [{"index": 0, "message": "..."}]
         """
         # Convert models to dicts
-        docs = [log.model_dump(by_alias=True) for log in logs]
+
+        docs = [log.model_dump(by_alias=True, mode='json') for log in logs]
 
         # Use insert_many which is much faster than loops
-        # return_new=True gives us back the docs with their new _id and _key
+
         result = self.db.collection("logs").insert_many(docs, return_new=True)
 
         # Wrap results back into Pydantic models
