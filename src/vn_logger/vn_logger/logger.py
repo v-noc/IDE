@@ -138,7 +138,7 @@ def context_logger(
                     # Get the parent's static ID from the context
                     parent_function_id = parent_function_id_var.get()
 
-                    parent_log_id = active_parent_log_id_var.get()
+                    active_parent_log_id = active_parent_log_id_var.get()
 
                     current_entry_log_id = str(uuid.uuid4())
 
@@ -155,6 +155,7 @@ def context_logger(
                         function_id=function_id,
                         chain_id=chain_id,
                         parent_function_id=parent_function_id,
+                        active_parent_log_id=active_parent_log_id,
                         function_name=func.__name__,
                     ):
 
@@ -176,7 +177,7 @@ def context_logger(
                                 event_type="enter",
                                 extra={
                                     "log_id": current_entry_log_id,
-                                    "parent_log_id": parent_log_id
+                                    "parent_log_id": active_parent_log_id
                                 },
                                 args=serialized_args,
                                 kwargs=serialized_kwargs,
