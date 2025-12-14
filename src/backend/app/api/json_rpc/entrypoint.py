@@ -45,8 +45,6 @@ api_v1_logs = jsonrpc.Entrypoint(
 def register_logs(
     params: RegisterLogsParams = Body(...),
     project=Depends(get_project),
-    parent_function=Depends(get_parent_function),
-    function=Depends(get_function),
     log_service=Depends(get_log_service),
 ) -> RegisterLogsResult:
 
@@ -54,13 +52,10 @@ def register_logs(
 
     if project is None:
         raise ProjectNotFoundError
-    if function is None:
-        raise FunctionNotFoundError
+
     try:
-        # Persist log and edges (derive parent via parent_function + chain_id)
-        parent_function_id = parent_function.id if parent_function else None
-        created_log = log_service.create(
-            function.id, params, parent_function_id)
+
+        _ = log_service.create_batch(params)
     except Exception as ex:
         print(ex)
 

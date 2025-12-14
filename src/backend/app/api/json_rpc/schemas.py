@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,12 @@ class RegisterLogsParams(BaseModel):
 
     chain_id: Optional[str] = Field(
         None, description="Chain ID"
+    )
+    id: Optional[str] = Field(
+        None, description="Log ID"
+    )
+    parent_log_id: Optional[str] = Field(
+        None, description="Parent log ID"
     )
     timestamp: datetime = Field(
         ..., description="Log timestamp (ISO 8601)"
@@ -42,9 +48,25 @@ class RegisterLogsParams(BaseModel):
     error: Optional[Dict[str, Any]] = Field(
         None, description="Error details for 'error' events"
     )
+    parent_function_id: Optional[str] = Field(
+        None, description="Parent function ID"
+    )
+
+
+class RegisterLogsBatchParams(BaseModel):
+    """Batch endpoint params - list of individual logs."""
+    logs: List[RegisterLogsParams]
 
 
 class RegisterLogsResult(BaseModel):
     """Minimal result placeholder for register_logs."""
 
     ok: bool = Field(..., description="Operation acknowledgement")
+
+
+class RegisterLogsBatchResult(BaseModel):
+    ok: bool
+    total: int
+    succeeded: int
+    failed: int
+    errors: Optional[List[dict]] = None  #
