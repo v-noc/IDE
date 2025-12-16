@@ -1,4 +1,5 @@
 # app/db/repositories.py
+import asyncio
 from typing import (
     TypeVar,
     Generic,
@@ -59,6 +60,59 @@ class BaseRepository(Generic[T]):
             self.adapter = TypeAdapter(model)
         else:
             self.adapter = None
+
+    async def _get_edge_collections(self) -> List[str]:
+        """
+        Get list of edge collection names (cached).
+
+        Optimization: Cache this result since edge collections rarely change.
+        """
+        if hasattr(self, '_edge_collections_cache'):
+            return self._edge_collections_cache
+
+        # Get all collections
+        all_collections = await self.db.collections()
+
+        # Filter for edge collections (concurrently check properties)
+        edge_cols = []
+        tasks = []
+
+        for col_info in all_collections:
+            if not col_info.get("system"):
+                tasks.append(self._is_edge_collection(col_info["name"]))
+
+        results = await asyncio.gather(*tasks)
+
+        edge_cols = [
+            all_collections[i]["name"]
+            for i, is_edge in enumerate(results)
+            if is_edge
+        ]
+
+        # Cache for performance
+        self._edge_collections_cache = edge_cols
+        return edge_cols
+
+    async def _delete_edges_for_node(self, edge_collection: str, node_id: str):
+        """Delete all edges connected to a node from a specific collection."""
+        query = """
+        FOR e IN @@collection
+            FILTER e._from == @node_id OR e._to == @node_id
+            REMOVE e IN @@collection
+        """
+        await self.db.aql.execute(
+            query,
+            bind_vars={"@collection": edge_collection, "node_id": node_id}
+        )
+
+    async def _is_edge_collection(self, col_name: str) -> bool:
+        """Check if a collection is an edge collection."""
+        try:
+            col = await self.db.collection(col_name)
+            props = await col.properties()
+            return bool(props.get("edge", False))
+        except Exception:
+            return False
 
     async def get_collection(self) -> StandardCollection:
         """Lazy-load collection handle asynchronously."""
@@ -276,14 +330,16 @@ class BaseRepository(Generic[T]):
         """Batch create multiple documents."""
         if not entities:
             return []
+
+        # Serialize all (sync, in-memory)
         dumps = [
             e.model_dump(by_alias=True, exclude_none=True, mode="json")
             for e in entities
         ]
+        # Batch insert (async, single call)
         collection = await self.get_collection()
         results = await collection.insert_many(
             dumps,
-            return_new=True,
-            overwrite=True,
+            return_new=True
         )
         return [self._validate(r["new"]) for r in results]
