@@ -23,6 +23,7 @@ dependencies = [
   "jedi>=0.19.2",
   "pyvis>=0.3.2",
   "python-socketio>=5.15.0",
+  "python-arango-async>=1.0.3",
 ]
 
 [project.optional-dependencies]
