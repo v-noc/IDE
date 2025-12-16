@@ -158,3 +158,46 @@ class LogService:
             return self.get_call_log(call.id)
 
         return []
+
+    def create_batch(self, batch_params: List["RegisterLogsParams"]):
+
+        log_docs = []
+        log_edges = []
+        func_edges = []
+
+        for p in batch_params:
+            print(p.timestamp)
+            # Assuming 'p' is a dict or RegisterLogsParams object
+            # Adapt this extraction based on your exact input format
+            log_docs.append(LogNode(
+                key=f"{p.id}",
+                timestamp=p.timestamp,
+                event_type=p.event_type,
+                message=p.message,
+                level_name=p.level_name,
+                duration_ms=p.duration_ms,
+                chain_id=p.chain_id,
+                payload=p.payload,
+                result=p.result,
+                error=p.error,
+            ))
+
+            func_edges.append({
+                "from_id": f"logs/{p.id}",
+                "to_id": f"nodes/{p.function_id}",
+            })
+            if p.parent_log_id:
+                log_edges.append({
+                    "from_id": f"logs/{p.id}",
+                    "to_id": f"logs/{p.parent_log_id}"
+                })
+            print(f"Log edge {p.id} -> {p.parent_log_id}")
+
+        # 2. Bulk Insert Logs (One DB Call)
+        # We get back objects with valid .id properties
+        self.repos.log_repo.create_batch(log_docs)
+
+        self.repos.log_repo.create_batch_edges(func_edges, "log_to_function")
+        self.repos.log_repo.create_batch_edges(log_edges, "log_to_log")
+
+        return True
