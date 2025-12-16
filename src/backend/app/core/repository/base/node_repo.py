@@ -205,10 +205,10 @@ class NodeRepository(BaseRepository[T]):
         }
         cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
         # Buffer all results (for backwards compatibility)
-        results = []
-        async for doc in cursor:
-            results.append(doc)
-        return results[0] if results else {"file": None, "project": None}
+
+        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+        result = await cursor.next() if cursor else None
+        return result or {"file": None, "project": None}
 
     async def find_by_qname(self, qname: str) -> Optional[T]:
         return await self.find_one({"qname": qname})
