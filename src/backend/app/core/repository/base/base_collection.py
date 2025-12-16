@@ -11,9 +11,9 @@ from typing import (
     get_origin,
 )
 from pydantic import BaseModel, TypeAdapter
-from arango.database import StandardDatabase
-from arango.collection import StandardCollection
-from arango.exceptions import DocumentGetError
+from arangoasync.database import AsyncDatabase
+from arangoasync.collection import StandardCollection
+from arangoasync.exceptions import DocumentGetError
 from datetime import datetime, timezone
 
 T = TypeVar("T", bound=BaseModel)
@@ -24,7 +24,7 @@ class BaseRepository(Generic[T]):
 
     def __init__(
         self,
-        db: StandardDatabase,
+        db: AsyncDatabase,
         collection_name: str,
         model: Union[Type[T], TypeAdapter[T]],
         is_edge: bool = False,
@@ -54,17 +54,16 @@ class BaseRepository(Generic[T]):
 
             }
         )
-        self._ensure_collection()
         # Handle discriminated unions
         if get_origin(model) is Union or hasattr(model, "__metadata__"):
             self.adapter = TypeAdapter(model)
         else:
             self.adapter = None
 
-    @property
-    def collection(self) -> StandardCollection:
+    async def get_collection(self) -> StandardCollection:
+        """Lazy-load collection handle asynchronously."""
         if self._collection is None:
-            self._collection = self._ensure_collection()
+            self._collection = await self._ensure_collection()
         return self._collection
 
     def _validate(self, doc: Dict[str, Any]) -> T:
@@ -72,9 +71,10 @@ class BaseRepository(Generic[T]):
             return self.adapter.validate_python(doc)
         return self.model.model_validate(doc)
 
-    def _ensure_collection(self) -> StandardCollection:
-        if self.db.has_collection(self.collection_name):
-            collection = self.db.collection(self.collection_name)
+    async def _ensure_collection(self) -> StandardCollection:
+        has_collection = await self.db.has_collection(self.collection_name)
+        if has_collection:
+            collection = await self.db.collection(self.collection_name)
             is_existing_edge = bool(collection.properties().get("edge", False))
 
             # CRITICAL: Check for type mismatch and
@@ -90,7 +90,7 @@ class BaseRepository(Generic[T]):
                     )
                 )
         else:
-            collection = self.db.create_collection(
+            collection = await self.db.create_collection(
                 self.collection_name,
                 edge=self.is_edge,
                 **self.key_options,  # This unpacks the dict
@@ -99,8 +99,7 @@ class BaseRepository(Generic[T]):
         # Apply indexes
         for index_spec in self.indexes:
             try:
-                # Add logging here if you have a logger configured
-                collection.add_hash_index(
+                await collection.add_hash_index(
                     fields=index_spec["fields"],
                     unique=index_spec.get("unique", False),
                 )
@@ -113,27 +112,30 @@ class BaseRepository(Generic[T]):
 
         return collection
 
-    def get_by_key(self, key: str) -> Optional[T]:
+    async def get_by_key(self, key: str) -> Optional[T]:
         try:
-            doc = self.collection.get(key)
+            collection = await self.get_collection()
+            doc = await collection.get(key)
             return self._validate(doc) if doc else None
         except DocumentGetError:
             return None
 
-    def get_raw_by_key(self, key: str) -> Optional[Dict[str, Any]]:
+    async def get_raw_by_key(self, key: str) -> Optional[Dict[str, Any]]:
         """Retrieves a document by its key without Pydantic validation."""
-        return self.collection.get(key)
+        collection = await self.get_collection()
+        return await collection.get(key)
 
-    def get_by_id(self, doc_id: str) -> Optional[T]:
+    async def get_by_id(self, doc_id: str) -> Optional[T]:
         """Get by full document ID (collection/key)."""
         key = doc_id.split("/")[-1] if "/" in doc_id else doc_id
-        return self.get_by_key(key)
+        return await self.get_by_key(key)
 
-    def create(self, entity: T, sync: bool = False) -> T:
+    async def create(self, entity: T, sync: bool = False) -> T:
         """Create a document and return the newly created version."""
         dump = entity.model_dump(by_alias=True, exclude_none=True, mode="json")
         # Get the full created document back in one call
-        meta = self.collection.insert(
+        collection = await self.get_collection()
+        meta = await collection.insert(
             dump,
             return_new=True,
             overwrite=True,
@@ -141,7 +143,7 @@ class BaseRepository(Generic[T]):
         )
         return self._validate(meta["new"])
 
-    def update(self, key: str, entity: T) -> T:
+    async def update(self, key: str, entity: T) -> T:
         """Update a document and return the newly updated version."""
         dump = entity.model_dump(
             by_alias=True,
@@ -160,47 +162,117 @@ class BaseRepository(Generic[T]):
             "_key": key,
             **dump,
         }
-        meta = self.collection.update(
+        collection = await self.get_collection()
+        meta = await collection.update(
             document,
             return_new=True,
 
         )
         return self._validate(meta["new"])
 
-    def delete(self, key: str) -> bool:
+    async def delete(self, key: str) -> bool:
         try:
-            self.collection.delete(key)
+            collection = await self.get_collection()
+            await collection.delete(key)
             return True
         except DocumentGetError:
             return False
 
-    def find(
+    async def find(
         self,
         filters: Dict[str, Any],
         limit: Optional[int] = None,
     ) -> List[T]:
-        cursor = self.collection.find(
+        collection = await self.get_collection()
+        cursor = await collection.find(
             filters,
             limit=limit,
         )
-        return [self._validate(doc) for doc in cursor]
+        results = []
+        async for doc in cursor:
+            results.append(self._validate(doc))
 
-    def find_one(self, filters: Dict[str, Any]) -> Optional[T]:
-        results = self.find(filters, limit=1)
+        return results
+
+    async def find_stream(
+        self,
+        filters: Dict[str, Any],
+        limit: Optional[int] = None,
+        batch_size: int = 1000
+    ):
+        """
+        Stream documents as async generator (memory-efficient).
+
+        Usage:
+            async for document in repo.find_stream({...}):
+                process(document)
+
+        Benefits:
+            - Constant memory usage
+            - Can start processing before query completes
+            - Supports backpressure
+        """
+        collection = await self.get_collection()
+        cursor = await collection.find(
+            filters,
+            limit=limit,
+            batch_size=batch_size  # Fetch in batches
+        )
+
+        async for doc in cursor:
+            yield self._validate(doc)  # Yield one at a time
+
+    async def find_one(self, filters: Dict[str, Any]) -> Optional[T]:
+        results = await self.find(filters, limit=1)
         return results[0] if results else None
 
-    def aql(
+    async def aql(
         self,
         query: str,
         bind_vars: Optional[Dict[str, Any]] = None,
+        batch_size: int = 1000
     ) -> List[T]:
-        cursor = self.db.aql.execute(
+        """
+        Execute AQL query (buffers all results).
+
+        For large results, use aql_stream() instead.
+        """
+        cursor = await self.db.aql.execute(
             query,
             bind_vars=bind_vars or {},
+            batch_size=batch_size
         )
-        return [self._validate(doc) for doc in cursor]
 
-    def bulk_create(self, entities: List[T]) -> List[T]:
+        results = []
+        async for doc in cursor:
+            results.append(self._validate(doc))
+
+        return results
+
+    async def aql_stream(
+        self,
+        query: str,
+        bind_vars: Optional[Dict[str, Any]] = None,
+        batch_size: int = 1000
+    ):
+        """
+        Stream AQL query results.
+
+        Example:
+            query = "FOR doc IN some_collection FILTER doc.x > @value RETURN doc"
+            async for result in repo.aql_stream(query, {"value": 10}):
+                await process(result)
+        """
+        cursor = await self.db.aql.execute(
+            query,
+            bind_vars=bind_vars or {},
+            batch_size=batch_size
+        )
+
+        async for doc in cursor:
+            yield self._validate(doc)
+
+    async def bulk_create(self, entities: List[T]) -> List[T]:
         """Batch create multiple documents."""
         if not entities:
             return []
@@ -208,7 +280,8 @@ class BaseRepository(Generic[T]):
             e.model_dump(by_alias=True, exclude_none=True, mode="json")
             for e in entities
         ]
-        results = self.collection.insert_many(
+        collection = await self.get_collection()
+        results = await collection.insert_many(
             dumps,
             return_new=True,
             overwrite=True,
