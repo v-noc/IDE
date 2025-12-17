@@ -11,6 +11,7 @@ from typing import (
     Union,
     get_origin,
 )
+from arangoasync.typings import CollectionType, KeyOptions
 from pydantic import BaseModel, TypeAdapter
 from arangoasync.database import AsyncDatabase
 from arangoasync.collection import StandardCollection
@@ -29,8 +30,7 @@ class BaseRepository(Generic[T]):
         collection_name: str,
         model: Union[Type[T], TypeAdapter[T]],
         is_edge: bool = False,
-        indexes: Optional[List[Dict[str, Any]]] = None,
-        key_options: Optional[Dict[str, Any]] = None,
+        indexes: Optional[List[Dict[str, Any]]] = None
     ):
         self.db = db
         self.collection_name = collection_name
@@ -45,15 +45,9 @@ class BaseRepository(Generic[T]):
         self._collection: Optional[StandardCollection] = None
         # Configure ArangoDB key generation options. Default to UUID keys while
         # still allowing user-provided keys.
-        self.key_options: Dict[str, Any] = (
-            key_options
-            or config.get("arango_key_options")
-            or {
-
-                "key_generator": "uuid",
-                "user_keys": True,
-
-            }
+        self.key_options: KeyOptions = KeyOptions(
+            allow_user_keys=True,
+            generator_type="uuid"
         )
         # Handle discriminated unions
         if get_origin(model) is Union or hasattr(model, "__metadata__"):
@@ -144,18 +138,20 @@ class BaseRepository(Generic[T]):
                     )
                 )
         else:
+            collection_type = CollectionType.EDGE if self.is_edge else CollectionType.DOCUMENT
             collection = await self.db.create_collection(
                 self.collection_name,
-                edge=self.is_edge,
-                **self.key_options,  # This unpacks the dict
+                col_type=collection_type,
+                key_options=self.key_options,  # This unpacks the dict
             )
 
         # Apply indexes
         for index_spec in self.indexes:
             try:
-                await collection.add_hash_index(
+                await collection.add_index(
+                    type="persistent",
                     fields=index_spec["fields"],
-                    unique=index_spec.get("unique", False),
+                    options={"unique": index_spec.get("unique", False)},
                 )
             except Exception as e:
                 # Prefer a specific python-arango exception and log it.
@@ -184,7 +180,7 @@ class BaseRepository(Generic[T]):
         key = doc_id.split("/")[-1] if "/" in doc_id else doc_id
         return await self.get_by_key(key)
 
-    async def create(self, entity: T, sync: bool = False) -> T:
+    async def create(self, entity: T) -> T:
         """Create a document and return the newly created version."""
         dump = entity.model_dump(by_alias=True, exclude_none=True, mode="json")
         # Get the full created document back in one call
@@ -193,7 +189,7 @@ class BaseRepository(Generic[T]):
             dump,
             return_new=True,
             overwrite=True,
-            sync=True
+
         )
         return self._validate(meta["new"])
 

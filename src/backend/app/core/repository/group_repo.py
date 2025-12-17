@@ -1,8 +1,8 @@
 from app.core.repository.base.node_repo import NodeRepository
 from app.core.model.nodes import GroupNode
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 
 
 class GroupRepo(NodeRepository[GroupNode]):
-    def __init__(self, db: StandardDatabase):
+    def __init__(self, db: AsyncDatabase):
         super().__init__(db, "nodes", GroupNode)

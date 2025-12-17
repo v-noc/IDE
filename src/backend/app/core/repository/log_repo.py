@@ -2,13 +2,13 @@ from typing import Any, Optional, List, Dict, Tuple
 
 from app.core.model import LogNode
 from app.core.repository.base.base_collection import BaseRepository
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 # from arango.cursor import Cursor
 
 
 class LogRepository(BaseRepository[LogNode]):
 
-    def __init__(self, db: StandardDatabase):
+    def __init__(self, db: AsyncDatabase):
         super().__init__(db, "logs", LogNode)
 
     async def find_enter_log(

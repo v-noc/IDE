@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 
 from app.core.model.nodes import CallNode, ClassNode, FunctionNode
 from app.core.repository.base.node_repo import NodeRepository
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class CallRepo(NodeRepository[CallNode]):
-    def __init__(self, db: StandardDatabase):
+    def __init__(self, db: AsyncDatabase):
         super().__init__(db, "nodes", CallNode)
 
     async def get_target(self, call_node_id: str) -> Optional[ClassNode | FunctionNode]:

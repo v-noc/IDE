@@ -1,11 +1,11 @@
 from .base.node_repo import NodeRepository
 from app.core.model.documents import DocumentNode
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 from typing import List
 
 
 class DocumentRepo(NodeRepository[DocumentNode]):
-    def __init__(self, db: StandardDatabase):
+    def __init__(self, db: AsyncDatabase):
         super().__init__(db, "documents", DocumentNode)
 
     async def node_exists(self, node_ref: str) -> bool:

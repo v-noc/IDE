@@ -4,13 +4,13 @@ import asyncio
 
 from app.core.model.nodes import ProjectNode
 from app.core.repository.base.node_repo import NodeRepository
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 
 
 class ProjectRepo(NodeRepository[ProjectNode]):
     """Repository for project collections."""
 
-    def __init__(self, db: StandardDatabase):
+    def __init__(self, db: AsyncDatabase):
         super().__init__(db, "nodes", ProjectNode)
 
     async def get_all_projects(self):

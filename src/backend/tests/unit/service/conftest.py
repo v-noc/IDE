@@ -2,6 +2,7 @@ from pathlib import Path
 import time
 
 import pytest
+import pytest_asyncio
 import shutil
 from app.core.model.properties import CodePosition
 from app.core.model.nodes import ProjectNode
@@ -24,8 +25,8 @@ DEFAULT_POSITION = CodePosition(
 )
 
 
-def _create_function(function_service: FunctionService, name: str, qname: str):
-    return function_service.create(
+async def _create_function(function_service: FunctionService, name: str, qname: str):
+    return await function_service.create(
         name,
         qname,
         f"This is {name.lower()}",
@@ -33,8 +34,8 @@ def _create_function(function_service: FunctionService, name: str, qname: str):
     )
 
 
-def _create_class(class_service: ClassService, name: str, qname: str):
-    return class_service.create(
+async def _create_class(class_service: ClassService, name: str, qname: str):
+    return await class_service.create(
         name,
         qname,
         f"This is {name.lower()}",
@@ -42,8 +43,8 @@ def _create_class(class_service: ClassService, name: str, qname: str):
     )
 
 
-def _create_call(call_service: CallService, name: str, qname: str, target_id: str):
-    return call_service.create(
+async def _create_call(call_service: CallService, name: str, qname: str, target_id: str):
+    return await call_service.create(
         name,
         qname,
         f"This is {name.lower()}",
@@ -52,8 +53,8 @@ def _create_call(call_service: CallService, name: str, qname: str, target_id: st
     )
 
 
-@pytest.fixture()
-def create_sample_project(arangodb_client, create_repos, tmp_path):
+@pytest_asyncio.fixture()
+async def create_sample_project(arangodb_client, create_repos, tmp_path):
     project_path = tmp_path / "project"
     shutil.copytree(PROJECT_PATH, project_path)
     project_node = ProjectNode(
@@ -68,7 +69,7 @@ def create_sample_project(arangodb_client, create_repos, tmp_path):
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     project_service = ProjectService(create_repos)
-    project_node = project_service.create_node(
+    project_node = await project_service.create_node(
         project_node
     )
 
@@ -83,20 +84,20 @@ def create_sample_project(arangodb_client, create_repos, tmp_path):
     orchestrator.resync()
 
 
-@pytest.fixture
-def create_project(create_repos):
+@pytest_asyncio.fixture
+async def create_project(create_repos):
     project_service = ProjectService(create_repos)
-    return project_service.create(
+    return await project_service.create(
         "Test Project",
         "This is a test project",
         "test_project"
     )
 
 
-@pytest.fixture
-def create_folder(create_repos):
+@pytest_asyncio.fixture
+async def create_folder(create_repos):
     folder_service = FolderService(create_repos)
-    return folder_service.create(
+    return await folder_service.create(
         "Test Folder",
         "test_project.test_folder",
         "This is a test folder",
@@ -104,10 +105,10 @@ def create_folder(create_repos):
     )
 
 
-@pytest.fixture
-def create_file(create_repos):
+@pytest_asyncio.fixture
+async def create_file(create_repos):
     file_service = FileService(create_repos)
-    return file_service.create(
+    return await file_service.create(
         "Test File",
         "test_project.test_file",
         "This is a test file",
@@ -131,54 +132,54 @@ def call_service(create_repos):
     return CallService(create_repos)
 
 
-@pytest.fixture
-def create_function(function_service):
-    return _create_function(
+@pytest_asyncio.fixture
+async def create_function(function_service):
+    return await _create_function(
         function_service,
         "Test Function",
         "test_project.test_function",
     )
 
 
-@pytest.fixture
-def create_function2(function_service):
-    return _create_function(
+@pytest_asyncio.fixture
+async def create_function2(function_service):
+    return await _create_function(
         function_service,
         "Test Function 2",
         "test_project.test_function2",
     )
 
 
-@pytest.fixture
-def create_function3(function_service):
-    return _create_function(
+@pytest_asyncio.fixture
+async def create_function3(function_service):
+    return await _create_function(
         function_service,
         "Test Function 3",
         "test_project.test_function3",
     )
 
 
-@pytest.fixture
-def create_class(class_service):
-    return _create_class(
+@pytest_asyncio.fixture
+async def create_class(class_service):
+    return await _create_class(
         class_service,
         "Test Class",
         "test_project.test_class",
     )
 
 
-@pytest.fixture
-def create_class2(class_service):
-    return _create_class(
+@pytest_asyncio.fixture
+async def create_class2(class_service):
+    return await _create_class(
         class_service,
         "Test Class 2",
         "test_project.test_class2",
     )
 
 
-@pytest.fixture
-def create_call(call_service, create_function):
-    return _create_call(
+@pytest_asyncio.fixture
+async def create_call(call_service, create_function):
+    return await _create_call(
         call_service,
         "Test Call",
         "test_project.test_call",
@@ -186,9 +187,9 @@ def create_call(call_service, create_function):
     )
 
 
-@pytest.fixture
-def create_call2(call_service, create_function2):
-    return _create_call(
+@pytest_asyncio.fixture
+async def create_call2(call_service, create_function2):
+    return await _create_call(
         call_service,
         "Test Call 2",
         "test_project.test_call2",
