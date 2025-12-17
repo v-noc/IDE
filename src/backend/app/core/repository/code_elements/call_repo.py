@@ -13,22 +13,22 @@ class CallRepo(NodeRepository[CallNode]):
     def __init__(self, db: StandardDatabase):
         super().__init__(db, "nodes", CallNode)
 
-    def get_target(self, call_node_id: str) -> Optional[ClassNode | FunctionNode]:
+    async def get_target(self, call_node_id: str) -> Optional[ClassNode | FunctionNode]:
         """Find the function or class that this CallNode targets.
 
         Avoids truthiness/len checks on Arango Cursor to prevent
         CursorCountError by consuming at most one document.
         """
         query = """
-        FOR target IN 1..1 OUTBOUND @start_node_id targets_edges
-            LIMIT 1
-            RETURN target
+            FOR target IN 1..1 OUTBOUND @start_node_id targets_edges
+                LIMIT 1
+                RETURN target
         """
         bind_vars = {
             "start_node_id": call_node_id,
         }
-        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
-        doc = next(cursor, None)
+        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+        doc = await cursor.next() if cursor else None
         if not doc:
             return None
         node_type = doc.get("node_type")
@@ -38,7 +38,7 @@ class CallRepo(NodeRepository[CallNode]):
             return ClassNode.model_validate(doc)
         return None
 
-    def find_call_by_target_parent(
+    async def find_call_by_target_parent(
         self,
         target_id: str,
         parent_id: str,
@@ -62,13 +62,13 @@ class CallRepo(NodeRepository[CallNode]):
         bind_vars = {"target_id": str(target_id), "parent_id": str(parent_id)}
 
         try:
-            cursor = self.db.aql.execute(
+            cursor = await self.db.aql.execute(
                 query,
                 bind_vars=bind_vars,
                 batch_size=1,
             )
 
-            doc = next(cursor, None)
+            doc = await cursor.next() if cursor else None
             if not doc:
                 return None
             return CallNode(**doc)
@@ -77,7 +77,7 @@ class CallRepo(NodeRepository[CallNode]):
             logger.error("Error finding call by target/parent: %s", e)
             return None
 
-    def find_calls_by_target_parent_batch(
+    async def find_calls_by_target_parent_batch(
         self,
         parent_target_pairs: List[tuple[str, str]],
     ) -> Dict[tuple[str, str], Optional[CallNode]]:
@@ -115,7 +115,7 @@ class CallRepo(NodeRepository[CallNode]):
         }
 
         try:
-            cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+            cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
             results = {}
 
             # Initialize all pairs to None
@@ -123,7 +123,7 @@ class CallRepo(NodeRepository[CallNode]):
                 results[(parent_id, target_id)] = None
 
             # Fill in found calls
-            for row in cursor:
+            async for row in cursor:
                 # Skip null rows (when FIRST() returns null for no match)
                 if row is None:
                     continue
