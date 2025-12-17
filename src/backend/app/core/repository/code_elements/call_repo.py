@@ -89,22 +89,22 @@ class CallRepo(NodeRepository[CallNode]):
             return {}
 
         query = """
-        FOR pair IN @pairs
-            LET result = FIRST(
-                FOR call IN 1..1 OUTBOUND pair.parent_id contains_edges
-                    FILTER call.node_type == "call"
-                    LET target = FIRST(
-                        FOR t IN 1..1 OUTBOUND call targets_edges
-                            RETURN t
-                    )
-                    FILTER target != null && target._id == pair.target_id
-                    RETURN {
-                        parent_id: pair.parent_id,
-                        target_id: pair.target_id,
-                        call: call
-                    }
-            )
-            RETURN result
+            FOR pair IN @pairs
+                LET result = FIRST(
+                    FOR call IN 1..1 OUTBOUND pair.parent_id contains_edges
+                        FILTER call.node_type == "call"
+                        LET target = FIRST(
+                            FOR t IN 1..1 OUTBOUND call targets_edges
+                                RETURN t
+                        )
+                        FILTER target != null && target._id == pair.target_id
+                        RETURN {
+                            parent_id: pair.parent_id,
+                            target_id: pair.target_id,
+                            call: call
+                        }
+                )
+                RETURN result
         """
 
         bind_vars = {
@@ -144,7 +144,7 @@ class CallRepo(NodeRepository[CallNode]):
             # Fallback: return None for all
             return {(p, t): None for p, t in parent_target_pairs}
 
-    def count_recursive_calls_upward(
+    async def count_recursive_calls_upward(
         self,
         parent_id: str,
         target_id: str,
@@ -172,18 +172,18 @@ class CallRepo(NodeRepository[CallNode]):
             Integer count of recursive calls found on the upward chain.
         """
         query = """
-        LET matches = (
-            FOR v IN 0..@max_depth INBOUND @start_parent_id @@contains
-                PRUNE v.node_type != "call"
-                FILTER v.node_type == "call"
-                LET target = FIRST(
-                    FOR t IN 1..1 OUTBOUND v @@targets
-                        RETURN t
-                )
-                FILTER target != null && target._id == @target_id
-                RETURN 1
-        )
-        RETURN LENGTH(matches)
+            LET matches = (
+                FOR v IN 0..@max_depth INBOUND @start_parent_id @@contains
+                    PRUNE v.node_type != "call"
+                    FILTER v.node_type == "call"
+                    LET target = FIRST(
+                        FOR t IN 1..1 OUTBOUND v @@targets
+                            RETURN t
+                    )
+                    FILTER target != null && target._id == @target_id
+                    RETURN 1
+            )
+            RETURN LENGTH(matches)
         """
 
         bind_vars = {
@@ -195,8 +195,8 @@ class CallRepo(NodeRepository[CallNode]):
         }
 
         try:
-            cursor = self.db.aql.execute(query, bind_vars=bind_vars)
-            result = next(cursor, 0)
+            cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+            result = await cursor.next() if cursor else 0
             return int(result or 0)
         except Exception as e:
             logger.error(
@@ -207,7 +207,7 @@ class CallRepo(NodeRepository[CallNode]):
             )
             return 0
 
-    def count_recursive_calls_upward_batch(
+    async def count_recursive_calls_upward_batch(
         self,
         parent_target_pairs: List[tuple[str, str]],
         max_depth: int = 50,
@@ -227,23 +227,23 @@ class CallRepo(NodeRepository[CallNode]):
             return {}
 
         query = """
-        FOR pair IN @pairs
-            LET matches = (
-                FOR v IN 0..@max_depth INBOUND pair.parent_id @@contains
-                    PRUNE v.node_type != "call"
-                    FILTER v.node_type == "call"
-                    LET target = FIRST(
-                        FOR t IN 1..1 OUTBOUND v @@targets
-                            RETURN t
-                    )
-                    FILTER target != null && target._id == pair.target_id
-                    RETURN 1
-            )
-            RETURN {
-                parent_id: pair.parent_id,
-                target_id: pair.target_id,
-                count: LENGTH(matches)
-            }
+            FOR pair IN @pairs
+                LET matches = (
+                    FOR v IN 0..@max_depth INBOUND pair.parent_id @@contains
+                        PRUNE v.node_type != "call"
+                        FILTER v.node_type == "call"
+                        LET target = FIRST(
+                            FOR t IN 1..1 OUTBOUND v @@targets
+                                RETURN t
+                        )
+                        FILTER target != null && target._id == pair.target_id
+                        RETURN 1
+                )
+                RETURN {
+                    parent_id: pair.parent_id,
+                    target_id: pair.target_id,
+                    count: LENGTH(matches)
+                }
         """
 
         bind_vars = {
@@ -257,7 +257,7 @@ class CallRepo(NodeRepository[CallNode]):
         }
 
         try:
-            cursor = self.db.aql.execute(query, bind_vars=bind_vars)
+            cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
             results = {}
 
             # Initialize all pairs to 0
@@ -265,7 +265,7 @@ class CallRepo(NodeRepository[CallNode]):
                 results[(parent_id, target_id)] = 0
 
             # Fill in found counts
-            for row in cursor:
+            async for row in cursor:
                 key = (row["parent_id"], row["target_id"])
                 results[key] = int(row["count"] or 0)
 
@@ -276,7 +276,7 @@ class CallRepo(NodeRepository[CallNode]):
             # Fallback: return 0 for all
             return {(p, t): 0 for p, t in parent_target_pairs}
 
-    def get_downward_call_chain(self, node_id: str) -> List[Dict[str, Any]]:
+    async def get_downward_call_chain(self, node_id: str) -> List[Dict[str, Any]]:
         query = """
         FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id @@contains
             OPTIONS { order: "bfs" }
@@ -300,42 +300,48 @@ class CallRepo(NodeRepository[CallNode]):
             "@targets": "targets_edges",
             "max_depth": 50,
         }
-        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
-        return list(cursor)
+        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+        results = []
+        async for doc in cursor:
+            results.append(doc)
+        return results
 
-    def find_upward_call_chain(self, call_id: str) -> List[Dict[str, Any]]:
+    async def find_upward_call_chain(self, call_id: str) -> List[Dict[str, Any]]:
         query = """
-        LET call_chain_path = (
-            FOR v IN 0..100 INBOUND @start_call_id @@contains
-                PRUNE v.node_type != "call"
-                RETURN v
-        )
+            LET call_chain_path = (
+                FOR v IN 0..100 INBOUND @start_call_id @@contains
+                    PRUNE v.node_type != "call"
+                    RETURN v
+            )
 
-        LET call_chain = REVERSE(call_chain_path)
+            LET call_chain = REVERSE(call_chain_path)
 
-        LET origin = FIRST(
-            call_chain
-        )
+            LET origin = FIRST(
+                call_chain
+            )
 
-        LET call_chain_with_targets = (
-            FOR call IN call_chain
-                LET target = FIRST(
-                    FOR t IN 1..1 OUTBOUND call._id @@targets
-                        RETURN t
-                )
-                FILTER target != null
-                RETURN { call: call, target: target }
-        )
+            LET call_chain_with_targets = (
+                FOR call IN call_chain
+                    LET target = FIRST(
+                        FOR t IN 1..1 OUTBOUND call._id @@targets
+                            RETURN t
+                    )
+                    FILTER target != null
+                    RETURN { call: call, target: target }
+            )
 
-        RETURN {
-            origin: origin,
-            calls: call_chain_with_targets
-        }
+            RETURN {
+                origin: origin,
+                calls: call_chain_with_targets
+            }
         """
         bind_vars = {
             "start_call_id": call_id,
             "@contains": "contains_edges",
             "@targets": "targets_edges",
         }
-        cursor = self.db.aql.execute(query, bind_vars=bind_vars)
-        return list(cursor)
+        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+        results = []
+        async for doc in cursor:
+            results.append(doc)
+        return results

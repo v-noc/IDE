@@ -9,7 +9,7 @@ class FunctionService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(
+    async def create(
         self,
         name: str,
         qname: str,
@@ -25,65 +25,65 @@ class FunctionService(ContainerService):
         )
         if _key:
             function.key = _key
-        return self.repos.function_repo.create(function)
+        return await self.repos.function_repo.create(function)
 
-    def get(self, function_id: str):
-        return self.repos.function_repo.get_by_id(function_id)
+    async def get(self, function_id: str):
+        return await self.repos.function_repo.get_by_id(function_id)
 
-    def update(self, function: FunctionNode):
-        return self.repos.function_repo.update(function.key, function)
+    async def update(self, function: FunctionNode):
+        return await self.repos.function_repo.update(function.key, function)
 
-    def delete(self, function_key: str):
+    async def delete(self, function_key: str):
         function_id = f"nodes/{function_key}"
 
-        descendants = self.repos.function_repo.get_containment_tree(
+        descendants = await self.repos.function_repo.get_containment_tree(
             function_id, depth="*")
 
         descendant_keys = [item["vertex"]["_key"] for item in descendants]
 
         for key in reversed(descendant_keys):
-            self.repos.nodes.delete(key)
+            await self.repos.nodes.delete(key)
 
-        return self.repos.function_repo.delete(function_key)
+        return await self.repos.function_repo.delete(function_key)
 
-    def add_function(self, parent_function_id: str, function_id: str):
-        return self.add_child_to_container(
+    async def add_function(self, parent_function_id: str, function_id: str):
+        return await self.add_child_to_container(
             parent_function_id,
             function_id,
             "function_to_function",
         )
 
-    def add_call(self, parent_function_id: str, call_id: str):
-        return self.add_child_to_container(
+    async def add_call(self, parent_function_id: str, call_id: str):
+        return await self.add_child_to_container(
             parent_function_id,
             call_id,
             "function_to_call",
         )
 
-    def add_class(self, parent_function_id: str, class_id: str):
-        return self.add_child_to_container(
+    async def add_class(self, parent_function_id: str, class_id: str):
+        return await self.add_child_to_container(
             parent_function_id,
             class_id,
             "function_to_class",
         )
 
-    def get_children(self, function_id: str):
-        return self.repos.function_repo.get_containment_tree(function_id)
+    async def get_children(self, function_id: str):
+        return await self.repos.function_repo.get_containment_tree(function_id)
 
-    def get_code(self, function_id: str):
-        function = self.repos.function_repo.get_by_id(function_id)
+    async def get_code(self, function_id: str):
+        function = await self.repos.function_repo.get_by_id(function_id)
         if not function:
             return None
 
-        file_doc, project_doc = self._resolve_file_and_project(function.id)
+        file_doc, project_doc = await self._resolve_file_and_project(function.id)
         if not file_doc or not project_doc:
             return None
 
-        abs_path = self._build_abs_file_path(
+        abs_path = await self._build_abs_file_path(
             project_doc.get("path"),
             file_doc.get("path"),
         )
-        code = self._extract_code_from_file(
+        code = await self._extract_code_from_file(
             abs_path,
             function.position,
         )

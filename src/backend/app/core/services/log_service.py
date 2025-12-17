@@ -15,7 +15,7 @@ class LogService:
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(
+    async def create(
         self,
         function_id: str,
         params: "RegisterLogsParams",
@@ -35,23 +35,23 @@ class LogService:
             error=params.error,
         )
 
-        created = self.repos.log_repo.create(log)
+        created = await self.repos.log_repo.create(log)
 
         # Edge: log -> function
-        self.repos.log_to_function_edges.create(
+        await self.repos.log_to_function_edges.create(
             LogToFunctionEdge(
                 from_id=created.id,
                 to_id=function_id,
             )
         )
 
-        self._link_to_parent_log(
+        await self._link_to_parent_log(
             created, function_id, parent_function_id, params.chain_id
         )
 
         return created
 
-    def _link_to_parent_log(
+    async def _link_to_parent_log(
         self,
         created_log: LogNode,
         function_id: str,
@@ -66,7 +66,7 @@ class LogService:
         # If not an enter event, first try to find parent within
         # the same function
         if created_log.event_type != "enter":
-            parent_log = self.repos.log_repo.find_enter_log(
+            parent_log = await self.repos.log_repo.find_enter_log(
                 function_id=function_id,
                 chain_id=chain_id,
             )
@@ -74,32 +74,32 @@ class LogService:
         # If it's an enter event, or no parent was found in the same function,
         # check the parent function
         if not parent_log and parent_function_id:
-            parent_log = self.repos.log_repo.find_enter_log(
+            parent_log = await self.repos.log_repo.find_enter_log(
                 function_id=parent_function_id,
                 chain_id=chain_id,
             )
 
         if parent_log:
-            self.repos.log_to_log_edges.create(
+            await self.repos.log_to_log_edges.create(
                 LogToLogEdge(
                     from_id=created_log.id,
                     to_id=parent_log.id,
                 )
             )
 
-    def get_parent_log(self, log_id: str):
-        return self.repos.log_repo.find_parent_log(log_id)
+    async def get_parent_log(self, log_id: str):
+        return await self.repos.log_repo.find_parent_log(log_id)
 
-    def get_function_log(self, function_id: str):
-        flat_logs = self.repos.log_repo.find_function_log(function_id)
+    async def get_function_log(self, function_id: str):
+        flat_logs = await self.repos.log_repo.find_function_log(function_id)
 
         return LogTreeBuilder(flat_logs).build()
 
-    def get_log_containment_tree(self, log_id: str):
+    async def get_log_containment_tree(self, log_id: str):
         """Gets all descendant logs for a given log ID and builds a tree."""
-        flat_descendants = self.repos.log_repo.get_containment_tree(log_id)
+        flat_descendants = await self.repos.log_repo.get_containment_tree(log_id)
 
-        root_log = self.repos.log_repo.get_by_id(log_id)
+        root_log = await self.repos.log_repo.get_by_id(log_id)
         if not root_log:
             return []
 
@@ -109,15 +109,15 @@ class LogService:
 
         return LogTreeBuilder(flat_list).build()
 
-    def get_call_log(self, call_id: str) -> List[LogTreeNode]:
+    async def get_call_log(self, call_id: str) -> List[LogTreeNode]:
         # 1. Find the function that was called
-        callees = self.repos.call_repo.get_target(call_id)
+        callees = await self.repos.call_repo.get_target(call_id)
         if not callees:
             return []
         called_function_id = callees.id
 
         # 2. Find the full function call chain
-        function_docs_result = self.repos.call_repo.find_upward_call_chain(
+        function_docs_result = await self.repos.call_repo.find_upward_call_chain(
             call_id
         )
         if not function_docs_result:
@@ -132,7 +132,7 @@ class LogService:
             function_ids.insert(0, origin['_id'])
 
         # 4. Find logs that share a chain_id across all these functions
-        flat_logs = self.repos.log_repo.find_logs_for_function_chain(
+        flat_logs = await self.repos.log_repo.find_logs_for_function_chain(
             function_ids,
             start_function_id=called_function_id,
 
@@ -141,25 +141,25 @@ class LogService:
         # 5. Build the tree from the flat list of logs
         return LogTreeBuilder(flat_logs).build()
 
-    def get_unified_log_tree(self, node_id: str) -> List[LogTreeNode]:
+    async def get_unified_log_tree(self, node_id: str) -> List[LogTreeNode]:
         """Return a log tree for either a function ID or a call ID.
 
         If the ID matches a function, return its log tree. If it matches a
         call, return the call log tree. Otherwise, return an empty list.
         """
         # Try function first
-        fn = self.repos.function_repo.get_by_id(node_id)
+        fn = await self.repos.function_repo.get_by_id(node_id)
         if fn is not None:
-            return self.get_function_log(fn.id)
+            return await self.get_function_log(fn.id)
 
         # Then try call
-        call = self.repos.call_repo.get_by_id(node_id)
+        call = await self.repos.call_repo.get_by_id(node_id)
         if call is not None:
-            return self.get_call_log(call.id)
+            return await self.get_call_log(call.id)
 
         return []
 
-    def create_batch(self, batch_params: List["RegisterLogsParams"]):
+    async def create_batch(self, batch_params: List["RegisterLogsParams"]):
 
         log_docs = []
         log_edges = []
@@ -195,9 +195,9 @@ class LogService:
 
         # 2. Bulk Insert Logs (One DB Call)
         # We get back objects with valid .id properties
-        self.repos.log_repo.create_batch(log_docs)
+        await self.repos.log_repo.create_batch(log_docs)
 
-        self.repos.log_repo.create_batch_edges(func_edges, "log_to_function")
-        self.repos.log_repo.create_batch_edges(log_edges, "log_to_log")
+        await self.repos.log_repo.create_batch_edges(func_edges, "log_to_function")
+        await self.repos.log_repo.create_batch_edges(log_edges, "log_to_log")
 
         return True

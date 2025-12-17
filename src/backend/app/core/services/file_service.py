@@ -8,7 +8,7 @@ class FileService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(self, name: str, qname: str, description: str, path: str, hash: str):
+    async def create(self, name: str, qname: str, description: str, path: str, hash: str):
         file = FileNode(
             name=name,
             qname=qname,
@@ -16,16 +16,16 @@ class FileService(ContainerService):
             path=path,
             hash=hash,
         )
-        return self.repos.file_repo.create(file)
+        return await self.repos.file_repo.create(file)
 
-    def write_code_by_id(self, node_key: str, code_block: str):
+    async def write_code_by_id(self, node_key: str, code_block: str):
         """Writes code for an element identified by its document key.
 
         - For a file node: overwrite full file content with code_block
         - For function/class/call nodes: replace the slice defined by position
         """
         # Fetch raw to determine type and full id
-        raw_node = self.repos.nodes.get_raw_by_key(node_key)
+        raw_node = await self.repos.nodes.get_raw_by_key(node_key)
         if not raw_node:
             return {"success": False, "error": "Element not found"}
 
@@ -36,10 +36,10 @@ class FileService(ContainerService):
 
         # Resolve enclosing file and project for absolute path
         if node_type == "file":
-            file_doc = self.repos.file_repo.get_by_id(full_id)
-            project_doc = self.repos.nodes.get_parent_project(full_id)
+            file_doc = await self.repos.file_repo.get_by_id(full_id)
+            project_doc = await self.repos.nodes.get_parent_project(full_id)
 
-            abs_path = self._build_abs_file_path(
+            abs_path = await self._build_abs_file_path(
                 project_doc.get("path"), file_doc.path)
 
             # Fallback: overwrite full file if no position
@@ -50,14 +50,14 @@ class FileService(ContainerService):
             except IOError as e:
                 return {"success": False, "error": str(e)}
         else:
-            file_doc, project_doc = self._resolve_file_and_project(full_id)
+            file_doc, project_doc = await self._resolve_file_and_project(full_id)
             if not file_doc or not project_doc:
                 return {"success": False, "error": "Enclosing file or project not found"}
 
             abs_path = self._build_abs_file_path(
                 project_doc.get("path"), file_doc.get("path"))
 
-            typed_node = self.repos.nodes.get_by_id(full_id)
+            typed_node = await self.repos.nodes.get_by_id(full_id)
             position: Optional[object] = getattr(typed_node, "position", None)
 
             # Replace code slice defined by CodePosition
@@ -98,61 +98,61 @@ class FileService(ContainerService):
             except IOError as e:
                 return {"success": False, "error": str(e)}
 
-    def get(self, file_id: str):
-        return self.repos.file_repo.get_by_id(file_id)
+    async def get(self, file_id: str):
+        return await self.repos.file_repo.get_by_id(file_id)
 
-    def update(self, file: FileNode):
-        return self.repos.file_repo.update(file.key, file)
+    async def update(self, file: FileNode):
+        return await self.repos.file_repo.update(file.key, file)
 
-    def delete(self, file_key: str):
+    async def delete(self, file_key: str):
         file_id = f"nodes/{file_key}"
 
-        descendants = self.repos.file_repo.get_containment_tree(
+        descendants = await self.repos.file_repo.get_containment_tree(
             file_id, depth="*")
 
         descendant_keys = [item["vertex"]["_key"] for item in descendants]
 
         for key in reversed(descendant_keys):
-            self.repos.nodes.delete(key)
+            await self.repos.nodes.delete(key)
 
-        return self.repos.file_repo.delete(file_key)
+        return await self.repos.file_repo.delete(file_key)
 
-    def add_function(self, file_id: str, function_id: str):
-        return self.add_child_to_container(
+    async def add_function(self, file_id: str, function_id: str):
+        return await self.add_child_to_container(
             file_id,
             function_id,
             "file_to_function",
         )
 
-    def add_call(self, file_id: str, call_id: str):
-        return self.add_child_to_container(
+    async def add_call(self, file_id: str, call_id: str):
+        return await self.add_child_to_container(
             file_id,
             call_id,
             "file_to_call",
         )
 
-    def add_class(self, file_id: str, class_id: str):
-        return self.add_child_to_container(
+    async def add_class(self, file_id: str, class_id: str):
+        return await self.add_child_to_container(
             file_id,
             class_id,
             "file_to_class",
         )
 
-    def get_children(self, file_id: str):
-        return self.repos.file_repo.get_containment_tree(file_id)
+    async def get_children(self, file_id: str):
+        return await self.repos.file_repo.get_containment_tree(file_id)
 
-    def get_code(self, file_id: str):
-        file = self.repos.file_repo.get_by_id(file_id)
+    async def get_code(self, file_id: str):
+        file = await self.repos.file_repo.get_by_id(file_id)
 
         if not file:
             return None
 
         # Resolve project root by walking parents
-        project_doc = self.repos.nodes.get_parent_project(
+        project_doc = await self.repos.nodes.get_parent_project(
             file.id,
         )
 
-        file_doc = self.repos.file_repo.get_by_id(file.id)
+        file_doc = await self.repos.file_repo.get_by_id(file.id)
 
         # When called on the file itself, file_doc may be None; use current
         # file
@@ -162,12 +162,12 @@ class FileService(ContainerService):
 
         project_path = project_doc.get("path")
         file_path = effective_file.path
-        abs_path = self._build_abs_file_path(
+        abs_path = await self._build_abs_file_path(
             project_path,
             file_path,
         )
 
-        content = self._extract_code_from_file(
+        content = await self._extract_code_from_file(
             abs_path,
             None,
         )

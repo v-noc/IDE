@@ -13,24 +13,24 @@ class ContainerService:
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def get(self, container_id: str) -> Optional[AllNodes]:
-        return self.repos.nodes.get_by_id(container_id)
+    async def get(self, container_id: str) -> Optional[AllNodes]:
+        return await self.repos.nodes.get_by_id(container_id)
 
-    def get_by_qname(self, qname: str):
-        return self.repos.class_repo.find_by_qname(qname)
+    async def get_by_qname(self, qname: str):
+        return await self.repos.class_repo.find_by_qname(qname)
 
-    def add_child_to_container(
+    async def add_child_to_container(
         self,
         container_id: str,
         child_id: str,
         contain_type: Optional[str] = None,
         version: Optional[int] = None,
     ):
-        container = self.repos.nodes.get_by_id(container_id)
+        container = await self.repos.nodes.get_by_id(container_id)
         if not container:
             raise ValueError(f"Container {container_id} not found")
 
-        child = self.repos.nodes.get_by_id(child_id)
+        child = await self.repos.nodes.get_by_id(child_id)
         if not child:
             raise ValueError(f"Child {child_id} not found")
 
@@ -50,18 +50,18 @@ class ContainerService:
             contain_type=contain_type,
             version=version,
         )
-        self.repos.contains_edges.create(contains_edge)
+        await self.repos.contains_edges.create(contains_edge)
         return True
 
-    def get_parent_container(self, container_id: str):
-        return self.repos.nodes.get_parent(container_id)
+    async def get_parent_container(self, container_id: str):
+        return await self.repos.nodes.get_parent(container_id)
 
-    def update_theme_config(
+    async def update_theme_config(
         self,
         container_id: str,
         theme_config: ThemeConfig,
     ) -> Optional[AllNodes]:
-        container_node = self.get(container_id)
+        container_node = await self.get(container_id)
         if not container_node or not isinstance(container_node, ContainerNode):
             return None
 
@@ -73,16 +73,16 @@ class ContainerService:
         else:
             container_node.theme_config = ThemeConfig(**update_data)
 
-        return self.repos.nodes.update(container_node.key, container_node)
+        return await self.repos.nodes.update(container_node.key, container_node)
 
-    def update_basic_info(
+    async def update_basic_info(
         self,
         container_id: str,
         name: Optional[str],
         description: Optional[str],
         icon: Optional[str]
     ) -> Optional[AllNodes]:
-        container_node = self.get(container_id)
+        container_node = await self.get(container_id)
         if not container_node or not isinstance(container_node, ContainerNode):
             return None
 
@@ -98,12 +98,12 @@ class ContainerService:
             updated = True
 
         if updated:
-            return self.repos.nodes.update(container_node.key, container_node)
+            return await self.repos.nodes.update(container_node.key, container_node)
 
         return container_node
 
     # Internal helpers for code resolution
-    def _resolve_file_and_project(self, start_node_id: str):
+    async def _resolve_file_and_project(self, start_node_id: str):
         """Walk parents via contains edges to find enclosing file and project.
 
         Returns a tuple (file_doc, project_doc) where each is a dict document.
@@ -115,7 +115,7 @@ class ContainerService:
 
         # Limit the ascent to avoid infinite loops
         for _ in range(50):
-            parent_info = self.repos.nodes.get_parent(current_id)
+            parent_info = await self.repos.nodes.get_parent(current_id)
 
             if not parent_info:
                 break
@@ -136,14 +136,14 @@ class ContainerService:
             current_id = parent_id
 
         if project_doc is None:
-            project_doc = self.repos.nodes.get_parent_project(
+            project_doc = await self.repos.nodes.get_parent_project(
                 file_doc.get("_id"))
 
             if project_doc is None:
                 return None, None
         return file_doc, project_doc
 
-    def _build_abs_file_path(self, project_path: str, file_path: str) -> str:
+    async def _build_abs_file_path(self, project_path: str, file_path: str) -> str:
         import os
 
         # If file_path is absolute, prefer it; else join with project root
@@ -151,7 +151,7 @@ class ContainerService:
             return file_path
         return os.path.normpath(os.path.join(project_path, file_path))
 
-    def _extract_code_from_file(
+    async def _extract_code_from_file(
         self,
         abs_path: str,
         position: Optional[CodePosition],
@@ -216,7 +216,7 @@ class ContainerService:
 
         return "\n".join(collected)
 
-    def rebuild_call_group(self, parent_id: str):
+    async def rebuild_call_group(self, parent_id: str):
         """Ensure a single call group exists under the given parent,
         containing all direct call children.
 
@@ -232,11 +232,11 @@ class ContainerService:
         # Local import to avoid circular dependency
         from app.core.services.group_service import GroupService
 
-        parent = self.repos.nodes.get_by_id(parent_id)
+        parent = await self.repos.nodes.get_by_id(parent_id)
         if not parent:
             return None
 
-        children = self.repos.nodes.get_containment_tree(parent_id, depth=1)
+        children = await self.repos.nodes.get_containment_tree(parent_id, depth=1)
 
         call_child_vertices = []
         existing_call_group_vertex = None
@@ -255,7 +255,7 @@ class ContainerService:
 
         if existing_call_group_vertex is not None:
             existing_call_group_id = existing_call_group_vertex.get("_id")
-            group_children = group_service.get_children(existing_call_group_id)
+            group_children = await group_service.get_children(existing_call_group_id)
             for gi in group_children:
                 if (
                     gi.get("vertex", {}).get("node_type") == "call"
@@ -264,7 +264,7 @@ class ContainerService:
                     call_child_vertices.append(gi.get("vertex"))
 
             # Remove the existing group (children get reattached to parent)
-            group_service.delete(existing_call_group_id)
+            await group_service.delete(existing_call_group_id)
 
         # Unique keys of calls to (re)group
         call_child_keys = []
@@ -279,14 +279,14 @@ class ContainerService:
             return None
 
         # parent_id is an id; group_service.create expects a key
-        return group_service.create(
+        return await group_service.create(
             name="Calls",
             description="Grouped calls",
             parent_id=parent.key,
             children_ids=call_child_keys,
         )
 
-    def clone_callee_call_graph(
+    async def clone_callee_call_graph(
         self,
         source_callee_id: str,
         attach_under_id: str,
@@ -303,7 +303,7 @@ class ContainerService:
         under attach_under_id).
         """
         # Get full subtree to preserve parent relationships
-        tree = self.repos.call_repo.get_downward_call_chain(
+        tree = await self.repos.call_repo.get_downward_call_chain(
             source_callee_id,
 
         )
@@ -323,7 +323,7 @@ class ContainerService:
         new_root_call_ids: list[str] = []
 
         # Ensure attach point exists
-        _ = self.repos.nodes.get_by_id(attach_under_id)
+        _ = await self.repos.nodes.get_by_id(attach_under_id)
 
         # BFS order from get_containment_tree ensures parents appear
         # before children
@@ -344,7 +344,7 @@ class ContainerService:
                     description=vertex.get("description", ""),
                     group_type=vertex.get("group_type", "call"),
                 )
-                created_group = self.repos.group_repo.create(new_group)
+                created_group = await self.repos.group_repo.create(new_group)
 
                 # Determine parent container: cloned ancestor or attach point
                 if orig_parent_id in orig_to_new:
@@ -353,7 +353,7 @@ class ContainerService:
                     parent_container_id = attach_under_id
 
                 # Edge: parent -> group (contain type auto-detected)
-                self.add_child_to_container(
+                await self.add_child_to_container(
                     parent_container_id,
                     created_group.id,
                     None,
@@ -382,11 +382,11 @@ class ContainerService:
                     ),
                     manually_created=True,
                 )
-                created = self.repos.call_repo.create(new_call)
+                created = await self.repos.call_repo.create(new_call)
 
                 # Recreate target edge if any
                 if target and target.get("_id"):
-                    self.repos.targets_edges.create(
+                    await self.repos.targets_edges.create(
                         TargetsEdge(from_id=created.id,
                                     to_id=target.get("_id"))
                     )
@@ -398,7 +398,7 @@ class ContainerService:
                     parent_container_id = attach_under_id
 
                 # Edge: parent -> call
-                self.add_child_to_container(
+                await self.add_child_to_container(
                     parent_container_id,
                     created.id,
                     None,
