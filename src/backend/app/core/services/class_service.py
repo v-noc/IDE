@@ -69,22 +69,22 @@ class ClassService(ContainerService):
         )
 
     async def get_children(self, class_id: str):
-        return self.repos.class_repo.get_containment_tree(class_id)
+        return await self.repos.class_repo.get_containment_tree(class_id)
 
     async def get_code(self, class_id: str):
-        class_node = self.repos.class_repo.get_by_id(class_id)
+        class_node = await self.repos.class_repo.get_by_id(class_id)
         if not class_node:
             return None
 
-        file_doc, project_doc = self._resolve_file_and_project(class_node.id)
+        file_doc, project_doc = await self._resolve_file_and_project(class_node.id)
         if not file_doc or not project_doc:
             return None
 
-        abs_path = self._build_abs_file_path(
+        abs_path = await self._build_abs_file_path(
             project_doc.get("path"),
             file_doc.get("path"),
         )
-        code = self._extract_code_from_file(
+        code = await self._extract_code_from_file(
             abs_path,
             class_node.position,
         )
