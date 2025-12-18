@@ -102,7 +102,7 @@ class BaseRepository(Generic[T]):
     async def _is_edge_collection(self, col_name: str) -> bool:
         """Check if a collection is an edge collection."""
         try:
-            col = await self.db.collection(col_name)
+            col = self.db.collection(col_name)
             props = await col.properties()
             return bool(props.get("edge", False))
         except Exception:
@@ -122,8 +122,10 @@ class BaseRepository(Generic[T]):
     async def _ensure_collection(self) -> StandardCollection:
         has_collection = await self.db.has_collection(self.collection_name)
         if has_collection:
-            collection = await self.db.collection(self.collection_name)
-            is_existing_edge = bool(collection.properties().get("edge", False))
+            collection = self.db.collection(self.collection_name)
+            props = await collection.properties()
+            is_existing_edge = props.type == CollectionType.EDGE
+            print(f"is_existing_edge: {props}")
 
             # CRITICAL: Check for type mismatch and
             # fail loudly instead of deleting
