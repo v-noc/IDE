@@ -2,6 +2,7 @@ import asyncio
 from typing import Optional, List, Tuple
 
 from app.core.model.base import BaseNode
+from app.core.parser.scope_manager.models import ScopeModel, ScopeType
 
 
 class AsyncSyncHelpers:
@@ -61,21 +62,79 @@ class AsyncSyncHelpers:
 
         async with self._semaphore:
             query = """
-            FOR edge IN @edges
-                UPSERT { _from: edge.from_id, _to: edge.to_id }
-                INSERT { 
-                    _from: edge.from_id, 
-                    _to: edge.to_id
-                }
-                UPDATE {}
-                IN contains_edges
-            """
+                FOR edge IN @edges
+                    UPSERT { _from: edge.from_id, _to: edge.to_id }
+                    INSERT { 
+                        _from: edge.from_id, 
+                        _to: edge.to_id
+                    }
+                    UPDATE {}
+                    IN contains_edges
+                """
             await self.repos.db.aql.execute(
                 query,
                 bind_vars={
                     "edges": [{"from_id": f, "to_id": t} for f, t in edges]
                 }
             )
+
+    async def async_get_graph_node_for_scope(
+        self,
+        scope: ScopeModel,
+    ) -> Optional[BaseNode]:
+        """
+        Resolve graph node for scope with caching.
+        """
+        if scope.id in self._node_cache:
+            return self._node_cache[scope.id]
+
+        async with self._semaphore:
+            node = None
+            if scope.type == ScopeType.FILE:
+                node = await self.repos.file_repo.async_find_one(
+                    {"qname": scope.qname}
+                )
+            elif scope.type == ScopeType.CLASS:
+                node = await self.repos.class_repo.async_find_one(
+                    {"qname": scope.qname}
+                )
+            elif scope.type == ScopeType.FUNCTION:
+                node = await self.repos.function_repo.async_find_one(
+                    {"qname": scope.qname}
+                )
+            elif scope.type == ScopeType.FOLDER:
+                node = await self.repos.folder_repo.async_find_one(
+                    {"qname": scope.qname}
+                )
+
+            if node:
+                self._node_cache[scope.id] = node
+            return node
+
+    async def async_get_call_target(self, call_id: str) -> Optional[BaseNode]:
+        """Get the target node of a call."""
+        async with self._semaphore:
+            return await self.repos.call_repo.async_get_target(call_id)
+
+    async def async_ensure_targets_edges_batch(
+        self,
+        edges: List[Tuple[str, str]],
+    ) -> None:
+        """Batch async ensure targets edges."""
+        if not edges:
+            return
+
+        query = """
+        FOR edge IN @edges
+            UPSERT { _from: edge.from_id, _to: edge.to_id }
+            INSERT { _from: edge.from_id, _to: edge.to_id }
+            UPDATE {}
+            IN targets_edges
+        """
+        await self.repos.db.aql.execute(
+            query,
+            bind_vars={"edges": [{"from_id": f, "to_id": t} for f, t in edges]}
+        )
 
     async def mark_node_deleted(self, node_id: str) -> None:
         """Mark a node as deleted (soft delete)."""

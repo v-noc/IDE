@@ -1,5 +1,6 @@
 import logging
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Set
 
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel, ScopeType
@@ -9,9 +10,11 @@ from app.core.parser.graph_builder.sync.mappers import (
     map_scope_to_function_node,
     map_scope_to_folder_node,
 )
-from app.core.parser.graph_builder.sync.sync_helpers import SyncHelpers
+from app.core.parser.graph_builder.sync.async_helpers import AsyncSyncHelpers
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
+import asyncio
 
+from backend.app.core.model.base import BaseNode
 logger = logging.getLogger(__name__)
 
 
@@ -21,12 +24,12 @@ class ScopeSyncService:
     def __init__(
         self,
         scope_manager: ScopeManager,
-        helpers: SyncHelpers,
+        helpers: AsyncSyncHelpers,
     ):
         self.scope_manager = scope_manager
         self.helpers = helpers
 
-    def sync_scope_hierarchy(
+    async def sync_scope_hierarchy(
         self, root_scope_id: str, project_node_id: str, change_set: Optional[ChangeSet] = None
     ):
         """
@@ -44,6 +47,8 @@ class ScopeSyncService:
             project_node_id: The project node ID to use as parent
             change_set: Optional ChangeSet to filter what gets synced
         """
+
+        touched_folders = self._build_touched_folders(change_set)
         if change_set:
             logger.info(
                 f"Incremental sync from {root_scope_id}: "
@@ -61,113 +66,142 @@ class ScopeSyncService:
             logger.error(f"Root scope {root_scope_id} not found")
             return
 
-        # Start from direct children of the root file scope
-        child_scopes = self.scope_manager.get_children(root_scope_id)
-        for child_scope in child_scopes:
-            self._sync_scope_recursive(
-                child_scope, parent_node_id=project_node_id, change_set=change_set
+        # Get direct children of root
+        children = self.scope_manager.get_children(root_scope_id)
+
+        # Process all children concurrently
+        await asyncio.gather(*[
+            self._sync_scope_async(
+                child,
+                parent_node_id=project_node_id,
+                change_set=change_set,
+                touched_folders=touched_folders
             )
+            for child in children
+        ])
 
-    def _sync_scope_recursive(
-        self, scope: ScopeModel, parent_node_id: str, change_set: Optional[ChangeSet] = None
-    ):
-        """
-        Recursively sync a scope and its children.
+    def _build_touched_folders(self, change_set: ChangeSet) -> Set[str]:
+        """Build set of folders that need sync due to file changes."""
+        touched = set()
 
-        If change_set is provided:
-        - For files: check if in new_files, modified_files, or deleted_files
-        - For folders: check if in new_folders or deleted_folders
-        - If not in change set: skip entirely (no recursion)
-        - If deleted: sync with negative version and skip recursion
+        # Explicit folder changes
+        touched.update(change_set.new_folders)
+        touched.update(change_set.deleted_folders)
 
-        Args:
-            scope: The scope to sync
-            parent_node_id: The parent node ID
-            change_set: Optional ChangeSet to filter what gets synced
-        """
-        # Check if this scope should be synced
-        # Only files and folders check change set
-        # Classes and functions always sync (they're children of files)
-        if change_set:
-            is_in_change_set = False
-            is_deleted = False
-            version = self.helpers.sync_version
+        # Folders containing file changes
+        all_changed_files = (
+            change_set.new_files +
+            change_set.modified_files +
+            change_set.deleted_files
+        )
 
-            if scope.type == ScopeType.FILE:
-                is_in_change_set = (
-                    scope.file_path in change_set.new_files or
-                    scope.file_path in change_set.modified_files or
-                    scope.file_path in change_set.deleted_files
-                )
-                is_deleted = scope.file_path in change_set.deleted_files
-            elif scope.type == ScopeType.FOLDER:
-                is_in_change_set = (
-                    scope.file_path in change_set.new_folders or
-                    scope.file_path in change_set.deleted_folders
-                )
-                is_deleted = scope.file_path in change_set.deleted_folders
-            elif scope.type in (ScopeType.CLASS, ScopeType.FUNCTION):
-                # Classes and functions always sync (they're children of files)
-                # If parent file is being synced, sync them too
-                is_in_change_set = True
-                is_deleted = False
-            else:
-                # Unknown type, skip
-                return
+        for file_path in all_changed_files:
+            parent = Path(file_path).parent
+            while parent != parent.parent:
+                touched.add(str(parent))
+                parent = parent.parent
 
-            # For files and folders: if not in change set, skip entirely
-            if scope.type in (ScopeType.FILE, ScopeType.FOLDER) and not is_in_change_set:
-                return
+        return touched
 
-            # If deleted, use negative version
-            if is_deleted:
-                version = -self.helpers.sync_version
-        else:
-            version = self.helpers.sync_version
-            is_deleted = False
+    async def _sync_scope_async(
+        self,
+        scope: ScopeModel,
+        parent_node_id: str,
+        change_set: ChangeSet,
+        touched_folders: Set[str],
+    ) -> None:
 
-        # Map scope to appropriate node type based on scope type
+        should_sync = False
+        should_recurse = False
+        is_deleted = False
+
         if scope.type == ScopeType.FILE:
-            node = map_scope_to_file_node(scope, version)
-            saved_node = self.helpers.create_or_update_node(
-                self.helpers.repos.file_repo, node, scope_id=None
-            )
-        elif scope.type == ScopeType.CLASS:
-            node = map_scope_to_class_node(scope, version)
-            saved_node = self.helpers.create_or_update_node(
-                self.helpers.repos.class_repo, node, scope_id=scope.id
-            )
-        elif scope.type == ScopeType.FUNCTION:
-            node = map_scope_to_function_node(scope, version)
-            saved_node = self.helpers.create_or_update_node(
-                self.helpers.repos.function_repo, node, scope_id=scope.id
-            )
+            if scope.file_path in change_set.new_files:
+                should_sync = True
+                should_recurse = True
+            elif scope.file_path in change_set.modified_files:
+                should_sync = True
+                should_recurse = True
+            elif scope.file_path in change_set.deleted_files:
+                should_sync = True
+                is_deleted = True
+                should_recurse = False
+
         elif scope.type == ScopeType.FOLDER:
-            node = map_scope_to_folder_node(scope, version)
-            saved_node = self.helpers.create_or_update_node(
-                self.helpers.repos.folder_repo, node, scope_id=scope.id
+            # Sync if explicitly changed OR contains changed files
+            if scope.file_path in touched_folders:
+                should_sync = True
+            # ALWAYS recurse into folders to find changed files
+            should_recurse = True
+
+        elif scope.type in (ScopeType.CLASS, ScopeType.FUNCTION):
+            # Always sync if we're visiting (parent was synced)
+            should_sync = True
+            should_recurse = True
+
+        # Perform sync if needed
+        if should_sync:
+            saved_node = await self._sync_single_scope(
+                scope, parent_node_id, is_deleted
             )
+            # Update parent_node_id for children
+            if saved_node:
+                parent_node_id = saved_node.id
+
+        # Recurse into children (concurrently)
+        if should_recurse and not is_deleted:
+            children = self.scope_manager.get_children(scope.id)
+            if children:
+                await asyncio.gather(*[
+                    self._sync_scope_async(
+                        child,
+                        parent_node_id=parent_node_id,
+                        change_set=change_set,
+                        touched_folders=touched_folders,
+                    )
+                    for child in children
+                ])
+
+    async def _sync_single_scope(
+        self,
+        scope: ScopeModel,
+        parent_node_id: str,
+        is_deleted: bool = False,
+    ) -> Optional[BaseNode]:
+        """Sync a single scope to the graph database."""
+        from .mappers import (
+            map_scope_to_file_node,
+            map_scope_to_folder_node,
+            map_scope_to_class_node,
+            map_scope_to_function_node,
+        )
+
+        # Map to appropriate node type
+        if scope.type == ScopeType.FILE:
+            node = map_scope_to_file_node(scope)
+        elif scope.type == ScopeType.FOLDER:
+            node = map_scope_to_folder_node(scope)
+        elif scope.type == ScopeType.CLASS:
+            node = map_scope_to_class_node(scope)
+        elif scope.type == ScopeType.FUNCTION:
+            node = map_scope_to_function_node(scope)
         else:
-            logger.warning(f"Unsupported scope type: {scope.type}")
-            return
+            return None
 
-        # Link to parent with contains edge if parent exists
-        if parent_node_id:
-            self.helpers.ensure_contains_edge(
-                parent_node_id,
-                saved_node.id,
-                version
-            )
-
-        # If deleted, don't recurse into children
+        # Handle deletion (soft delete or remove)
         if is_deleted:
-            return
+            await self.helpers.mark_node_deleted(node.id)
+            return None
 
-        # Recursively process children (scopes only; calls handled separately)
-        children = self.scope_manager.get_children(scope.id)
-        for child_scope in children:
-            self._sync_scope_recursive(
-                child_scope,
-                parent_node_id=saved_node.id,
-                change_set=change_set
+        # Create or update node
+        saved_node = await self.helpers.async_create_or_update_node(
+            node, scope_id=scope.id
+        )
+
+        # Ensure contains edge
+        if parent_node_id and saved_node:
+            await self.helpers.async_ensure_contains_edge(
+                parent_node_id, saved_node.id
             )
+
+        return saved_node
