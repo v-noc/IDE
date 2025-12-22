@@ -13,48 +13,43 @@ def map_scope_to_position(scope: ScopeModel) -> CodePosition:
     )
 
 
-def map_scope_to_file_node(scope: ScopeModel, version: int) -> FileNode:
+def map_scope_to_file_node(scope: ScopeModel) -> FileNode:
     """Map ScopeModel to FileNode."""
     return FileNode(
         id=f"nodes/{scope.id}",
         name=scope.name,
         description=f"File: {scope.name}",
         qname=scope.qname,
-        current_version=version,
-
         path=scope.file_path,
         hash=scope.checksum or "",
     )
 
 
-def map_scope_to_folder_node(scope: ScopeModel, version: int) -> FolderNode:
+def map_scope_to_folder_node(scope: ScopeModel) -> FolderNode:
     """Map ScopeModel to FolderNode."""
     return FolderNode(
         id=f"nodes/{scope.id}",
         name=scope.name,
         description=f"Folder: {scope.name}",
         qname=scope.qname,
-        current_version=version,
         path=scope.file_path,  # For folders, file_path is the folder path
     )
 
 
-def map_scope_to_class_node(scope: ScopeModel, version: int) -> ClassNode:
+def map_scope_to_class_node(scope: ScopeModel) -> ClassNode:
     """Map ScopeModel to ClassNode."""
     return ClassNode(
         id=f"nodes/{scope.id}",
         name=scope.name,
         description=f"Class: {scope.name}",
         qname=scope.qname,
-        current_version=version,
-
         position=map_scope_to_position(scope),
         implements=scope.mro,  # Using MRO as implements for now
     )
 
 
 def map_scope_to_function_node(
-    scope: ScopeModel, version: int
+    scope: ScopeModel
 ) -> FunctionNode:
     """Map ScopeModel to FunctionNode."""
     return FunctionNode(
@@ -62,7 +57,5 @@ def map_scope_to_function_node(
         id=f"nodes/{scope.id}",
         description=f"Function: {scope.name}",
         qname=scope.qname,
-        current_version=version,
-
         position=map_scope_to_position(scope),
     )
