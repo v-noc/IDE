@@ -178,7 +178,7 @@ class GraphBuilderOrchestrator:
 
         # Phase 3: Sync scopes to graph database
         # Generate version at project level
-        sync_version = int(time.time_ns())
+
         call_sync_service = None
         sync_service = None
         if self.repos:
@@ -186,7 +186,6 @@ class GraphBuilderOrchestrator:
                 self.repos,
                 self.scope_manager,
                 self.project_node,
-                sync_version,
             )
 
             sync_service.sync_scope_hierarchy(self.project_node.id, change_set)
