@@ -81,7 +81,11 @@ class NodeRepository(BaseRepository[T]):
         cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
 
         # Get first result only (don't buffer all)
-        result = await cursor.next() if cursor else None
+        result = None
+
+        async for row in cursor:
+            result = row
+            break  # Get first and exit
 
         return result
 
@@ -110,7 +114,10 @@ class NodeRepository(BaseRepository[T]):
         cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
 
         # Only fetch first result
-        result = await cursor.next() if cursor else None
+        result = None
+        async for row in cursor:
+            result = row
+            break  # Get first and exit
 
         return ProjectNode.model_validate(result) if result else None
 
@@ -208,7 +215,11 @@ class NodeRepository(BaseRepository[T]):
         # Buffer all results (for backwards compatibility)
 
         cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-        result = await cursor.next() if cursor else None
+        result = None
+        async for row in cursor:
+            result = row
+            break  # Get first and exit
+
         return result or {"file": None, "project": None}
 
     async def find_by_qname(self, qname: str) -> Optional[T]:
