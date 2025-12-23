@@ -66,6 +66,7 @@ class Collector:
                 self.project_path,
             )
             return None
+
         # 1. Build Hierarchy (creates/updates file, folder scopes)
         build_result = await self.hierarchy_builder.build_hierarchy(
             rel_path, checksum)
@@ -76,7 +77,7 @@ class Collector:
 
         # 2. Parse Content & Scan AST
         try:
-            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(str(abs_path), "r", encoding="utf-8") as f:
                 content = await f.read()
         except Exception as e:
             logger.error(f"Failed to scan AST for {file_path}: {e}")
@@ -86,7 +87,7 @@ class Collector:
         # descendants)
         loop = asyncio.get_event_loop()
         try:
-            ast_nodes = await loop.run_in_executor(None, scan, content, str(rel_path))
+            ast_nodes = await loop.run_in_executor(None, scan, content, str(abs_path))
         except Exception as e:
             logger.error(
                 f"Failed to collect descendant scopes for {file_path}: {e}")
