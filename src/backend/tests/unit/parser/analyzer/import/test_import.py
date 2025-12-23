@@ -4,6 +4,7 @@ from app.core.schemas.tree import (
     AnyTreeNode,
     CallTreeNode,
 )
+import pytest
 
 
 def find_file_node(nodes: list[AnyTreeNode], file_name: str) -> FileTreeNode | None:
@@ -17,7 +18,8 @@ def find_file_node(nodes: list[AnyTreeNode], file_name: str) -> FileTreeNode | N
     return None
 
 
-def test_absolute_path_import(project_tree: ProjectNode):
+@pytest.mark.asyncio
+async def test_absolute_path_import(project_tree: ProjectNode):
     file_node = find_file_node(project_tree.children, "import_absolute")
 
     assert file_node is not None

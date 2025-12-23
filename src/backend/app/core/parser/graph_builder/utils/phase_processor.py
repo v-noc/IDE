@@ -174,6 +174,8 @@ class PhaseProcessor:
                 except Exception as exc:
                     print(
                         f"Error processing file {result.file_scope.file_path}: {exc}")
+                    from traceback import format_exc
+                    print(format_exc())
                     return set()
 
         async with asyncio.TaskGroup() as tg:

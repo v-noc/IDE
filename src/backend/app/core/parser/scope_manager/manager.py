@@ -1,3 +1,4 @@
+import asyncio
 from .db import DBConnectionManager
 from .repository import ScopeRepository
 from .models import ScopeModel, CallSiteModel, ScopeType
@@ -14,6 +15,7 @@ class ScopeManager:
     def __init__(self, project_name: str, db_path: Optional[str] = None):
         self.db_manager = DBConnectionManager(project_name, db_path)
         self.repository = ScopeRepository(self.db_manager)
+        self.semaphore = asyncio.Semaphore(1)
 
     # Scope Management
 
@@ -36,26 +38,28 @@ class ScopeManager:
         checksum: Optional[str] = None,
     ) -> ScopeModel:
         """Create a new scope."""
-        scope = ScopeModel(
-            id=scope_id or str(uuid.uuid4()),
-            name=name,
-            qname=qname,
-            type=scope_type,
-            file_path=file_path,
-            start_line=start_line,
-            start_col=start_col,
-            end_line=end_line,
-            end_col=end_col,
-            mro=mro or [],
-            checksum=checksum,
-        )
-        await self.repository.create_scope(scope)
-        return scope
+        async with self.semaphore:
+            scope = ScopeModel(
+                id=scope_id or str(uuid.uuid4()),
+                name=name,
+                qname=qname,
+                type=scope_type,
+                file_path=file_path,
+                start_line=start_line,
+                start_col=start_col,
+                end_line=end_line,
+                end_col=end_col,
+                mro=mro or [],
+                checksum=checksum,
+            )
+            await self.repository.create_scope(scope)
+            return scope
 
     async def update_scope(self, scope: ScopeModel) -> ScopeModel:
         """Update an existing scope."""
-        await self.repository.update_scope(scope)
-        return scope
+        async with self.semaphore:
+            await self.repository.update_scope(scope)
+            return scope
 
     async def batch_get_scopes_by_ids(self, scope_ids: List[str]) -> dict[str, ScopeModel]:
         """Batch get scopes by their IDs. Returns a dict mapping id -> ScopeModel."""
@@ -75,7 +79,8 @@ class ScopeManager:
 
     async def delete_scope(self, scope_id: str) -> None:
         """Delete a scope and its relationships."""
-        await self.repository.delete_scope(scope_id)
+        async with self.semaphore:
+            await self.repository.delete_scope(scope_id)
 
     async def batch_delete_scopes(self, root_scope_ids: List[str]) -> None:
         """Batch delete multiple scopes and all their children/relationships."""
@@ -113,11 +118,13 @@ class ScopeManager:
 
     async def batch_create_scopes(self, scopes: List[ScopeModel]) -> None:
         """Batch create multiple scopes efficiently."""
-        await self.repository.batch_create_scopes(scopes)
+        async with self.semaphore:
+            await self.repository.batch_create_scopes(scopes)
 
     async def batch_link_parent_child(self, relationships: List[dict[str, str]]) -> None:
         """Batch link parent-child relationships. relationships is a list of dicts with 'parent_id' and 'child_id' keys."""
-        await self.repository.batch_link_parent_child(relationships)
+        async with self.semaphore:
+            await self.repository.batch_link_parent_child(relationships)
 
     async def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all children of a scope."""
@@ -135,15 +142,16 @@ class ScopeManager:
         prev_call_site_id: Optional[str] = None,
     ) -> CallSiteModel:
         """Create a call site linking caller to callee (if resolved), optionally chained."""
-        call_site = CallSiteModel(
-            id=str(uuid.uuid4()),
-            line=line,
-            col=col,
-            name=name,
-        )
-        await self.repository.create_call_site(
-            caller_id, callee_id, call_site, prev_call_site_id)
-        return call_site
+        async with self.semaphore:
+            call_site = CallSiteModel(
+                id=str(uuid.uuid4()),
+                line=line,
+                col=col,
+                name=name,
+            )
+            await self.repository.create_call_site(
+                caller_id, callee_id, call_site, prev_call_site_id)
+            return call_site
 
     async def batch_create_calls(
         self,
@@ -168,26 +176,27 @@ class ScopeManager:
             return []
 
         # Create CallSiteModel instances
-        created_call_sites = []
-        batch_data = []
-        for item in call_sites:
-            call_site = CallSiteModel(
-                id=str(uuid.uuid4()),
-                line=item["line"],
-                col=item["col"],
-                name=item.get("name"),
-            )
-            created_call_sites.append(call_site)
-            batch_data.append({
-                "call_site": call_site,
-                "caller_id": item["caller_id"],
-                "callee_id": item.get("callee_id"),
-                "prev_call_site_id": item.get("prev_call_site_id"),
-            })
+        async with self.semaphore:
+            created_call_sites = []
+            batch_data = []
+            for item in call_sites:
+                call_site = CallSiteModel(
+                    id=str(uuid.uuid4()),
+                    line=item["line"],
+                    col=item["col"],
+                    name=item.get("name"),
+                )
+                created_call_sites.append(call_site)
+                batch_data.append({
+                    "call_site": call_site,
+                    "caller_id": item["caller_id"],
+                    "callee_id": item.get("callee_id"),
+                    "prev_call_site_id": item.get("prev_call_site_id"),
+                })
 
-        # Batch insert
-        await self.repository.batch_create_call_sites(batch_data)
-        return created_call_sites
+            # Batch insert
+            await self.repository.batch_create_call_sites(batch_data)
+            return created_call_sites
 
     async def get_root_calls_from(
         self, caller_id: str, include_children: bool = False
@@ -562,7 +571,8 @@ class ScopeManager:
 
     async def clear_calls(self, scope_id: str) -> None:
         """Clear all calls originating from a scope."""
-        await self.repository.clear_calls_from_scope(scope_id)
+        async with self.semaphore:
+            await self.repository.clear_calls_from_scope(scope_id)
 
     # Utility
 

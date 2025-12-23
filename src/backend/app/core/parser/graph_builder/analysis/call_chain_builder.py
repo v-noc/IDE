@@ -502,33 +502,34 @@ class CallChainBuilder:
                 self._temp_id_to_actual_id[temp_id] = actual_id
 
         # Create deferred NEXT_IN_CHAIN relationships
-        if deferred_chain_links:
-            from app.core.parser.scope_manager.repository import ScopeRepository
+        # if deferred_chain_links:
+        #     from app.core.parser.scope_manager.repository import ScopeRepository
 
-            repo: ScopeRepository = self.scope_manager.repository
+        #     repo: ScopeRepository = self.scope_manager.repository
 
-            chain_data = []
-            for prev_temp_id, curr_temp_id in deferred_chain_links:
-                prev_actual_id = self._temp_id_to_actual_id.get(prev_temp_id)
-                curr_actual_id = self._temp_id_to_actual_id.get(curr_temp_id)
-                if prev_actual_id and curr_actual_id:
-                    chain_data.append(
-                        {
-                            "prev_id": prev_actual_id,
-                            "curr_id": curr_actual_id,
-                        }
-                    )
+        #     chain_data = []
+        #     for prev_temp_id, curr_temp_id in deferred_chain_links:
+        #         prev_actual_id = self._temp_id_to_actual_id.get(prev_temp_id)
+        #         curr_actual_id = self._temp_id_to_actual_id.get(curr_temp_id)
+        #         if prev_actual_id and curr_actual_id:
+        #             chain_data.append(
+        #                 {
+        #                     "prev_id": prev_actual_id,
+        #                     "curr_id": curr_actual_id,
+        #                 }
+        #             )
 
-            if chain_data:
-                await repo.conn.execute(
-                    """
-                    UNWIND $chains AS c
-                    MATCH (prev:CallSite {id: c.prev_id})
-                    MATCH (curr:CallSite {id: c.curr_id})
-                    CREATE (prev)-[:NEXT_IN_CHAIN]->(curr)
-                    """,
-                    {"chains": chain_data},
-                )
+        #     if chain_data:
+        #         async with self.scope_manager.semaphore:
+        #             await repo.conn.execute(
+        #                 """
+        #                 UNWIND $chains AS c
+        #                 MATCH (prev:CallSite {id: c.prev_id})
+        #                 MATCH (curr:CallSite {id: c.curr_id})
+        #                 CREATE (prev)-[:NEXT_IN_CHAIN]->(curr)
+        #                 """,
+        #                 {"chains": chain_data},
+        #             )
 
         logger.debug(
             f"Flushed {len(self._call_site_buffer)} call site(s) for file")

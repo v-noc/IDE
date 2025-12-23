@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 import shutil
 from pathlib import Path
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
@@ -21,8 +22,8 @@ def project_path() -> Path:
     return Path(current_dir, "sample_import").absolute()
 
 
-@pytest.fixture
-def setup_project(tmp_path, arangodb_client, project_path):
+@pytest_asyncio.fixture
+async def setup_project(tmp_path, arangodb_client, project_path):
     project_path = tmp_path / "sample_import"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
@@ -36,17 +37,19 @@ def setup_project(tmp_path, arangodb_client, project_path):
         description="Test Project",
     )
     scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
+    await scope_manager.initialize()
 
     # Create project node in database (matching test_function.py pattern)
     repos = Repositories(arangodb_client)
+    await repos.ensure_collections()
     project_service = ProjectService(repos)
-    project_node = project_service.create_node(project_node)
+    project_node = await project_service.create_node(project_node)
 
     return project_node, scope_manager, arangodb_client
 
 
-@pytest.fixture
-def project_tree(setup_project) -> ProjectNode:
+@pytest_asyncio.fixture
+async def project_tree(setup_project) -> ProjectNode:
     project_node, scope_manager, arangodb_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
@@ -55,16 +58,16 @@ def project_tree(setup_project) -> ProjectNode:
         ignore_file_name="v-noc.toml",
         db=arangodb_client,
     )
-    orchestrator.resync()
+    await orchestrator.resync()
 
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
 
-    projects = project_service.get_all()
+    projects = await project_service.get_all()
     assert len(projects) > 0
     project = projects[0]
 
-    children = project_service.get_children(project.id)
+    children = await project_service.get_children(project.id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()

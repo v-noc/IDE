@@ -211,6 +211,7 @@ class GraphBuilderOrchestrator:
             )
             logger.info("Phase 2: Analysis completed")
             print("Phase 2: Analysis completed", flush=True)
+
         finally:
             # Ensure cleanup happens even if there's an error
             logger.debug("Phase 2 cleanup complete")

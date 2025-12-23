@@ -2,6 +2,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
@@ -16,8 +17,8 @@ PROJECT_PATH = SAMPLES_PATH
 PROJECT_NAME = "sample_class"
 
 
-@pytest.fixture
-def setup_project(tmp_path, arangodb_client):
+@pytest_asyncio.fixture
+async def setup_project(tmp_path, arangodb_client):
     project_path = tmp_path / "sample_class"
     shutil.copytree(PROJECT_PATH, project_path)
 
@@ -31,14 +32,18 @@ def setup_project(tmp_path, arangodb_client):
         description="Protector is a tool for protecting your code.",
     )
     scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
+
+    await scope_manager.initialize()
     repos = Repositories(arangodb_client)
+    await repos.ensure_collections()
     project_service = ProjectService(repos)
-    project_node = project_service.create_node(project_node)
+    project_node = await project_service.create_node(project_node)
 
     return project_node, scope_manager, arangodb_client
 
 
-def test_class_analysis(setup_project):
+@pytest.mark.asyncio
+async def test_class_analysis(setup_project):
     project_node, scope_manager, arangodb_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
@@ -46,14 +51,14 @@ def test_class_analysis(setup_project):
         db=arangodb_client,
         scope_manager=scope_manager,
     )
-    orchestrator.resync()
+    await orchestrator.resync()
 
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
 
-    project = project_service.get_all()
+    project = await project_service.get_all()
 
-    children = project_service.get_children(project[0].id)
+    children = await project_service.get_children(project[0].id)
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
