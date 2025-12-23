@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
+import aiofiles
+import asyncio
 from app.core.model.nodes import ProjectNode
 from app.core.parser.ast.scanner import scan
 from app.core.parser.jedi_adapter.manager import JediProjectManager
@@ -43,24 +45,11 @@ class Collector:
         """Reset builder caches between orchestrator runs."""
         self.hierarchy_builder.reset_session()
 
-    def process_file(
+    async def process_file(
         self, file_path: str, checksum: str
     ) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 1 collection.
-
-        For NEW files:
-        - Create folder hierarchy and file scope
-        - Parse AST and create all scopes
-        - Return all scopes as updated (new) for Phase 2
-
-        For UPDATED files:
-        - Build folder hierarchy and update file scope if needed
-        - Parse AST and build current scope hierarchy
-        - For each scope found by ID, check if path/position/name changed
-        - Create new scopes
-        - Track removed scopes (by ID)
-        - Return only new or modified scopes for Phase 2
 
         Returns:
         - file_scope: The file scope node
@@ -78,7 +67,7 @@ class Collector:
             )
             return None
         # 1. Build Hierarchy (creates/updates file, folder scopes)
-        build_result = self.hierarchy_builder.build_hierarchy(
+        build_result = await self.hierarchy_builder.build_hierarchy(
             rel_path, checksum)
         if not build_result:
             logger.error(f"Failed to build hierarchy for {file_path}")
@@ -87,21 +76,29 @@ class Collector:
 
         # 2. Parse Content & Scan AST
         try:
-            with open(abs_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            ast_nodes = scan(content, str(abs_path))
+            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
+                content = await f.read()
         except Exception as e:
             logger.error(f"Failed to scan AST for {file_path}: {e}")
             return None
+
         # 3. Get existing children from database (recursively collect all
         # descendants)
-        existing_map = self._collect_all_descendant_scopes(file_scope.id)
+        loop = asyncio.get_event_loop()
+        try:
+            ast_nodes = await loop.run_in_executor(None, scan, content, str(rel_path))
+        except Exception as e:
+            logger.error(
+                f"Failed to collect descendant scopes for {file_path}: {e}")
+            return None
+
+        existing_map = await self._collect_all_descendant_scopes(file_scope.id)
 
         # 4. Process AST Nodes to build current scope hierarchy
         # ASTProcessor will check each scope by ID and update if path/pos/name
         # changed
 
-        current_scopes_nodes = self.ast_processor.process_ast_nodes(
+        current_scopes_nodes = await self.ast_processor.process_ast_nodes(
             ast_nodes, file_scope, content)
 
         # 5. Determine which scopes are new or modified (Internal Update)
@@ -138,7 +135,7 @@ class Collector:
             folder_changes=build_result.folder_changes,
         )
 
-    def process_folder(self, folder_path: str) -> Optional[List[FolderChange]]:
+    async def process_folder(self, folder_path: str) -> Optional[List[FolderChange]]:
         """Ensure folder hierarchy exists for a folder change event."""
         abs_path = Path(folder_path)
         try:
@@ -149,15 +146,15 @@ class Collector:
                 folder_path,
                 self.project_path,
             )
-            return None
-        build_result = self.hierarchy_builder.ensure_folder(rel_path)
+            return []
+        build_result = await self.hierarchy_builder.ensure_folder(rel_path)
         if not build_result:
-            return None
+            return []
         return build_result.folder_changes
 
-    def _collect_all_descendant_scopes(
+    async def _collect_all_descendant_scopes(
         self, parent_scope_id: str
-    ) -> dict[str, ScopeModel]:  # noqa: E501
+    ) -> dict[str, ScopeModel]:
         """
         Recursively collect all descendant scopes from a parent scope.
         Returns a dictionary mapping scope ID to ScopeModel.
@@ -167,7 +164,7 @@ class Collector:
 
         while queue:
             current_id = queue.pop(0)
-            children = self.manager.get_children(current_id)
+            children = await self.manager.get_children(current_id)
             for child in children:
                 if child.id not in result:
                     result[child.id] = child

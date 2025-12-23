@@ -3,7 +3,8 @@ import logging
 import uuid
 import hashlib
 import json
-from typing import List, Tuple, Any, Optional, Dict
+import asyncio
+from typing import List, Optional, Dict
 
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel, ScopeType
@@ -17,7 +18,7 @@ class ASTProcessor:
         self.manager = scope_manager
         self.mro_resolver = mro_resolver
 
-    def process_ast_nodes(self, nodes: List[BaseNode], parent_scope: ScopeModel, content: Optional[str] = None) -> List[tuple[ScopeModel, BaseNode]]:
+    async def process_ast_nodes(self, nodes: List[BaseNode], parent_scope: ScopeModel, content: Optional[str] = None) -> List[tuple[ScopeModel, BaseNode]]:
         """
         Recursively create scopes for AST nodes and return created scopes with their AST nodes.
         Uses batch operations for efficiency.
@@ -34,7 +35,7 @@ class ASTProcessor:
         scope_ids_to_check = [data["node_id"] for data in node_data_list]
 
         # Batch check all existing scopes
-        existing_scopes = self.manager.batch_get_scopes_by_ids(
+        existing_scopes = await self.manager.batch_get_scopes_by_ids(
             scope_ids_to_check)
 
         # Collect scopes to create, update, and relationships to link
@@ -107,16 +108,20 @@ class ASTProcessor:
             scope_map[node_id] = scope
 
         # Batch create all scopes
+        tasks = []
         if scopes_to_create:
-            self.manager.batch_create_scopes(scopes_to_create)
+            tasks.append(self.manager.batch_create_scopes(scopes_to_create))
 
         # Batch update all scopes
         if scopes_to_update:
-            self.manager.batch_update_scopes(scopes_to_update)
+            tasks.append(self.manager.batch_update_scopes(scopes_to_update))
 
         # Batch link all parent-child relationships
         if relationships_to_link:
-            self.manager.batch_link_parent_child(relationships_to_link)
+            tasks.append(self.manager.batch_link_parent_child(
+                relationships_to_link))
+        if tasks:
+            await asyncio.gather(*tasks)
 
         # Build results list
         results = []

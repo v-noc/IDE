@@ -1,5 +1,6 @@
 import logging
 import uuid
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Dict
@@ -34,28 +35,28 @@ class HierarchyBuilder:
         """Reset cached folder touches for a new orchestration run."""
         self._touched_folder_ids.clear()
 
-    def build_hierarchy(
+    async def build_hierarchy(
         self, rel_path: Path, checksum: str
     ) -> Optional[HierarchyBuildResult]:
         """
         Build folder + file hierarchy for a file path.
         Returns the resulting file scope and folder change metadata.
         """
-        return self._ensure_path(
+        return await self._ensure_path(
             rel_path, checksum=checksum, terminal_type=ScopeType.FILE
         )
 
-    def ensure_folder(
+    async def ensure_folder(
         self, rel_path: Path
     ) -> Optional[HierarchyBuildResult]:
         """
         Ensure that a folder hierarchy exists for the given relative path.
         """
-        return self._ensure_path(
+        return await self._ensure_path(
             rel_path, checksum=None, terminal_type=ScopeType.FOLDER
         )
 
-    def _ensure_path(
+    async def _ensure_path(
         self,
         rel_path: Path,
         checksum: Optional[str],
@@ -63,7 +64,8 @@ class HierarchyBuilder:
     ) -> Optional[HierarchyBuildResult]:
         rel_parts = [part for part in rel_path.parts if part]
         folder_changes: List[FolderChange] = []
-        root = self._ensure_root(folder_changes)
+
+        root = await self._ensure_root(folder_changes)
         folder_chain = [{"scope": root, "parent": None}]
 
         if not rel_parts and terminal_type == ScopeType.FOLDER:
@@ -89,7 +91,7 @@ class HierarchyBuilder:
             )
 
         # Batch check all qnames at once
-        existing_scopes = self.manager.batch_get_scopes_by_qnames(
+        existing_scopes = await self.manager.batch_get_scopes_by_qnames(
             qnames_to_check
         )
 
@@ -151,7 +153,7 @@ class HierarchyBuilder:
                     )
                     if checksum_changed:
                         scope.checksum = checksum
-                        scope = self.manager.update_scope(scope)
+                        scope = await self.manager.update_scope(scope)
                         hierarchy_changed = True
                 else:
                     folder_chain.append(
@@ -163,11 +165,11 @@ class HierarchyBuilder:
 
         # Batch create all scopes
         if scopes_to_create:
-            self.manager.batch_create_scopes(scopes_to_create)
+            await self.manager.batch_create_scopes(scopes_to_create)
 
         # Batch link all parent-child relationships
         if relationships_to_link:
-            self.manager.batch_link_parent_child(
+            await self.manager.batch_link_parent_child(
                 relationships_to_link
             )
 
@@ -189,13 +191,13 @@ class HierarchyBuilder:
             scope=terminal_scope, folder_changes=folder_changes
         )
 
-    def _ensure_root(self, folder_changes: List[FolderChange]) -> ScopeModel:
+    async def _ensure_root(self, folder_changes: List[FolderChange]) -> ScopeModel:
         current_qname = self.project_node.name
-        root = self.manager.get_scope_by_qname(current_qname)
+        root = await self.manager.get_scope_by_qname(current_qname)
         if root:
             return root
 
-        root = self.manager.create_scope(
+        root = await self.manager.create_scope(
             name=self.project_node.name,
             qname=current_qname,
             scope_type=ScopeType.FOLDER,
