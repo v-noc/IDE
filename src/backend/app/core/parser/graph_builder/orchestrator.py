@@ -42,8 +42,9 @@ class GraphBuilderOrchestrator:
         db: Optional[AsyncDatabase] = None,
         scope_manager: Optional[ScopeManager] = None,
         ignore_file_name: str = ".gitignore",
-        batch_size: int = 1000,
-        max_concurrent_files: int = 10,
+        max_concurrent_files: int = 50,
+        max_concurrent_db: int = 100,
+        batch_size: int = 100,
     ):
         self.project_node = project_node
         self.project_path = project_node.path
@@ -93,6 +94,9 @@ class GraphBuilderOrchestrator:
             self.collector,
             self.jedi_manager,
             batch_size=self.batch_size,
+            max_concurrent_db=self.max_concurrent_db,
+            max_concurrent_files=self.max_concurrent_files,
+
         )
 
         # Initialize Sync components
@@ -151,7 +155,7 @@ class GraphBuilderOrchestrator:
 
         # Handle folder additions proactively to ensure hierarchy exists
         for folder_path in change_set.new_folders:
-            folder_result = self.collector.process_folder(folder_path)
+            folder_result = await self.collector.process_folder(folder_path)
             if folder_result:
                 folder_changes.extend(folder_result)
                 touched_folder_ids.update(fc.scope.id for fc in folder_result)
@@ -171,13 +175,13 @@ class GraphBuilderOrchestrator:
 
         # Process Deleted folders before files to avoid orphan references
         if change_set.deleted_folders:
-            self.deletion_handler.handle_batch_folder_deletions(
+            await self.deletion_handler.handle_batch_folder_deletions(
                 change_set.deleted_folders, folder_changes, touched_folder_ids
             )
 
         # Process Deleted files (Full file deletion)
         if change_set.deleted_files:
-            self.deletion_handler.handle_batch_file_deletions(
+            await self.deletion_handler.handle_batch_file_deletions(
                 change_set.deleted_files, folder_changes, touched_folder_ids
             )
 
@@ -193,7 +197,7 @@ class GraphBuilderOrchestrator:
                 self.project_node,
             )
 
-            sync_service.sync_scope_hierarchy(self.project_node.id, change_set)
+            await sync_service.sync_scope_hierarchy(self.project_node.id, change_set)
             call_sync_service = sync_service.call_sync.sync_call_chain_scopes
         else:
             logger.warning("No database connection for sync; skipping")
@@ -202,7 +206,7 @@ class GraphBuilderOrchestrator:
         logger.info("Starting Phase 2: Analysis")
         print("Starting Phase 2: Analysis", flush=True)
         try:
-            self.phase_processor.process_analysis_phase(
+            await self.phase_processor.process_analysis_phase(
                 collection_results, call_sync_service
             )
             logger.info("Phase 2: Analysis completed")
@@ -215,7 +219,7 @@ class GraphBuilderOrchestrator:
             logger.info("Syncing call chains to graph database...")
             print("Syncing call chains to graph database...", flush=True)
             try:
-                sync_service.call_sync.batch_sync_calls()
+                await sync_service.call_sync.batch_sync_calls()
                 logger.info("Call chain sync completed")
                 print("Call chain sync completed", flush=True)
             except Exception as sync_exc:

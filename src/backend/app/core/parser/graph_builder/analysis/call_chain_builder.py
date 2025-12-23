@@ -9,7 +9,8 @@ This module:
 4. Handles class instantiation edge case (links to class, processes
    __init__ if present)
 """
-
+import asyncio
+import aiofiles
 import logging
 import time
 from collections import defaultdict
@@ -80,7 +81,7 @@ class CallChainBuilder:
         global _timings
         _timings.clear()
 
-    def _get_scope_with_retry(
+    async def _get_scope_with_retry(
         self,
         scope_id: Optional[str] = None,
         qname: Optional[str] = None,
@@ -110,14 +111,14 @@ class CallChainBuilder:
         for attempt in range(max_retries):
             # Try ID-based lookup first
             if scope_id:
-                scope = self.scope_manager.get_scope(scope_id)
+                scope = await self.scope_manager.get_scope(scope_id)
                 if scope:
                     return scope
 
             # Try qname-based lookup if ID failed or wasn't provided
             if qname:
                 print(f"Getting scope by qname: {qname} {scope_id}")
-                scope = self.scope_manager.get_scope_by_qname(qname)
+                scope = await self.scope_manager.get_scope_by_qname(qname)
                 if scope:
                     return scope
 
@@ -130,7 +131,7 @@ class CallChainBuilder:
 
         return None
 
-    def build_chain(
+    async def build_chain(
         self,
         call_node: CallNode,
         caller_scope: ScopeModel,
@@ -170,8 +171,8 @@ class CallChainBuilder:
 
         t0 = time.time()
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                source = f.read()
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+                source = await f.read()
         except OSError as e:
             logger.error(f"Could not read file {file_path}: {e}")
             return None
@@ -179,13 +180,14 @@ class CallChainBuilder:
 
         # Resolve the call using Jedi with context preservation
         t0 = time.time()
-        resolutions = self.call_resolver.resolve_call(
-            str(file_path),
-            source,
-            call_node.position.line,
-            call_node.call_col_pos,
-            parent_context=parent_context,
-        )
+        loop = asyncio.get_event_loop()
+        resolutions = await loop.run_in_executor(None, self.call_resolver.resolve_call,
+                                                 str(file_path),
+                                                 source,
+                                                 call_node.position.line,
+                                                 call_node.call_col_pos,
+                                                 parent_context=parent_context,
+                                                 )
         resolve_time = time.time() - t0
         _timings["resolve_call"].append(resolve_time)
         # Track instance-level stats
@@ -209,7 +211,7 @@ class CallChainBuilder:
             # Use retry logic to handle race conditions with concurrent
             # scope creation
             t0 = time.time()
-            callee_scope = self._get_scope_with_retry(
+            callee_scope = await self._get_scope_with_retry(
                 scope_id=resolution.callee_id,
                 qname=resolution.qname,
             )
@@ -237,8 +239,6 @@ class CallChainBuilder:
                 self.call_chain_scope_ids[callee_scope.id] += 1
 
             if self.call_chain_scope_ids[callee_scope.id] >= self.max_depth:
-                # print(
-                #     f"Max depth reached for {callee_scope.qname} {caller_scope.qname} {self.call_chain_scope_ids[callee_scope.id]}")
                 continue
 
             # Generate call site ID (will be created in batch)
@@ -260,10 +260,10 @@ class CallChainBuilder:
             )
 
             # Extract execution context for recursion
-            execution_context = resolution.execution_context if resolution else None
+            execution_context = getattr(resolution, 'execution_context', None)
 
             # Process each body separately
-            self._process_scope_body(
+            await self._process_scope_body(
                 callee_scope, depth + 1, call_site_id, execution_context
             )
 
@@ -325,7 +325,7 @@ class CallChainBuilder:
         segment = segment.strip()
         return segment or raw_name
 
-    def _process_scope_body(
+    async def _process_scope_body(
         self,
         scope: ScopeModel,
         depth: int,
@@ -351,8 +351,8 @@ class CallChainBuilder:
 
         t0 = time.time()
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                source = f.read()
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+                source = await f.read()
         except OSError as e:
             logger.error(f"Could not read file {file_path}: {e}")
             return
@@ -360,8 +360,9 @@ class CallChainBuilder:
 
         # Parse the AST
         t0 = time.time()
+        loop = asyncio.get_event_loop()
         try:
-            nodes = scan(source, str(file_path))
+            nodes = await loop.run_in_executor(None, scan, source, str(file_path))
         except Exception as e:
             logger.error(f"Failed to scan AST for {file_path}: {e}")
             return
@@ -383,16 +384,8 @@ class CallChainBuilder:
 
         logger.debug(f"Found {len(call_nodes)} call(s) in {scope.qname}")
 
-        # Process each call recursively
-        # Note: Call sites are buffered and flushed per file, not per scope
-        # When processing nested calls within a callee's body (current_call_id is not None),
-        # all nested calls should be chained to the parent call site that invoked this scope.
-        # Calls within the same scope are siblings and share the same parent (current_call_id),
-        # but are not chained to each other sequentially.
         for call_node in call_nodes:
-            # Chain nested calls to the parent call site (if we're processing a callee's body)
-            # If current_call_id is None, this is a top-level call with no parent
-            self.build_chain(
+            await self.build_chain(
                 call_node,
                 scope,
                 current_call_id,  # Pass through the parent call site ID for chaining
@@ -444,7 +437,7 @@ class CallChainBuilder:
 
         return calls
 
-    def _flush_all_buffered_call_sites(self) -> None:
+    async def _flush_all_buffered_call_sites(self) -> None:
         """
         Flush all call sites in the buffer.
 
@@ -498,7 +491,7 @@ class CallChainBuilder:
 
         # Batch create call sites
         t0 = time.time()
-        created_call_sites = self.scope_manager.batch_create_calls(batch_data)
+        created_call_sites = await self.scope_manager.batch_create_calls(batch_data)
         _timings["create_call_site"].append(time.time() - t0)
 
         # Map temp IDs from this batch to actual IDs
@@ -527,7 +520,7 @@ class CallChainBuilder:
                     )
 
             if chain_data:
-                repo.conn.execute(
+                await repo.conn.execute(
                     """
                     UNWIND $chains AS c
                     MATCH (prev:CallSite {id: c.prev_id})
@@ -543,9 +536,9 @@ class CallChainBuilder:
         # Clear the buffer
         self._call_site_buffer.clear()
 
-    def flush_all_call_sites(self) -> None:
+    async def flush_all_call_sites(self) -> None:
         """Flush all remaining call sites in the buffer."""
-        self._flush_all_buffered_call_sites()
+        await self._flush_all_buffered_call_sites()
         self.reset_visited()
 
     def reset_visited(self):
