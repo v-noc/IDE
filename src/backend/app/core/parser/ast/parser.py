@@ -132,11 +132,15 @@ class JediParser:
     def _visit_function(self, node: Function) -> FunctionNode:
         if node.type == 'lambdef':
             return None
+        target_node = node
+        if node.parent and node.parent.type == 'async_funcdef':
+            target_node = node.parent
+
         return FunctionNode(
-            id=self._extract_id(node),
+            id=self._extract_id(target_node),
             name=node.name.value,
-            position=self._get_position(node),
-            children=self._scan_children(node)
+            position=self._get_position(target_node),
+            children=self._scan_children(target_node)
         )
 
     def _get_clean_code(self, node) -> str:
