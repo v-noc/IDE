@@ -57,6 +57,9 @@ async def project_tree(setup_project) -> ProjectNode:
         scope_manager=scope_manager,
         ignore_file_name="v-noc.toml",
         db=arangodb_client,
+        max_concurrent_files=1,
+        max_concurrent_db=1,
+        batch_size=1,
     )
     await orchestrator.resync()
 

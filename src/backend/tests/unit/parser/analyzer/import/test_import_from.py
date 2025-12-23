@@ -5,6 +5,7 @@ from app.core.schemas.tree import (
     AnyTreeNode,
     CallTreeNode,
 )
+import pytest
 
 
 def find_file_node(nodes: list[AnyTreeNode], file_name: str) -> FileTreeNode | None:
@@ -29,7 +30,8 @@ def find_file_node(nodes: list[AnyTreeNode], file_name: str) -> FileTreeNode | N
 #     assert call_node.target.qname == "sample_import.utils.helper.create_user"
 
 
-def test_import_from_relative_path(project_tree: ProjectNode):
+@pytest.mark.asyncio
+async def test_import_from_relative_path(project_tree: ProjectNode):
     file_node = find_file_node(project_tree.children, "import_relative")
     assert file_node is not None
     assert len(file_node.children) == 2
@@ -49,7 +51,8 @@ def test_import_from_relative_path(project_tree: ProjectNode):
     assert user_call.target.qname == "sample_import.utils.data.user.User"
 
 
-def test_import_from_wildcard(project_tree: ProjectNode):
+@pytest.mark.asyncio
+async def test_import_from_wildcard(project_tree: ProjectNode):
     # Test relative wildcard import
     file_node_relative = find_file_node(
         project_tree.children, "import_wild_card")
@@ -76,7 +79,8 @@ def test_import_from_wildcard(project_tree: ProjectNode):
     assert call_node_absolute.target.qname == "sample_import.utils.helper.create_user"
 
 
-def test_import_from_with_alias(project_tree: ProjectNode):
+@pytest.mark.asyncio
+async def test_import_from_with_alias(project_tree: ProjectNode):
     file_node = find_file_node(project_tree.children, "import_alias")
     assert file_node is not None
     assert len(file_node.children) == 2
@@ -88,7 +92,8 @@ def test_import_from_with_alias(project_tree: ProjectNode):
     assert call_node.target.qname == "sample_import.utils.helper.create_user"
 
 
-def test_import_from_init(project_tree: ProjectNode):
+@pytest.mark.asyncio
+async def test_import_from_init(project_tree: ProjectNode):
     file_node = find_file_node(project_tree.children, "init_import")
 
     assert len(file_node.children) == 2
