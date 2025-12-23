@@ -1,4 +1,5 @@
 """Processes collection and analysis phases."""
+from dataclasses import dataclass, field
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from typing import Callable, List, Optional
@@ -10,6 +11,8 @@ from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.scope_manager.manager import ScopeManager
+import aiofiles
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +20,15 @@ logger = logging.getLogger(__name__)
 FILE_PROCESSING_TIMEOUT = 60  # 1 minute per file
 # Limit workers to reduce database connection contention
 MAX_WORKERS = 4
+
+
+@dataclass
+class ProcessingStats:
+    """Statistics for phase processing."""
+    files_processed: int = 0
+    files_failed: int = 0
+    total_time: float = 0.0
+    errors: List[tuple] = field(default_factory=list)
 
 
 class PhaseProcessor:
@@ -29,16 +41,24 @@ class PhaseProcessor:
         scope_manager: ScopeManager,
         collector: Collector,
         jedi_manager: JediProjectManager,
-        batch_size: int = 500,
+        max_concurrent_files: int = 50,
+        max_concurrent_db: int = 100,
+        file_timeout: float = 60.0,
+        batch_size: int = 100,
     ):
         self.project_node = project_node
         self.project_path = project_path
         self.scope_manager = scope_manager
         self.collector = collector
         self.jedi_manager = jedi_manager
-        self.batch_size = batch_size
 
-    def process_collection_phase(
+        # Concurrency control
+        self._file_semaphore = asyncio.Semaphore(max_concurrent_files)
+        self._db_semaphore = asyncio.Semaphore(max_concurrent_db)
+        self._file_timeout = file_timeout
+        self._batch_size = batch_size
+
+    async def process_collection_phase(
         self,
         change_set: ChangeSet,
         scan_result: ScanResult,
@@ -56,81 +76,53 @@ class PhaseProcessor:
         self.collector.reset_session()
         files_to_process = change_set.new_files + change_set.modified_files
 
-        collection_results = []
-        removed_scope_ids_to_delete = []
+        results = []
+        removed_scope_ids = []
+        folder_changes = []
 
-        def _process_single_file(file_path: str):
-            checksum = scan_result.files.get(file_path)
-            if not checksum:
-                return None
-            logger.info(f"Collecting structure for: {file_path}")
-            try:
-                return self.collector.process_file(file_path, checksum)
-            except Exception as exc:
-                # Log error but don't let it propagate to avoid deadlocks
-                logger.error(
-                    "Error in collector.process_file for %s: %s",
-                    file_path,
-                    exc,
-                    exc_info=True,
-                )
-                return None
-
-        # Run file collection in parallel to improve throughput
-        # Limit workers to reduce database connection contention
-        with ThreadPoolExecutor() as executor:
-            future_to_file = {
-                executor.submit(_process_single_file, file_path): file_path
-                for file_path in files_to_process
-            }
-            for future in as_completed(future_to_file):
-                file_path = future_to_file[future]
+        async def _process_single_file(file_path: str):
+            async with self._file_semaphore:
+                checksum = scan_result.files.get(file_path)
+                if not checksum:
+                    return None
+                logger.info(f"Collecting structure for: {file_path}")
                 try:
-                    # Add timeout to prevent indefinite hanging
-                    result = future.result(timeout=FILE_PROCESSING_TIMEOUT)
-                except FutureTimeoutError:
-                    logger.error(
-                        "Timeout collecting structure for %s (exceeded %d seconds)",
-                        file_path,
-                        FILE_PROCESSING_TIMEOUT,
+                    result = await asyncio.wait_for(
+                        self.collector.process_file(file_path, checksum),
+                        timeout=self._file_timeout,
                     )
-                    continue
-                except Exception as exc:  # pragma: no cover - defensive logging
+                    return result
+                except Exception as exc:
+                    # Log error but don't let it propagate to avoid deadlocks
                     logger.error(
-                        "Error collecting structure for %s: %s",
+                        "Error in collector.process_file for %s: %s",
                         file_path,
                         exc,
                         exc_info=True,
                     )
-                    continue
+                    return None
 
-                if result:
-                    collection_results.append(result)
-                    # Collect removed scope IDs to delete after parallel processing
-                    removed_scope_ids_to_delete.extend(
-                        result.removed_scope_ids)
+        async with asyncio.TaskGroup() as tg:
+            tasks = [
+                tg.create_task(_process_single_file(file_path))
+                for file_path in files_to_process
+            ]
 
-        # Delete Removed Scopes sequentially after all parallel work is done
-        # This avoids race conditions and database connection contention
-        for scope_id in removed_scope_ids_to_delete:
-            try:
-                logger.info("Deleting removed scope ID: %s", scope_id)
-                self.scope_manager.delete_scope(scope_id)
-            except Exception as exc:
-                logger.error(
-                    "Error deleting scope ID %s: %s",
-                    scope_id,
-                    exc,
-                    exc_info=True,
-                )
-                # Continue with other deletions even if one fails
+        for task in tasks:
+            result = task.result()
+            if result:
+                results.append(result)
+                removed_scope_ids.update(result.removed_scope_ids)
+                folder_changes.extend(result.folder_changes)
 
-        return collection_results
+        if removed_scope_ids:
+            await self._batch_delete_scopes(list(removed_scope_ids))
+        return results
 
-    def process_analysis_phase(
+    async def process_analysis_phase(
         self,
         collection_results: List,
-        call_sync_service: Optional[Callable[[List[str]], None]] = None,
+        call_sync_service=None,
     ) -> None:
         """
         Process Phase 2: Body Analysis (Calls).
@@ -139,48 +131,52 @@ class PhaseProcessor:
             collection_results: Results from collection phase
             call_sync_service: Optional service to sync call chains after analysis
         """
-        def _process_single_file_analysis(result):
+
+        all_processed_scope_ids = set()
+
+        async def _process_single_file_analysis(result):
             """Process a single file's AST analysis in a thread."""
-            try:
-                logger.info(
-                    "Analyzing changes for: %s",
-                    result.file_scope.file_path,
-                )
+            async with self._file_semaphore:
+                try:
+                    logger.info(
+                        "Analyzing changes for: %s",
+                        result.file_scope.file_path,
+                    )
 
-                # Create a new BodyParser for this thread/file
-                body_parser = BodyParser(
-                    self.project_path,
-                    self.project_node.name,
-                    self.scope_manager,
-                    self.jedi_manager,
-                    batch_size=self.batch_size,
-                )
+                    # Create a new BodyParser for this thread/file
+                    body_parser = BodyParser(
+                        self.project_path,
+                        self.project_node.name,
+                        self.scope_manager,
+                        self.jedi_manager,
+                        batch_size=self.batch_size,
+                    )
 
-                # Process File Body (Full Analysis)
-                logger.info("Processing file body: %s",
-                            result.file_scope.qname)
+                    # Process File Body (Full Analysis)
+                    logger.info("Processing file body: %s",
+                                result.file_scope.qname)
 
-                # Clear file-scope calls; children clear during traversal
-                self.scope_manager.clear_calls(result.file_scope.id)
+                    # Clear file-scope calls; children clear during traversal
+                    await self.scope_manager.clear_calls(result.file_scope.id)
 
-                # Parse the full AST tree
-                # BodyParser traverses descendants and clears their calls en route
-                body_parser.process_ast(result.file_scope)
+                    # Parse the full AST tree
+                    # BodyParser traverses descendants and clears their calls en route
+                    body_parser.process_ast(result.file_scope)
 
-                # Flush any remaining call sites in the buffer for this file
-                processed_scope_ids = body_parser.flush_all_call_sites()
+                    # Flush any remaining call sites in the buffer for this file
+                    processed_scope_ids = body_parser.flush_all_call_sites()
 
-                # Get stats from this file's processing
-                stats = body_parser.get_stats()
+                    # Get stats from this file's processing
+                    stats = body_parser.get_stats()
 
-                return {
-                    "processed_scope_ids": processed_scope_ids,
-                    "stats": stats,
-                }
-            except Exception as exc:
-                print(
-                    f"Error processing file {result.file_scope.file_path}: {exc}")
-                return None
+                    return {
+                        "processed_scope_ids": processed_scope_ids,
+                        "stats": stats,
+                    }
+                except Exception as exc:
+                    print(
+                        f"Error processing file {result.file_scope.file_path}: {exc}")
+                    return None
 
         # Run file analysis in parallel threads
         # Limit workers to reduce database connection contention

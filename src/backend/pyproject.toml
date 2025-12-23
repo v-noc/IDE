@@ -25,6 +25,7 @@ dependencies = [
   "python-socketio>=5.15.0",
   "python-arango-async>=1.0.3",
   "pytest-asyncio>=1.1.0",
+  "aiofiles>=25.1.0",
 ]
 
 [project.optional-dependencies]

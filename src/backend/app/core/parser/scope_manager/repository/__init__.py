@@ -88,9 +88,9 @@ class ScopeRepository:
         """Batch create multiple call sites efficiently using Neo4j UNWIND."""
         self._call_site_repo.batch_create_call_sites(call_sites)
 
-    def clear_calls_from_scope(self, scope_id: str) -> None:
+    async def async_clear_calls_from_scope(self, scope_id: str) -> None:
         """Delete all call sites originating from the given scope."""
-        self._call_site_repo.clear_calls_from_scope(scope_id)
+        await self._call_site_repo.clear_calls_from_scope(scope_id)
 
     def get_call_chain(self, call_site_id: str) -> List[CallSiteModel]:
         """Get the full call chain starting from a call site."""

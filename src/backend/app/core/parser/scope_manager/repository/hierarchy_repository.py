@@ -10,9 +10,9 @@ class HierarchyRepository:
     def __init__(self, db_manager: DBConnectionManager):
         self.conn = db_manager.get_connection()
 
-    def link_parent_child(self, parent_id: str, child_id: str) -> None:
+    async def link_parent_child(self, parent_id: str, child_id: str) -> None:
         """Create CONTAINS relationship."""
-        self.conn.execute(
+        await self.conn.execute(
             """
             MATCH (p:Scope {id: $parent_id}), (c:Scope {id: $child_id})
             CREATE (p)-[:CONTAINS]->(c)
@@ -20,12 +20,12 @@ class HierarchyRepository:
             {"parent_id": parent_id, "child_id": child_id}
         )
 
-    def batch_link_parent_child(self, relationships: List[dict[str, str]]) -> None:
+    async def batch_link_parent_child(self, relationships: List[dict[str, str]]) -> None:
         """Batch create CONTAINS relationships. relationships is a list of dicts with 'parent_id' and 'child_id' keys."""
         if not relationships:
             return
 
-        self.conn.execute(
+        await self.conn.execute(
             """
             UNWIND $relationships AS rel
             MATCH (p:Scope {id: rel.parent_id}), (c:Scope {id: rel.child_id})
@@ -34,9 +34,9 @@ class HierarchyRepository:
             {"relationships": relationships}
         )
 
-    def get_children(self, parent_id: str) -> List[ScopeModel]:
+    async def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all direct children of a scope."""
-        result = self.conn.execute(
+        result = await self.conn.execute(
             """
             MATCH (p:Scope {id: $parent_id})-[:CONTAINS]->(c:Scope)
             RETURN c
@@ -60,4 +60,3 @@ class HierarchyRepository:
                 checksum=node.get("checksum"),
             ))
         return children
-

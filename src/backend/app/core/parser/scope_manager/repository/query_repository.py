@@ -10,9 +10,9 @@ class QueryRepository:
     def __init__(self, db_manager: DBConnectionManager):
         self.conn = db_manager.get_connection()
 
-    def get_all_scopes(self) -> List[ScopeModel]:
+    async def get_all_scopes(self) -> List[ScopeModel]:
         """Get all scopes."""
-        result = self.conn.execute("MATCH (s:Scope) RETURN s")
+        result = await self.conn.execute("MATCH (s:Scope) RETURN s")
         scopes = []
         for row in result:
             node = row[0]
@@ -31,9 +31,9 @@ class QueryRepository:
             ))
         return scopes
 
-    def get_all_file_scopes(self) -> List[ScopeModel]:
+    async def get_all_file_scopes(self) -> List[ScopeModel]:
         """Get all scopes of type FILE."""
-        result = self.conn.execute("MATCH (s:Scope {type: 'file'}) RETURN s")
+        result = await self.conn.execute("MATCH (s:Scope {type: 'file'}) RETURN s")
         scopes = []
         for row in result:
             node = row[0]
@@ -52,9 +52,9 @@ class QueryRepository:
             ))
         return scopes
 
-    def get_all_folder_scopes(self) -> List[ScopeModel]:
+    async def get_all_folder_scopes(self) -> List[ScopeModel]:
         """Get all scopes of type FOLDER."""
-        result = self.conn.execute("MATCH (s:Scope {type: 'folder'}) RETURN s")
+        result = await self.conn.execute("MATCH (s:Scope {type: 'folder'}) RETURN s")
         scopes = []
         for row in result:
             node = row[0]
@@ -72,4 +72,3 @@ class QueryRepository:
                 checksum=node.get("checksum"),
             ))
         return scopes
-

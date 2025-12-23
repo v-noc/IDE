@@ -10,7 +10,7 @@ class CallSiteRepository:
     def __init__(self, db_manager: DBConnectionManager):
         self.conn = db_manager.get_connection()
 
-    def create_call_site(
+    async def create_call_site(
         self,
         caller_id: str,
         callee_id: Optional[str],
@@ -19,7 +19,7 @@ class CallSiteRepository:
     ) -> None:
         """Create a call site node and link it to caller/callee."""
         # Create CallSite node
-        self.conn.execute(
+        await self.conn.execute(
             """
             CREATE (cs:CallSite {
                 id: $id,
@@ -37,7 +37,7 @@ class CallSiteRepository:
         )
 
         # Link to Caller
-        self.conn.execute(
+        await self.conn.execute(
             """
             MATCH (caller:Scope {id: $caller_id}), (cs:CallSite {id: $cs_id})
             CREATE (caller)-[:HAS_CALL_SITE]->(cs)
@@ -47,7 +47,7 @@ class CallSiteRepository:
 
         # Link to Callee (if resolved)
         if callee_id:
-            self.conn.execute(
+            await self.conn.execute(
                 """
                 MATCH (cs:CallSite {id: $cs_id})
                 MATCH (callee:Scope {id: $callee_id})
@@ -58,7 +58,7 @@ class CallSiteRepository:
 
         # Link to previous call site (if chained)
         if prev_call_site_id:
-            self.conn.execute(
+            await self.conn.execute(
                 """
                 MATCH (prev:CallSite {id: $prev_id})
                 MATCH (curr:CallSite {id: $curr_id})
@@ -67,7 +67,7 @@ class CallSiteRepository:
                 {"prev_id": prev_call_site_id, "curr_id": call_site.id}
             )
 
-    def batch_create_call_sites(
+    async def batch_create_call_sites(
         self,
         call_sites: List[dict],
     ) -> None:
@@ -99,7 +99,7 @@ class CallSiteRepository:
             })
 
         # Batch create all CallSite nodes
-        self.conn.execute(
+        await self.conn.execute(
             """
             UNWIND $call_sites AS cs_data
             CREATE (cs:CallSite {
@@ -113,7 +113,7 @@ class CallSiteRepository:
         )
 
         # Batch create HAS_CALL_SITE relationships
-        self.conn.execute(
+        await self.conn.execute(
             """
             UNWIND $call_sites AS cs_data
             MATCH (caller:Scope {id: cs_data.caller_id})
@@ -130,7 +130,7 @@ class CallSiteRepository:
             if cs["callee_id"]
         ]
         if targets_data:
-            self.conn.execute(
+            await self.conn.execute(
                 """
                 UNWIND $targets AS t
                 MATCH (cs:CallSite {id: t.cs_id})
@@ -147,7 +147,7 @@ class CallSiteRepository:
             if cs["prev_call_site_id"]
         ]
         if chain_data:
-            self.conn.execute(
+            await self.conn.execute(
                 """
                 UNWIND $chains AS c
                 MATCH (prev:CallSite {id: c.prev_id})
@@ -157,9 +157,9 @@ class CallSiteRepository:
                 {"chains": chain_data}
             )
 
-    def clear_calls_from_scope(self, scope_id: str) -> None:
+    async def clear_calls_from_scope(self, scope_id: str) -> None:
         """Delete all call sites originating from the given scope."""
-        self.conn.execute(
+        await self.conn.execute(
             """
             MATCH (s:Scope {id: $id})-[:HAS_CALL_SITE]->(root:CallSite)
             WHERE NOT EXISTS { MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(root) }
@@ -170,9 +170,9 @@ class CallSiteRepository:
             {"id": scope_id}
         )
 
-    def get_call_chain(self, call_site_id: str) -> List[CallSiteModel]:
+    async def get_call_chain(self, call_site_id: str) -> List[CallSiteModel]:
         """Get the full call chain starting from a call site."""
-        result = self.conn.execute(
+        result = await self.conn.execute(
             """
             MATCH path = (
                 start:CallSite {id: $id}
@@ -194,7 +194,7 @@ class CallSiteRepository:
             ))
         return chain
 
-    def get_call_chain_roots(
+    async def get_call_chain_roots(
         self,
         target_scope_id: Optional[str] = None,
     ) -> List[CallSiteModel]:
@@ -205,7 +205,7 @@ class CallSiteRepository:
         targets that scope.
         """
         if target_scope_id is None:
-            result = self.conn.execute(
+            result = await self.conn.execute(
                 """
                 MATCH (cs:CallSite)
                 WHERE NOT EXISTS { MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(cs) }
@@ -213,7 +213,7 @@ class CallSiteRepository:
                 """
             )
         else:
-            result = self.conn.execute(
+            result = await self.conn.execute(
                 """
                 MATCH (root:CallSite)
                 WHERE NOT EXISTS { MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(root) }

@@ -556,9 +556,9 @@ class ScopeManager:
         """
         return self.repository.get_call_chain_roots(target_scope_id)
 
-    def clear_calls(self, scope_id: str) -> None:
+    async def async_clear_calls(self, scope_id: str) -> None:
         """Clear all calls originating from a scope."""
-        self.repository.clear_calls_from_scope(scope_id)
+        await self.repository.clear_calls_from_scope(scope_id)
 
     # Utility
 

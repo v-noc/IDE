@@ -1,10 +1,9 @@
 """Orchestrator for coordinating graph building phases."""
 import logging
-import time
 from pathlib import Path
 from typing import Optional
-
-from arango.database import StandardDatabase
+import asyncio
+from arangoasync.database import AsyncDatabase
 
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.collection.collector import Collector
@@ -40,16 +39,20 @@ class GraphBuilderOrchestrator:
     def __init__(
         self,
         project_node: ProjectNode,
-        db: Optional[StandardDatabase] = None,
+        db: Optional[AsyncDatabase] = None,
         scope_manager: Optional[ScopeManager] = None,
         ignore_file_name: str = ".gitignore",
         batch_size: int = 1000,
+        max_concurrent_files: int = 10,
     ):
         self.project_node = project_node
         self.project_path = project_node.path
+        self._async_sync_service = None
         self.project_root = Path(self.project_path)
         self.db = db
+        self.max_concurrent_files = max_concurrent_files
         self.batch_size = batch_size
+        self._file_semaphore = asyncio.Semaphore(max_concurrent_files)
 
         # Initialize ScopeManager
         # Note: ScopeManager handles DB connection internally
@@ -96,7 +99,7 @@ class GraphBuilderOrchestrator:
         # Will create sync service with version when needed in _process_changes
         self.repos = Repositories(self.db) if self.db else None
 
-    def resync(self) -> ChangeSet:
+    async def resync(self) -> ChangeSet:
         """
         Perform an incremental resync of the project.
         1. Scan files
@@ -129,11 +132,11 @@ class GraphBuilderOrchestrator:
             return change_set
 
         # 3. Process Changes (Phase 1 & 2)
-        self._process_changes(change_set, scan_result)
+        await self._process_changes(change_set, scan_result)
 
         return change_set
 
-    def _process_changes(self, change_set: ChangeSet, scan_result: ScanResult):
+    async def _process_changes(self, change_set: ChangeSet, scan_result: ScanResult):
         """
         Process the detected changes in multiple phases.
 
@@ -153,7 +156,7 @@ class GraphBuilderOrchestrator:
 
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")
-        collection_results = self.phase_processor.process_collection_phase(
+        collection_results = await self.phase_processor.process_collection_phase(
             change_set, scan_result
         )
 

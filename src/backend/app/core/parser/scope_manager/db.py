@@ -17,14 +17,13 @@ class DBConnectionManager:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         print(f"Database path: {self.db_path}")
         self.db = kuzu.Database(self.db_path)
-        self.conn = kuzu.Connection(self.db)
-        self._initialize_schema()
+        self.conn = kuzu.AsyncConnection(self.db)
 
-    def _initialize_schema(self):
+    async def _initialize_schema(self):
         # Create Scope node table (ignore "already exists" errors)
 
         try:
-            self.conn.execute("""
+            await self.conn.execute("""
                 CREATE NODE TABLE Scope (
                     id STRING,
                     name STRING,
@@ -46,7 +45,7 @@ class DBConnectionManager:
 
         # Create CallSite Node Table
         try:
-            self.conn.execute("""
+            await self.conn.execute("""
                 CREATE NODE TABLE CallSite (
                     id STRING,
                     line INT64,
@@ -62,7 +61,7 @@ class DBConnectionManager:
         # Create Relationships
         # CONTAINS: Scope -> Scope (e.g. Class contains Function)
         try:
-            self.conn.execute(
+            await self.conn.execute(
                 "CREATE REL TABLE CONTAINS (FROM Scope TO Scope)")
         except RuntimeError as e:
             if "already exists" not in str(e):
@@ -70,7 +69,7 @@ class DBConnectionManager:
 
         # HAS_CALL_SITE: Scope -> CallSite (Caller)
         try:
-            self.conn.execute(
+            await self.conn.execute(
                 "CREATE REL TABLE HAS_CALL_SITE (FROM Scope TO CallSite)")
         except RuntimeError as e:
             if "already exists" not in str(e):
@@ -78,7 +77,7 @@ class DBConnectionManager:
 
         # TARGETS: CallSite -> Scope (Callee)
         try:
-            self.conn.execute(
+            await self.conn.execute(
                 "CREATE REL TABLE TARGETS (FROM CallSite TO Scope)")
         except RuntimeError as e:
             if "already exists" not in str(e):
@@ -86,7 +85,7 @@ class DBConnectionManager:
 
         # NEXT_IN_CHAIN: CallSite -> CallSite (Call chain)
         try:
-            self.conn.execute(
+            await self.conn.execute(
                 "CREATE REL TABLE NEXT_IN_CHAIN (FROM CallSite TO CallSite)")
         except RuntimeError as e:
             if "already exists" not in str(e):

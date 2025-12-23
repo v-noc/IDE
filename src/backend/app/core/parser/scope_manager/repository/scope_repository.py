@@ -10,9 +10,9 @@ class ScopeRepository:
     def __init__(self, db_manager: DBConnectionManager):
         self.conn = db_manager.get_connection()
 
-    def create_scope(self, scope: ScopeModel) -> None:
+    async def create_scope(self, scope: ScopeModel) -> None:
         """Create a Scope node."""
-        self.conn.execute(
+        await self.conn.execute(
             """
             CREATE (s:Scope {
                 id: $id,
@@ -43,9 +43,9 @@ class ScopeRepository:
             }
         )
 
-    def update_scope(self, scope: ScopeModel) -> None:
+    async def update_scope(self, scope: ScopeModel) -> None:
         """Update an existing Scope node's properties."""
-        self.conn.execute(
+        await self.conn.execute(
             """
             MATCH (s:Scope {id: $id})
             SET s.name = $name,
@@ -74,7 +74,7 @@ class ScopeRepository:
             }
         )
 
-    def batch_update_scopes(self, scopes: List[ScopeModel]) -> None:
+    async def batch_update_scopes(self, scopes: List[ScopeModel]) -> None:
         """Batch update multiple scopes efficiently using Neo4j UNWIND."""
         if not scopes:
             return
@@ -95,7 +95,7 @@ class ScopeRepository:
                 "checksum": scope.checksum,
             })
 
-        self.conn.execute(
+        await self.conn.execute(
             """
             UNWIND $scopes AS scope_data
             MATCH (s:Scope {id: scope_data.id})
@@ -113,9 +113,9 @@ class ScopeRepository:
             {"scopes": scope_data}
         )
 
-    def get_scope_by_id(self, scope_id: str) -> Optional[ScopeModel]:
+    async def get_scope_by_id(self, scope_id: str) -> Optional[ScopeModel]:
         """Get a Scope by ID."""
-        result = self.conn.execute(
+        result = await self.conn.execute(
             "MATCH (s:Scope {id: $id}) RETURN s",
             {"id": scope_id}
         )
@@ -137,9 +137,9 @@ class ScopeRepository:
             )
         return None
 
-    def get_scope_by_qname(self, qname: str) -> Optional[ScopeModel]:
+    async def get_scope_by_qname(self, qname: str) -> Optional[ScopeModel]:
         """Get a scope by its qualified name."""
-        result = self.conn.execute(
+        result = await self.conn.execute(
             "MATCH (s:Scope {qname: $qname}) RETURN s",
             {"qname": qname}
         )
@@ -160,7 +160,7 @@ class ScopeRepository:
             )
         return None
 
-    def batch_get_scopes_by_qnames(
+    async def batch_get_scopes_by_qnames(
         self, qnames: List[str]
     ) -> dict[str, ScopeModel]:
         """
@@ -170,7 +170,7 @@ class ScopeRepository:
         if not qnames:
             return {}
 
-        result = self.conn.execute(
+        result = await self.conn.execute(
             """
             UNWIND $qnames AS qname
             MATCH (s:Scope {qname: qname})
@@ -198,7 +198,7 @@ class ScopeRepository:
             )
         return scopes_map
 
-    def batch_get_scopes_by_ids(
+    async def batch_get_scopes_by_ids(
         self, scope_ids: List[str]
     ) -> dict[str, ScopeModel]:
         """
@@ -208,7 +208,7 @@ class ScopeRepository:
         if not scope_ids:
             return {}
 
-        result = self.conn.execute(
+        result = await self.conn.execute(
             """
             UNWIND $scope_ids AS scope_id
             MATCH (s:Scope {id: scope_id})
@@ -236,7 +236,7 @@ class ScopeRepository:
             )
         return scopes_map
 
-    def batch_create_scopes(self, scopes: List[ScopeModel]) -> None:
+    async def batch_create_scopes(self, scopes: List[ScopeModel]) -> None:
         """Batch create multiple scopes efficiently using Neo4j UNWIND."""
         if not scopes:
             return
@@ -257,7 +257,7 @@ class ScopeRepository:
                 "checksum": scope.checksum,
             })
 
-        self.conn.execute(
+        await self.conn.execute(
             """
             UNWIND $scopes AS scope_data
             CREATE (s:Scope {
