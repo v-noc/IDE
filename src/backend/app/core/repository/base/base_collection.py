@@ -186,6 +186,7 @@ class BaseRepository(Generic[T]):
         """Create a document and return the newly created version."""
         dump = entity.model_dump(by_alias=True, exclude_none=True, mode="json")
         # Get the full created document back in one call
+
         collection = await self.get_collection()
         meta = await collection.insert(
             dump,
@@ -193,6 +194,7 @@ class BaseRepository(Generic[T]):
             overwrite=True,
 
         )
+
         return self._validate(meta["new"])
 
     async def update(self, key: str, entity: T) -> T:

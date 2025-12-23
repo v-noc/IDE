@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 
 import pytest
+import pytest_asyncio
 
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
@@ -17,8 +18,8 @@ FIXTURE_PROJECT = Path(__file__).parent / "simple_function"
 PROJECT_NAME = "simple_function"
 
 
-@pytest.fixture
-def setup_project(tmp_path, arangodb_client):
+@pytest_asyncio.fixture
+async def setup_project(tmp_path, arangodb_client):
     project_path = tmp_path / "project"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
@@ -32,9 +33,13 @@ def setup_project(tmp_path, arangodb_client):
         description="Test Project",
     )
     scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
+    await scope_manager.initialize()
     repos = Repositories(arangodb_client)
+    await repos.ensure_collections()
+    print(
+        f"Repositories: {repos.contains_edges.collection_name} {repos.contains_edges.is_edge}")
     project_service = ProjectService(repos)
-    project_node = project_service.create_node(project_node)
+    project_node = await project_service.create_node(project_node)
 
     return project_node, scope_manager, arangodb_client
 
@@ -43,7 +48,8 @@ def find_node_by_name(nodes: List[AnyTreeNode], name: str):
     return next((node for node in nodes if node.qname.split('.')[-1] == name), None)
 
 
-def test_function_get_code(setup_project):
+@pytest.mark.asyncio
+async def test_function_get_code(setup_project):
     project_node, scope_manager, arangodb_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
@@ -51,13 +57,14 @@ def test_function_get_code(setup_project):
         db=arangodb_client,
         scope_manager=scope_manager,
     )
-    orchestrator.resync()
+    await orchestrator.resync()
 
     repos = Repositories(arangodb_client)
-    proj_service = ProjectService(repos)
-    project = proj_service.get_all()
 
-    children = proj_service.get_children(project[0].id)
+    proj_service = ProjectService(repos)
+    project = await proj_service.get_all()
+
+    children = await proj_service.get_children(project[0].id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -82,7 +89,7 @@ def test_function_get_code(setup_project):
     )
 
     func_service = FunctionService(repos)
-    snippet = func_service.get_code(factory_func.id)
+    snippet = await func_service.get_code(factory_func.id)
 
     assert snippet is not None, "get_code returned None"
     assert 'code' in snippet, "snippet missing 'code' field"
@@ -98,7 +105,8 @@ def test_function_get_code(setup_project):
     assert 'return add' in code
 
 
-def test_function_collector(setup_project):
+@pytest.mark.asyncio
+async def test_function_collector(setup_project):
     project_node, scope_manager, arangodb_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
@@ -107,14 +115,15 @@ def test_function_collector(setup_project):
         scope_manager=scope_manager,
     )
 
-    orchestrator.resync()
+    await orchestrator.resync()
 
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
 
-    project = project_service.get_all()
+    project = await project_service.get_all()
+    print(project)
 
-    children = project_service.get_children(project[0].id)
+    children = await project_service.get_children(project[0].id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()

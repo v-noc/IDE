@@ -94,7 +94,7 @@ class GraphBuilderOrchestrator:
             self.collector,
             self.jedi_manager,
             batch_size=self.batch_size,
-            max_concurrent_db=self.max_concurrent_db,
+            max_concurrent_db=max_concurrent_db,
             max_concurrent_files=self.max_concurrent_files,
 
         )
@@ -127,7 +127,7 @@ class GraphBuilderOrchestrator:
         )
 
         # 2. Detect Changes
-        change_set = self.change_detector.detect_changes(scan_result)
+        change_set = await self.change_detector.detect_changes(scan_result)
         logger.info(f"Detected changes: {change_set}")
 
         if (
@@ -198,7 +198,7 @@ class GraphBuilderOrchestrator:
             )
 
             await sync_service.sync_scope_hierarchy(self.project_node.id, change_set)
-            call_sync_service = sync_service.call_sync.sync_call_chain_scopes
+            call_sync_service = sync_service.call_sync
         else:
             logger.warning("No database connection for sync; skipping")
 

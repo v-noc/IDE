@@ -186,7 +186,7 @@ class CallChainBuilder:
                                                  source,
                                                  call_node.position.line,
                                                  call_node.call_col_pos,
-                                                 parent_context=parent_context,
+                                                 parent_context,
                                                  )
         resolve_time = time.time() - t0
         _timings["resolve_call"].append(resolve_time)

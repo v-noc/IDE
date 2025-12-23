@@ -28,7 +28,11 @@ class CallRepo(NodeRepository[CallNode]):
             "start_node_id": call_node_id,
         }
         cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-        doc = await cursor.next() if cursor else None
+        doc = None
+        async for row in cursor:
+            doc = row
+            break  # Get first and exit
+
         if not doc:
             return None
         node_type = doc.get("node_type")

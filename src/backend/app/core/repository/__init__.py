@@ -54,3 +54,12 @@ class Repositories:
         # self.imports_edges = BaseRepository(
         #     db, "imports_edges", edges.ImportsEdge, is_edge=True
         # )
+
+    async def ensure_collections(self):
+        await self.nodes.get_collection()
+        await self.contains_edges.get_collection()
+        await self.targets_edges.get_collection()
+        await self.log_to_function_edges.get_collection()
+        await self.log_to_log_edges.get_collection()
+        await self.document_repo.get_collection()
+        await self.log_repo.get_collection()

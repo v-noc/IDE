@@ -65,7 +65,7 @@ class CallSyncService:
         Equivalent to sync_call_chain_scopes but async.
         """
         for scope_id in scope_ids:
-            scope = self.scope_manager.get_scope(scope_id)
+            scope = await self.scope_manager.get_scope(scope_id)
             if not scope:
                 continue
 
@@ -76,11 +76,11 @@ class CallSyncService:
             ):
                 continue
 
-            graph_node = await self.helpers.get_graph_node_for_scope(scope)
+            graph_node = await self.helpers.async_get_graph_node_for_scope(scope)
             if not graph_node:
                 continue
 
-            call_infos = self.scope_manager.get_root_calls_from(
+            call_infos = await self.scope_manager.get_root_calls_from(
                 scope.id, include_children=True
             )
             if call_infos:
@@ -145,7 +145,7 @@ class CallSyncService:
                 continue
             processed_pairs.add(process_key)
 
-            callee_node = await self.helpers.get_graph_node_for_scope(callee_scope)
+            callee_node = await self.helpers.async_get_graph_node_for_scope(callee_scope)
             if not callee_node:
                 continue
 
@@ -238,6 +238,8 @@ class CallSyncService:
                 self._stats['calls_created'] += 1
             except Exception as e:
                 logger.error(f"Error creating call node: {e}")
+                from traceback import format_exc
+                print(format_exc())
                 return None
         else:
             # Update existing - nothing to update without version
@@ -258,7 +260,7 @@ class CallSyncService:
         """
         call_site_ids = [cid for cid, _ in call_site_node_pairs]
 
-        calls_map = self.scope_manager.batch_get_calls_inside_callee(
+        calls_map = await self.scope_manager.batch_get_calls_inside_callee(
             call_site_ids)
 
         results = []

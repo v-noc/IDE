@@ -28,18 +28,18 @@ class AsyncSyncHelpers:
             repo = self._get_repo_for_node(node)
 
             if scope_id:
-                existing = await repo.async_get_by_id(scope_id)
+                existing = await repo.get_by_id(scope_id)
             else:
-                existing = await repo.async_find_one({"qname": node.qname})
+                existing = await repo.find_one({"qname": node.qname})
 
             if existing:
                 # Update existing node
                 existing.qname = node.qname
                 if hasattr(existing, 'position') and hasattr(node, 'position'):
                     existing.position = node.position
-                return await repo.async_update(existing.key, existing)
+                return await repo.update(existing.key, existing)
             else:
-                return await repo.async_create(node)
+                return await repo.create(node)
 
     async def async_ensure_contains_edge(
         self,
@@ -48,9 +48,33 @@ class AsyncSyncHelpers:
     ) -> None:
         """Async ensure a contains edge exists."""
         async with self._semaphore:
-            await self.repos.contains_edges.async_upsert(
-                parent_id, child_id
-            )
+            try:
+
+                query = """
+                    UPSERT { _from: @from_id, _to: @to_id }
+                    INSERT { 
+                        _from: @from_id, 
+                        _to: @to_id, 
+                        contain_type: CONCAT(DOCUMENT(@from_id).node_type, "_to_", DOCUMENT(@to_id).node_type)
+                    }
+                    UPDATE {}
+                    IN contains_edges
+                """
+                # Note: DOCUMENT() function allows us to get the node types inside the query!
+
+                bind_vars = {
+                    "from_id": parent_id,
+                    "to_id": child_id,
+                }
+                await self.repos.contains_edges.db.aql.execute(
+                    query, bind_vars=bind_vars)
+
+            except Exception as e:
+                pass
+                # logger.error(
+                #     f"Error ensuring contains edge {parent_id} -> "
+                #     f"{child_id}: {e}"
+                # )
 
     async def async_ensure_contains_edges_batch(
         self,
@@ -59,24 +83,30 @@ class AsyncSyncHelpers:
         """Batch async ensure contains edges."""
         if not edges:
             return
+        try:
+            async with self._semaphore:
+                query = """
+                    FOR edge IN @edges
+                        UPSERT { _from: edge.from_id, _to: edge.to_id }
+                        INSERT { 
+                            _from: edge.from_id, 
+                            _to: edge.to_id
+                        }
+                        UPDATE {}
+                        IN contains_edges
+                    """
 
-        async with self._semaphore:
-            query = """
-                FOR edge IN @edges
-                    UPSERT { _from: edge.from_id, _to: edge.to_id }
-                    INSERT { 
-                        _from: edge.from_id, 
-                        _to: edge.to_id
+                await self.repos.contains_edges.db.aql.execute(
+                    query,
+                    bind_vars={
+                        "edges": [{"from_id": f, "to_id": t} for f, t in edges]
                     }
-                    UPDATE {}
-                    IN contains_edges
-                """
-            await self.repos.db.aql.execute(
-                query,
-                bind_vars={
-                    "edges": [{"from_id": f, "to_id": t} for f, t in edges]
-                }
-            )
+                )
+        except Exception as e:
+            print(f"Error ensuring contains edges batch: {e}")
+            # logger.error(
+            #     f"Error ensuring contains edges batch: {e}"
+            # )
 
     async def async_get_graph_node_for_scope(
         self,
@@ -91,19 +121,19 @@ class AsyncSyncHelpers:
         async with self._semaphore:
             node = None
             if scope.type == ScopeType.FILE:
-                node = await self.repos.file_repo.async_find_one(
+                node = await self.repos.file_repo.find_one(
                     {"qname": scope.qname}
                 )
             elif scope.type == ScopeType.CLASS:
-                node = await self.repos.class_repo.async_find_one(
+                node = await self.repos.class_repo.find_one(
                     {"qname": scope.qname}
                 )
             elif scope.type == ScopeType.FUNCTION:
-                node = await self.repos.function_repo.async_find_one(
+                node = await self.repos.function_repo.find_one(
                     {"qname": scope.qname}
                 )
             elif scope.type == ScopeType.FOLDER:
-                node = await self.repos.folder_repo.async_find_one(
+                node = await self.repos.folder_repo.find_one(
                     {"qname": scope.qname}
                 )
 
@@ -114,7 +144,7 @@ class AsyncSyncHelpers:
     async def async_get_call_target(self, call_id: str) -> Optional[BaseNode]:
         """Get the target node of a call."""
         async with self._semaphore:
-            return await self.repos.call_repo.async_get_target(call_id)
+            return await self.repos.call_repo.get_target(call_id)
 
     async def async_ensure_targets_edges_batch(
         self,
@@ -123,18 +153,24 @@ class AsyncSyncHelpers:
         """Batch async ensure targets edges."""
         if not edges:
             return
-
-        query = """
-        FOR edge IN @edges
-            UPSERT { _from: edge.from_id, _to: edge.to_id }
-            INSERT { _from: edge.from_id, _to: edge.to_id }
-            UPDATE {}
-            IN targets_edges
-        """
-        await self.repos.db.aql.execute(
-            query,
-            bind_vars={"edges": [{"from_id": f, "to_id": t} for f, t in edges]}
-        )
+        try:
+            query = """
+            FOR edge IN @edges
+                UPSERT { _from: edge.from_id, _to: edge.to_id }
+                INSERT { _from: edge.from_id, _to: edge.to_id }
+                UPDATE {}
+                IN targets_edges
+            """
+            await self.repos.targets_edges.db.aql.execute(
+                query,
+                bind_vars={"edges": [{"from_id": f, "to_id": t}
+                                     for f, t in edges]}
+            )
+        except Exception as e:
+            print(f"Error ensuring targets edges batch: {e}")
+            # logger.error(
+            #     f"Error ensuring targets edges batch: {e}"
+            # )
 
     async def mark_node_deleted(self, node_id: str) -> None:
         """Mark a node as deleted (soft delete)."""

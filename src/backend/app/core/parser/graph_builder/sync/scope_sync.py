@@ -61,13 +61,13 @@ class ScopeSyncService:
         else:
             logger.info(f"Full sync from {root_scope_id}")
 
-        root_scope = self.scope_manager.get_scope(root_scope_id)
+        root_scope = await self.scope_manager.get_scope(root_scope_id)
         if not root_scope:
             logger.error(f"Root scope {root_scope_id} not found")
             return
 
         # Get direct children of root
-        children = self.scope_manager.get_children(root_scope_id)
+        children = await self.scope_manager.get_children(root_scope_id)
 
         # Process all children concurrently
         await asyncio.gather(*[
@@ -150,7 +150,7 @@ class ScopeSyncService:
 
         # Recurse into children (concurrently)
         if should_recurse and not is_deleted:
-            children = self.scope_manager.get_children(scope.id)
+            children = await self.scope_manager.get_children(scope.id)
             if children:
                 await asyncio.gather(*[
                     self._sync_scope_async(

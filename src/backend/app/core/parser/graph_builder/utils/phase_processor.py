@@ -77,7 +77,7 @@ class PhaseProcessor:
         files_to_process = change_set.new_files + change_set.modified_files
 
         results = []
-        removed_scope_ids = []
+        removed_scope_ids = set()
         folder_changes = []
 
         async def _process_single_file(file_path: str):
@@ -149,7 +149,7 @@ class PhaseProcessor:
                         self.project_node.name,
                         self.scope_manager,
                         self.jedi_manager,
-                        batch_size=self.batch_size,
+                        batch_size=self._batch_size,
                     )
 
                     # Process File Body (Full Analysis)

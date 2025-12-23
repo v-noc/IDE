@@ -32,7 +32,7 @@ class ChangeDetector:
     def __init__(self, scope_manager: ScopeManager):
         self.manager = scope_manager
 
-    def detect_changes(self, scan_result: ScanResult) -> ChangeSet:
+    async def detect_changes(self, scan_result: ScanResult) -> ChangeSet:
         """
         Compare current files from disk with those in the DB.
         """
@@ -40,10 +40,10 @@ class ChangeDetector:
         current_folders = scan_result.folders
 
         # 1. Fetch DB State
-        db_scopes = self.manager.get_all_file_scopes()
+        db_scopes = await self.manager.get_all_file_scopes()
 
         db_state = {s.file_path: s.checksum for s in db_scopes}
-        db_folders = self.manager.get_all_folder_scopes()
+        db_folders = await self.manager.get_all_folder_scopes()
         db_folder_paths: Set[str] = {folder.file_path for folder in db_folders}
 
         new_files = []

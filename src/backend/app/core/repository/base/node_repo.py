@@ -49,6 +49,7 @@ class NodeRepository(BaseRepository[T]):
         # 3. Delete the node itself
         try:
             collection = await self.get_collection()
+
             await collection.delete(key)
             return True
         except (DocumentDeleteError, DocumentGetError):

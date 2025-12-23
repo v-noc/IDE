@@ -108,20 +108,17 @@ class ASTProcessor:
             scope_map[node_id] = scope
 
         # Batch create all scopes
-        tasks = []
         if scopes_to_create:
-            tasks.append(self.manager.batch_create_scopes(scopes_to_create))
+            await self.manager.batch_create_scopes(scopes_to_create)
 
         # Batch update all scopes
         if scopes_to_update:
-            tasks.append(self.manager.batch_update_scopes(scopes_to_update))
+            await self.manager.batch_update_scopes(scopes_to_update)
 
         # Batch link all parent-child relationships
         if relationships_to_link:
-            tasks.append(self.manager.batch_link_parent_child(
-                relationships_to_link))
-        if tasks:
-            await asyncio.gather(*tasks)
+            await self.manager.batch_link_parent_child(
+                relationships_to_link)
 
         # Build results list
         results = []
