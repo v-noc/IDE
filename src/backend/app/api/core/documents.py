@@ -36,12 +36,12 @@ class UpdateDocumentRequest(BaseModel):
     response_model=DocumentNode,
     status_code=status.HTTP_201_CREATED,
 )
-def create_document(
+async def create_document(
     request: CreateDocumentRequest,
     document_service: DocumentService = Depends(get_document_service),
 ):
     try:
-        return document_service.create(
+        return await document_service.create(
             name=request.name,
             description=request.description,
             node_id=request.node_id,
@@ -54,12 +54,12 @@ def create_document(
 
 
 @router.put("/{document_key}", response_model=DocumentNode)
-def update_document(
+async def update_document(
     document_key: str,
     request: UpdateDocumentRequest,
     document_service: DocumentService = Depends(get_document_service),
 ):
-    existing = document_service.get(document_key)
+    existing = await document_service.get(document_key)
 
     if not existing:
         raise HTTPException(
@@ -74,11 +74,11 @@ def update_document(
     if request.data is not None:
         existing.data = request.data
 
-    return document_service.update(existing)
+    return await document_service.update(existing)
 
 
 @router.delete("/{document_key}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(
+async def delete_document(
     document_key: str,
     node_id: str = Query(
         ...,
@@ -88,7 +88,7 @@ def delete_document(
     document_service: DocumentService = Depends(get_document_service),
 ):
     try:
-        document_service.delete(document_key, node_id)
+        await document_service.delete(document_key, node_id)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -98,16 +98,15 @@ def delete_document(
 
 
 @router.get("/{node_id}", response_model=List[DocumentNode])
-def get_documents_for_node(
+async def get_documents_for_node(
     node_id: str,
     document_service: DocumentService = Depends(get_document_service),
 ):
     try:
-        documents = document_service.get_nodes_by_parent_node(node_id)
+        documents = await document_service.get_nodes_by_parent_node(node_id)
         return documents
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
-    return []

@@ -20,8 +20,8 @@ class UpdateBasicInfoRequest(BaseModel):
 
 
 @router.put("/{container_id}/update-theme", response_model=AllNodes)
-def update_theme(container_id: str, theme: ThemeConfig, container_service: ContainerService = Depends(get_container_service)):
-    updated_node = container_service.update_theme_config(container_id, theme)
+async def update_theme(container_id: str, theme: ThemeConfig, container_service: ContainerService = Depends(get_container_service)):
+    updated_node = await container_service.update_theme_config(container_id, theme)
     if updated_node is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -31,12 +31,12 @@ def update_theme(container_id: str, theme: ThemeConfig, container_service: Conta
 
 
 @router.put("/{container_id}/update-basic-info", response_model=AllNodes)
-def update_basic_info(
+async def update_basic_info(
     container_id: str,
     request: UpdateBasicInfoRequest,
     container_service: ContainerService = Depends(get_container_service)
 ):
-    updated_node = container_service.update_basic_info(
+    updated_node = await container_service.update_basic_info(
         container_id,
         name=request.name,
         description=request.description,

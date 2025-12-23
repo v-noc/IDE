@@ -1,15 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
-from typing import List
 
 import fastapi_jsonrpc as jsonrpc
 from fastapi import Depends, Body
 
-from .schemas import RegisterLogsBatchParams, RegisterLogsParams, RegisterLogsResult
+from .schemas import RegisterLogsBatchParams, RegisterLogsResult
 from .dependencies import (
-    get_function,
     get_project,
-    get_parent_function,
     get_log_service,
 )
 from .error import (
@@ -43,7 +40,7 @@ api_v1_logs = jsonrpc.Entrypoint(
 
 
 @api_v1_logs.method()
-def register_logs_batch(
+async def register_logs_batch(
     params: RegisterLogsBatchParams = Body(...),
     project=Depends(get_project),
     log_service=Depends(get_log_service),
@@ -55,7 +52,7 @@ def register_logs_batch(
 
     try:
 
-        _ = log_service.create_batch(params.logs)
+        _ = await log_service.create_batch(params.logs)
     except Exception as ex:
         print(ex)
 
