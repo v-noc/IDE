@@ -125,7 +125,6 @@ class BaseRepository(Generic[T]):
             collection = self.db.collection(self.collection_name)
             props = await collection.properties()
             is_existing_edge = props.type == CollectionType.EDGE
-            print(f"is_existing_edge: {props}")
 
             # CRITICAL: Check for type mismatch and
             # fail loudly instead of deleting

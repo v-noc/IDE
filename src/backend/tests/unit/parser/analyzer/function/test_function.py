@@ -36,8 +36,6 @@ async def setup_project(tmp_path, arangodb_client):
     await scope_manager.initialize()
     repos = Repositories(arangodb_client)
     await repos.ensure_collections()
-    print(
-        f"Repositories: {repos.contains_edges.collection_name} {repos.contains_edges.is_edge}")
     project_service = ProjectService(repos)
     project_node = await project_service.create_node(project_node)
 
@@ -121,7 +119,6 @@ async def test_function_collector(setup_project):
     project_service = ProjectService(repos)
 
     project = await project_service.get_all()
-    print(project)
 
     children = await project_service.get_children(project[0].id)
 
