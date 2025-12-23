@@ -112,6 +112,8 @@ class GraphBuilderOrchestrator:
             self.project_node.name,
         )
 
+        await self.scope_manager.initialize()
+
         # 1. Scan Disk
         scan_result = self.file_scanner.scan()
         logger.info(

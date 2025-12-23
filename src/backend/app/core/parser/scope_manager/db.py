@@ -18,6 +18,7 @@ class DBConnectionManager:
         print(f"Database path: {self.db_path}")
         self.db = kuzu.Database(self.db_path)
         self.conn = kuzu.AsyncConnection(self.db)
+        self.initialized = False
 
     async def _initialize_schema(self):
         # Create Scope node table (ignore "already exists" errors)
