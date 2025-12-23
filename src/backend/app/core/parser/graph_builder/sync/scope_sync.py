@@ -14,7 +14,7 @@ from app.core.parser.graph_builder.sync.async_helpers import AsyncSyncHelpers
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 import asyncio
 
-from backend.app.core.model.base import BaseNode
+from app.core.model.base import BaseNode
 logger = logging.getLogger(__name__)
 
 
