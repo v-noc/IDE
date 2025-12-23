@@ -11,7 +11,7 @@ def temp_manager():
     temp_dir = tempfile.mkdtemp()
     db_path = f"{temp_dir}/test_db"
     manager = ScopeManager(project_name="test_project", db_path=db_path)
-
+    manager.initialize()
     yield manager
 
     # Cleanup
