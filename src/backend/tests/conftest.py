@@ -11,7 +11,7 @@ from app.core.repository import Repositories
 TEST_DB_NAME = "test_db"
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="function")
 async def arangodb_client() -> AsyncDatabase:
     # Create one async client for the test session.
     client = ArangoClient(hosts="http://localhost:8529")
