@@ -49,6 +49,17 @@ def find_node_by_name(nodes: List[AnyTreeNode], name: str):
     )
 
 
+def find_node_by_qname_recursive(nodes: List[AnyTreeNode], qname: str):
+    for node in nodes:
+        if node.qname == qname:
+            return node
+        if hasattr(node, "children") and node.children:
+            found = find_node_by_qname_recursive(node.children, qname)
+            if found:
+                return found
+    return None
+
+
 def find_node_by_name_recursive(
     nodes: List[AnyTreeNode], name: str
 ) -> AnyTreeNode:
@@ -221,9 +232,12 @@ async def test_function_sync_add_and_remove_inside_function(setup_project):
         tree_after_add = await _resync_and_get_tree(
             project_node, scope_manager, arangodb_client
         )
-        add_func_after_add = find_node_by_name_recursive(
-            tree_after_add, "add"
+        add_func_after_add = find_node_by_qname_recursive(
+            tree_after_add, "simple_function.main.factory.add"
         )
+        for child in add_func_after_add.children:
+            print(
+                f"Child: {child.name}, Status: {child.status} type: {child.node_type}")
         assert "sync_added_inside" in [
             getattr(c, "name", None) for c in add_func_after_add.children
         ], "New function not detected in 'add'"
@@ -240,8 +254,9 @@ async def test_function_sync_add_and_remove_inside_function(setup_project):
         tree_after_remove = await _resync_and_get_tree(
             project_node, scope_manager, arangodb_client
         )
-        add_func_after_remove = find_node_by_name_recursive(
-            tree_after_remove, "add")
+        add_func_after_remove = find_node_by_qname_recursive(
+            tree_after_remove, "simple_function.main.factory.add"
+        )
         assert "sync_added_inside" not in [
             getattr(c, "name", None) for c in add_func_after_remove.children
         ], "Removed function still present"
