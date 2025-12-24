@@ -104,6 +104,7 @@ class CallSyncService:
         self._pending_call_infos = []
 
         processed_pairs: Set[Tuple[str, str]] = set()
+        current_call_ids_by_parent: Dict[str, Set[str]] = defaultdict(set)
 
         while queue:
             batch = queue[:self.batch_size]
@@ -111,12 +112,17 @@ class CallSyncService:
 
             edge_buffers = EdgeBuffers()
             recursive_calls = await self._process_batch(
-                batch, processed_pairs, edge_buffers
+                batch, processed_pairs, edge_buffers, current_call_ids_by_parent
             )
 
             await self._flush_edges(edge_buffers)
 
             queue.extend(recursive_calls)
+
+        # Cleanup: orphan calls that exist in DB under processed parents
+        # but are missing from the current AST-derived call set.
+        for parent_id, current_call_ids in current_call_ids_by_parent.items():
+            await self._mark_missing_calls_orphaned(parent_id, current_call_ids)
 
         batch_sync_time = time.time() - batch_sync_start
         _timings["batch_sync_calls_total"].append(batch_sync_time)
@@ -126,6 +132,7 @@ class CallSyncService:
         batch: List[Tuple[dict, object]],
         processed_pairs: Set[Tuple[str, str]],
         edge_buffers: EdgeBuffers,
+        current_call_ids_by_parent: Dict[str, Set[str]],
     ) -> List[Tuple[dict, object]]:
         """
         Process a batch of call infos.
@@ -185,6 +192,8 @@ class CallSyncService:
 
                 # Queue recursive calls
                 if call_node:
+                    current_call_ids_by_parent[parent_node.id].add(
+                        call_node.id)
                     call_site_id = call_info.get("call_site").id
                     recursive_calls.append((call_site_id, call_node))
 
@@ -211,7 +220,7 @@ class CallSyncService:
         callee_scope = call_info.get("callee")
 
         if not call_site or not callee_scope:
-            return call_node
+            return existing_call_node
 
         call_node = existing_call_node
 
@@ -244,6 +253,13 @@ class CallSyncService:
                 return None
         else:
             # Update existing - nothing to update without version
+            if getattr(call_node, "status", None) == "orphaned":
+                call_node.status = "active"
+                call_node.orphan_reason = None
+                call_node = await self.call_service.repos.call_repo.update(
+                    call_node.key, call_node
+                )
+                self._stats["calls_reactivated"] += 1
             self._stats['calls_updated'] += 1
 
         # Add edges to buffer
@@ -282,6 +298,35 @@ class CallSyncService:
                 self.helpers.async_ensure_targets_edges_batch(
                     edge_buffers.targets),
             )
+
+    async def _mark_missing_calls_orphaned(
+        self, parent_id: str, current_call_ids: Set[str]
+    ) -> None:
+        """
+        Collect all direct call-node children under a parent and reconcile status:
+        - If a DB call child is missing from current_call_ids => mark orphaned.
+        - If a DB call child is present but currently orphaned => reactivate.
+        """
+        calls = await self.helpers.async_get_children(parent_id, node_types=["call"])
+        for call in calls:
+            call_id = call.get("_id")
+            if not call_id:
+                continue
+
+            if call_id in current_call_ids:
+                if call.get("status") == "orphaned":
+                    await self.helpers.async_mark_node_status(
+                        call, status="active", reason=None
+                    )
+                    self._stats["calls_reactivated"] += 1
+            else:
+                if call.get("status") != "orphaned":
+                    await self.helpers.async_mark_node_status(
+                        call,
+                        status="orphaned",
+                        reason="not_in_ast_under_same_parent",
+                    )
+                    self._stats["calls_orphaned"] += 1
 
     def get_stats(self) -> Dict[str, int]:
         """Get sync statistics."""

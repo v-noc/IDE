@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 
 import pytest
+import pytest_asyncio
 
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
@@ -23,7 +24,9 @@ def _find_node_by_name(nodes: List[AnyTreeNode], name: str):
     )
 
 
-def _find_node_by_name_recursive(nodes: List[AnyTreeNode], name: str) -> AnyTreeNode:
+def _find_node_by_name_recursive(
+    nodes: List[AnyTreeNode], name: str
+) -> AnyTreeNode:
     for node in nodes:
         if getattr(node, "name", None) == name:
             return node
@@ -42,38 +45,38 @@ def _write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def _build_and_get_tree(project_node, scope_manager, db):
+async def _build_and_get_tree(project_node, scope_manager, db):
     orchestrator = GraphBuilderOrchestrator(
         project_node,
         db=db,
         scope_manager=scope_manager,
     )
-    orchestrator.resync()
+    await orchestrator.resync()
 
     repos = Repositories(db)
     project_service = ProjectService(repos)
-    projects = project_service.get_all()
-    assert projects, "No project found after build"
+    project = await project_service.get(project_node.id)
+    assert project is not None, "Project not found after build"
 
-    children = project_service.get_children(projects[0].id)
+    children = await project_service.get_children(project_node.id)
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
-def _resync_and_get_tree(project_node, scope_manager, db):
-    repos = Repositories(db)
-    project_service = ProjectService(repos)
-    projects = project_service.get_all()
-    assert projects, "No project found before resync"
-
+async def _resync_and_get_tree(project_node, scope_manager, db):
     orchestrator = GraphBuilderOrchestrator(
         project_node,
         db=db,
         scope_manager=scope_manager,
     )
-    orchestrator.resync()
+    await orchestrator.resync()
 
-    children = project_service.get_children(projects[0].id)
+    repos = Repositories(db)
+    project_service = ProjectService(repos)
+    project = await project_service.get(project_node.id)
+    assert project is not None, "Project not found before resync"
+
+    children = await project_service.get_children(project_node.id)
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
@@ -103,17 +106,23 @@ def _get_call_children(node: AnyTreeNode) -> List[AnyTreeNode]:
 
 
 def _has_call_named(node: AnyTreeNode, name: str) -> bool:
-    return any(getattr(c, "name", None) == name for c in _get_call_children(node))
+    return any(
+        getattr(c, "name", None) == name for c in _get_call_children(node)
+    )
 
 
-def _get_call_child_by_name(node: AnyTreeNode, name: str) -> AnyTreeNode | None:
+def _get_call_child_by_name(
+    node: AnyTreeNode, name: str
+) -> AnyTreeNode | None:
     for c in _get_call_children(node):
         if getattr(c, "name", None) == name:
             return c
     return None
 
 
-def _get_call_child_by_qname(node: AnyTreeNode, qname: str) -> AnyTreeNode | None:
+def _get_call_child_by_qname(
+    node: AnyTreeNode, qname: str
+) -> AnyTreeNode | None:
     for c in _get_call_children(node):
         if getattr(c, "qname", None) == qname:
             return c
@@ -131,8 +140,8 @@ def _has_nested_call_with_name(node: AnyTreeNode, name_pred: str) -> bool:
     return False
 
 
-@pytest.fixture
-def setup_project(tmp_path, arangodb_client):
+@pytest_asyncio.fixture
+async def setup_project(tmp_path, arangodb_client):
     project_path = tmp_path / "simple_calls"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
@@ -147,13 +156,16 @@ def setup_project(tmp_path, arangodb_client):
     )
     scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
     repos = Repositories(arangodb_client)
+    await scope_manager.initialize()
+    await repos.ensure_collections()
     project_service = ProjectService(repos)
-    project_node = project_service.create_node(project_node)
+    project_node = await project_service.create_node(project_node)
 
     return project_node, scope_manager, arangodb_client, project_path
 
 
-def test_call_sync_add_and_remove(setup_project):
+@pytest.mark.asyncio
+async def test_call_sync_add_and_remove(setup_project):
     project_node, scope_manager, arangodb_client, project_path = setup_project
     target_file = project_path / "main.py"
 
@@ -173,7 +185,9 @@ def test_call_sync_add_and_remove(setup_project):
     _write_file(target_file, initial_code)
 
     # 1) Build once
-    tree = _build_and_get_tree(project_node, scope_manager, arangodb_client)
+    tree = await _build_and_get_tree(
+        project_node, scope_manager, arangodb_client
+    )
     file_node = _get_file_node(tree)
 
     # There should be exactly one top-level 'reader' call under the file
@@ -184,7 +198,7 @@ def test_call_sync_add_and_remove(setup_project):
     original = _read_file(target_file)
     try:
         _append_reader_call(target_file)
-        tree_after_add = _resync_and_get_tree(
+        tree_after_add = await _resync_and_get_tree(
             project_node, scope_manager, arangodb_client
         )
         file_after_add = _get_file_node(tree_after_add)
@@ -220,18 +234,34 @@ def test_call_sync_add_and_remove(setup_project):
         )
         nested_names = {getattr(n, "qname", "") for n in reader_nested_calls}
         assert (
-            "simple_calls.main.reader::simple_calls.main.Document.read" in nested_names
+            "simple_calls.main.reader::simple_calls.main.Document.read"
+            in nested_names
         ), "Document.read not found under reader"
         assert (
             "simple_calls.main.reader::simple_calls.main.FileReader.read"
             in nested_names
         ), "FileReader.read not found under reader"
 
+        # Record the created nested call node id/key so we can assert it gets
+        # orphaned then reactivated (not duplicated).
+        repos = Repositories(arangodb_client)
+        file_reader_call_qname = (
+            "simple_calls.main.reader::simple_calls.main.FileReader.read"
+        )
+        file_reader_call_node = await repos.call_repo.find_one(
+            {"qname": file_reader_call_qname}
+        )
+        assert file_reader_call_node is not None, (
+            "Expected FileReader.read call node to exist in DB"
+        )
+        created_file_reader_call_key = file_reader_call_node.key
+        assert file_reader_call_node.status == "active"
+
         # 3) Remove the extra call and resync
         updated = _remove_reader_call(_read_file(target_file))
         _write_file(target_file, updated)
 
-        tree_after_remove = _resync_and_get_tree(
+        tree_after_remove = await _resync_and_get_tree(
             project_node, scope_manager, arangodb_client
         )
         file_after_remove = _get_file_node(tree_after_remove)
@@ -242,6 +272,14 @@ def test_call_sync_add_and_remove(setup_project):
             "simple_calls.main.reader::simple_calls.main.FileReader.read",
         )
         assert not nested_exists, "Removed FileReader.read call still present"
+
+        # But it should still exist in DB and be marked orphaned
+        orphaned_file_reader_call_node = await repos.call_repo.find_one(
+            {"qname": file_reader_call_qname}
+        )
+        assert orphaned_file_reader_call_node is not None
+        assert orphaned_file_reader_call_node.key == created_file_reader_call_key
+        assert orphaned_file_reader_call_node.status == "orphaned"
 
         # Document.read should still be present
         assert _has_nested_call_with_name(
@@ -256,7 +294,27 @@ def test_call_sync_add_and_remove(setup_project):
                 c, "name", None) == "reader"]
         )
         assert remaining_reader == 1
+
+        # 4) Add it back and ensure the orphaned call node is reactivated
+        _append_reader_call(target_file)
+        tree_after_readd = await _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
+        file_after_readd = _get_file_node(tree_after_readd)
+        assert _has_nested_call_with_name(
+            file_after_readd,
+            "simple_calls.main.reader::simple_calls.main.FileReader.read",
+        ), "Expected FileReader.read call after re-adding it"
+
+        reactivated_node = await repos.call_repo.find_one(
+            {"qname": file_reader_call_qname}
+        )
+        assert reactivated_node is not None
+        assert reactivated_node.key == created_file_reader_call_key
+        assert reactivated_node.status == "active"
     finally:
         # Restore original file content and resync
         _write_file(target_file, original)
-        _resync_and_get_tree(project_node, scope_manager, arangodb_client)
+        await _resync_and_get_tree(
+            project_node, scope_manager, arangodb_client
+        )
