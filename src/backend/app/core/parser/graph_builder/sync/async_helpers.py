@@ -1,8 +1,10 @@
 import asyncio
-from typing import Optional, List, Tuple
+from typing import Literal, Optional, List, Tuple
 
 from app.core.model.base import BaseNode
 from app.core.parser.scope_manager.models import ScopeModel, ScopeType
+from app.core.parser.graph_builder.sync.mappers import map_scope_to_position
+from app.core.model.nodes import ContainerNode
 
 
 class AsyncSyncHelpers:
@@ -17,6 +19,62 @@ class AsyncSyncHelpers:
         self.repos = async_repos
         self._semaphore = asyncio.Semaphore(semaphore_limit)
         self._node_cache = {}
+
+    async def async_move_node(
+        self,
+        node_id: str,
+        old_parent_id: str,
+        new_parent_id: str,
+    ) -> None:
+        """Async move a node."""
+        if old_parent_id:
+            # Remove old edge
+            await self.repos.contains_edges.db.aql.execute("""
+                FOR e IN contains_edges
+                    FILTER e._to == @node_id
+                    REMOVE e IN contains_edges
+            """, bind_vars={"node_id": node_id})
+
+        # Create new edge
+        await self.async_ensure_contains_edge(new_parent_id, node_id)
+
+    async def async_update_node_properties(self, node: BaseNode, scope: ScopeModel) -> BaseNode:
+        """Async update a node's properties."""
+        async with self._semaphore:
+
+            repo = self._get_repo_for_node(node)
+            node.qname = scope.qname
+            node.name = scope.name
+            if hasattr(node, 'position') and hasattr(scope, 'position'):
+                node.position = map_scope_to_position(scope)
+            return await repo.update(node.key, node)
+
+    async def async_create_node(self, node: BaseNode) -> BaseNode:
+        """Async create a node."""
+        async with self._semaphore:
+            repo = self._get_repo_for_node(node)
+            return await repo.create(node)
+
+    async def async_get_node_by_id(self, node_id: str) -> Optional[BaseNode]:
+        """Async get a node by its ID."""
+        async with self._semaphore:
+            return await self.repos.nodes.get_by_id(node_id)
+
+    async def async_get_parent_id(self, node_id: str) -> Optional[str]:
+        """Async get a node's parent ID."""
+        async with self._semaphore:
+            parent = await self.repos.nodes.get_parent(node_id)
+            if parent:
+                return parent.get("parent_id")
+            return None
+
+    async def async_get_children(self, node_id: str, node_types: List[str] = []) -> List[BaseNode]:
+        """Async get a node's children IDs."""
+        async with self._semaphore:
+            children = await self.repos.nodes.get_children(node_id)
+            if children:
+                return [child for child in children if child.get("node_type") in node_types]
+            return []
 
     async def async_create_or_update_node(
         self,
@@ -40,6 +98,14 @@ class AsyncSyncHelpers:
                 return await repo.update(existing.key, existing)
             else:
                 return await repo.create(node)
+
+    async def async_mark_node_status(self, node: ContainerNode, status: Literal["active", "orphaned", "deleted"], reason: Optional[str] = None) -> None:
+        """Async mark a node's status."""
+        async with self._semaphore:
+            node = ContainerNode(**node)
+            node.status = status
+            node.orphan_reason = reason
+            return await self.repos.nodes.update(node.key, node)
 
     async def async_ensure_contains_edge(
         self,
@@ -194,4 +260,4 @@ class AsyncSyncHelpers:
             return self.repos.class_repo
         elif node_type == 'function':
             return self.repos.function_repo
-        return self.repos.node_repo
+        return self.repos.nodes

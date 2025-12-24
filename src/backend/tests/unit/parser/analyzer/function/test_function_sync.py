@@ -166,6 +166,9 @@ async def test_function_sync_add_and_remove(setup_project):
             project_node, scope_manager, arangodb_client
         )
         file_node_after_remove = tree_after_remove[0]
+        for child in file_node_after_remove.children:
+            print(
+                f"Child: {child.name}, Status: {child.status} type: {child.node_type}")
         names_after_remove = [
             getattr(c, "name", None) for c in file_node_after_remove.children
         ]

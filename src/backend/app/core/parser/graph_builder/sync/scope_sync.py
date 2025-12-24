@@ -1,4 +1,5 @@
 import logging
+import datetime
 from pathlib import Path
 from typing import Optional, Set
 
@@ -32,44 +33,16 @@ class ScopeSyncService:
     async def sync_scope_hierarchy(
         self, root_scope_id: str, project_node_id: str, change_set: Optional[ChangeSet] = None
     ):
-        """
-        Sync scope hierarchy starting from root_scope_id.
+        """Main entry point for hierarchy synchronization."""
+        touched_folders = self._build_touched_folders(
+            change_set) if change_set else set()
 
-        Traverses all child scopes and:
-        - Creates/updates nodes (only version updated on existing nodes)
-        - Establishes contain edges
-
-        If change_set is provided, only syncs scopes that are in the change set.
-        Items not in change set are skipped (no recursion).
-
-        Args:
-            root_scope_id: The scope ID to start traversal from
-            project_node_id: The project node ID to use as parent
-            change_set: Optional ChangeSet to filter what gets synced
-        """
-
-        touched_folders = self._build_touched_folders(change_set)
-        if change_set:
-            logger.info(
-                f"Incremental sync from {root_scope_id}: "
-                f"{len(change_set.new_files)} new, "
-                f"{len(change_set.modified_files)} modified, "
-                f"{len(change_set.deleted_files)} deleted files, "
-                f"{len(change_set.new_folders)} new, "
-                f"{len(change_set.deleted_folders)} deleted folders"
-            )
-        else:
-            logger.info(f"Full sync from {root_scope_id}")
-
-        root_scope = await self.scope_manager.get_scope(root_scope_id)
-        if not root_scope:
-            logger.error(f"Root scope {root_scope_id} not found")
-            return
-
-        # Get direct children of root
+        # In this unified strategy, the root children are synced first
         children = await self.scope_manager.get_children(root_scope_id)
 
-        # Process all children concurrently
+        # Track current child IDs to orphan missing ones at the project root level
+        current_child_ids = {f"nodes/{child.id}" for child in children}
+
         await asyncio.gather(*[
             self._sync_scope_async(
                 child,
@@ -79,6 +52,9 @@ class ScopeSyncService:
             )
             for child in children
         ])
+
+        # Cleanup: Mark nodes that exist in DB under project but aren't in AST anymore
+        await self._mark_missing_children_orphaned(project_node_id, current_child_ids)
 
     def _build_touched_folders(self, change_set: ChangeSet) -> Set[str]:
         """Build set of folders that need sync due to file changes."""
@@ -107,101 +83,104 @@ class ScopeSyncService:
         self,
         scope: ScopeModel,
         parent_node_id: str,
-        change_set: ChangeSet,
+        change_set: Optional[ChangeSet],
         touched_folders: Set[str],
     ) -> None:
+        """Recursive unified sync logic."""
 
-        should_sync = False
-        should_recurse = False
-        is_deleted = False
+        # 1. Determine if we need to sync this specific node
+        should_sync, should_recurse = self._determine_sync_necessity(
+            scope, change_set, touched_folders)
 
-        if scope.type == ScopeType.FILE:
-            if scope.file_path in change_set.new_files:
-                should_sync = True
-                should_recurse = True
-            elif scope.file_path in change_set.modified_files:
-                should_sync = True
-                should_recurse = True
-            elif scope.file_path in change_set.deleted_files:
-                should_sync = True
-                is_deleted = True
-                should_recurse = False
-
-        elif scope.type == ScopeType.FOLDER:
-            # Sync if explicitly changed OR contains changed files
-            if scope.file_path in touched_folders:
-                should_sync = True
-            # ALWAYS recurse into folders to find changed files
-            should_recurse = True
-
-        elif scope.type in (ScopeType.CLASS, ScopeType.FUNCTION):
-            # Always sync if we're visiting (parent was synced)
-            should_sync = True
-            should_recurse = True
-
-        # Perform sync if needed
         if should_sync:
-            saved_node = await self._sync_single_scope(
-                scope, parent_node_id, is_deleted
-            )
-            # Update parent_node_id for children
+            # 2. Unified Sync Logic (Create / Update / Move)
+            # This replaces the old _sync_single_scope
+            saved_node = await self._unified_sync_node(scope, parent_node_id)
             if saved_node:
                 parent_node_id = saved_node.id
 
-        # Recurse into children (concurrently)
-        if should_recurse and not is_deleted:
+        # 3. Recurse into children
+        if should_recurse:
             children = await self.scope_manager.get_children(scope.id)
             if children:
+                current_child_ids = {f"nodes/{c.id}" for c in children}
+
+                # Sync children concurrently
                 await asyncio.gather(*[
                     self._sync_scope_async(
-                        child,
-                        parent_node_id=parent_node_id,
-                        change_set=change_set,
-                        touched_folders=touched_folders,
-                    )
+                        child, parent_node_id, change_set, touched_folders)
                     for child in children
                 ])
 
-    async def _sync_single_scope(
-        self,
-        scope: ScopeModel,
-        parent_node_id: str,
-        is_deleted: bool = False,
-    ) -> Optional[BaseNode]:
-        """Sync a single scope to the graph database."""
-        from .mappers import (
-            map_scope_to_file_node,
-            map_scope_to_folder_node,
-            map_scope_to_class_node,
-            map_scope_to_function_node,
-        )
+                # 4. Cleanup: Soft-delete children no longer present in AST under this parent
+                await self._mark_missing_children_orphaned(parent_node_id, current_child_ids)
 
-        # Map to appropriate node type
-        if scope.type == ScopeType.FILE:
-            node = map_scope_to_file_node(scope)
-        elif scope.type == ScopeType.FOLDER:
-            node = map_scope_to_folder_node(scope)
+    def _map_scope_to_node(self, scope: ScopeModel) -> BaseNode:
+        """Map ScopeModel to BaseNode."""
+        if scope.type == ScopeType.FOLDER:
+            return map_scope_to_folder_node(scope)
+        elif scope.type == ScopeType.FILE:
+            return map_scope_to_file_node(scope)
         elif scope.type == ScopeType.CLASS:
-            node = map_scope_to_class_node(scope)
+            return map_scope_to_class_node(scope)
         elif scope.type == ScopeType.FUNCTION:
-            node = map_scope_to_function_node(scope)
+            return map_scope_to_function_node(scope)
         else:
-            return None
+            raise ValueError(f"Unsupported scope type: {scope.type}")
 
-        # Handle deletion (soft delete or remove)
-        if is_deleted:
-            await self.helpers.mark_node_deleted(node.id)
-            return None
+    async def _unified_sync_node(self, scope: ScopeModel, expected_parent_id: str) -> Optional[BaseNode]:
+        """Implementation of the 08 Decision Table: Create, Update, or Re-parent."""
+        node_id = f"nodes/{scope.id}"
+        existing_node = await self.helpers.async_get_node_by_id(node_id)
 
-        # Create or update node
-        saved_node = await self.helpers.async_create_or_update_node(
-            node, scope_id=scope.id
-        )
+        if not existing_node:
+            # ACTION: CREATE
+            node = self._map_scope_to_node(scope)
+            saved_node = await self.helpers.async_create_node(node)
+            await self.helpers.async_ensure_contains_edge(expected_parent_id, node_id)
+            return saved_node
 
-        # Ensure contains edge
-        if parent_node_id and saved_node:
-            await self.helpers.async_ensure_contains_edge(
-                parent_node_id, saved_node.id
-            )
+        # Check current parent to detect moves
+        current_parent_id = await self.helpers.async_get_parent_id(node_id)
 
-        return saved_node
+        if current_parent_id == expected_parent_id:
+            # ACTION: UPDATE (Same parent, just refresh properties)
+            existing_node.status = "active"
+            # existing_node.status_changed_at = datetime.now()
+            existing_node.orphan_reason = None
+            saved_node = await self.helpers.async_update_node_properties(existing_node, scope)
+            return saved_node
+        else:
+            # ACTION: RE-PARENT (Move)
+            await self.helpers.async_move_node(node_id, current_parent_id, expected_parent_id)
+            existing_node.status = "active"
+            # existing_node.status_changed_at = datetime.now()
+            existing_node.orphan_reason = None
+            saved_node = await self.helpers.async_update_node_properties(existing_node, scope)
+            return saved_node
+
+    def _determine_sync_necessity(self, scope: ScopeModel, change_set: Optional[ChangeSet], touched_folders: Set[str]):
+        """Logic to decide if we should process or skip this scope."""
+        if not change_set:  # Full sync
+            return True, True
+
+        if scope.type == ScopeType.FOLDER:
+            return (scope.file_path in touched_folders), True
+        if scope.type == ScopeType.FILE:
+            is_changed = scope.file_path in change_set.new_files or scope.file_path in change_set.modified_files
+            return is_changed, is_changed
+
+        # Classes/Functions: If parent (file) is being synced, they are visited
+        return True, True
+
+    async def _mark_missing_children_orphaned(self, parent_id: str, current_child_ids: Set[str]):
+        """Soft-delete nodes that exist in DB but not in current AST parse."""
+        db_children = await self.helpers.async_get_children(parent_id, [ScopeType.FOLDER, ScopeType.FILE, ScopeType.CLASS, ScopeType.FUNCTION])
+
+        for child in db_children:
+            if child.get("_id") not in current_child_ids:
+                await self.helpers.async_mark_node_status(
+                    child,
+                    status="orphaned",
+                    reason="not_in_ast_under_same_parent"
+                )

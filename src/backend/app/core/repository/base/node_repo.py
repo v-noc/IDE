@@ -145,9 +145,11 @@ class NodeRepository(BaseRepository[T]):
             LET start_ver = start_node.current_version != null ? start_node.current_version : 0
 
             FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id @@contains_collection
+                PRUNE v.status != "active"
                 OPTIONS { order: "bfs", uniqueVertices: "global" }
 
-                // 4. OUTPUT CALCULATIONS
+                FILTER v.status == "active"
+               
                 LET parent_candidates = (
                     FOR i IN 2..LENGTH(p.vertices)
                         LET candidate = p.vertices[LENGTH(p.vertices) - i]
@@ -227,3 +229,20 @@ class NodeRepository(BaseRepository[T]):
 
     async def find_by_type(self, node_type: str) -> List[T]:
         return await self.find({"node_type": node_type})
+
+    async def get_children(self, node_id: str) -> List[T]:
+        """Async get a node's children."""
+        query = """
+        FOR v, e, p IN 1..1 OUTBOUND @start_node_id @@contains_collection
+            OPTIONS { order: "bfs" }
+            RETURN v
+        """
+        bind_vars = {
+            "start_node_id": node_id,
+            "@contains_collection": "contains_edges"
+        }
+        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+        results = []
+        async for doc in cursor:
+            results.append(doc)
+        return results
