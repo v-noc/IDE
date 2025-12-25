@@ -111,3 +111,71 @@ def inject_ids(content: str) -> Tuple[str, bool]:
         return content, False
     except Exception as e:
         return content, False
+
+
+def inject_module_metadata(content: str, metadata: Dict[str, str]) -> Tuple[str, bool]:
+    """
+    Injects key-value metadata into the module-level docstring.
+    Preserves existing metadata unless overwritten.
+    """
+    try:
+        module = cst.parse_module(content)
+        current_doc = module.get_docstring(clean=True)
+        
+        injector = IDInjector()
+        # Check if we actually need to change anything
+        current_metadata = injector._extract_metadata(current_doc)
+        needs_update = False
+        for k, v in metadata.items():
+            if current_metadata.get(k) != v:
+                needs_update = True
+                break
+        
+        if not needs_update:
+            return content, False
+
+        # Reuse the docstring building logic from IDInjector
+        # We temporarily merge current and new metadata for the build
+        combined_metadata = current_metadata.copy()
+        combined_metadata.update(metadata)
+        
+        new_doc_content = injector._build_docstring(current_doc, metadata) # _build_docstring logic handles merging/replacing
+
+        # Create new body with updated docstring
+        statements = module.body
+        new_body_statements = statements
+
+        if current_doc is not None:
+             if (
+               statements
+               and isinstance(statements[0], cst.SimpleStatementLine)
+               and len(statements[0].body) == 1
+               and isinstance(statements[0].body[0], cst.Expr)
+               and isinstance(statements[0].body[0].value, cst.SimpleString)
+               ):
+                old_expr = statements[0].body[0]
+                new_expr = old_expr.with_changes(
+                    value=cst.SimpleString(f'"""{new_doc_content}"""')
+                )
+                new_stmt = statements[0].with_changes(body=(new_expr,))
+                new_body_statements = (new_stmt,) + statements[1:]
+        else:
+            # Insert new docstring at start
+            new_stmt = cst.SimpleStatementLine(
+                body=(
+                    cst.Expr(
+                        value=cst.SimpleString(f'"""{new_doc_content}"""')
+                    ),
+                ),
+                trailing_whitespace=cst.TrailingWhitespace(
+                    newline=cst.Newline()
+                ),
+            )
+            new_body_statements = (new_stmt,) + statements
+
+        new_module = module.with_changes(body=new_body_statements)
+        return new_module.code, True
+
+    except Exception as e:
+        # Fallback or log error? For now return original
+        return content, False
