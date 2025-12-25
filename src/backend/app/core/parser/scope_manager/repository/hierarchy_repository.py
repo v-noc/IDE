@@ -28,6 +28,30 @@ class HierarchyRepository:
                 del result
                 gc.collect()  # Force immediate cleanup of the C++ object
 
+    async def relink_parent_child(self, new_parent_id: str, child_id: str) -> None:
+        """
+        Ensure the child has exactly one parent by removing any existing incoming
+        CONTAINS relationships, then creating a new one from new_parent_id.
+        """
+        conn = self.db_manager.get_connection()
+        result = None
+        try:
+            result = await conn.execute(
+                """
+                MATCH (c:Scope {id: $child_id})
+                OPTIONAL MATCH (:Scope)-[r:CONTAINS]->(c)
+                DELETE r
+                WITH c
+                MATCH (p:Scope {id: $new_parent_id})
+                CREATE (p)-[:CONTAINS]->(c)
+                """,
+                {"new_parent_id": new_parent_id, "child_id": child_id},
+            )
+        finally:
+            if result is not None:
+                del result
+                gc.collect()  # Force immediate cleanup of the C++ object
+
     async def batch_link_parent_child(
         self, relationships: List[dict[str, str]]
     ) -> None:

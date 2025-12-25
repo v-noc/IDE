@@ -113,6 +113,10 @@ class ScopeRepository:
         """Batch create CONTAINS relationships."""
         await self._hierarchy_repo.batch_link_parent_child(relationships)
 
+    async def relink_parent_child(self, new_parent_id: str, child_id: str) -> None:
+        """Replace any existing parent CONTAINS links for child_id with new_parent_id."""
+        await self._hierarchy_repo.relink_parent_child(new_parent_id, child_id)
+
     async def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all direct children of a scope."""
         return await self._hierarchy_repo.get_children(parent_id)

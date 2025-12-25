@@ -1,4 +1,4 @@
-"""Orchestrator for coordinating graph building phases."""
+
 import logging
 from pathlib import Path
 from typing import Optional

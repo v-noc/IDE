@@ -126,6 +126,14 @@ class ScopeManager:
         async with self.semaphore:
             await self.repository.link_parent_child(parent_id, child_id)
 
+    async def relink_parent_child(self, new_parent_id: str, child_id: str) -> None:
+        """
+        Replace any existing incoming CONTAINS relationship(s) for child_id with
+        a single link from new_parent_id.
+        """
+        async with self.semaphore:
+            await self.repository.relink_parent_child(new_parent_id, child_id)
+
     async def batch_get_scopes_by_qnames(self, qnames: List[str]) -> dict[str, ScopeModel]:
         """Batch get scopes by their qualified names. Returns a dict mapping qname -> ScopeModel."""
         async with self.semaphore:
