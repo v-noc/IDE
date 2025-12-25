@@ -149,6 +149,17 @@ class ScopeManager:
         async with self.semaphore:
             await self.repository.batch_link_parent_child(relationships)
 
+    async def batch_relink_parent_child(
+        self, relationships: List[dict[str, str]]
+    ) -> None:
+        """
+        Batch relink parent-child relationships.
+        For each child_id, remove existing incoming CONTAINS edges and create a new one
+        from parent_id.
+        """
+        async with self.semaphore:
+            await self.repository.batch_relink_parent_child(relationships)
+
     async def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all children of a scope."""
         async with self.semaphore:

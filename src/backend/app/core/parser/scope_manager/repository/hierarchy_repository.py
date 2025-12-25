@@ -79,6 +79,37 @@ class HierarchyRepository:
                 del result
                 gc.collect()  # Force immediate cleanup of the C++ object
 
+    async def batch_relink_parent_child(
+        self, relationships: List[dict[str, str]]
+    ) -> None:
+        """
+        Batch relink CONTAINS relationships.
+        For each child_id, remove any incoming CONTAINS edges and create a new one
+        from parent_id.
+        """
+        if not relationships:
+            return
+
+        conn = self.db_manager.get_connection()
+        result = None
+        try:
+            result = await conn.execute(
+                """
+                UNWIND $relationships AS rel
+                MATCH (c:Scope {id: rel.child_id})
+                OPTIONAL MATCH (:Scope)-[r:CONTAINS]->(c)
+                DELETE r
+                WITH rel, c
+                MATCH (p:Scope {id: rel.parent_id})
+                CREATE (p)-[:CONTAINS]->(c)
+                """,
+                {"relationships": relationships},
+            )
+        finally:
+            if result is not None:
+                del result
+                gc.collect()  # Force immediate cleanup of the C++ object
+
     async def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all direct children of a scope."""
         conn = self.db_manager.get_connection()

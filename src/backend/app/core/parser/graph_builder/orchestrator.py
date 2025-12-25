@@ -15,7 +15,11 @@ from app.core.parser.graph_builder.discovery.scanner import (
     FileScanner,
     ScanResult,
 )
-from app.core.parser.graph_builder.utils import GraphVisualizer, PathResolver, PhaseProcessor, DeletionHandler, CallSiteTreePrinter
+from app.core.parser.graph_builder.utils import (
+    DeletionHandler,
+    PathResolver,
+    PhaseProcessor,
+)
 from app.core.parser.graph_builder.sync.graph_sync import (
     MainGraphSyncService,
 )
@@ -143,7 +147,9 @@ class GraphBuilderOrchestrator:
 
         return change_set
 
-    async def _process_changes(self, change_set: ChangeSet, scan_result: ScanResult):
+    async def _process_changes(
+        self, change_set: ChangeSet, scan_result: ScanResult
+    ):
         """
         Process the detected changes in multiple phases.
 
@@ -154,17 +160,22 @@ class GraphBuilderOrchestrator:
         folder_changes = []
         touched_folder_ids = set()
 
-        # Handle folder additions proactively to ensure hierarchy exists
-        for folder_path in change_set.new_folders:
-            folder_result = await self.collector.process_folder(folder_path)
-            if folder_result:
-                folder_changes.extend(folder_result)
-                touched_folder_ids.update(fc.scope.id for fc in folder_result)
+        # Reset per-run caches and perform ID-first folder synchronization
+        # (moves/new/deletes).
+        self.collector.reset_session()
+        folder_result = await self.collector.process_folder_changes_batch(
+            change_set, batch_size=self.batch_size
+        )
+        if folder_result:
+            folder_changes.extend(folder_result)
+            touched_folder_ids.update(fc.scope.id for fc in folder_result)
 
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")
-        collection_results = await self.phase_processor.process_collection_phase(
-            change_set, scan_result
+        collection_results = (
+            await self.phase_processor.process_collection_phase(
+                change_set, scan_result
+            )
         )
 
         # Collect folder changes from collection results
@@ -174,16 +185,12 @@ class GraphBuilderOrchestrator:
                 fc.scope.id for fc in result.folder_changes
             )
 
-        # Process Deleted folders before files to avoid orphan references
-        if change_set.deleted_folders:
-            await self.deletion_handler.handle_batch_folder_deletions(
-                change_set.deleted_folders, folder_changes, touched_folder_ids
-            )
-
         # Process Deleted files (Full file deletion)
         if change_set.deleted_files:
             await self.deletion_handler.handle_batch_file_deletions(
-                change_set.deleted_files, folder_changes, touched_folder_ids
+                [tp.path for tp in change_set.deleted_files if tp.path],
+                folder_changes,
+                touched_folder_ids,
             )
 
         # Phase 3: Sync scopes to graph database
@@ -198,7 +205,9 @@ class GraphBuilderOrchestrator:
                 self.project_node,
             )
 
-            await sync_service.sync_scope_hierarchy(self.project_node.id, change_set)
+            await sync_service.sync_scope_hierarchy(
+                self.project_node.id, change_set
+            )
             call_sync_service = sync_service.call_sync
         else:
             logger.warning("No database connection for sync; skipping")

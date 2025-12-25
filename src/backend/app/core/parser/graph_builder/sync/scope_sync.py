@@ -67,13 +67,21 @@ class ScopeSyncService:
         touched = set()
 
         # Explicit folder changes
-        touched.update(change_set.new_folders)
-        touched.update(change_set.deleted_folders)
+        touched.update([tp.path for tp in change_set.new_folders if tp.path])
+        touched.update([tp.path for tp in change_set.deleted_folders if tp.path])
+        touched.update([mv.new for mv in change_set.moved_folders if mv.new])
 
         # Folders containing file changes
-        all_changed_files = (
-            change_set.new_files + change_set.modified_files + change_set.deleted_files
-        )
+        all_changed_files = [
+            tp.path
+            for tp in (
+                change_set.new_files
+                + change_set.modified_files
+                + change_set.deleted_files
+            )
+            if tp.path
+        ]
+        all_changed_files.extend([mv.new for mv in change_set.moved_files if mv.new])
 
         for file_path in all_changed_files:
             parent = Path(file_path).parent
@@ -191,9 +199,13 @@ class ScopeSyncService:
         if scope.type == ScopeType.FOLDER:
             return (scope.file_path in touched_folders), True
         if scope.type == ScopeType.FILE:
+            new_paths = {tp.path for tp in change_set.new_files if tp.path}
+            modified_paths = {tp.path for tp in change_set.modified_files if tp.path}
+            moved_new_paths = {mv.new for mv in change_set.moved_files if mv.new}
             is_changed = (
-                scope.file_path in change_set.new_files
-                or scope.file_path in change_set.modified_files
+                scope.file_path in new_paths
+                or scope.file_path in modified_paths
+                or scope.file_path in moved_new_paths
             )
             return is_changed, is_changed
 

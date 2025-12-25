@@ -73,8 +73,13 @@ class PhaseProcessor:
         Returns:
             List of collection results
         """
-        self.collector.reset_session()
-        files_to_process = change_set.new_files + change_set.modified_files
+        files_to_process = [
+            tp.path
+            for tp in (change_set.new_files + change_set.modified_files)
+            if tp.path
+        ]
+        # Process moved files at their new location as well (same stable ID)
+        files_to_process.extend([mv.new for mv in change_set.moved_files if mv.new])
 
         results = []
         removed_scope_ids = set()

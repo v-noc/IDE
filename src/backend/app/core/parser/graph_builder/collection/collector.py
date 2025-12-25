@@ -14,6 +14,7 @@ from app.core.parser.scope_manager.models import ScopeModel
 
 from .ast_processor import ASTProcessor
 from .hierarchy import HierarchyBuilder, FolderChange
+from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,14 @@ class Collector:
     def reset_session(self) -> None:
         """Reset builder caches between orchestrator runs."""
         self.hierarchy_builder.reset_session()
+
+    async def process_folder_changes_batch(
+        self, change_set: ChangeSet, batch_size: int = 100
+    ) -> List[FolderChange]:
+        """ID-first batch folder synchronization (moves/new/deletes)."""
+        return await self.hierarchy_builder.process_folder_changes_batch(
+            change_set, batch_size=batch_size
+        )
 
     async def process_file(
         self, file_path: str, checksum: str
@@ -77,7 +86,9 @@ class Collector:
 
         # 2. Parse Content & Scan AST
         try:
-            async with aiofiles.open(str(abs_path), "r", encoding="utf-8") as f:
+            async with aiofiles.open(
+                str(abs_path), "r", encoding="utf-8"
+            ) as f:
                 content = await f.read()
         except Exception as e:
             logger.error(f"Failed to scan AST for {file_path}: {e}")
@@ -87,7 +98,9 @@ class Collector:
         # descendants)
         loop = asyncio.get_event_loop()
         try:
-            ast_nodes = await loop.run_in_executor(None, scan, content, str(abs_path))
+            ast_nodes = await loop.run_in_executor(
+                None, scan, content, str(abs_path)
+            )
         except Exception as e:
             logger.error(
                 f"Failed to collect descendant scopes for {file_path}: {e}")
@@ -136,7 +149,9 @@ class Collector:
             folder_changes=build_result.folder_changes,
         )
 
-    async def process_folder(self, folder_path: str) -> Optional[List[FolderChange]]:
+    async def process_folder(
+        self, folder_path: str
+    ) -> Optional[List[FolderChange]]:
         """Ensure folder hierarchy exists for a folder change event."""
         abs_path = Path(folder_path)
         try:
