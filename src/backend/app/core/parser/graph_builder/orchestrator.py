@@ -160,11 +160,11 @@ class GraphBuilderOrchestrator:
         folder_changes = []
         touched_folder_ids = set()
 
-        # Reset per-run caches and perform ID-first folder synchronization
-        # (moves/new/deletes).
+        # Reset per-run caches and perform ID-first structure synchronization
+        # (folders + file shells).
         self.collector.reset_session()
-        folder_result = await self.collector.process_folder_changes_batch(
-            change_set, batch_size=self.batch_size
+        folder_result = await self.collector.sync_structure(
+            change_set, scan_result, batch_size=self.batch_size
         )
         if folder_result:
             folder_changes.extend(folder_result)

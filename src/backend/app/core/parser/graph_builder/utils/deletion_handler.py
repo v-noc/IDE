@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.core.model.nodes import ProjectNode
-from app.core.parser.graph_builder.collection.hierarchy import FolderChange
+from app.core.parser.graph_builder.collection.folder_processor import FolderChange
 from app.core.parser.graph_builder.utils import PathResolver
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel

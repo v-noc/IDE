@@ -6,6 +6,7 @@ import libcst as cst
 
 logger = logging.getLogger(__name__)
 
+
 class FileTracker:
     def __init__(self):
         pass
@@ -26,7 +27,7 @@ class FileTracker:
             module = cst.parse_module(content)
             doc = module.get_docstring(clean=True)
             meta = IDInjector()._extract_metadata(doc)
-            
+
             existing_id = meta.get("FileID")
             if existing_id:
                 file_id = existing_id
@@ -34,11 +35,12 @@ class FileTracker:
                 file_id = str(uuid.uuid4())
 
             # Inject if missing
-            new_content, modified = inject_module_metadata(content, {"FileID": file_id})
-            
+            new_content, modified = inject_module_metadata(
+                content, {"FileID": file_id})
+
             if modified:
                 file_path.write_text(new_content, encoding="utf-8")
-                
+
             return file_id
 
         except Exception as e:

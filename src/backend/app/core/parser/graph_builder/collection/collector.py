@@ -11,10 +11,12 @@ from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.jedi_adapter.resolver import MROResolver
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel
+from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
+from app.core.parser.graph_builder.discovery.scanner import ScanResult
 
 from .ast_processor import ASTProcessor
-from .hierarchy import HierarchyBuilder, FolderChange
-from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
+from .folder_processor import FolderProcessor, FolderChange
+from .file_processor import FileProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -38,32 +40,42 @@ class Collector:
         self.manager = scope_manager
         self.jedi_manager = jedi_manager
 
-        self.hierarchy_builder = HierarchyBuilder(project_node, scope_manager)
+        self.folder_processor = FolderProcessor(project_node, scope_manager)
+        self.file_processor = FileProcessor(project_node, scope_manager)
+
         self.mro_resolver = MROResolver(jedi_manager)
         self.ast_processor = ASTProcessor(scope_manager, self.mro_resolver)
 
     def reset_session(self) -> None:
         """Reset builder caches between orchestrator runs."""
-        self.hierarchy_builder.reset_session()
+        self.folder_processor.reset_session()
 
-    async def process_folder_changes_batch(
-        self, change_set: ChangeSet, batch_size: int = 100
+    async def sync_structure(
+        self, change_set: ChangeSet, scan_result: ScanResult, batch_size: int = 100
     ) -> List[FolderChange]:
-        """ID-first batch folder synchronization (moves/new/deletes)."""
-        return await self.hierarchy_builder.process_folder_changes_batch(
-            change_set, batch_size=batch_size
-        )
+        """
+        Phase 1.5: Batch synchronize all folder and file structures (shells).
+        Returns folder changes for notification/logging.
+        """
+        # 1. Sync Folders
+        folder_changes = await self.folder_processor.process_batch(change_set, batch_size=batch_size)
+
+        # 2. Sync Files (Shells)
+        await self.file_processor.process_batch(change_set, scan_result, batch_size=batch_size)
+
+        return folder_changes
 
     async def process_file(
         self, file_path: str, checksum: str
     ) -> Optional[CollectionResult]:
         """
-        Process a single file for Phase 1 collection.
+        Process a single file for Phase 2 collection (Content/AST).
+        Assumes file scope structure is already synced in Phase 1.5.
 
         Returns:
         - file_scope: The file scope node
-        - updated_scopes: New or modified scopes (need Phase 2 body analysis)
         - removed_scope_ids: IDs of deleted scopes
+        - folder_changes: Empty list (kept for signature compatibility or legacy bubbling)
         """
         abs_path = Path(file_path)
         try:
@@ -76,13 +88,27 @@ class Collector:
             )
             return None
 
-        # 1. Build Hierarchy (creates/updates file, folder scopes)
-        build_result = await self.hierarchy_builder.build_hierarchy(
-            rel_path, checksum)
-        if not build_result:
-            logger.error(f"Failed to build hierarchy for {file_path}")
+        # 1. Retrieve File Scope (Optimized: Should exist from batch sync)
+        # We need the ID to process children.
+        # We could optimize by having a cache or passing ID, but lookup by path is fast enough for now.
+        # However, file_path in DB might not be updated if we rely on qname?
+        # FileProcessor updates file_path in DB.
+
+        # We can search by file_path.
+        # TODO: Potential race condition if two files map to same path? Unlikely in this flow.
+        file_scope_list = await self.manager.get_scopes_by_file_path(str(abs_path))
+        if not file_scope_list:
+            logger.error(
+                f"File scope not found for {file_path} after structure sync")
             return None
-        file_scope = build_result.scope
+
+        # If multiple scopes return (shouldn't happen for file type), pick the FILE one
+        file_scope = next(
+            (s for s in file_scope_list if s.type == "file"), None)
+        # If types are enums in DB, handle accordingly. ScopeType.FILE is "file".
+        if not file_scope:
+            # Fallback: maybe just take the first one?
+            file_scope = file_scope_list[0]
 
         # 2. Parse Content & Scan AST
         try:
@@ -91,11 +117,10 @@ class Collector:
             ) as f:
                 content = await f.read()
         except Exception as e:
-            logger.error(f"Failed to scan AST for {file_path}: {e}")
+            logger.error(f"Failed to read file {file_path}: {e}")
             return None
 
-        # 3. Get existing children from database (recursively collect all
-        # descendants)
+        # 3. Get existing children from database
         loop = asyncio.get_event_loop()
         try:
             ast_nodes = await loop.run_in_executor(
@@ -103,36 +128,28 @@ class Collector:
             )
         except Exception as e:
             logger.error(
-                f"Failed to collect descendant scopes for {file_path}: {e}")
+                f"Failed to scan AST for {file_path}: {e}")
             return None
 
         existing_map = await self._collect_all_descendant_scopes(file_scope.id)
 
         # 4. Process AST Nodes to build current scope hierarchy
-        # ASTProcessor will check each scope by ID and update if path/pos/name
-        # changed
-
         current_scopes_nodes = await self.ast_processor.process_ast_nodes(
             ast_nodes, file_scope, content)
 
         # 5. Determine which scopes are new or modified (Internal Update)
-        # We still need to iterate to find removed scopes and update DB
         current_ids = set()
 
         for scope, node in current_scopes_nodes:
             current_ids.add(scope.id)
-
             existing = existing_map.get(scope.id)
             if not existing:
-                # New scope - already created by ASTProcessor
                 logger.debug(f"New scope detected: {scope.qname}")
             else:
-                # Existing scope - check if it changed
                 if self._scope_changed(existing, scope):
-                    # Modified scope - already updated by ASTProcessor
                     logger.debug(f"Modified scope detected: {scope.qname}")
 
-        # 6. Identify removed scopes (existed before but not in current AST)
+        # 6. Identify removed scopes
         removed_scope_ids = []
         for child_id in existing_map.keys():
             if child_id not in current_ids:
@@ -146,7 +163,7 @@ class Collector:
         return CollectionResult(
             file_scope=file_scope,
             removed_scope_ids=removed_scope_ids,
-            folder_changes=build_result.folder_changes,
+            folder_changes=[],  # Folder changes are now handled in batch sync
         )
 
     async def process_folder(
@@ -163,10 +180,17 @@ class Collector:
                 self.project_path,
             )
             return []
-        build_result = await self.hierarchy_builder.ensure_folder(rel_path)
+        build_result = await self.folder_processor.ensure_folder(rel_path)
         if not build_result:
             return []
         return build_result.folder_changes
+
+    # Delegate to HierarchyBuilder (deprecated) or use new methods?
+    # process_folder_changes_batch is now on FolderProcessor.
+    async def process_folder_changes_batch(
+        self, change_set: ChangeSet, batch_size: int = 100
+    ) -> List[FolderChange]:
+        return await self.folder_processor.process_batch(change_set, batch_size)
 
     async def _collect_all_descendant_scopes(
         self, parent_scope_id: str
@@ -193,7 +217,6 @@ class Collector:
     ) -> bool:
         """
         Check if a scope has changed by comparing key attributes.
-        Checks: checksum, position, name, qname (path).
         """
         return (
             existing.checksum != current.checksum or
