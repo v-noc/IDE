@@ -17,7 +17,6 @@ class ScopeRepository:
     """
 
     def __init__(self, db_manager: DBConnectionManager):
-        self.conn = db_manager.get_connection()
         # Initialize domain-specific repositories
         self._scope_repo = ScopeCRUDRepository(db_manager)
         self._call_site_repo = CallSiteRepository(db_manager)

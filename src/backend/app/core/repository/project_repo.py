@@ -81,14 +81,22 @@ class ProjectRepo(NodeRepository[ProjectNode]):
             remove_vertices_query = (
                 """
                 FOR vid IN @vertexIds
-                  LET key = SPLIT(vid, "/")[1]
-                  REMOVE { _key: key } IN @@vertex_collection
+                  // vid should be an _id of the form "<collection>/<key>"
+                  // Guard against nulls / malformed values to avoid:
+                  // "Expected _key to be a string attribute in document"
+                  LET parsed = IS_STRING(vid) ? PARSE_IDENTIFIER(vid) : null
+                  FILTER parsed != null
+                  FILTER parsed.collection == @vertex_collection_name
+                  FILTER IS_STRING(parsed.key)
+                  REMOVE { _key: parsed.key } IN @@vertex_collection
+                    OPTIONS { ignoreErrors: true }
                 """
             )
             await self.db.aql.execute(
                 remove_vertices_query,
                 bind_vars={
                     "vertexIds": vertex_ids,
+                    "vertex_collection_name": self.collection_name,
                     "@vertex_collection": self.collection_name,
                 },
             )

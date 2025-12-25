@@ -26,7 +26,7 @@ class DeletionHandler:
         self.scope_manager = scope_manager
         self.path_resolver = path_resolver
 
-    def handle_folder_deletion(
+    async def handle_folder_deletion(
         self,
         folder_path: str,
         folder_changes: list,
@@ -52,9 +52,9 @@ class DeletionHandler:
         self._append_folder_change(
             folder_changes, touched_folder_ids, folder_scope, "deleted"
         )
-        self.scope_manager.delete_scope(folder_scope.id)
+        await self.scope_manager.delete_scope(folder_scope.id)
 
-    def handle_file_deletion(
+    async def handle_file_deletion(
         self,
         file_path: str,
         folder_changes: list,
@@ -68,11 +68,11 @@ class DeletionHandler:
             folder_changes: List to append folder changes to
             touched_folder_ids: Set of folder IDs that have been touched
         """
-        self.scope_manager.delete_file_scope(file_path)
-        self._touch_parent_folders(
+        await self.scope_manager.delete_file_scope(file_path)
+        await self._touch_parent_folders(
             file_path, folder_changes, touched_folder_ids)
 
-    def _touch_parent_folders(
+    async def _touch_parent_folders(
         self,
         target_path: str,
         folder_changes: list,
@@ -104,14 +104,14 @@ class DeletionHandler:
 
         for part in folder_parts:
             current_qname = f"{current_qname}.{part}"
-            folder_scope = self.scope_manager.get_scope_by_qname(current_qname)
+            folder_scope = await self.scope_manager.get_scope_by_qname(current_qname)
             if not folder_scope or folder_scope.id in touched_folder_ids:
                 continue
             self._append_folder_change(
                 folder_changes, touched_folder_ids, folder_scope, "updated"
             )
 
-    def handle_batch_folder_deletions(
+    async def handle_batch_folder_deletions(
         self,
         folder_paths: list[str],
         folder_changes: list,
@@ -154,9 +154,9 @@ class DeletionHandler:
         if folder_scopes_to_delete:
             scope_ids_to_delete = [
                 scope.id for scope in folder_scopes_to_delete]
-            self.scope_manager.batch_delete_scopes(scope_ids_to_delete)
+            await self.scope_manager.batch_delete_scopes(scope_ids_to_delete)
 
-    def handle_batch_file_deletions(
+    async def handle_batch_file_deletions(
         self,
         file_paths: list[str],
         folder_changes: list,
@@ -176,11 +176,11 @@ class DeletionHandler:
         logger.info(f"Processing batch deletion of {len(file_paths)} files")
 
         # Batch delete all file scopes and their children/relationships
-        self.scope_manager.batch_delete_file_scopes(file_paths)
+        await self.scope_manager.batch_delete_file_scopes(file_paths)
 
         # Batch touch parent folders
         for file_path in file_paths:
-            self._touch_parent_folders(
+            await self._touch_parent_folders(
                 file_path, folder_changes, touched_folder_ids)
 
     def _append_folder_change(

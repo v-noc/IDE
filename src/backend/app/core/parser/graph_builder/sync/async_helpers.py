@@ -71,10 +71,14 @@ class AsyncSyncHelpers:
     async def async_get_children(self, node_id: str, node_types: List[str] = []) -> List[BaseNode]:
         """Async get a node's children IDs."""
         async with self._semaphore:
-            children = await self.repos.nodes.get_children(node_id)
-            if children:
-                return [child for child in children if child.get("node_type") in node_types]
-            return []
+            try:
+                children = await self.repos.nodes.get_children(node_id)
+                if children:
+                    return [child for child in children if child.get("node_type") in node_types]
+                return []
+            except Exception as e:
+                print(f"Error getting children: {e}")
+                return []
 
     async def async_create_or_update_node(
         self,

@@ -4,7 +4,7 @@ import logging
 import asyncio
 from typing import Dict, Optional
 from threading import Lock
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 from fastapi import Depends, Request
 
 from app.core.model.nodes import ProjectNode
@@ -26,7 +26,7 @@ class WatcherService:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, db: StandardDatabase | None = None):
+    def __init__(self, db: AsyncDatabase | None = None):
         if not hasattr(self, 'initialized'):
             self.watchers: Dict[str, ProjectWatcher] = {}
             self.db = db
@@ -38,7 +38,7 @@ class WatcherService:
         """Set the main event loop to use for async operations from sync threads."""
         self.main_event_loop = loop
 
-    def set_db(self, db: StandardDatabase):
+    def set_db(self, db: AsyncDatabase):
         if self.db is None:
             self.db = db
 
@@ -132,8 +132,16 @@ class WatcherService:
                     db=self.db
                 )
 
-                # Perform the sync
-                changes = orchestrator.resync()
+                # Perform the sync (orchestrator is async; we run it in the main loop)
+                if self.main_event_loop and self.main_event_loop.is_running():
+                    future = asyncio.run_coroutine_threadsafe(
+                        orchestrator.resync(),
+                        self.main_event_loop,
+                    )
+                    changes = future.result(timeout=None)
+                else:
+                    # Fallback: run in a dedicated loop in this thread
+                    changes = asyncio.run(orchestrator.resync())
 
                 # 3. Notify Frontend: Sync Complete
                 msg = "Sync complete."
@@ -181,7 +189,7 @@ class WatcherService:
 # Dependency remains the same...
 
 
-def get_watcher_service(request: Request, db: StandardDatabase = Depends(get_db)) -> WatcherService:
+def get_watcher_service(request: Request, db: AsyncDatabase = Depends(get_db)) -> WatcherService:
     service = getattr(request.app.state, "watcher_service", None)
     if service is None:
         service = WatcherService()

@@ -139,6 +139,7 @@ class GraphBuilderOrchestrator:
 
         # 3. Process Changes (Phase 1 & 2)
         await self._process_changes(change_set, scan_result)
+        self.scope_manager.close()
 
         return change_set
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, status
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 from typing import Dict, Any
 from pydantic import BaseModel
 import os
@@ -29,7 +29,7 @@ class RunCode(BaseModel):
     filename: str | None = None
 
 
-def _get_services(db: StandardDatabase):
+def _get_services(db: AsyncDatabase):
     project_service = get_project_service(db)
     file_service = get_file_service(db)
     class_service = get_class_service(db)
@@ -48,7 +48,7 @@ def _get_services(db: StandardDatabase):
 async def write_code(
     element_id: str,
     code_block: str = Body(..., embed=True, alias="code"),
-    db: StandardDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
     watcher_service: WatcherService = Depends(get_watcher_service),
 ) -> Dict[str, Any]:
     """
@@ -81,7 +81,7 @@ async def write_code(
 @router.get("/{element_id}/code")
 async def get_code(
     element_id: str,
-    db: StandardDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     Retrieves the code for a given element by first determining its type.

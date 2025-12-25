@@ -29,6 +29,15 @@ async def get_db_async_client() -> AsyncDatabase:
     return _db
 
 
+async def get_db() -> AsyncDatabase:
+    """
+    FastAPI dependency: returns the process-wide cached AsyncDatabase.
+
+    Kept as `get_db` for compatibility with existing imports.
+    """
+    return await get_db_async_client()
+
+
 def close_db_client() -> None:
     """Close the global Arango client (best-effort)."""
     global _client, _db

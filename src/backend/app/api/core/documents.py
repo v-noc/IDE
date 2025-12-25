@@ -4,7 +4,7 @@ from typing import Optional
 from app.core.services.document_service import DocumentService
 from app.core.repository import Repositories
 from app.db.client import get_db
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 from app.core.model.documents import DocumentNode
 from pydantic import BaseModel, Field
 from typing import List
@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 def get_document_service(
-    db: StandardDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
 ) -> DocumentService:
     repos = Repositories(db)
     return DocumentService(repos)

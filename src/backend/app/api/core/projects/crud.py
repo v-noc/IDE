@@ -7,12 +7,13 @@ from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.builder.tree_builder import TreeBuilder
 from app.db.client import get_db
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 from app.api.dependencies import get_project_service
 from pathlib import Path
 from app.core.watcher.service import WatcherService, get_watcher_service
+from loguru import logger
 
 from app.core.model.nodes import ProjectNode
 
@@ -34,7 +35,7 @@ router = APIRouter()
 @router.post("/", response_model=ProjectTreeNode)
 async def create_project(
     project: CreateProjectRequest,
-    db: StandardDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectTreeNode:
     """Create a project graph from a local path.
@@ -60,9 +61,7 @@ async def create_project(
             qname=project.name.lower().replace(" ", "_"),
             path=project.path,
         )
-        repos = Repositories(db)
-        project_service_create = ProjectService(repos)
-        project_node = project_service_create.create_node(project_node)
+        project_node = await project_service.create_node(project_node)
 
         scope_manager = ScopeManager(project_node.name)
         orchestrator = GraphBuilderOrchestrator(
@@ -80,13 +79,11 @@ async def create_project(
             },
         )
     except Exception as exc:
-        print(exc)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to build project graph",
-        )
+        # Let the global exception handler return 500, but preserve traceback
+        logger.exception(f"Failed to build project graph: {exc}")
+        raise
 
-    children = project_service.get_children(project_node.id)
+    children = await project_service.get_children(project_node.id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()

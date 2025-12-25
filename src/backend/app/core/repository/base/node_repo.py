@@ -181,14 +181,18 @@ class NodeRepository(BaseRepository[T]):
             "max_depth": max_depth,
             "exclude_types": exclude_types or [],
         }
-        # Note: This returns raw dicts, not Pydantic models directly,
-        # because the structure is custom ("vertex", "parent_id").
-        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-        # Buffer all results (for backwards compatibility)
-        results = []
-        async for doc in cursor:
-            results.append(doc)
-        return results
+        try:
+            # Note: This returns raw dicts, not Pydantic models directly,
+            # because the structure is custom ("vertex", "parent_id").
+            cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+            # Buffer all results (for backwards compatibility)
+            results = []
+            async for doc in cursor:
+                results.append(doc)
+            return results
+        except Exception as e:
+            print(f"Error getting containment tree: {e}")
+            return []
 
     async def get_nearest_file_and_project(self, node_id: str) -> Dict[str, Any]:
         """Return nearest file and project ancestors in one traversal.
