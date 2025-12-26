@@ -51,7 +51,7 @@ class FolderProcessor:
         rel_parts = [part for part in rel_path.parts if part]
         folder_changes: List[FolderChange] = []
 
-        root = await self._ensure_root(folder_changes)
+        root = self.project_node
 
         if not rel_parts:
             return FolderBuildResult(node=root, folder_changes=folder_changes)
@@ -112,7 +112,7 @@ class FolderProcessor:
         folder_changes: List[FolderChange] = []
 
         # Ensure project root scope exists
-        root = await self._ensure_root(folder_changes)
+        root = self.project_node
 
         # Map absolute folder path -> stable folder id for any changed folders
         path_to_id: Dict[str, str] = {
@@ -320,23 +320,3 @@ class FolderProcessor:
         parent_qname = self.qname_for_rel_path(rel_parent)
         parent_node = parent_nodes_by_qname.get(parent_qname)
         return parent_node.id if parent_node else None
-
-    async def _ensure_root(
-        self, folder_changes: List[FolderChange]
-    ) -> FolderNode:
-        current_qname = self.project_node.name
-        root = await self.folder_repo.find_one({"qname": current_qname})
-        if root:
-            return root
-
-        root = await self.folder_repo.create(FolderNode(
-            id=self.project_node.id,
-            name=self.project_node.name,
-            qname=current_qname,
-            path=str(self.project_path),
-            description=f"Project root for {self.project_node.name}",
-            node_type="folder"
-        ))
-        folder_changes.append(FolderChange(node=root, action="created"))
-        self._touched_folder_ids.add(root.id)
-        return root

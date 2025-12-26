@@ -7,7 +7,6 @@ import pytest_asyncio
 
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 from app.core.builder.tree_builder import TreeBuilder
@@ -23,23 +22,25 @@ async def setup_project(tmp_path, arangodb_client):
     project_path = tmp_path / "project"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
-    db_path = tmp_path / "db" / PROJECT_NAME
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
     project_node = ProjectNode(
         name=PROJECT_NAME,
         path=str(project_path),
         qname=PROJECT_NAME,
         description="Test Project",
     )
-    scope_manager = ScopeManager(PROJECT_NAME, db_path=str(db_path))
-    await scope_manager.initialize()
+
     repos = Repositories(arangodb_client)
     await repos.ensure_collections()
+
     project_service = ProjectService(repos)
+    # Ensure project node exists in DB
+    # Check if create_node is the right method or if we should use repo directly
+    # Service usually wraps repo.
+    # We might need to handle if it already exists or just create it.
+    # Given clean DB per test (usually), create is fine.
     project_node = await project_service.create_node(project_node)
 
-    return project_node, scope_manager, arangodb_client
+    return project_node, repos, arangodb_client
 
 
 def find_node_by_name(nodes: List[AnyTreeNode], name: str):
@@ -48,16 +49,13 @@ def find_node_by_name(nodes: List[AnyTreeNode], name: str):
 
 @pytest.mark.asyncio
 async def test_function_get_code(setup_project):
-    project_node, scope_manager, arangodb_client = setup_project
+    project_node, repos, arangodb_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
         db=arangodb_client,
-        scope_manager=scope_manager,
     )
     await orchestrator.resync()
-
-    repos = Repositories(arangodb_client)
 
     proj_service = ProjectService(repos)
     project = await proj_service.get_all()
@@ -105,17 +103,15 @@ async def test_function_get_code(setup_project):
 
 @pytest.mark.asyncio
 async def test_function_collector(setup_project):
-    project_node, scope_manager, arangodb_client = setup_project
+    project_node, repos, arangodb_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
         db=arangodb_client,
-        scope_manager=scope_manager,
     )
 
     await orchestrator.resync()
 
-    repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
 
     project = await project_service.get_all()
