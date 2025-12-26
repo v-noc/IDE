@@ -5,12 +5,11 @@ from typing import List, Optional
 
 import aiofiles
 import asyncio
-from app.core.model.nodes import ProjectNode
+from app.core.model.nodes import ProjectNode, FileNode
 from app.core.parser.ast.scanner import scan
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.jedi_adapter.resolver import MROResolver
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import ScopeModel, ScopeType
+from app.core.repository import Repositories
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CollectionResult:
-    file_scope: ScopeModel
+    file_node: FileNode
     removed_scope_ids: List[str]  # IDs of scopes that were deleted
     folder_changes: List[FolderChange]
 
@@ -33,19 +32,19 @@ class Collector:
     def __init__(
         self,
         project_node: ProjectNode,
-        scope_manager: ScopeManager,
+        repos: Repositories,
         jedi_manager: JediProjectManager,
     ):
         self.project_node = project_node
         self.project_path = Path(project_node.path)
-        self.manager = scope_manager
+        self.repos = repos
         self.jedi_manager = jedi_manager
 
-        self.folder_processor = FolderProcessor(project_node, scope_manager)
-        self.file_processor = FileProcessor(project_node, scope_manager)
+        self.folder_processor = FolderProcessor(project_node, repos.folder_repo)
+        self.file_processor = FileProcessor(project_node, repos.file_repo, repos.folder_repo)
 
         self.mro_resolver = MROResolver(jedi_manager)
-        self.ast_processor = ASTProcessor(scope_manager, self.mro_resolver)
+        self.ast_processor = ASTProcessor(repos, self.mro_resolver)
 
     def reset_session(self) -> None:
         """Reset builder caches between orchestrator runs."""
@@ -81,10 +80,10 @@ class Collector:
     ) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 2 collection (Content/AST).
-        Assumes file scope structure is already synced in Phase 1.5.
+        Assumes file node structure is already synced in Phase 1.5.
 
         Returns:
-        - file_scope: The file scope node
+        - file_node: The file node
         - removed_scope_ids: IDs of deleted scopes (handled internally)
         - folder_changes: Empty list (kept for signature compatibility)
         """
@@ -101,24 +100,17 @@ class Collector:
                 )
                 return None
 
-            # 1. Retrieve File Scope (Optimized: Should exist from batch sync)
-            with tracker.timer("collector.process_file.get_scope"):
-                file_scope_list = await self.manager.get_scopes_by_file_path(
-                    str(abs_path)
+            # 1. Retrieve File Node
+            with tracker.timer("collector.process_file.get_node"):
+                file_node = await self.repos.file_repo.find_one(
+                    {"path": str(abs_path)}
                 )
-            if not file_scope_list:
+            if not file_node:
                 logger.error(
-                    f"File scope not found for {file_path} after "
+                    f"File node not found for {file_path} after "
                     f"structure sync"
                 )
                 return None
-
-            # If multiple scopes return (shouldn't happen for file type),
-            # pick the FILE one
-            file_scope = next(
-                (s for s in file_scope_list if s.type == ScopeType.FILE),
-                file_scope_list[0]
-            )
 
             # 2. Parse Content & Scan AST
             try:
@@ -149,11 +141,11 @@ class Collector:
             # line numbers in ast_nodes match it (IDs injected)
             with tracker.timer("collector.process_file.sync_content"):
                 await self.ast_processor.sync_content(
-                    file_scope, ast_nodes, processed_content
+                    file_node, ast_nodes, processed_content
                 )
 
             return CollectionResult(
-                file_scope=file_scope,
+                file_node=file_node,
                 removed_scope_ids=[],  # Deletions handled internally
                 folder_changes=[],
             )

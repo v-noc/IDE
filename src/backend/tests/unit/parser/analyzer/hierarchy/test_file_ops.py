@@ -10,13 +10,12 @@ async def run_sync(ctx):
     # Run structure sync (Folders + File Shells)
     folder_changes = await ctx["collector"].sync_structure(change_set, scan_result)
 
-    # Handle File Deletions (Orchestrator logic)
+    # Handle File Deletions (Manual Repo Logic replacing Orchestrator/DeletionHandler)
     if change_set.deleted_files:
-        await ctx["deletion_handler"].handle_batch_file_deletions(
-            [tp.path for tp in change_set.deleted_files if tp.path],
-            folder_changes,
-            set()  # touched_folder_ids
-        )
+        for tp in change_set.deleted_files:
+            if tp.id:
+                # The TrackedPath.id from FileRepo is the key (UUID)
+                await ctx["repos"].file_repo.delete(tp.id)
 
     return change_set
 
@@ -25,7 +24,8 @@ async def run_sync(ctx):
 async def test_file_add(synced_project):
     ctx = synced_project
     project_path = ctx["project_path"]
-    manager = ctx["scope_manager"]
+    repos = ctx["repos"]
+    project_name = ctx["project_name"]
 
     new_file = project_path / "new_file.py"
     new_file.write_text("# new file")
@@ -34,21 +34,22 @@ async def test_file_add(synced_project):
 
     assert any(f.path == str(new_file) for f in change_set.new_files)
 
-    scope = await manager.get_scope_by_qname(f"{ctx['project_name']}.new_file")
-    assert scope is not None
-    assert scope.type.value == "file"
+    node = await repos.nodes.find_by_qname(f"{project_name}.new_file")
+    assert node is not None
+    assert node.node_type == "file"
 
 
 @pytest.mark.asyncio
 async def test_file_remove(synced_project):
     ctx = synced_project
     project_path = ctx["project_path"]
-    manager = ctx["scope_manager"]
+    repos = ctx["repos"]
+    project_name = ctx["project_name"]
 
     target = project_path / "main.py"
 
-    scope_before = await manager.get_scope_by_qname(f"{ctx['project_name']}.main")
-    assert scope_before
+    node_before = await repos.nodes.find_by_qname(f"{project_name}.main")
+    assert node_before
 
     target.unlink()
 
@@ -56,15 +57,16 @@ async def test_file_remove(synced_project):
 
     assert any(f.path == str(target) for f in change_set.deleted_files)
 
-    scope_after = await manager.get_scope_by_qname(f"{ctx['project_name']}.main")
-    assert scope_after is None
+    node_after = await repos.nodes.find_by_qname(f"{project_name}.main")
+    assert node_after is None
 
 
 @pytest.mark.asyncio
 async def test_file_move(synced_project):
     ctx = synced_project
     project_path = ctx["project_path"]
-    manager = ctx["scope_manager"]
+    repos = ctx["repos"]
+    project_name = ctx["project_name"]
 
     # Move "main.py" -> "core/main.py"
     src = project_path / "main.py"
@@ -72,93 +74,134 @@ async def test_file_move(synced_project):
 
     # Ensure dst folder exists (it does in fixture)
 
-    scope_before = await manager.get_scope_by_qname(f"{ctx['project_name']}.main")
-    stable_id = scope_before.id
-    old_parent = await manager.get_scope_by_qname(ctx["project_name"])
+    node_before = await repos.nodes.find_by_qname(f"{project_name}.main")
+    assert node_before
+    # stable_id should be the key (UUID) to match MoveEvent.id
+    stable_id = node_before.key if node_before.key else node_before.id.split(
+        "/")[-1]
+
+    old_parent = await repos.nodes.find_by_qname(project_name)
     assert old_parent is not None
-    new_parent = await manager.get_scope_by_qname(f"{ctx['project_name']}.core")
+    new_parent = await repos.nodes.find_by_qname(f"{project_name}.core")
     assert new_parent is not None
 
     shutil.move(src, dst)
 
     change_set = await run_sync(ctx)
+    moved_files = change_set.moved_files
 
-    assert any(m.id == stable_id for m in change_set.moved_files)
+    assert any(m.id == stable_id for m in moved_files)
 
     # Check old gone
-    assert await manager.get_scope_by_qname(f"{ctx['project_name']}.main") is None
+    assert await repos.nodes.find_by_qname(f"{project_name}.main") is None
 
     # Check new exists
-    scope_new = await manager.get_scope_by_qname(f"{ctx['project_name']}.core.main")
-    assert scope_new is not None
-    assert scope_new.id == stable_id
+    node_new = await repos.nodes.find_by_qname(f"{project_name}.core.main")
+    assert node_new is not None
+    node_new_key = node_new.key if node_new.key else node_new.id.split("/")[-1]
+    assert node_new_key == stable_id
 
-    # Parent relink check: root should not contain it; core should contain it
-    old_children = await manager.get_children(old_parent.id)
-    assert stable_id not in {c.id for c in old_children}
-    new_children = await manager.get_children(new_parent.id)
-    assert stable_id in {c.id for c in new_children}
+    # Parent relink check
+    # Note: get_children returns raw dicts currently in NodeRepo
+    old_children = await repos.nodes.get_children(old_parent.id)
+    # Handle dict vs model
+    old_child_ids = {c["_key"] if isinstance(
+        c, dict) and "_key" in c else c.id for c in old_children}
+    # ArangoDB IDs might be "collection/key".
+    # If node.id is full ID, and c['_id'] is full ID, we compare those.
+    # If node.id is key, we compare keys.
+    # Usually node.id is set to _key in models for Arango.
+
+    # Safest: compare full _id if available, or just keys.
+    # Let's check what node.id is. Usually key.
+
+    # Helper to get ID from child result
+    def get_id(c):
+        if isinstance(c, dict):
+            # Depending on query, it might be the document.
+            return c.get("_key")
+        return c.key if c.key else c.id.split("/")[-1]
+
+    assert stable_id not in {get_id(c) for c in old_children}
+
+    new_children = await repos.nodes.get_children(new_parent.id)
+    assert stable_id in {get_id(c) for c in new_children}
 
 
 @pytest.mark.asyncio
 async def test_file_rename(synced_project):
     ctx = synced_project
     project_path = ctx["project_path"]
-    manager = ctx["scope_manager"]
+    repos = ctx["repos"]
+    project_name = ctx["project_name"]
 
     # "main.py" -> "entry.py"
     src = project_path / "main.py"
     dst = project_path / "entry.py"
 
-    scope_before = await manager.get_scope_by_qname(f"{ctx['project_name']}.main")
-    stable_id = scope_before.id
-    root = await manager.get_scope_by_qname(ctx["project_name"])
+    node_before = await repos.nodes.find_by_qname(f"{project_name}.main")
+    stable_id = node_before.id
+    root = await repos.nodes.find_by_qname(project_name)
     assert root is not None
 
     shutil.move(src, dst)
 
     await run_sync(ctx)
 
-    scope_new = await manager.get_scope_by_qname(f"{ctx['project_name']}.entry")
-    assert scope_new is not None
-    assert scope_new.id == stable_id
+    node_new = await repos.nodes.find_by_qname(f"{project_name}.entry")
+    assert node_new is not None
+    assert node_new.id == stable_id
 
-    # Parent link check: root should now contain entry, not main
-    root_children = await manager.get_children(root.id)
-    child_ids = {c.id for c in root_children}
+    # Parent link check
+    root_children = await repos.nodes.get_children(root.id)
+
+    def get_id(c):
+        return c.get("_key") if isinstance(c, dict) else c.id
+
+    def get_qname(c):
+        return c.get("qname") if isinstance(c, dict) else c.qname
+
+    child_ids = {f"nodes/{get_id(c)}" for c in root_children}
     assert stable_id in child_ids
-    child_qnames = {c.qname for c in root_children}
-    assert f"{ctx['project_name']}.entry" in child_qnames
-    assert f"{ctx['project_name']}.main" not in child_qnames
+
+    child_qnames = {get_qname(c) for c in root_children}
+    assert f"{project_name}.entry" in child_qnames
+    assert f"{project_name}.main" not in child_qnames
 
 
 @pytest.mark.asyncio
 async def test_file_rename_and_move(synced_project):
     ctx = synced_project
     project_path = ctx["project_path"]
-    manager = ctx["scope_manager"]
+    repos = ctx["repos"]
+    project_name = ctx["project_name"]
 
     # "main.py" -> "core/entry.py"
     src = project_path / "main.py"
     dst = project_path / "core" / "entry.py"
 
-    scope_before = await manager.get_scope_by_qname(f"{ctx['project_name']}.main")
-    stable_id = scope_before.id
-    old_parent = await manager.get_scope_by_qname(ctx["project_name"])
+    node_before = await repos.nodes.find_by_qname(f"{project_name}.main")
+    stable_id = node_before.id
+
+    old_parent = await repos.nodes.find_by_qname(project_name)
     assert old_parent is not None
-    new_parent = await manager.get_scope_by_qname(f"{ctx['project_name']}.core")
+    new_parent = await repos.nodes.find_by_qname(f"{project_name}.core")
     assert new_parent is not None
 
     shutil.move(src, dst)
 
     await run_sync(ctx)
 
-    scope_new = await manager.get_scope_by_qname(f"{ctx['project_name']}.core.entry")
-    assert scope_new is not None
-    assert scope_new.id == stable_id
+    node_new = await repos.nodes.find_by_qname(f"{project_name}.core.entry")
+    assert node_new is not None
+    assert node_new.id == stable_id
 
-    # Parent relink check: root should not contain it; core should contain it
-    old_children = await manager.get_children(old_parent.id)
-    assert stable_id not in {c.id for c in old_children}
-    new_children = await manager.get_children(new_parent.id)
-    assert stable_id in {c.id for c in new_children}
+    # Parent relink check
+    def get_id(c):
+        return c.get("_key") if isinstance(c, dict) else c.id
+
+    old_children = await repos.nodes.get_children(old_parent.id)
+    assert stable_id not in {f"nodes/{get_id(c)}" for c in old_children}
+
+    new_children = await repos.nodes.get_children(new_parent.id)
+    assert stable_id in {f"nodes/{get_id(c)}" for c in new_children}

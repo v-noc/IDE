@@ -15,20 +15,15 @@ import logging
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import Optional, Dict, Union
 
+from app.core.model.nodes import CallNode, ClassNode, FunctionNode, CodePosition
 from app.core.parser.ast.models import (
-    BaseNode,
-    CallNode,
-    ClassNode,
-    FunctionNode,
+    CallNode as ASTCallNode,
 )
-from app.core.parser.ast.scanner import scan
 from app.core.parser.jedi_adapter.call_resolver import CallResolver
 from app.core.parser.jedi_adapter.manager import JediProjectManager
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import ScopeModel
-from app.core.parser.graph_builder.performance import tracker
+from app.core.repository import Repositories
 
 logger = logging.getLogger(__name__)
 
@@ -51,24 +46,19 @@ class CallChainBuilder:
         self,
         project_path: Path,
         project_name: str,
-        scope_manager: ScopeManager,
+        repos: Repositories,
         jedi_manager: JediProjectManager,
-        max_depth: int = 1,
+        max_depth: int = 5,
     ):
         self.project_path = project_path
         self.project_name = project_name
-        self.scope_manager = scope_manager
+        self.repos = repos
         self.jedi_manager = jedi_manager
         self.call_resolver = CallResolver(jedi_manager)
         self.max_depth = max_depth
 
         # for recursive detection
         self.call_chain_scope_ids: Dict[str, int] = {}
-
-        # Batch processing for call sites
-        self._call_site_buffer: List[dict] = []
-        # Maps temp_id -> actual_id for resolved call sites
-        self._temp_id_to_actual_id: dict = {}
 
         # Instance-level statistics tracking
         self._instance_stats = {
@@ -82,91 +72,57 @@ class CallChainBuilder:
         global _timings
         _timings.clear()
 
-    async def _get_scope_with_retry(
+    async def _get_node_with_retry(
         self,
-        scope_id: Optional[str] = None,
         qname: Optional[str] = None,
         max_retries: int = 1,
         initial_delay: float = 0.01,
-    ) -> Optional[ScopeModel]:
+    ) -> Optional[Union[FunctionNode, ClassNode]]:
         """
-        Get a scope with retry logic to handle race conditions.
-
-        When scopes are created in parallel threads, there can be a race
-        condition where one thread tries to fetch a scope before it's fully
-        committed to the database. This method retries with exponential
-        backoff.
-
-        Args:
-            scope_id: Scope ID to fetch (priority 1)
-            qname: Qualified name to fetch (priority 2, if scope_id fails)
-            max_retries: Maximum number of retry attempts
-            initial_delay: Initial delay in seconds before retry
-
-        Returns:
-            ScopeModel if found, None otherwise
+        Get a node with retry logic to handle race conditions.
         """
-        delay = initial_delay
-        scope = None
+        if not qname:
+            return None
 
+        # Try function first, then class
         for attempt in range(max_retries):
-            # Try ID-based lookup first
-            if scope_id:
-                scope = await self.scope_manager.get_scope(scope_id)
-                if scope:
-                    return scope
+            # Try function
+            node = await self.repos.function_repo.find_one({"qname": qname})
+            if node:
+                return node
 
-            # Try qname-based lookup if ID failed or wasn't provided
-            if qname:
-                print(f"Getting scope by qname: {qname} {scope_id}")
-                scope = await self.scope_manager.get_scope_by_qname(qname)
-                if scope:
-                    return scope
+            # Try class
+            node = await self.repos.class_repo.find_one({"qname": qname})
+            if node:
+                return node
 
             # If not found and we have retries left, wait and retry
-            # if attempt < max_retries - 1:
-            #     print(f"Waiting {delay} seconds to retry")
-            #     print(f"Attempt {attempt} of {max_retries}")
-            #     time.sleep(delay)
-            #     delay *= 2  # Exponential backoff
+            if attempt < max_retries - 1:
+                await asyncio.sleep(initial_delay * (2 ** attempt))
 
         return None
 
     async def build_chain(
         self,
-        call_node: CallNode,
-        caller_scope: ScopeModel,
-        current_call_id: Optional[str] = None,
-        depth: int = 2,
+        call_node: ASTCallNode,
+        caller_node: Union[FunctionNode, ClassNode],
+        depth: int = 0,
         parent_context: Optional[object] = None,
-    ) -> Optional[str]:
+    ) -> Optional[CallNode]:
         """
         Build a call chain starting from a call node.
-
-        This method:
-        1. Uses Jedi to resolve the call WITH context preservation
-        2. Creates a call site linking caller -> callee
-        3. Returns the call site ID for chaining
-
-        Note: Does NOT recursively process callee bodies - BodyParser
-              handles that during its traversal of the AST.
-
-        Args:
-            call_node: The AST CallNode to resolve
-            caller_scope: The scope containing this call
-            current_call_id: ID of the previous call site in the chain
-            depth: Current recursion depth (unused, kept for compatibility)
-            parent_context: Optional Jedi context from the caller
-
-        Returns:
-            The ID of the created call site
         """
-        # If we are at the top level, clear the call chain scope ids
-        if parent_context is None:
+        if depth > self.max_depth:
+            return None
 
-            self.call_chain_scope_ids.clear()
+        file_node_info = await self.repos.nodes.get_nearest_file_and_project(caller_node.id)
+        file_node = file_node_info.get("file")
+        if not file_node:
+            logger.warning(
+                f"Could not find file for caller {caller_node.qname}")
+            return None
 
-        file_path = Path(caller_scope.file_path)
+        file_path = Path(file_node["path"])
         if not file_path.is_absolute():
             file_path = self.project_path / file_path
 
@@ -193,15 +149,13 @@ class CallChainBuilder:
         )
         resolve_time = time.time() - t0
         _timings["resolve_call"].append(resolve_time)
-        # Track instance-level stats
         self._instance_stats["resolve_call_count"] += 1
         self._instance_stats["resolve_call_time"] += resolve_time
 
         return await self.build_chain_from_resolutions(
             call_node=call_node,
-            caller_scope=caller_scope,
+            caller_node=caller_node,
             resolutions=resolutions,
-            current_call_id=current_call_id,
             depth=depth,
             parent_context=parent_context,
         )
@@ -209,407 +163,71 @@ class CallChainBuilder:
     async def build_chain_from_resolutions(
         self,
         *,
-        call_node: CallNode,
-        caller_scope: ScopeModel,
+        call_node: ASTCallNode,
+        caller_node: Union[FunctionNode, ClassNode],
         resolutions: Optional[list],
-        current_call_id: Optional[str] = None,
-        depth: int = 2,
+        depth: int = 0,
         parent_context: Optional[object] = None,
-    ) -> Optional[str]:
+    ) -> Optional[CallNode]:
         """
         Build a call chain when resolutions have already been computed.
-
-        This is a performance-oriented entry point that allows callers to
-        parallelize Jedi resolution (the expensive part) while keeping the
-        call-site buffering and recursive processing deterministic/serialized.
         """
-        # If we are at the top level, clear the call chain scope ids
-        if parent_context is None:
-            self.call_chain_scope_ids.clear()
-
         if not resolutions:
-            logger.debug(
-                f"Could not resolve call {call_node.name} at "
-                f"{call_node.position.line}:{call_node.position.column}"
-            )
             return None
 
-        call_site_ids = []
-        call_name = self._normalize_call_name(call_node.name)
-        call_line = call_node.position.line
-        call_col = call_node.call_col_pos
+        created_call_node = None
 
         for resolution in resolutions:
             t0 = time.time()
-            callee_scope = await self._get_scope_with_retry(
-                scope_id=getattr(resolution, "callee_id", None),
-                qname=getattr(resolution, "qname", None),
+            callee_qname = getattr(resolution, "qname", None)
+
+            callee_node = await self._get_node_with_retry(
+                qname=callee_qname,
             )
+
             get_scope_time = time.time() - t0
             _timings["get_scope_with_retry"].append(get_scope_time)
             self._instance_stats["get_scope_count"] += 1
             self._instance_stats["get_scope_time"] += get_scope_time
 
-            if not callee_scope:
-                print(
-                    f"Could not resolve call {resolution} "
-                    f"{call_node.name} at "
-                    f"{call_node.position.line}:"
-                    f"{call_node.position.column} "
-                    f"(callee_id={getattr(resolution, 'callee_id', None)}, "
-                    f"qname={getattr(resolution, 'qname', None)})"
+            if not callee_node:
+                # External or unresolvable call
+                continue
+
+            # Check recursion depth
+            recursion_count = await self.repos.call_repo.count_recursion_depth(
+                caller_node.id, callee_node.id
+            )
+            if recursion_count >= 2:  # Limit recursion
+                continue
+
+            # Create CallNode
+            try:
+                db_call_node = CallNode(
+                    name=call_node.name or "call",
+                    qname=f"{caller_node.qname}::{callee_node.qname}",
+                    position=CodePosition(
+                        line_no=call_node.position.line,
+                        col_offset=call_node.position.column,
+                        end_line_no=call_node.position.end_line,
+                        end_col_offset=call_node.position.end_column
+                    ),
+                    node_type="call"
                 )
-                continue
 
-            if callee_scope.id not in self.call_chain_scope_ids:
-                self.call_chain_scope_ids[callee_scope.id] = 0
-            else:
-                self.call_chain_scope_ids[callee_scope.id] += 1
+                created_node = await self.repos.call_repo.create_with_edges(
+                    db_call_node,
+                    parent_id=caller_node.id,
+                    target_id=callee_node.id
+                )
+                created_call_node = created_node
 
-            if self.call_chain_scope_ids[callee_scope.id] >= self.max_depth:
-                continue
-
-            import uuid
-
-            call_site_id = str(uuid.uuid4())
-
-            self._call_site_buffer.append(
-                {
-                    "caller_id": caller_scope.id,
-                    "line": call_line,
-                    "col": call_col,
-                    "name": call_name,
-                    "callee_id": callee_scope.id,
-                    "prev_call_site_id": current_call_id,
-                    "_temp_id": call_site_id,
-                }
-            )
-
-            # Skip recursive scope body processing - body_parser already traverses
-            # the full AST tree, so we don't need to follow calls into callees here.
-            # This avoids redundant Jedi resolutions and re-parsing the file 29+ times.
-            call_site_ids.append(call_site_id)
-
-        return call_site_ids if call_site_ids else None
-
-    def _candidate_qnames(
-        self,
-        caller_scope: ScopeModel,
-        jedi_qname: str,
-    ) -> List[str]:
-        """
-        Generate possible fully-qualified qnames for a callee based on the
-        caller scope.
-
-        Jedi often returns module-relative names. This method tries:
-        1. The raw qname (if already project-qualified)
-        2. Project + module + qname (same file/module reference)
-        3. Project + qname (cross-module references within the project)
-        """
-        if not jedi_qname:
-            return []
-
-        normalized = jedi_qname.strip().strip(".")
-        if not normalized:
-            return []
-
-        project_prefix = self.project_name
-
-        candidates: List[str] = []
-
-        if normalized.startswith(f"{project_prefix}."):
-            candidates.append(normalized)
-
-        candidates.append(f"{project_prefix}.{normalized}")
-
-        # Deduplicate while preserving order
-        seen = set()
-        ordered = []
-        for candidate in candidates:
-            if candidate not in seen:
-                seen.add(candidate)
-                ordered.append(candidate)
-        return ordered
-
-    def _normalize_call_name(self, raw_name: Optional[str]) -> Optional[str]:
-        """
-        Normalize the call site name for comparisons (use last attribute
-        segment).
-        """
-        if not raw_name:
-            return raw_name
-
-        segment = raw_name.strip().split(".")[-1]
-        if segment.endswith("()"):
-            segment = segment[:-2]
-
-        segment = segment.strip()
-        return segment or raw_name
-
-    async def _process_scope_body(
-        self,
-        scope: ScopeModel,
-        depth: int,
-        current_call_id,
-        parent_context: Optional[object] = None,
-    ):
-        """
-        Process all calls within a function/method scope.
-
-        Args:
-            scope: The scope to process
-            depth: Current recursion depth
-            current_call_id: ID of the previous call
-            parent_context: Optional Jedi context to use for resolution
-                within this body
-        """
-        logger.debug(f"Processing body of {scope.qname}")
-
-        with tracker.timer("call_chain_builder.process_scope_body"):
-            # Get the source code
-            file_path = Path(scope.file_path)
-            if not file_path.is_absolute():
-                file_path = self.project_path / file_path
-
-            t0 = time.time()
-            try:
-                with tracker.timer("call_chain_builder.read_file"):
-                    async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
-                        source = await f.read()
-            except OSError as e:
-                logger.error(f"Could not read file {file_path}: {e}")
-                return
-            _timings["read_file_body"].append(time.time() - t0)
-
-            # Parse the AST
-            t0 = time.time()
-            loop = asyncio.get_event_loop()
-            try:
-                with tracker.timer("call_chain_builder.scan_ast"):
-                    # scan() returns (nodes, processed_content) tuple
-                    nodes, _ = await loop.run_in_executor(None, scan, source, str(file_path))
             except Exception as e:
-                logger.error(f"Failed to scan AST for {file_path}: {e}")
-                return
-            _timings["scan_ast"].append(time.time() - t0)
+                logger.error(f"Error creating call node: {e}")
+                continue
 
-            # Find the function/class node that corresponds to this scope
-            t0 = time.time()
-            with tracker.timer("call_chain_builder.find_scope_node"):
-                target_node = self._find_scope_node(nodes, scope)
-            _timings["find_scope_node"].append(time.time() - t0)
-
-            if not target_node:
-                logger.warning(
-                    f"Could not find AST node for scope {scope.qname}")
-                return
-
-            # Extract all call nodes from this scope's body
-            t0 = time.time()
-            with tracker.timer("call_chain_builder.extract_calls"):
-                call_nodes = self._extract_calls(target_node)
-            _timings["extract_calls"].append(time.time() - t0)
-
-            logger.debug(f"Found {len(call_nodes)} call(s) in {scope.qname}")
-
-        for call_node in call_nodes:
-            await self.build_chain(
-                call_node,
-                scope,
-                current_call_id,  # Pass through the parent call site ID for chaining
-                depth,
-                parent_context=parent_context,
-            )
-
-    def _find_scope_node(
-        self, nodes: List[BaseNode], scope: ScopeModel
-    ) -> Optional[BaseNode]:
-        """
-        Find the AST node that corresponds to a scope.
-
-        Matches based on qname or position.
-        """
-        for node in nodes:
-            # Check if this node matches the scope
-            if isinstance(node, (FunctionNode, ClassNode)):
-                # Match by position (line)
-                if node.position.line == scope.start_line and node.name == scope.name:
-                    return node
-
-            # Recurse into children
-            if hasattr(node, "children"):
-                result = self._find_scope_node(node.children, scope)
-                if result:
-                    return result
-
-        return None
-
-    def _extract_calls(self, node: BaseNode) -> List[CallNode]:
-        """
-        Extract all CallNode instances from a node's children.
-
-        Only extracts direct calls, not calls nested in child scopes.
-        """
-        calls = []
-
-        if hasattr(node, "children"):
-            for child in node.children:
-                if isinstance(child, CallNode):
-                    calls.append(child)
-                elif isinstance(child, (FunctionNode, ClassNode)):
-                    # Don't recurse into nested scopes
-                    continue
-                else:
-                    # Recurse into other nodes (If, For, etc.)
-                    calls.extend(self._extract_calls(child))
-
-        return calls
-
-    async def _flush_all_buffered_call_sites(self) -> None:
-        """
-        Flush all call sites in the buffer.
-
-        This is called per file to batch all call sites from all scopes
-        in that file together for maximum performance.
-        """
-        if not self._call_site_buffer:
-            return
-
-        # Collect temp IDs in this batch
-        batch_temp_ids = {
-            item.get("_temp_id")
-            for item in self._call_site_buffer
-            if item.get("_temp_id")
-        }
-
-        # Resolve prev_call_site_id references:
-        # - If it's a temp ID from a previous batch, resolve it
-        # - If it's a temp ID from this batch, we'll handle it after creation
-        # - Otherwise, it's already an actual ID
-        deferred_chain_links = []  # Store (temp_prev_id, temp_curr_id) pairs
-
-        for item in self._call_site_buffer:
-            prev_id = item.get("prev_call_site_id")
-            temp_id = item.get("_temp_id")
-
-            if prev_id:
-                if prev_id in self._temp_id_to_actual_id:
-                    # Resolve from previous batch (from previous file)
-                    item["prev_call_site_id"] = self._temp_id_to_actual_id[prev_id]
-                elif prev_id in batch_temp_ids:
-                    # Defer: this is a temp ID in the same batch
-                    deferred_chain_links.append((prev_id, temp_id))
-                    item["prev_call_site_id"] = (
-                        None  # Remove for now, add relationship later
-                    )
-
-        # Prepare batch data (without _temp_id and with resolved prev_call_site_id)
-        batch_data = []
-        for item in self._call_site_buffer:
-            batch_data.append(
-                {
-                    "caller_id": item["caller_id"],
-                    "line": item["line"],
-                    "col": item["col"],
-                    "name": item.get("name"),
-                    "callee_id": item.get("callee_id"),
-                    "prev_call_site_id": item.get("prev_call_site_id"),
-                }
-            )
-
-        # Batch create call sites
-        t0 = time.time()
-        created_call_sites = await self.scope_manager.batch_create_calls(batch_data)
-        _timings["create_call_site"].append(time.time() - t0)
-
-        # Map temp IDs from this batch to actual IDs
-        for i, item in enumerate(self._call_site_buffer):
-            temp_id = item.get("_temp_id")
-            if temp_id and i < len(created_call_sites):
-                actual_id = created_call_sites[i].id
-                self._temp_id_to_actual_id[temp_id] = actual_id
-
-        # Create deferred NEXT_IN_CHAIN relationships
-        # if deferred_chain_links:
-        #     from app.core.parser.scope_manager.repository import ScopeRepository
-
-        #     repo: ScopeRepository = self.scope_manager.repository
-
-        #     chain_data = []
-        #     for prev_temp_id, curr_temp_id in deferred_chain_links:
-        #         prev_actual_id = self._temp_id_to_actual_id.get(prev_temp_id)
-        #         curr_actual_id = self._temp_id_to_actual_id.get(curr_temp_id)
-        #         if prev_actual_id and curr_actual_id:
-        #             chain_data.append(
-        #                 {
-        #                     "prev_id": prev_actual_id,
-        #                     "curr_id": curr_actual_id,
-        #                 }
-        #             )
-
-        #     if chain_data:
-        #         async with self.scope_manager.semaphore:
-        #             await repo.conn.execute(
-        #                 """
-        #                 UNWIND $chains AS c
-        #                 MATCH (prev:CallSite {id: c.prev_id})
-        #                 MATCH (curr:CallSite {id: c.curr_id})
-        #                 CREATE (prev)-[:NEXT_IN_CHAIN]->(curr)
-        #                 """,
-        #                 {"chains": chain_data},
-        #             )
-
-        logger.debug(
-            f"Flushed {len(self._call_site_buffer)} call site(s) for file")
-
-        # Clear the buffer
-        self._call_site_buffer.clear()
-
-    async def flush_all_call_sites(self) -> None:
-        """Flush all remaining call sites in the buffer."""
-        await self._flush_all_buffered_call_sites()
-        self.reset_visited()
-
-    def reset_visited(self):
-        """Reset the visited scopes tracker."""
-
-        self._call_site_buffer.clear()
-        self._temp_id_to_actual_id.clear()
+        return created_call_node
 
     def get_stats(self) -> dict:
         """Get instance-level statistics."""
         return self._instance_stats.copy()
-
-    def print_timing_summary(self):
-        """Print timing statistics for performance analysis."""
-        global _timings
-
-        if not _timings:
-            return
-
-        print("\n" + "=" * 80)
-        print("CALL CHAIN BUILDER PERFORMANCE TIMING SUMMARY")
-        print("=" * 80)
-
-        total_time = 0.0
-        for operation, times in sorted(_timings.items()):
-            if times:
-                count = len(times)
-                total = sum(times)
-                avg = total / count
-                max_time = max(times)
-                min_time = min(times)
-                total_time += total
-
-                print(
-                    f"{operation:40s} "
-                    f"count: {count:6d} "
-                    f"total: {total:8.4f}s "
-                    f"avg: {avg:8.6f}s "
-                    f"max: {max_time:8.6f}s "
-                    f"min: {min_time:8.6f}s"
-                )
-
-        print("=" * 80)
-        print(f"TOTAL TIME IN TRACKED OPERATIONS: {total_time:.4f}s")
-        print("=" * 80 + "\n")

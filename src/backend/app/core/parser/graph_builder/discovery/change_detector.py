@@ -3,13 +3,13 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple, Any
 
 from app.core.parser.graph_builder.collection.file_tracker import FileTracker
 from app.core.parser.graph_builder.collection.folder_tracker import (
     FolderTracker,
 )
-from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.repository import Repositories
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 
 
@@ -62,8 +62,8 @@ class ChangeSet:
 
 
 class ChangeDetector:
-    def __init__(self, scope_manager: ScopeManager):
-        self.manager = scope_manager
+    def __init__(self, repos: Repositories):
+        self.repos = repos
         self.file_tracker = FileTracker()
         self.folder_tracker = FolderTracker()
 
@@ -90,13 +90,13 @@ class ChangeDetector:
     def _compute_file_changes(
         self,
         current_files: Dict[str, str],
-        db_file_scopes,
+        db_file_snapshots: List[Dict[str, Any]],
     ) -> Tuple[List[str], List[str], List[str], Dict[str, str]]:
         """
         Returns (new_files, modified_files, deleted_files, db_id_by_path).
         """
-        db_state = {s.file_path: s.checksum for s in db_file_scopes}
-        db_id_by_path = {s.file_path: s.id for s in db_file_scopes}
+        db_state = {f["path"]: f["checksum"] for f in db_file_snapshots}
+        db_id_by_path = {f["path"]: f["id"] for f in db_file_snapshots}
 
         current_paths = set(current_files.keys())
         db_paths = set(db_state.keys())
@@ -118,16 +118,16 @@ class ChangeDetector:
     def _compute_folder_changes(
         self,
         current_folders: Set[str],
-        db_folder_scopes,
+        db_folder_snapshots: List[Dict[str, Any]],
     ) -> Tuple[List[str], List[str], Dict[str, str]]:
         """
         Returns (new_folders, deleted_folders, db_id_by_path).
         """
         db_folder_paths: Set[str] = {
-            folder.file_path for folder in db_folder_scopes
+            f["path"] for f in db_folder_snapshots
         }
         db_id_by_path = {
-            folder.file_path: folder.id for folder in db_folder_scopes
+            f["path"]: f["id"] for f in db_folder_snapshots
         }
 
         new_folders = sorted(current_folders - db_folder_paths)
@@ -213,9 +213,9 @@ class ChangeDetector:
         current_folders = scan_result.folders
 
         # 1) Fetch DB state in parallel
-        db_file_scopes, db_folder_scopes = await asyncio.gather(
-            self.manager.get_all_file_scopes(),
-            self.manager.get_all_folder_scopes(),
+        db_file_snapshots, db_folder_snapshots = await asyncio.gather(
+            self.repos.file_repo.get_all_files_snapshot(),
+            self.repos.folder_repo.get_all_folders_snapshot(),
         )
 
         (
@@ -223,13 +223,13 @@ class ChangeDetector:
             modified_files,
             deleted_files,
             db_file_id_by_path,
-        ) = self._compute_file_changes(current_files, db_file_scopes)
+        ) = self._compute_file_changes(current_files, db_file_snapshots)
 
         (
             new_folders,
             deleted_folders,
             db_folder_id_by_path,
-        ) = self._compute_folder_changes(current_folders, db_folder_scopes)
+        ) = self._compute_folder_changes(current_folders, db_folder_snapshots)
 
         # Convert DB-derived sets to tracked paths (path + stable id)
         modified_files_tracked = [

@@ -1,201 +1,271 @@
 import logging
-import uuid
 import hashlib
 import json
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import ScopeModel, ScopeType
-from app.core.parser.ast.models import BaseNode, ClassNode, FunctionNode
+from app.core.repository import Repositories
+from app.core.model.nodes import (
+    FileNode, FunctionNode, ClassNode, CodePosition, ContainerNode
+)
+from app.core.parser.ast.models import (
+    BaseNode,
+    ClassNode as ASTClassNode,
+    FunctionNode as ASTFunctionNode
+)
 from app.core.parser.jedi_adapter.resolver import MROResolver
 
 logger = logging.getLogger(__name__)
 
 
 class ASTProcessor:
-    def __init__(self, scope_manager: ScopeManager, mro_resolver: Optional[MROResolver] = None):
-        self.manager = scope_manager
+    def __init__(
+        self, repos: Repositories, mro_resolver: Optional[MROResolver] = None
+    ):
+        self.repos = repos
         self.mro_resolver = mro_resolver
 
     async def sync_content(
         self,
-        file_scope: ScopeModel,
+        file_node: FileNode,
         nodes: List[BaseNode],
         content: Optional[str] = None
-    ) -> List[ScopeModel]:
+    ) -> List[ContainerNode]:
         """
-        Synchronize AST nodes as descendants of the given file scope.
-        Handles Creation, Updates, and Deletions of child scopes.
+        Synchronize AST nodes as descendants of the given file node.
+        Handles Creation, Updates, and Deletions of child nodes.
         """
-        # 1. Fetch Full Scope Tree (ID-based)
-        # Fetch all descendants to avoid recursive DB calls
-        existing_descendants = await self.manager.get_descendants(file_scope.id)
-        existing_map = {s.id: s for s in existing_descendants}
+        # 1. Fetch Full Scope Tree (Graph-based)
+        existing_tree = await self.repos.nodes.get_containment_tree(
+            file_node.id,
+            depth=50,
+            exclude_types=["call"]
+        )
 
-        # 2. Flatten AST & Prepare Scopes
-        desired_scopes_data = []
-        self._flatten_nodes(nodes, file_scope, content, desired_scopes_data)
-
-        scopes_to_create: List[ScopeModel] = []
-        scopes_to_update: List[ScopeModel] = []
-        relationships_to_relink: List[dict[str, str]] = []
-
-        processed_ids = set()
-        current_scopes = []
-
-        for data in desired_scopes_data:
-            node: BaseNode = data["node"]
-            scope_data: Dict[str, Any] = data["scope_data"]
-            parent_id: str = data["parent_id"]
-
-            # Skip if no ID (as requested)
-            if not node.id:
+        existing_map = {}
+        for item in existing_tree:
+            vertex = item["vertex"]
+            node_type = vertex.get("node_type")
+            if node_type == "function":
+                try:
+                    node = FunctionNode(**vertex)
+                except Exception as e:
+                    logger.warning(f"Failed to parse FunctionNode: {e}")
+                    continue
+            elif node_type == "class":
+                try:
+                    node = ClassNode(**vertex)
+                except Exception as e:
+                    logger.warning(f"Failed to parse ClassNode: {e}")
+                    continue
+            else:
                 continue
 
-            scope_id = node.id
-            processed_ids.add(scope_id)
+            existing_map[node.id] = {
+                "node": node,
+                "parent_id": item["parent_id"]
+            }
 
-            existing = existing_map.get(scope_id)
+        # 2. Flatten AST & Prepare Nodes
+        desired_nodes_data = []
+        self._flatten_nodes(
+            nodes, file_node, file_node.path, content, desired_nodes_data
+        )
 
-            # Checksum
-            checksum = self._compute_checksum(node)
+        funcs_to_create: List[FunctionNode] = []
+        classes_to_create: List[ClassNode] = []
 
-            # Prepare ScopeModel
-            mro = scope_data.get("mro", [])
+        funcs_to_update: List[FunctionNode] = []
+        classes_to_update: List[ClassNode] = []
 
-            new_scope = ScopeModel(
-                id=scope_id,
-                name=node.name,
-                qname=scope_data["qname"],
-                type=scope_data["type"],
-                file_path=file_scope.file_path,
-                start_line=node.position.line,
-                start_col=node.position.column,
-                end_line=node.position.end_line,
-                end_col=node.position.end_column,
-                mro=mro,
-                checksum=checksum,
-                parent_id=parent_id
+        moves_to_execute: List[tuple[str, str]] = []  # (child_id, parent_id)
+
+        processed_ids = set()
+        current_nodes = []
+
+        for data in desired_nodes_data:
+            ast_node: BaseNode = data["node"]
+            node_data: Dict[str, Any] = data["node_data"]
+            parent_id: str = data["parent_id"]
+
+            if not ast_node.id:
+                continue
+
+            node_id = ast_node.id
+            processed_ids.add(node_id)
+
+            existing_entry = existing_map.get(node_id)
+            existing_node = existing_entry["node"] if existing_entry else None
+            existing_parent_id = existing_entry["parent_id"] \
+                if existing_entry else None
+
+            # Prepare Node Model
+            position = CodePosition(
+                line_no=ast_node.position.line,
+                col_offset=ast_node.position.column,
+                end_line_no=ast_node.position.end_line,
+                end_col_offset=ast_node.position.end_column
             )
-            current_scopes.append(new_scope)
 
-            if not existing:
-                scopes_to_create.append(new_scope)
-                relationships_to_relink.append(
-                    {"parent_id": parent_id, "child_id": scope_id})
-                logger.debug(f"Will create new scope: {new_scope.qname}")
+            if node_data["type"] == "class":
+                mro = node_data.get("mro", [])
+                new_node = ClassNode(
+                    id=node_id,
+                    name=ast_node.name,
+                    qname=node_data["qname"],
+                    position=position,
+                    implements=mro,
+                    description=f"Class {ast_node.name}",
+                    node_type="class"
+                )
+            else:
+                new_node = FunctionNode(
+                    id=node_id,
+                    name=ast_node.name,
+                    qname=node_data["qname"],
+                    position=position,
+                    description=f"Function {ast_node.name}",
+                    node_type="function"
+                )
+
+            current_nodes.append(new_node)
+
+            if not existing_node:
+                if isinstance(new_node, ClassNode):
+                    classes_to_create.append(new_node)
+                else:
+                    funcs_to_create.append(new_node)
+
+                moves_to_execute.append((node_id, parent_id))
+                logger.debug(f"Will create new node: {new_node.qname}")
             else:
                 # Update if changed
-                # Check content/position/parent (Move)
-                # Note: parent_id check detects Moves
                 needs_update = (
-                    existing.checksum != checksum or
-                    existing.start_line != new_scope.start_line or
-                    existing.start_col != new_scope.start_col or
-                    existing.end_line != new_scope.end_line or
-                    existing.end_col != new_scope.end_col or
-                    existing.parent_id != parent_id or
-                    existing.mro != mro
+                    existing_node.name != new_node.name or
+                    existing_node.qname != new_node.qname or
+                    existing_node.position != new_node.position or
+                    (isinstance(existing_node, ClassNode) and
+                     isinstance(new_node, ClassNode) and
+                     existing_node.implements != new_node.implements)
                 )
 
                 if needs_update:
-                    scopes_to_update.append(new_scope)
-                    logger.debug(f"Scope updated: {new_scope.qname}")
+                    if isinstance(new_node, ClassNode):
+                        classes_to_update.append(new_node)
+                    else:
+                        funcs_to_update.append(new_node)
+                    logger.debug(f"Node updated: {new_node.qname}")
 
-                    if existing.parent_id != parent_id:
-                        logger.debug(
-                            f"Scope moved: {existing.qname} -> parent {parent_id}")
-                        relationships_to_relink.append(
-                            {"parent_id": parent_id, "child_id": scope_id})
+                if existing_parent_id != parent_id:
+                    logger.debug(
+                        f"Node moved: {existing_node.qname} -> "
+                        f"parent {parent_id}"
+                    )
+                    moves_to_execute.append((node_id, parent_id))
 
         # 3. Calculate Deletes
         ids_to_delete = [
-            sid for sid in existing_map if sid not in processed_ids]
+            sid for sid in existing_map if sid not in processed_ids
+        ]
 
         # 4. Batch Execution
-        if scopes_to_create:
-            await self.manager.batch_create_scopes(scopes_to_create)
+        if funcs_to_create:
+            await self.repos.function_repo.create_batch(funcs_to_create)
+        if classes_to_create:
+            await self.repos.class_repo.create_batch(classes_to_create)
 
-        if scopes_to_update:
-            await self.manager.batch_update_scopes(scopes_to_update)
+        if funcs_to_update:
+            await self.repos.function_repo.update_batch(funcs_to_update)
+        if classes_to_update:
+            await self.repos.class_repo.update_batch(classes_to_update)
 
-        if relationships_to_relink:
-            # Ensure correct parentage (Move or New Link)
-            await self.manager.batch_relink_parent_child(relationships_to_relink)
+        if moves_to_execute:
+            await self.repos.nodes.move_batch(moves_to_execute)
 
         if ids_to_delete:
-            await self.manager.batch_delete_scopes(ids_to_delete)
+            await self.repos.nodes.delete_batch(ids_to_delete)
             logger.info(
-                f"Deleted {len(ids_to_delete)} stale scopes in {file_scope.file_path}")
+                f"Deleted {len(ids_to_delete)} stale nodes in {file_node.path}"
+            )
 
-        return current_scopes
+        return current_nodes
 
     def _flatten_nodes(
         self,
         nodes: List[BaseNode],
-        # Can be FileScope or Class/Function Scope (but passed as ScopeModel)
-        parent_scope: ScopeModel,
+        parent_node: Union[FileNode, FunctionNode, ClassNode],
+        file_path: str,
         content: Optional[str],
         result_list: List[dict]
     ) -> None:
         """Recursively flatten nodes and prepare their metadata."""
         for node in nodes:
-            if isinstance(node, (ClassNode, FunctionNode)):
-                # Prepare data
-                qname = f"{parent_scope.qname}.{node.name}"
-                scope_type = ScopeType.CLASS if isinstance(
-                    node, ClassNode) else ScopeType.FUNCTION
+            if isinstance(node, (ASTClassNode, ASTFunctionNode)):
+                qname = f"{parent_node.qname}.{node.name}"
+                node_type = (
+                    "class" if isinstance(node, ASTClassNode) else "function"
+                )
 
                 mro = []
-                if isinstance(node, ClassNode) and self.mro_resolver and content:
-                    mro = self._resolve_mro(node, parent_scope, content)
+                if (isinstance(node, ASTClassNode) and
+                        self.mro_resolver and content):
+                    mro = self._resolve_mro(node, file_path, content)
 
-                scope_data = {
+                node_data = {
                     "qname": qname,
-                    "type": scope_type,
+                    "type": node_type,
                     "mro": mro
                 }
 
-                # Append to result
                 result_list.append({
                     "node": node,
-                    "scope_data": scope_data,
-                    "parent_id": parent_scope.id
+                    "node_data": node_data,
+                    "parent_id": parent_node.id
                 })
 
-                # Create a temporary pseudo-scope for children recursion
-                # We need the ID to be the parent_id for children.
                 if node.id:
                     node_id = node.id
                 else:
-                    # If we don't have an ID, we assume ID injection failed or wasn't run.
-                    # We CANNOT process children properly because we don't have a stable parent ID.
-                    # The instruction was "if node has no id do not process it".
-                    # Skipping the node means its children are skipped too in this recursion branch.
                     continue
 
-                pseudo_parent = ScopeModel(
-                    id=node_id,
-                    name=node.name,
-                    qname=qname,
-                    type=scope_type,
-                    file_path=parent_scope.file_path,
-                    start_line=node.position.line,
-                    start_col=node.position.column,
-                    end_line=node.position.end_line,
-                    end_col=node.position.end_column
-                )
+                if node_type == "class":
+                    pseudo_parent = ClassNode(
+                        id=node_id,
+                        name=node.name,
+                        qname=qname,
+                        position=CodePosition(
+                            line_no=0, col_offset=0,
+                            end_line_no=0, end_col_offset=0
+                        ),
+                        implements=[],
+                        description=f"Class {node.name}",
+                        node_type="class"
+                    )
+                else:
+                    pseudo_parent = FunctionNode(
+                        id=node_id,
+                        name=node.name,
+                        qname=qname,
+                        position=CodePosition(
+                            line_no=0, col_offset=0,
+                            end_line_no=0, end_col_offset=0
+                        ),
+                        description=f"Function {node.name}",
+                        node_type="function"
+                    )
 
-                # Recurse
                 if hasattr(node, "children"):
                     self._flatten_nodes(
-                        node.children, pseudo_parent, content, result_list)
+                        node.children, pseudo_parent, file_path,
+                        content, result_list
+                    )
 
-    def _resolve_mro(self, node: ClassNode, parent_scope: ScopeModel, content: str) -> List[str]:
+    def _resolve_mro(
+        self, node: ASTClassNode, file_path: str, content: str
+    ) -> List[str]:
         try:
             name_column = self._get_name_column(content, node)
             return self.mro_resolver.resolve_mro(
-                file_path=parent_scope.file_path,
+                file_path=file_path,
                 source=content,
                 line=node.position.line,
                 column=name_column + (len(node.name))
@@ -230,15 +300,3 @@ class ASTProcessor:
         for child in children:
             hashes.append(child.name + child.type + str(child.position))
         return hashlib.sha256("".join(hashes).encode("utf-8")).hexdigest()
-
-    # Legacy method wrapper if needed, but we should update usage
-    async def process_ast_nodes(self, nodes: List[BaseNode], parent_scope: ScopeModel, content: Optional[str] = None) -> List[tuple[ScopeModel, BaseNode]]:
-        # Deprecated adapter
-        result_scopes = await self.sync_content(parent_scope, nodes, content)
-        # Map back to (scope, node) tuple?
-        # The nodes in `nodes` list were modified in-place with IDs.
-        # But result_scopes are flat.
-        # This method returned `List[tuple[ScopeModel, BaseNode]]` for *all* nodes?
-        # The old method `_collect_nodes_recursive` flattened them.
-        # We can try to reconstruct it if strictly needed, but better to update caller.
-        return []

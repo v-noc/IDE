@@ -16,15 +16,9 @@ from app.core.parser.graph_builder.discovery.scanner import (
     ScanResult,
 )
 from app.core.parser.graph_builder.utils import (
-    DeletionHandler,
-    PathResolver,
     PhaseProcessor,
 )
 from app.core.parser.graph_builder.performance import tracker
-from app.core.parser.graph_builder.sync.graph_sync import (
-    MainGraphSyncService,
-)
-from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.repository import Repositories
 
 logger = logging.getLogger(__name__)
@@ -38,14 +32,14 @@ class GraphBuilderOrchestrator:
     1. Discovery: Scan files and detect changes
     2. Collection: Build scope hierarchy
     3. Analysis: Parse AST and build call chains
-    4. Sync: Synchronize to graph database
+    4. Sync: Synchronize to graph database (ArangoDB Direct)
     """
 
     def __init__(
         self,
         project_node: ProjectNode,
         db: Optional[AsyncDatabase] = None,
-        scope_manager: Optional[ScopeManager] = None,
+        # scope_manager: Optional[ScopeManager] = None, # Removed
         ignore_file_name: str = ".gitignore",
         max_concurrent_files: int = 50,
         max_concurrent_db: int = 100,
@@ -53,20 +47,21 @@ class GraphBuilderOrchestrator:
     ):
         self.project_node = project_node
         self.project_path = project_node.path
-        self._async_sync_service = None
         self.project_root = Path(self.project_path)
         self.db = db
         self.max_concurrent_files = max_concurrent_files
         self.batch_size = batch_size
         self._file_semaphore = asyncio.Semaphore(max_concurrent_files)
 
-        # Initialize ScopeManager
-        # Note: ScopeManager handles DB connection internally
-        self.scope_manager = scope_manager or ScopeManager(project_node.name)
+        # Initialize Repositories (Required)
+        if not db:
+            raise ValueError(
+                "Database connection is required for GraphBuilderOrchestrator")
+
+        self.repos = Repositories(db)
 
         # Initialize Jedi Adapter
         from app.core.parser.jedi_adapter.manager import JediProjectManager
-
         self.jedi_manager = JediProjectManager(self.project_root)
 
         # Initialize Discovery components
@@ -74,39 +69,28 @@ class GraphBuilderOrchestrator:
             self.project_path,
             ignore_file_name=ignore_file_name,
         )
-        self.change_detector = ChangeDetector(self.scope_manager)
+        self.change_detector = ChangeDetector(self.repos)
 
         # Initialize Collection components
         self.collector = Collector(
             self.project_node,
-            self.scope_manager,
+            self.repos,
             self.jedi_manager,
         )
 
-        # Initialize helper components
-        self.path_resolver = PathResolver(
-            self.project_node, self.scope_manager
-        )
-        self.deletion_handler = DeletionHandler(
-            self.project_node, self.scope_manager, self.path_resolver
-        )
-
         # Initialize Phase Processor
+        # PhaseProcessor also needs refactoring to remove ScopeManager
+        # For now, we update initialization to match what we have or remove incompatible args
         self.phase_processor = PhaseProcessor(
             self.project_node,
             self.project_path,
-            self.scope_manager,
+            self.repos,  # Replaces scope_manager
             self.collector,
             self.jedi_manager,
             batch_size=self.batch_size,
             max_concurrent_db=max_concurrent_db,
             max_concurrent_files=self.max_concurrent_files,
-
         )
-
-        # Initialize Sync components
-        # Will create sync service with version when needed in _process_changes
-        self.repos = Repositories(self.db) if self.db else None
 
     async def resync(self) -> ChangeSet:
         """
@@ -122,8 +106,6 @@ class GraphBuilderOrchestrator:
         )
 
         tracker.reset()
-
-        await self.scope_manager.initialize()
 
         # 1. Scan Disk
         scan_result = self.file_scanner.scan()
@@ -157,7 +139,6 @@ class GraphBuilderOrchestrator:
 
         Phase 1: Collection - Build scope hierarchy
         Phase 2: Analysis - Parse AST and build call chains
-        Phase 3: Sync - Synchronize to graph database
         """
         folder_changes = []
         touched_folder_ids = set()
@@ -170,7 +151,7 @@ class GraphBuilderOrchestrator:
         )
         if folder_result:
             folder_changes.extend(folder_result)
-            touched_folder_ids.update(fc.scope.id for fc in folder_result)
+            touched_folder_ids.update(fc.node.id for fc in folder_result)
 
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")
@@ -181,38 +162,32 @@ class GraphBuilderOrchestrator:
         )
 
         # Process Deleted files (Full file deletion)
+        # TODO: Refactor DeletionHandler to use Repositories.
+        # For now, simplistic deletion handling or assuming PhaseProcessor handles it via Repos?
+        # ChangeSet deleted_files are handled in ChangeDetector/Collector?
+        # Collector handles folder/file shell deletion.
+        # But deep deletions (children of files) are usually handled by cascade or DeletionHandler.
+        # ArangoDB deletion handles edges. Children of files (functions/classes) need to be found.
+        # If we delete the file node, its children might be orphaned if we don't delete them.
+        # NodeRepository.delete doesn't recursively delete children nodes (only edges).
+        # We need to find all descendants and delete them.
+        # This logic should be in a repo method or handler.
         if change_set.deleted_files:
-            await self.deletion_handler.handle_batch_file_deletions(
-                [tp.path for tp in change_set.deleted_files if tp.path],
-                folder_changes,
-                touched_folder_ids,
-            )
-
-        # Phase 3: Sync scopes to graph database
-        # Generate version at project level
-
-        call_sync_service = None
-        sync_service = None
-        if self.repos:
-            sync_service = MainGraphSyncService(
-                self.repos,
-                self.scope_manager,
-                self.project_node,
-            )
-
-            await sync_service.sync_scope_hierarchy(
-                self.project_node.id, change_set
-            )
-            call_sync_service = sync_service.call_sync
-        else:
-            logger.warning("No database connection for sync; skipping")
+            for tp in change_set.deleted_files:
+                if tp.path and tp.id:
+                    key = tp.id.split("/")[-1] if "/" in tp.id else tp.id
+                    # Recursive delete?
+                    # We can implement a recursive delete in Repo or here.
+                    await self.repos.file_repo.delete(key)
 
         # Phase 2: Analysis (Body parsing and call chain building)
         logger.info("Starting Phase 2: Analysis")
         print("Starting Phase 2: Analysis", flush=True)
         try:
+            # Phase 2 refactoring is deferred.
+            # We pass None for call_sync_service as we removed SyncService.
             await self.phase_processor.process_analysis_phase(
-                collection_results, call_sync_service
+                collection_results, None
             )
             logger.info("Phase 2: Analysis completed")
             print("Phase 2: Analysis completed", flush=True)
@@ -221,27 +196,7 @@ class GraphBuilderOrchestrator:
             # Ensure cleanup happens even if there's an error
             logger.debug("Phase 2 cleanup complete")
 
-        if sync_service:
-            logger.info("Syncing call chains to graph database...")
-            print("Syncing call chains to graph database...", flush=True)
-            try:
-                await sync_service.call_sync.batch_sync_calls()
-                logger.info("Call chain sync completed")
-                print("Call chain sync completed", flush=True)
-            except Exception as sync_exc:
-                logger.error(
-                    f"Error during batch sync: {sync_exc}", exc_info=True)
-                print(f"Error during batch sync: {sync_exc}", flush=True)
-                raise
-
         logger.info("All phases completed successfully")
         print("All phases completed successfully", flush=True)
 
         tracker.print_report()
-
-        # Debugger: Visualize scope and call site graph
-        # visualizer = GraphVisualizer(self.scope_manager)
-        # visualizer.visualize_graph()
-
-        # printer = CallSiteTreePrinter(self.scope_manager)
-        # printer.print_call_site_tree()

@@ -10,7 +10,7 @@ from app.core.parser.graph_builder.collection.collector import Collector
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.parser.jedi_adapter.manager import JediProjectManager
-from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
 import aiofiles
 import asyncio
@@ -39,7 +39,7 @@ class PhaseProcessor:
         self,
         project_node: ProjectNode,
         project_path: str,
-        scope_manager: ScopeManager,
+        repos: Repositories,
         collector: Collector,
         jedi_manager: JediProjectManager,
         max_concurrent_files: int = 50,
@@ -49,7 +49,7 @@ class PhaseProcessor:
     ):
         self.project_node = project_node
         self.project_path = project_path
-        self.scope_manager = scope_manager
+        self.repos = repos
         self.collector = collector
         self.jedi_manager = jedi_manager
 
@@ -80,7 +80,8 @@ class PhaseProcessor:
             if tp.path
         ]
         # Process moved files at their new location as well (same stable ID)
-        files_to_process.extend([mv.new for mv in change_set.moved_files if mv.new])
+        files_to_process.extend(
+            [mv.new for mv in change_set.moved_files if mv.new])
 
         results = []
         removed_scope_ids = set()
@@ -147,41 +148,38 @@ class PhaseProcessor:
                     try:
                         logger.info(
                             "Analyzing changes for: %s",
-                            result.file_scope.file_path,
+                            result.file_node.path,
                         )
 
                         # Create a new BodyParser for this thread/file
                         body_parser = BodyParser(
-                            self.project_path,
+                            Path(self.project_path),
                             self.project_node.name,
-                            self.scope_manager,
+                            self.repos,
                             self.jedi_manager,
                             batch_size=self._batch_size,
                         )
 
                         # Process File Body (Full Analysis)
                         logger.info("Processing file body: %s",
-                                    result.file_scope.qname)
+                                    result.file_node.qname)
 
-                        # Clear file-scope calls; children clear during traversal
-                        await self.scope_manager.clear_calls(result.file_scope.id)
+                        # Clear old calls for this file
+                        await self.repos.call_repo.delete_descendant_calls(result.file_node.id)
 
                         # Process AST
                         with tracker.timer("phase2.process_ast"):
                             await asyncio.wait_for(
-                                body_parser.process_ast(result.file_scope),
+                                body_parser.process_ast(result.file_node),
                                 timeout=self._file_timeout,
                             )
 
-                        # Flush any remaining call sites in the buffer for this file
-                        processed_scope_ids = await body_parser.flush_all_call_sites()
-                        if call_sync_service and processed_scope_ids:
-                            await call_sync_service.collect_call_infos(list(processed_scope_ids))
+                        # Return processed scope IDs (file ID mostly)
+                        return {result.file_node.id}
 
-                        return processed_scope_ids
                     except Exception as exc:
                         print(
-                            f"Error processing file {result.file_scope.file_path}: {exc}")
+                            f"Error processing file {result.file_node.path}: {exc}")
                         from traceback import format_exc
                         print(format_exc())
                         return set()
@@ -200,5 +198,24 @@ class PhaseProcessor:
 
     async def _batch_delete_scopes(self, scope_ids: List[str]) -> None:
         """Batch delete scopes with concurrency control."""
+        # For ArangoDB, we can just batch delete.
+        # But we need to know the keys.
+        keys = [sid.split("/")[-1] if "/" in sid else sid for sid in scope_ids]
+        if not keys:
+             return
+             
         async with self._db_semaphore:
-            await self.scope_manager.batch_delete_scopes(scope_ids)
+             # Repos don't have batch_delete generic helper yet, implement loop or AQL
+             # AQL is safest
+             query = """
+                 FOR doc IN @@collection
+                    FILTER doc._key IN @keys
+                    REMOVE doc IN @@collection
+             """
+             try:
+                 await self.repos.nodes.db.aql.execute(
+                     query,
+                     bind_vars={"@keys": keys, "@@collection": "nodes"}
+                 )
+             except Exception as e:
+                 logger.error(f"Batch delete failed: {e}")

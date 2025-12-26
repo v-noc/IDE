@@ -3,9 +3,9 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import ScopeModel, ScopeType
-from app.core.model.nodes import ProjectNode
+from app.core.repository.file_repo import FileRepo
+from app.core.repository.folder_repo import FolderRepo
+from app.core.model.nodes import ProjectNode, FileNode, FolderNode
 from app.core.parser.graph_builder.discovery.change_detector import (
     ChangeSet,
     TrackedPath,
@@ -18,13 +18,14 @@ logger = logging.getLogger(__name__)
 class FileProcessor:
     """
     Handles file scope synchronization using ID-first optimization.
-    Ensures File Scopes exist and are linked to correct parents before content analysis.
+    Ensures File Nodes exist and are linked to correct parents before content analysis.
     """
 
-    def __init__(self, project_node: ProjectNode, scope_manager: ScopeManager):
+    def __init__(self, project_node: ProjectNode, file_repo: FileRepo, folder_repo: FolderRepo):
         self.project_node = project_node
         self.project_path = Path(project_node.path)
-        self.manager = scope_manager
+        self.file_repo = file_repo
+        self.folder_repo = folder_repo
 
     async def process_batch(
         self,
@@ -33,7 +34,7 @@ class FileProcessor:
         batch_size: int = 100
     ) -> None:
         """
-        Synchronize file scopes (Shells) using ID-first events.
+        Synchronize file nodes (Shells) using ID-first events.
         """
         # 1. Collect all folders that might be parents (newly created or moved folders)
         # This helps resolving parent IDs without hitting DB if they are in the change set
@@ -46,6 +47,7 @@ class FileProcessor:
         # 2. Process Moves (Update Location & Parent)
         moved_tracked = [TrackedPath(path=mv.new, id=mv.id)
                          for mv in change_set.moved_files]
+
         await self._upsert_files_in_batches(
             files=moved_tracked,
             folder_path_to_id=folder_path_to_id,
@@ -103,7 +105,7 @@ class FileProcessor:
         if not ids:
             return
 
-        existing_by_id = await self.manager.batch_get_scopes_by_ids(ids)
+        existing_by_id = await self.file_repo.get_by_ids(ids)
 
         # Pre-fetch parent scopes that are NOT in the change set map
         parent_qnames_needed: Set[str] = set()
@@ -119,19 +121,19 @@ class FileProcessor:
             except ValueError:
                 continue
 
-        parent_scopes_by_qname: Dict[str, ScopeModel] = {}
+        parent_nodes_by_qname: Dict[str, FolderNode] = {}
         if parent_qnames_needed:
-            parent_scopes_by_qname = await self.manager.batch_get_scopes_by_qnames(
+            parent_nodes_by_qname = await self.folder_repo.get_by_qnames(
                 sorted(parent_qnames_needed)
             )
 
-        scopes_to_create: List[ScopeModel] = []
-        scopes_to_update: List[ScopeModel] = []
-        relationships_to_relink: List[dict[str, str]] = []
+        nodes_to_create: List[FileNode] = []
+        nodes_to_update: List[FileNode] = []
+        moves_to_execute: List[tuple[str, str]] = []
 
-        # Get root scope for fallback
-        root_scope = await self.manager.get_scope_by_qname(self.project_node.name)
-        if not root_scope:
+        # Get root node for fallback
+        root_node = await self.folder_repo.find_one({"qname": self.project_node.name})
+        if not root_node:
             # Should exist due to FolderProcessor running first
             logger.warning("Root scope not found during file processing")
             return
@@ -153,85 +155,63 @@ class FileProcessor:
 
             desired_name = abs_path.stem
             desired_qname = self.qname_for_rel_path(rel_path, is_file=True)
-            desired_file_path = str(abs_path)
+            desired_path = str(abs_path)
             checksum = scan_result.files.get(tp.path)
 
-            scope = existing_by_id.get(tp.id)
-            if not scope:
-                scope = ScopeModel(
-                    id=tp.id,
+            node = existing_by_id.get(tp.id)
+            if not node:
+                node = FileNode(
+                    key=tp.id,
                     name=desired_name,
                     qname=desired_qname,
-                    type=ScopeType.FILE,
-                    file_path=desired_file_path,
-                    start_line=0,
-                    start_col=0,
-                    end_line=0,
-                    end_col=0,
-                    checksum=checksum,
+                    path=desired_path,
+                    hash=checksum,
+                    description=f"File {desired_name}",
+                    node_type="file"
                 )
-                scopes_to_create.append(scope)
+                nodes_to_create.append(node)
             else:
                 changed = (
-                    scope.name != desired_name
-                    or scope.qname != desired_qname
-                    or scope.file_path != desired_file_path
-                    or (checksum and scope.checksum != checksum)
+                    node.name != desired_name
+                    or node.qname != desired_qname
+                    or node.path != desired_path
+                    or (checksum and node.hash != checksum)
                 )
                 if changed:
-                    scope.name = desired_name
-                    scope.qname = desired_qname
-                    scope.file_path = desired_file_path
+                    node.name = desired_name
+                    node.qname = desired_qname
+                    node.path = desired_path
                     if checksum:
-                        scope.checksum = checksum
-                    scopes_to_update.append(scope)
+                        node.hash = checksum
+                    nodes_to_update.append(node)
 
             # Link/Relink Parent
             parent_id = self.resolve_parent_id(
                 abs_path=abs_path,
-                root_scope=root_scope,
+                root_node=root_node,
                 folder_path_to_id=folder_path_to_id,
-                parent_scopes_by_qname=parent_scopes_by_qname,
+                parent_nodes_by_qname=parent_nodes_by_qname,
             )
 
             if parent_id:
-                # Use batch_relink_parent_child to ensure we remove any old parent link
-                # This is critical for moves (file now has a new parent)
-                relationships_to_relink.append(
-                    {"parent_id": parent_id, "child_id": tp.id}
-                )
+                moves_to_execute.append((tp.id, parent_id))
             else:
                 logger.warning(f"Could not resolve parent for file {tp.path}")
 
-        if scopes_to_create:
-            await self.manager.batch_create_scopes(scopes_to_create)
-        if scopes_to_update:
-            await self.manager.batch_update_scopes(scopes_to_update)
-        if relationships_to_relink:
-            # We use batch_relink_parent_child instead of link_parent_child
-            # This handles both new links (no previous parent) and moves (delete old parent link)
-            await self.manager.batch_relink_parent_child(relationships_to_relink)
+        if nodes_to_create:
+            await self.file_repo.create_batch(nodes_to_create)
+        if nodes_to_update:
+            await self.file_repo.update_batch(nodes_to_update)
+        if moves_to_execute:
+            await self.file_repo.move_batch(moves_to_execute)
 
     def qname_for_rel_path(self, rel_path: Path, is_file: bool = False) -> str:
         parts = [p for p in rel_path.parts if p]
         if not parts:
             return self.project_node.name
 
-        qname = ".".join([self.project_node.name] + parts)
         if is_file:
-            # File QName usually includes the file stem (module name)
-            # parts[-1] is the filename (e.g. 'main.py').
-            # We want 'root.main'.
-            # Path(p).stem handles 'main.py' -> 'main'.
-            # But rel_path parts are strings.
-            # Reconstruct to be safe.
-            # qname above uses full filename 'root.main.py' which might be wrong for Python.
-            # Typically QName for python file 'a/b.py' is 'a.b'.
-            # HierarchyBuilder logic was:
-            # display_name = Path(part).stem if is_file_node else part
-            # current_qname = f"{current_qname}.{display_name}"
-
-            # Let's match HierarchyBuilder logic exactly.
+            # Match HierarchyBuilder logic exactly.
             q_parts = [self.project_node.name]
             for idx, part in enumerate(parts):
                 is_last = idx == len(parts) - 1
@@ -239,19 +219,19 @@ class FileProcessor:
                 q_parts.append(name)
             return ".".join(q_parts)
 
-        return qname
+        return ".".join([self.project_node.name] + parts)
 
     def resolve_parent_id(
         self,
         *,
         abs_path: Path,
-        root_scope: ScopeModel,
+        root_node: FolderNode,
         folder_path_to_id: Dict[str, str],
-        parent_scopes_by_qname: Dict[str, ScopeModel],
+        parent_nodes_by_qname: Dict[str, FolderNode],
     ) -> Optional[str]:
         parent_abs = abs_path.parent
         if str(parent_abs) == str(self.project_path):
-            return root_scope.id
+            return root_node.id
 
         parent_id = folder_path_to_id.get(str(parent_abs))
         if parent_id:
@@ -263,5 +243,5 @@ class FileProcessor:
             return None
 
         parent_qname = self.qname_for_rel_path(rel_parent)
-        parent_scope = parent_scopes_by_qname.get(parent_qname)
-        return parent_scope.id if parent_scope else None
+        parent_node = parent_nodes_by_qname.get(parent_qname)
+        return parent_node.id if parent_node else None
