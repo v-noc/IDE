@@ -231,6 +231,32 @@ class CallSiteRepository:
                 del result
                 gc.collect()  # Force immediate cleanup of the C++ object
 
+    async def batch_clear_calls_from_scopes(self, scope_ids: List[str]) -> None:
+        """Batch delete all call sites originating from the given scopes."""
+        if not scope_ids:
+            return
+
+        conn = self.db_manager.get_connection()
+        result = None
+        try:
+            result = await conn.execute(
+                """
+                UNWIND $scope_ids AS scope_id
+                MATCH (s:Scope {id: scope_id})-[:HAS_CALL_SITE]->(root:CallSite)
+                WHERE NOT EXISTS {
+                    MATCH (:CallSite)-[:NEXT_IN_CHAIN]->(root)
+                }
+                MATCH path = (root)-[:NEXT_IN_CHAIN*0..]->(cs:CallSite)
+                WITH DISTINCT cs
+                DETACH DELETE cs
+                """,
+                {"scope_ids": scope_ids},
+            )
+        finally:
+            if result is not None:
+                del result
+                gc.collect()  # Force immediate cleanup of the C++ object
+
     async def get_call_chain(self, call_site_id: str) -> List[CallSiteModel]:
         """Get the full call chain starting from a call site."""
         conn = self.db_manager.get_connection()

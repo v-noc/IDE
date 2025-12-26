@@ -138,6 +138,7 @@ class HierarchyRepository:
                         end_col=node["end_col"],
                         mro=node.get("mro", []),
                         checksum=node.get("checksum"),
+                        parent_id=parent_id  # We know the parent here
                     )
                 )
             return children
@@ -145,3 +146,43 @@ class HierarchyRepository:
             if result is not None:
                 del result
                 gc.collect()  # Force immediate cleanup of the C++ object
+
+    async def get_descendants(self, root_id: str) -> List[ScopeModel]:
+        """Get all descendants of a scope (recursive children)."""
+        conn = self.db_manager.get_connection()
+        result = None
+        try:
+            result = await conn.execute(
+                """
+                MATCH (root:Scope {id: $root_id})-[:CONTAINS*]->(c:Scope)
+                OPTIONAL MATCH (p:Scope)-[:CONTAINS]->(c)
+                RETURN c, p.id as parent_id
+                """,
+                {"root_id": root_id},
+            )
+            children = []
+            for row in result:
+                node = row[0]
+                parent_id = row[1]
+                children.append(
+                    ScopeModel(
+                        id=node["id"],
+                        name=node["name"],
+                        qname=node["qname"],
+                        type=node["type"],
+                        file_path=node["file_path"],
+                        start_line=node["start_line"],
+                        start_col=node["start_col"],
+                        end_line=node["end_line"],
+                        end_col=node["end_col"],
+                        mro=node.get("mro", []),
+                        checksum=node.get("checksum"),
+                        parent_id=parent_id
+                    )
+                )
+            return children
+        finally:
+            if result is not None:
+                del result
+                gc.collect()
+

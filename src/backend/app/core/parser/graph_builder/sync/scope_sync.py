@@ -15,6 +15,7 @@ from app.core.parser.graph_builder.sync.mappers import (
 )
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel, ScopeType
+from app.core.parser.graph_builder.performance import tracker
 
 logger = logging.getLogger(__name__)
 
@@ -151,40 +152,41 @@ class ScopeSyncService:
         self, scope: ScopeModel, expected_parent_id: str
     ) -> Optional[BaseNode]:
         """Implementation of the 08 Decision Table: Create, Update, or Re-parent."""
-        node_id = f"nodes/{scope.id}"
-        existing_node = await self.helpers.async_get_node_by_id(node_id)
+        with tracker.timer("sync.scope_node_op"):
+            node_id = f"nodes/{scope.id}"
+            existing_node = await self.helpers.async_get_node_by_id(node_id)
 
-        if not existing_node:
-            # ACTION: CREATE
-            node = self._map_scope_to_node(scope)
-            saved_node = await self.helpers.async_create_node(node)
-            await self.helpers.async_ensure_contains_edge(expected_parent_id, node_id)
-            return saved_node
+            if not existing_node:
+                # ACTION: CREATE
+                node = self._map_scope_to_node(scope)
+                saved_node = await self.helpers.async_create_node(node)
+                await self.helpers.async_ensure_contains_edge(expected_parent_id, node_id)
+                return saved_node
 
-        # Check current parent to detect moves
-        current_parent_id = await self.helpers.async_get_parent_id(node_id)
+            # Check current parent to detect moves
+            current_parent_id = await self.helpers.async_get_parent_id(node_id)
 
-        if current_parent_id == expected_parent_id:
-            # ACTION: UPDATE (Same parent, just refresh properties)
-            existing_node.status = "active"
-            # existing_node.status_changed_at = datetime.now()
-            existing_node.orphan_reason = None
-            saved_node = await self.helpers.async_update_node_properties(
-                existing_node, scope
-            )
-            return saved_node
-        else:
-            # ACTION: RE-PARENT (Move)
-            await self.helpers.async_move_node(
-                node_id, current_parent_id, expected_parent_id
-            )
-            existing_node.status = "active"
-            # existing_node.status_changed_at = datetime.now()
-            existing_node.orphan_reason = None
-            saved_node = await self.helpers.async_update_node_properties(
-                existing_node, scope
-            )
-            return saved_node
+            if current_parent_id == expected_parent_id:
+                # ACTION: UPDATE (Same parent, just refresh properties)
+                existing_node.status = "active"
+                # existing_node.status_changed_at = datetime.now()
+                existing_node.orphan_reason = None
+                saved_node = await self.helpers.async_update_node_properties(
+                    existing_node, scope
+                )
+                return saved_node
+            else:
+                # ACTION: RE-PARENT (Move)
+                await self.helpers.async_move_node(
+                    node_id, current_parent_id, expected_parent_id
+                )
+                existing_node.status = "active"
+                # existing_node.status_changed_at = datetime.now()
+                existing_node.orphan_reason = None
+                saved_node = await self.helpers.async_update_node_properties(
+                    existing_node, scope
+                )
+                return saved_node
 
     def _determine_sync_necessity(
         self,

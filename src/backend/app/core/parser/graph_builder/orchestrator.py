@@ -20,6 +20,7 @@ from app.core.parser.graph_builder.utils import (
     PathResolver,
     PhaseProcessor,
 )
+from app.core.parser.graph_builder.performance import tracker
 from app.core.parser.graph_builder.sync.graph_sync import (
     MainGraphSyncService,
 )
@@ -120,6 +121,8 @@ class GraphBuilderOrchestrator:
             self.project_node.name,
         )
 
+        tracker.reset()
+
         await self.scope_manager.initialize()
 
         # 1. Scan Disk
@@ -143,7 +146,6 @@ class GraphBuilderOrchestrator:
 
         # 3. Process Changes (Phase 1 & 2)
         await self._process_changes(change_set, scan_result)
-        self.scope_manager.close()
 
         return change_set
 
@@ -177,13 +179,6 @@ class GraphBuilderOrchestrator:
                 change_set, scan_result
             )
         )
-
-        # Collect folder changes from collection results
-        for result in collection_results:
-            folder_changes.extend(result.folder_changes)
-            touched_folder_ids.update(
-                fc.scope.id for fc in result.folder_changes
-            )
 
         # Process Deleted files (Full file deletion)
         if change_set.deleted_files:
@@ -241,6 +236,8 @@ class GraphBuilderOrchestrator:
 
         logger.info("All phases completed successfully")
         print("All phases completed successfully", flush=True)
+
+        tracker.print_report()
 
         # Debugger: Visualize scope and call site graph
         # visualizer = GraphVisualizer(self.scope_manager)

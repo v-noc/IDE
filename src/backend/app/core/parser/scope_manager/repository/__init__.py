@@ -91,6 +91,10 @@ class ScopeRepository:
         """Delete all call sites originating from the given scope."""
         await self._call_site_repo.clear_calls_from_scope(scope_id)
 
+    async def batch_clear_calls_from_scopes(self, scope_ids: List[str]) -> None:
+        """Batch delete all call sites originating from the given scopes."""
+        await self._call_site_repo.batch_clear_calls_from_scopes(scope_ids)
+
     async def get_call_chain(self, call_site_id: str) -> List[CallSiteModel]:
         """Get the full call chain starting from a call site."""
         return await self._call_site_repo.get_call_chain(call_site_id)
@@ -127,6 +131,10 @@ class ScopeRepository:
         """Get all direct children of a scope."""
         return await self._hierarchy_repo.get_children(parent_id)
 
+    async def get_descendants(self, root_id: str) -> List[ScopeModel]:
+        """Get all descendants of a scope."""
+        return await self._hierarchy_repo.get_descendants(root_id)
+
     # Query operations - delegate to QueryRepository
     async def get_all_scopes(self) -> List[ScopeModel]:
         """Get all scopes."""
@@ -139,6 +147,10 @@ class ScopeRepository:
     async def get_all_folder_scopes(self) -> List[ScopeModel]:
         """Get all scopes of type FOLDER."""
         return await self._query_repo.get_all_folder_scopes()
+
+    async def get_scopes_by_file_path(self, file_path: str) -> List[ScopeModel]:
+        """Get scopes by file path."""
+        return await self._query_repo.get_scopes_by_file_path(file_path)
 
     # Deletion operations - delegate to DeletionRepository
     async def delete_scope(self, scope_id: str) -> None:

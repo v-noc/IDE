@@ -67,8 +67,8 @@ class ScopeManager:
 
     async def batch_get_scopes_by_ids(self, scope_ids: List[str]) -> dict[str, ScopeModel]:
         """Batch get scopes by their IDs. Returns a dict mapping id -> ScopeModel."""
-        async with self.semaphore:
-            return await self.repository.batch_get_scopes_by_ids(scope_ids)
+
+        return await self.repository.batch_get_scopes_by_ids(scope_ids)
 
     async def batch_update_scopes(self, scopes: List[ScopeModel]) -> None:
         """Batch update multiple scopes efficiently."""
@@ -77,13 +77,12 @@ class ScopeManager:
 
     async def get_scope(self, scope_id: str) -> Optional[ScopeModel]:
         """Get a scope by ID."""
-        async with self.semaphore:
-            return await self.repository.get_scope_by_id(scope_id)
+
+        return await self.repository.get_scope_by_id(scope_id)
 
     async def get_scope_by_qname(self, qname: str) -> Optional[ScopeModel]:
         """Get a scope by qualified name."""
-        async with self.semaphore:
-            return await self.repository.get_scope_by_qname(qname)
+        return await self.repository.get_scope_by_qname(qname)
 
     async def delete_scope(self, scope_id: str) -> None:
         """Delete a scope and its relationships."""
@@ -106,18 +105,19 @@ class ScopeManager:
 
     async def get_all_scopes(self) -> List[ScopeModel]:
         """Get all scopes."""
-        async with self.semaphore:
-            return await self.repository.get_all_scopes()
+        return await self.repository.get_all_scopes()
 
     async def get_all_file_scopes(self) -> List[ScopeModel]:
         """Get all scopes of type FILE."""
-        async with self.semaphore:
-            return await self.repository.get_all_file_scopes()
+        return await self.repository.get_all_file_scopes()
 
     async def get_all_folder_scopes(self) -> List[ScopeModel]:
         """Get all scopes of type FOLDER."""
-        async with self.semaphore:
-            return await self.repository.get_all_folder_scopes()
+        return await self.repository.get_all_folder_scopes()
+
+    async def get_scopes_by_file_path(self, file_path: str) -> List[ScopeModel]:
+        """Get scopes by file path (should be mainly the file scope itself)."""
+        return await self.repository.get_scopes_by_file_path(file_path)
 
     # Hierarchy Management
 
@@ -136,8 +136,7 @@ class ScopeManager:
 
     async def batch_get_scopes_by_qnames(self, qnames: List[str]) -> dict[str, ScopeModel]:
         """Batch get scopes by their qualified names. Returns a dict mapping qname -> ScopeModel."""
-        async with self.semaphore:
-            return await self.repository.batch_get_scopes_by_qnames(qnames)
+        return await self.repository.batch_get_scopes_by_qnames(qnames)
 
     async def batch_create_scopes(self, scopes: List[ScopeModel]) -> None:
         """Batch create multiple scopes efficiently."""
@@ -162,8 +161,11 @@ class ScopeManager:
 
     async def get_children(self, parent_id: str) -> List[ScopeModel]:
         """Get all children of a scope."""
-        async with self.semaphore:
-            return await self.repository.get_children(parent_id)
+        return await self.repository.get_children(parent_id)
+
+    async def get_descendants(self, root_id: str) -> List[ScopeModel]:
+        """Get all descendants of a scope."""
+        return await self.repository.get_descendants(root_id)
 
     # Call Site Management
 
@@ -356,15 +358,15 @@ class ScopeManager:
 
     async def get_calls_from(self, caller_id: str) -> List[dict]:
         """Get all calls made from a scope (including unresolved callees)."""
-        async with self.semaphore:
-            result = await self.db_manager.connection.execute(
-                """
-                MATCH (caller:Scope {id: $caller_id})-[:HAS_CALL_SITE]->(cs:CallSite)
-                OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
-                RETURN cs, callee
-                """,
-                {"caller_id": caller_id}
-            )
+
+        result = await self.db_manager.connection.execute(
+            """
+            MATCH (caller:Scope {id: $caller_id})-[:HAS_CALL_SITE]->(cs:CallSite)
+            OPTIONAL MATCH (cs)-[:TARGETS]->(callee:Scope)
+            RETURN cs, callee
+            """,
+            {"caller_id": caller_id}
+        )
 
         calls = []
         for row in result:
@@ -399,15 +401,15 @@ class ScopeManager:
 
     async def get_call_chain_children(self, call_site_id: str) -> List[dict]:
         """Get NEXT_IN_CHAIN children for a call site, plus their target scope."""
-        async with self.semaphore:
-            result = await self.db_manager.connection.execute(
-                """
-                MATCH (cs:CallSite {id: $call_site_id})-[:NEXT_IN_CHAIN]->(child:CallSite)
-                OPTIONAL MATCH (child)-[:TARGETS]->(callee:Scope)
-                RETURN child, callee
-                """,
-                {"call_site_id": call_site_id}
-            )
+
+        result = await self.db_manager.connection.execute(
+            """
+            MATCH (cs:CallSite {id: $call_site_id})-[:NEXT_IN_CHAIN]->(child:CallSite)
+            OPTIONAL MATCH (child)-[:TARGETS]->(callee:Scope)
+            RETURN child, callee
+            """,
+            {"call_site_id": call_site_id}
+        )
 
         children = []
         for row in result:
@@ -449,16 +451,16 @@ class ScopeManager:
 
         Returns calls that are executed within the callee function's body.
         """
-        async with self.semaphore:
-            result = await self.db_manager.connection.execute(
-                """
-                MATCH (cs:CallSite {id: $call_site_id})-[:TARGETS]->(callee:Scope)
-                MATCH (callee)-[:HAS_CALL_SITE]->(inner_call:CallSite)
-                OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
-                RETURN inner_call, inner_callee
-                """,
-                {"call_site_id": call_site_id}
-            )
+
+        result = await self.db_manager.connection.execute(
+            """
+            MATCH (cs:CallSite {id: $call_site_id})-[:TARGETS]->(callee:Scope)
+            MATCH (callee)-[:HAS_CALL_SITE]->(inner_call:CallSite)
+            OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
+            RETURN inner_call, inner_callee
+            """,
+            {"call_site_id": call_site_id}
+        )
 
         calls = []
         for row in result:
@@ -507,17 +509,16 @@ class ScopeManager:
         if not call_site_ids:
             return {}
 
-        async with self.semaphore:
-            result = await self.db_manager.connection.execute(
-                """
-                UNWIND $call_site_ids AS call_site_id
-                MATCH (cs:CallSite {id: call_site_id})-[:TARGETS]->(callee:Scope)
-                MATCH (callee)-[:HAS_CALL_SITE]->(inner_call:CallSite)
-                OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
-                RETURN call_site_id, inner_call, inner_callee
-                """,
-                {"call_site_ids": call_site_ids}
-            )
+        result = await self.db_manager.connection.execute(
+            """
+            UNWIND $call_site_ids AS call_site_id
+            MATCH (cs:CallSite {id: call_site_id})-[:TARGETS]->(callee:Scope)
+            MATCH (callee)-[:HAS_CALL_SITE]->(inner_call:CallSite)
+            OPTIONAL MATCH (inner_call)-[:TARGETS]->(inner_callee:Scope)
+            RETURN call_site_id, inner_call, inner_callee
+            """,
+            {"call_site_ids": call_site_ids}
+        )
 
         calls_map = {}
         for row in result:
@@ -562,14 +563,14 @@ class ScopeManager:
 
     async def get_calls_to(self, callee_id: str) -> List[dict]:
         """Get all calls made to a scope."""
-        async with self.semaphore:
-            result = await self.db_manager.connection.execute(
-                """
-                MATCH (caller:Scope)-[:HAS_CALL_SITE]->(cs:CallSite)-[:TARGETS]->(callee:Scope {id: $callee_id})
-                RETURN cs, caller
-                """,
-                {"callee_id": callee_id}
-            )
+
+        result = await self.db_manager.connection.execute(
+            """
+            MATCH (caller:Scope)-[:HAS_CALL_SITE]->(cs:CallSite)-[:TARGETS]->(callee:Scope {id: $callee_id})
+            RETURN cs, caller
+            """,
+            {"callee_id": callee_id}
+        )
 
         calls = []
         for row in result:
@@ -599,8 +600,7 @@ class ScopeManager:
 
     async def get_call_chain(self, call_site_id: str) -> List[CallSiteModel]:
         """Get the full call chain starting from a call site."""
-        async with self.semaphore:
-            return await self.repository.get_call_chain(call_site_id)
+        return await self.repository.get_call_chain(call_site_id)
 
     async def get_call_chain_roots(self, target_scope_id: Optional[str] = None) -> List[CallSiteModel]:
         """
@@ -610,13 +610,17 @@ class ScopeManager:
         there exists a path along `NEXT_IN_CHAIN` that contains a call site targeting
         the given scope.
         """
-        async with self.semaphore:
-            return await self.repository.get_call_chain_roots(target_scope_id)
+        return await self.repository.get_call_chain_roots(target_scope_id)
 
     async def clear_calls(self, scope_id: str) -> None:
         """Clear all calls originating from a scope."""
         async with self.semaphore:
             await self.repository.clear_calls_from_scope(scope_id)
+
+    async def batch_clear_calls(self, scope_ids: List[str]) -> None:
+        """Batch clear all calls originating from multiple scopes."""
+        async with self.semaphore:
+            await self.repository.batch_clear_calls_from_scopes(scope_ids)
 
     # Utility
 

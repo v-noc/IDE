@@ -28,6 +28,7 @@ from app.core.parser.jedi_adapter.call_resolver import CallResolver
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.parser.scope_manager.models import ScopeModel
+from app.core.parser.graph_builder.performance import tracker
 
 logger = logging.getLogger(__name__)
 
@@ -181,18 +182,51 @@ class CallChainBuilder:
         # Resolve the call using Jedi with context preservation
         t0 = time.time()
         loop = asyncio.get_event_loop()
-        resolutions = await loop.run_in_executor(None, self.call_resolver.resolve_call,
-                                                 str(file_path),
-                                                 source,
-                                                 call_node.position.line,
-                                                 call_node.call_col_pos,
-                                                 parent_context,
-                                                 )
+        resolutions = await loop.run_in_executor(
+            None,
+            self.call_resolver.resolve_call,
+            str(file_path),
+            source,
+            call_node.position.line,
+            call_node.call_col_pos,
+            parent_context,
+        )
         resolve_time = time.time() - t0
         _timings["resolve_call"].append(resolve_time)
         # Track instance-level stats
         self._instance_stats["resolve_call_count"] += 1
         self._instance_stats["resolve_call_time"] += resolve_time
+
+        return await self.build_chain_from_resolutions(
+            call_node=call_node,
+            caller_scope=caller_scope,
+            resolutions=resolutions,
+            current_call_id=current_call_id,
+            depth=depth,
+            parent_context=parent_context,
+        )
+
+    async def build_chain_from_resolutions(
+        self,
+        *,
+        call_node: CallNode,
+        caller_scope: ScopeModel,
+        resolutions: Optional[list],
+        current_call_id: Optional[str] = None,
+        depth: int = 2,
+        parent_context: Optional[object] = None,
+    ) -> Optional[str]:
+        """
+        Build a call chain when resolutions have already been computed.
+
+        This is a performance-oriented entry point that allows callers to
+        parallelize Jedi resolution (the expensive part) while keeping the
+        call-site buffering and recursive processing deterministic/serialized.
+        """
+        # If we are at the top level, clear the call chain scope ids
+        if parent_context is None:
+            self.call_chain_scope_ids.clear()
+
         if not resolutions:
             logger.debug(
                 f"Could not resolve call {call_node.name} at "
@@ -205,31 +239,25 @@ class CallChainBuilder:
         call_line = call_node.position.line
         call_col = call_node.call_col_pos
 
-        # Process each resolution separately
         for resolution in resolutions:
-            # Determine callee_id based on resolution
-            # Use retry logic to handle race conditions with concurrent
-            # scope creation
             t0 = time.time()
             callee_scope = await self._get_scope_with_retry(
-                scope_id=resolution.callee_id,
-                qname=resolution.qname,
+                scope_id=getattr(resolution, "callee_id", None),
+                qname=getattr(resolution, "qname", None),
             )
             get_scope_time = time.time() - t0
             _timings["get_scope_with_retry"].append(get_scope_time)
-            # Track instance-level stats
             self._instance_stats["get_scope_count"] += 1
             self._instance_stats["get_scope_time"] += get_scope_time
 
-            # If still not found, log and skip this resolution
             if not callee_scope:
                 print(
                     f"Could not resolve call {resolution} "
                     f"{call_node.name} at "
                     f"{call_node.position.line}:"
                     f"{call_node.position.column} "
-                    f"(callee_id={resolution.callee_id}, "
-                    f"qname={resolution.qname})"
+                    f"(callee_id={getattr(resolution, 'callee_id', None)}, "
+                    f"qname={getattr(resolution, 'qname', None)})"
                 )
                 continue
 
@@ -241,12 +269,10 @@ class CallChainBuilder:
             if self.call_chain_scope_ids[callee_scope.id] >= self.max_depth:
                 continue
 
-            # Generate call site ID (will be created in batch)
             import uuid
 
             call_site_id = str(uuid.uuid4())
 
-            # Add to batch buffer instead of creating immediately
             self._call_site_buffer.append(
                 {
                     "caller_id": caller_scope.id,
@@ -255,18 +281,13 @@ class CallChainBuilder:
                     "name": call_name,
                     "callee_id": callee_scope.id,
                     "prev_call_site_id": current_call_id,
-                    "_temp_id": call_site_id,  # Temporary ID for chaining
+                    "_temp_id": call_site_id,
                 }
             )
 
-            # Extract execution context for recursion
-            execution_context = getattr(resolution, 'execution_context', None)
-
-            # Process each body separately
-            await self._process_scope_body(
-                callee_scope, depth + 1, call_site_id, execution_context
-            )
-
+            # Skip recursive scope body processing - body_parser already traverses
+            # the full AST tree, so we don't need to follow calls into callees here.
+            # This avoids redundant Jedi resolutions and re-parsing the file 29+ times.
             call_site_ids.append(call_site_id)
 
         return call_site_ids if call_site_ids else None
@@ -344,45 +365,52 @@ class CallChainBuilder:
         """
         logger.debug(f"Processing body of {scope.qname}")
 
-        # Get the source code
-        file_path = Path(scope.file_path)
-        if not file_path.is_absolute():
-            file_path = self.project_path / file_path
+        with tracker.timer("call_chain_builder.process_scope_body"):
+            # Get the source code
+            file_path = Path(scope.file_path)
+            if not file_path.is_absolute():
+                file_path = self.project_path / file_path
 
-        t0 = time.time()
-        try:
-            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
-                source = await f.read()
-        except OSError as e:
-            logger.error(f"Could not read file {file_path}: {e}")
-            return
-        _timings["read_file_body"].append(time.time() - t0)
+            t0 = time.time()
+            try:
+                with tracker.timer("call_chain_builder.read_file"):
+                    async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+                        source = await f.read()
+            except OSError as e:
+                logger.error(f"Could not read file {file_path}: {e}")
+                return
+            _timings["read_file_body"].append(time.time() - t0)
 
-        # Parse the AST
-        t0 = time.time()
-        loop = asyncio.get_event_loop()
-        try:
-            nodes = await loop.run_in_executor(None, scan, source, str(file_path))
-        except Exception as e:
-            logger.error(f"Failed to scan AST for {file_path}: {e}")
-            return
-        _timings["scan_ast"].append(time.time() - t0)
+            # Parse the AST
+            t0 = time.time()
+            loop = asyncio.get_event_loop()
+            try:
+                with tracker.timer("call_chain_builder.scan_ast"):
+                    # scan() returns (nodes, processed_content) tuple
+                    nodes, _ = await loop.run_in_executor(None, scan, source, str(file_path))
+            except Exception as e:
+                logger.error(f"Failed to scan AST for {file_path}: {e}")
+                return
+            _timings["scan_ast"].append(time.time() - t0)
 
-        # Find the function/class node that corresponds to this scope
-        t0 = time.time()
-        target_node = self._find_scope_node(nodes, scope)
-        _timings["find_scope_node"].append(time.time() - t0)
+            # Find the function/class node that corresponds to this scope
+            t0 = time.time()
+            with tracker.timer("call_chain_builder.find_scope_node"):
+                target_node = self._find_scope_node(nodes, scope)
+            _timings["find_scope_node"].append(time.time() - t0)
 
-        if not target_node:
-            logger.warning(f"Could not find AST node for scope {scope.qname}")
-            return
+            if not target_node:
+                logger.warning(
+                    f"Could not find AST node for scope {scope.qname}")
+                return
 
-        # Extract all call nodes from this scope's body
-        t0 = time.time()
-        call_nodes = self._extract_calls(target_node)
-        _timings["extract_calls"].append(time.time() - t0)
+            # Extract all call nodes from this scope's body
+            t0 = time.time()
+            with tracker.timer("call_chain_builder.extract_calls"):
+                call_nodes = self._extract_calls(target_node)
+            _timings["extract_calls"].append(time.time() - t0)
 
-        logger.debug(f"Found {len(call_nodes)} call(s) in {scope.qname}")
+            logger.debug(f"Found {len(call_nodes)} call(s) in {scope.qname}")
 
         for call_node in call_nodes:
             await self.build_chain(

@@ -11,6 +11,7 @@ from app.core.parser.graph_builder.sync.async_helpers import AsyncSyncHelpers
 from app.core.parser.graph_builder.sync.scope_sync import ScopeSyncService
 from app.core.parser.graph_builder.sync.call_sync import CallSyncService
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
+from app.core.parser.graph_builder.performance import tracker
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +72,13 @@ class MainGraphSyncService:
         #     )
 
         print("Scope hierarchy synced")
-        time_start = time.time()
-
-        # Pass change_set to sync_scope_hierarchy for incremental sync
-        # If change_set is None or project is new, it will do full sync
-        await self.scope_sync.sync_scope_hierarchy(
-            root_scope_id, self.project_node.id, change_set
-        )
-
-        time_end = time.time()
-        print(
-            f"Time taken to sync scope hierarchy: {time_end - time_start} seconds")
+        
+        with tracker.timer("sync.sync_scope_hierarchy"):
+            # Pass change_set to sync_scope_hierarchy for incremental sync
+            # If change_set is None or project is new, it will do full sync
+            await self.scope_sync.sync_scope_hierarchy(
+                root_scope_id, self.project_node.id, change_set
+            )
 
     async def sync_call_chains(self, root_scope_id: str):
         """
@@ -99,4 +96,5 @@ class MainGraphSyncService:
             root_scope_id,
         )
 
-        await self.call_sync.sync_call_chains(root_scope_id)
+        with tracker.timer("sync.sync_call_chains"):
+            await self.call_sync.sync_call_chains(root_scope_id)

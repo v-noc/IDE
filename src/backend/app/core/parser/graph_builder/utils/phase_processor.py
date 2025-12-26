@@ -11,6 +11,7 @@ from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.scope_manager.manager import ScopeManager
+from app.core.parser.graph_builder.performance import tracker
 import aiofiles
 import asyncio
 
@@ -141,47 +142,49 @@ class PhaseProcessor:
 
         async def _process_single_file_analysis(result):
             """Process a single file's AST analysis in a thread."""
-            async with self._file_semaphore:
-                try:
-                    logger.info(
-                        "Analyzing changes for: %s",
-                        result.file_scope.file_path,
-                    )
+            with tracker.timer("phase2.analyze_file"):
+                async with self._file_semaphore:
+                    try:
+                        logger.info(
+                            "Analyzing changes for: %s",
+                            result.file_scope.file_path,
+                        )
 
-                    # Create a new BodyParser for this thread/file
-                    body_parser = BodyParser(
-                        self.project_path,
-                        self.project_node.name,
-                        self.scope_manager,
-                        self.jedi_manager,
-                        batch_size=self._batch_size,
-                    )
+                        # Create a new BodyParser for this thread/file
+                        body_parser = BodyParser(
+                            self.project_path,
+                            self.project_node.name,
+                            self.scope_manager,
+                            self.jedi_manager,
+                            batch_size=self._batch_size,
+                        )
 
-                    # Process File Body (Full Analysis)
-                    logger.info("Processing file body: %s",
-                                result.file_scope.qname)
+                        # Process File Body (Full Analysis)
+                        logger.info("Processing file body: %s",
+                                    result.file_scope.qname)
 
-                    # Clear file-scope calls; children clear during traversal
-                    await self.scope_manager.clear_calls(result.file_scope.id)
+                        # Clear file-scope calls; children clear during traversal
+                        await self.scope_manager.clear_calls(result.file_scope.id)
 
-                    # Process AST
-                    await asyncio.wait_for(
-                        body_parser.process_ast(result.file_scope),
-                        timeout=self._file_timeout,
-                    )
+                        # Process AST
+                        with tracker.timer("phase2.process_ast"):
+                            await asyncio.wait_for(
+                                body_parser.process_ast(result.file_scope),
+                                timeout=self._file_timeout,
+                            )
 
-                    # Flush any remaining call sites in the buffer for this file
-                    processed_scope_ids = await body_parser.flush_all_call_sites()
-                    if call_sync_service and processed_scope_ids:
-                        await call_sync_service.collect_call_infos(list(processed_scope_ids))
+                        # Flush any remaining call sites in the buffer for this file
+                        processed_scope_ids = await body_parser.flush_all_call_sites()
+                        if call_sync_service and processed_scope_ids:
+                            await call_sync_service.collect_call_infos(list(processed_scope_ids))
 
-                    return processed_scope_ids
-                except Exception as exc:
-                    print(
-                        f"Error processing file {result.file_scope.file_path}: {exc}")
-                    from traceback import format_exc
-                    print(format_exc())
-                    return set()
+                        return processed_scope_ids
+                    except Exception as exc:
+                        print(
+                            f"Error processing file {result.file_scope.file_path}: {exc}")
+                        from traceback import format_exc
+                        print(format_exc())
+                        return set()
 
         async with asyncio.TaskGroup() as tg:
             tasks = [
