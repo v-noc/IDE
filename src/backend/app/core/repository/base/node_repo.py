@@ -188,7 +188,6 @@ class NodeRepository(BaseRepository[T]):
                 PRUNE v.status != "active"
                 OPTIONS { order: "bfs", uniqueVertices: "global" }
 
-                FILTER v.status == "active"
                
                 LET parent_candidates = (
                     FOR i IN 2..LENGTH(p.vertices)
@@ -384,7 +383,13 @@ class NodeRepository(BaseRepository[T]):
         await self.db.aql.execute(
             insert_query,
             bind_vars={
-                "moves": [{"child_id": c, "parent_id": p} for c, p in moves],
+                "moves": [
+                    {
+                        "child_id": c if "/" in c else f"nodes/{c}",
+                        "parent_id": p if "/" in p else f"nodes/{p}",
+                    }
+                    for c, p in moves
+                ],
                 "@contains_collection": "contains_edges"
             }
         )

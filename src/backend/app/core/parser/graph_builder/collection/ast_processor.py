@@ -109,7 +109,7 @@ class ASTProcessor:
             if node_data["type"] == "class":
                 mro = node_data.get("mro", [])
                 new_node = ClassNode(
-                    id=node_id,
+                    key=node_id,
                     name=ast_node.name,
                     qname=node_data["qname"],
                     position=position,
@@ -119,7 +119,7 @@ class ASTProcessor:
                 )
             else:
                 new_node = FunctionNode(
-                    id=node_id,
+                    key=node_id,
                     name=ast_node.name,
                     qname=node_data["qname"],
                     position=position,

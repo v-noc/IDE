@@ -1,16 +1,17 @@
 import logging
 import asyncio
 import aiofiles
+import uuid
 from pathlib import Path
 from typing import List, Optional, Dict
 
 from app.core.parser.ast.models import (
-    BaseNode, 
-    CallNode as ASTCallNode, 
-    ClassNode as ASTClassNode, 
+    BaseNode,
+    CallNode as ASTCallNode,
+    ClassNode as ASTClassNode,
     FunctionNode as ASTFunctionNode
 )
-from app.core.model.nodes import FileNode, FunctionNode, ClassNode, ContainerNode
+from app.core.model.nodes import FileNode, FunctionNode, ClassNode, CallNode, ContainerNode
 from app.core.parser.ast.scanner import scan
 from app.core.parser.graph_builder.analysis.call_chain_builder import CallChainBuilder
 from app.core.parser.jedi_adapter.manager import JediProjectManager
@@ -37,7 +38,7 @@ class BodyParser:
         self.batch_size = batch_size
         self.call_resolve_concurrency = call_resolve_concurrency
         self.processed_scope_ids = set()
-        
+
         self.call_chain_builder = CallChainBuilder(
             project_path=project_path,
             project_name=project_name,
@@ -59,11 +60,11 @@ class BodyParser:
             # This allows us to map AST nodes to DB IDs
             with tracker.timer("body_parser.prefetch_nodes"):
                 existing_tree = await self.repos.nodes.get_containment_tree(
-                    file_node.id, 
-                    depth=50, 
+                    file_node.id,
+                    depth=50,
                     exclude_types=["call"]
                 )
-                
+
                 # Map qname -> DB Node
                 node_map: Dict[str, ContainerNode] = {}
                 for item in existing_tree:
@@ -131,7 +132,7 @@ class BodyParser:
                 # Calculate qname to find DB node
                 qname = f"{current_node.qname}.{node.name}"
                 db_node = node_map.get(qname)
-                
+
                 if not db_node:
                     continue
 
@@ -162,9 +163,9 @@ class BodyParser:
 
             for n, resolutions in resolved:
                 await self.call_chain_builder.build_chain_from_resolutions(
-                    call_node=n, 
+                    call_node=n,
                     caller_node=current_node,
-                    resolutions=resolutions, 
-                    depth=0, 
+                    resolutions=resolutions,
+                    depth=0,
                     parent_context=None,
                 )
