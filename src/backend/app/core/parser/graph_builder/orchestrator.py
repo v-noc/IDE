@@ -146,7 +146,6 @@ class GraphBuilderOrchestrator:
         Phase 2: Analysis - Parse AST and build call chains
         """
         folder_changes = []
-        touched_folder_ids = set()
 
         # Reset per-run caches and perform ID-first structure synchronization
         # (folders + file shells).
@@ -156,7 +155,6 @@ class GraphBuilderOrchestrator:
         )
         if folder_result:
             folder_changes.extend(folder_result)
-            touched_folder_ids.update(fc.node.id for fc in folder_result)
 
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")
@@ -165,25 +163,6 @@ class GraphBuilderOrchestrator:
                 change_set, scan_result
             )
         )
-
-        # Process Deleted files (Full file deletion)
-        # TODO: Refactor DeletionHandler to use Repositories.
-        # For now, simplistic deletion handling or assuming PhaseProcessor handles it via Repos?
-        # ChangeSet deleted_files are handled in ChangeDetector/Collector?
-        # Collector handles folder/file shell deletion.
-        # But deep deletions (children of files) are usually handled by cascade or DeletionHandler.
-        # ArangoDB deletion handles edges. Children of files (functions/classes) need to be found.
-        # If we delete the file node, its children might be orphaned if we don't delete them.
-        # NodeRepository.delete doesn't recursively delete children nodes (only edges).
-        # We need to find all descendants and delete them.
-        # This logic should be in a repo method or handler.
-        if change_set.deleted_files:
-            for tp in change_set.deleted_files:
-                if tp.path and tp.id:
-                    key = tp.id.split("/")[-1] if "/" in tp.id else tp.id
-                    # Recursive delete?
-                    # We can implement a recursive delete in Repo or here.
-                    await self.repos.file_repo.delete(key)
 
         # Phase 2: Analysis (Body parsing and call chain building)
         logger.info("Starting Phase 2: Analysis")

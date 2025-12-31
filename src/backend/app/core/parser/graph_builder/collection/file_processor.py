@@ -75,6 +75,16 @@ class FileProcessor:
             batch_size=batch_size,
         )
 
+        # 5. Batch delete files by stable id (mirror FolderProcessor behavior)
+        if change_set.deleted_files:
+            deleted_ids = [tp.id for tp in change_set.deleted_files if tp.id]
+            if deleted_ids:
+                # chunk to avoid very large AQL bind vars / loops
+                for i in range(0, len(deleted_ids), batch_size):
+                    batch_ids = deleted_ids[i: i + batch_size]
+                    await self.file_repo.delete_batch(batch_ids)
+                logger.info("Deleted %d file(s) in batch", len(deleted_ids))
+
     async def _upsert_files_in_batches(
         self,
         *,

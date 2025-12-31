@@ -10,13 +10,6 @@ async def run_sync(ctx):
     # Run structure sync (Folders + File Shells)
     folder_changes = await ctx["collector"].sync_structure(change_set, scan_result)
 
-    # Handle File Deletions (Manual Repo Logic replacing Orchestrator/DeletionHandler)
-    if change_set.deleted_files:
-        for tp in change_set.deleted_files:
-            if tp.id:
-                # The TrackedPath.id from FileRepo is the key (UUID)
-                await ctx["repos"].file_repo.delete(tp.id)
-
     return change_set
 
 

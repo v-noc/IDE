@@ -8,20 +8,6 @@ async def run_sync(ctx):
     change_set = await ctx["change_detector"].detect_changes(scan_result)
     await ctx["collector"].sync_structure(change_set, scan_result)
 
-    # Handle File Deletions (Manual Repo Logic)
-    if change_set.deleted_files:
-        for tp in change_set.deleted_files:
-            if tp.id:
-                key = tp.id.split("/")[-1]
-                await ctx["repos"].file_repo.delete(key)
-
-    # Handle Folder Deletions (if any, though collector typically handles structure)
-    if change_set.deleted_folders:
-        for tp in change_set.deleted_folders:
-            if tp.id:
-                key = tp.id.split("/")[-1]
-                await ctx["repos"].folder_repo.delete(key)
-
     return change_set
 
 
