@@ -107,6 +107,11 @@ class GraphBuilderOrchestrator:
 
         tracker.reset()
 
+        # Ensure project root exists once (create if new, otherwise reuse).
+        await self.collector.ensure_project_root()
+        self.project_node = self.collector.project_node
+        self.phase_processor.project_node = self.project_node
+
         # 1. Scan Disk
         scan_result = self.file_scanner.scan()
         logger.info(

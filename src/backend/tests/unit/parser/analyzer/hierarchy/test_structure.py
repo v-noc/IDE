@@ -36,7 +36,8 @@ async def test_hierarchy_and_ignore(synced_project):
     project_name = ctx["project_name"]
 
     root = await repos.nodes.find_by_qname(project_name)
-    assert root and root.node_type == "folder" # ProjectNode is type folder usually, or project? Check ProjectNode.
+    # ProjectNode is type folder usually, or project? Check ProjectNode.
+    assert root and root.node_type == "project"
 
     main = await repos.nodes.find_by_qname(f"{project_name}.main")
     assert main and main.node_type == "file"

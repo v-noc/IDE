@@ -132,7 +132,7 @@ class FileProcessor:
         moves_to_execute: List[tuple[str, str]] = []
 
         # Get root node for fallback
-        root_node = await self.folder_repo.find_one({"qname": self.project_node.name})
+        root_node = self.project_node
         if not root_node:
             # Should exist due to FolderProcessor running first
             logger.warning("Root scope not found during file processing")
@@ -231,7 +231,11 @@ class FileProcessor:
     ) -> Optional[str]:
         parent_abs = abs_path.parent
         if str(parent_abs) == str(self.project_path):
-            return root_node.id
+            # Always use self.project_node.id to ensure we use the persisted version
+            if not self.project_node.id:
+                # Fallback to root_node.id if project_node.id is not set
+                return root_node.id if root_node.id else None
+            return self.project_node.id
 
         parent_id = folder_path_to_id.get(str(parent_abs))
         if parent_id:

@@ -71,6 +71,13 @@ class FolderProcessor:
         nodes_to_create = []
         moves_to_execute = []  # List of (child_id, parent_id)
         current_parent = root
+        # Prefer the persisted project root reference; fall back to key.
+        root_ref = (
+            self.project_node.id
+            or self.project_node.key
+            or root.id
+            or root.key
+        )
 
         for qname in qnames_to_check:
             node = existing_nodes.get(qname)
@@ -86,7 +93,14 @@ class FolderProcessor:
                     node_type="folder"
                 )
                 nodes_to_create.append(node)
-                moves_to_execute.append((node.id, current_parent.id))
+                # Always move using key/id references (node.id can be None pre-insert).
+                parent_ref = (
+                    root_ref
+                    if current_parent == root
+                    else (current_parent.id or current_parent.key)
+                )
+                if parent_ref:
+                    moves_to_execute.append((node.key, parent_ref))
 
                 folder_changes.append(FolderChange(
                     node=node, action="created"))
@@ -306,7 +320,11 @@ class FolderProcessor:
     ) -> Optional[str]:
         parent_abs = abs_path.parent
         if str(parent_abs) == str(self.project_path):
-            return root_node.id
+            # Always use self.project_node.id to ensure we use the persisted version
+            if not self.project_node.id:
+                # Fallback to root_node.id if project_node.id is not set
+                return root_node.id if root_node.id else None
+            return self.project_node.id
 
         parent_id = path_to_id.get(str(parent_abs))
         if parent_id:

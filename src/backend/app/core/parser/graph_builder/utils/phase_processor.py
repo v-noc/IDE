@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
+from pathlib import Path
 from typing import Callable, List, Optional
 import time
 from app.core.model.nodes import ProjectNode
@@ -202,20 +203,20 @@ class PhaseProcessor:
         # But we need to know the keys.
         keys = [sid.split("/")[-1] if "/" in sid else sid for sid in scope_ids]
         if not keys:
-             return
-             
+            return
+
         async with self._db_semaphore:
-             # Repos don't have batch_delete generic helper yet, implement loop or AQL
-             # AQL is safest
-             query = """
+            # Repos don't have batch_delete generic helper yet, implement loop or AQL
+            # AQL is safest
+            query = """
                  FOR doc IN @@collection
                     FILTER doc._key IN @keys
                     REMOVE doc IN @@collection
              """
-             try:
-                 await self.repos.nodes.db.aql.execute(
-                     query,
-                     bind_vars={"@keys": keys, "@@collection": "nodes"}
-                 )
-             except Exception as e:
-                 logger.error(f"Batch delete failed: {e}")
+            try:
+                await self.repos.nodes.db.aql.execute(
+                    query,
+                    bind_vars={"@keys": keys, "@@collection": "nodes"}
+                )
+            except Exception as e:
+                logger.error(f"Batch delete failed: {e}")

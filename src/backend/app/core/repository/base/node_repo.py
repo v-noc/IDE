@@ -276,6 +276,7 @@ class NodeRepository(BaseRepository[T]):
 
     async def get_children(self, node_id: str) -> List[T]:
         """Async get a node's children."""
+
         query = """
         FOR v, e, p IN 1..1 OUTBOUND @start_node_id @@contains_collection
             OPTIONS { order: "bfs" }

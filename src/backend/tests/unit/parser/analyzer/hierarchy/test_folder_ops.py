@@ -134,6 +134,8 @@ async def test_folder_rename(synced_project):
     await run_sync(ctx)
 
     node_new = await repos.nodes.find_by_qname(f"{project_name}.kernel")
+    root_children = await repos.nodes.get_children(root.id)
+
     assert node_new is not None
     assert node_new.id == stable_id
 
@@ -142,6 +144,7 @@ async def test_folder_rename(synced_project):
         return c.get("qname") if isinstance(c, dict) else c.qname
 
     root_children = await repos.nodes.get_children(root.id)
+
     child_qnames = {get_qname(c) for c in root_children}
     assert f"{project_name}.kernel" in child_qnames
     assert f"{project_name}.core" not in child_qnames

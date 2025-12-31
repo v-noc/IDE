@@ -135,6 +135,8 @@ async def test_function_collector(setup_project):
         assert func_name in expected_func_names
 
     main_func = find_node_by_name(file_node.children, 'main')
+    print(f"main_func: {main_func}")
+    print(f"file_node.children: {file_node.children}")
 
     factory_func = find_node_by_name(file_node.children, 'factory')
     call_back_func = find_node_by_name(file_node.children, 'call_back')
