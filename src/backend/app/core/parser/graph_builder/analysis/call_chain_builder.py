@@ -74,25 +74,23 @@ class CallChainBuilder:
 
     async def _get_node_with_retry(
         self,
-        qname: Optional[str] = None,
+        id: str,
         max_retries: int = 1,
         initial_delay: float = 0.01,
     ) -> Optional[Union[FunctionNode, ClassNode]]:
         """
         Get a node with retry logic to handle race conditions.
         """
-        if not qname:
-            return None
 
         # Try function first, then class
         for attempt in range(max_retries):
             # Try function
-            node = await self.repos.function_repo.find_one({"qname": qname})
+            node = await self.repos.function_repo.get_by_id(f"nodes/{id}")
             if node:
                 return node
 
             # Try class
-            node = await self.repos.class_repo.find_one({"qname": qname})
+            node = await self.repos.class_repo.get_by_id(f"nodes/{id}")
             if node:
                 return node
 
@@ -179,10 +177,11 @@ class CallChainBuilder:
 
         for resolution in resolutions:
             t0 = time.time()
-            callee_qname = getattr(resolution, "qname", None)
+
+            callee_id = getattr(resolution, "callee_id", None)
 
             callee_node = await self._get_node_with_retry(
-                qname=callee_qname,
+                id=callee_id,
             )
 
             get_scope_time = time.time() - t0
@@ -206,6 +205,7 @@ class CallChainBuilder:
                 db_call_node = CallNode(
                     name=call_node.name or "call",
                     qname=f"{caller_node.qname}::{callee_node.qname}",
+                    description=f"call{caller_node.qname}::{callee_node.qname} ",
                     position=CodePosition(
                         line_no=call_node.position.line,
                         col_offset=call_node.position.column,

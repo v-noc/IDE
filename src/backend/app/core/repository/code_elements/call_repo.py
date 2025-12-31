@@ -27,14 +27,14 @@ class CallRepo(NodeRepository[CallNode]):
         """
         # Create the call node first
         created_node = await self.create(call_node)
-        
+
         # Create edges
         # We use asyncio.gather for parallelism
         await asyncio.gather(
             self._ensure_contains_edge(parent_id, created_node.id),
             self._ensure_targets_edge(created_node.id, target_id)
         )
-        
+
         return created_node
 
     async def _ensure_contains_edge(self, parent_id: str, child_id: str):
@@ -63,7 +63,7 @@ class CallRepo(NodeRepository[CallNode]):
         """
         try:
             cursor = await self.db.aql.execute(
-                query, 
+                query,
                 bind_vars={
                     "key": call_id.split("/")[-1] if "/" in call_id else call_id,
                     "updates": updates,
@@ -270,8 +270,10 @@ class CallRepo(NodeRepository[CallNode]):
 
         try:
             cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-            result = await cursor.next() if cursor else 0
-            return int(result or 0)
+            # Query returns a single scalar row: LENGTH(matches)
+            async for row in cursor:
+                return int(row or 0)
+            return 0
         except Exception as e:
             logger.error(
                 "Error counting recursive calls upward for %s -> %s: %s",
@@ -438,8 +440,9 @@ class CallRepo(NodeRepository[CallNode]):
                 key = call_id.split("/")[-1] if "/" in call_id else call_id
                 if await self.delete(key):
                     count += 1
-            
+
             return count
         except Exception as e:
-            logger.error(f"Error deleting descendant calls for {ancestor_id}: {e}")
+            logger.error(
+                f"Error deleting descendant calls for {ancestor_id}: {e}")
             return 0
