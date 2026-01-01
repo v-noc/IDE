@@ -20,6 +20,7 @@ class Repositories:
 
     def __init__(self, db: AsyncDatabase):
         # Generic Node Repo for mixed-type queries
+        self.db = db
         self.nodes = NodeRepository(db, "nodes", AllNodes)
 
         # Specific Node Repos for type-specific operations

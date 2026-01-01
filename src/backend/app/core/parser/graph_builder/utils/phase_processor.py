@@ -1,10 +1,10 @@
 """Processes collection and analysis phases."""
 from dataclasses import dataclass, field
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from pathlib import Path
-from typing import Callable, List, Optional
-import time
+from typing import List
+import asyncio
+
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.analysis.body_parser import BodyParser
 from app.core.parser.graph_builder.collection.collector import Collector
@@ -13,15 +13,8 @@ from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
-import aiofiles
-import asyncio
 
 logger = logging.getLogger(__name__)
-
-# Timeout for individual file processing (in seconds)
-FILE_PROCESSING_TIMEOUT = 60  # 1 minute per file
-# Limit workers to reduce database connection contention
-MAX_WORKERS = 4
 
 
 @dataclass
@@ -66,27 +59,19 @@ class PhaseProcessor:
         scan_result: ScanResult,
     ) -> List:
         """
-        Process Phase 1: Collection (Structure).
-
-        Args:
-            change_set: Detected changes
-            scan_result: Scan results with file checksums
-
-        Returns:
-            List of collection results
+        Phase 1: Structure Collection.
+        (Code remains unchanged from your snippet, it is correct)
         """
         files_to_process = [
             tp.path
             for tp in (change_set.new_files + change_set.modified_files)
             if tp.path
         ]
-        # Process moved files at their new location as well (same stable ID)
         files_to_process.extend(
             [mv.new for mv in change_set.moved_files if mv.new])
 
         results = []
         removed_scope_ids = set()
-        folder_changes = []
 
         async def _process_single_file(file_path: str):
             async with self._file_semaphore:
@@ -95,18 +80,14 @@ class PhaseProcessor:
                     return None
                 logger.info(f"Collecting structure for: {file_path}")
                 try:
-                    result = await asyncio.wait_for(
+                    return await asyncio.wait_for(
                         self.collector.process_file(file_path, checksum),
                         timeout=self._file_timeout,
                     )
-                    return result
                 except Exception as exc:
-                    # Log error but don't let it propagate to avoid deadlocks
                     logger.error(
                         "Error in collector.process_file for %s: %s",
-                        file_path,
-                        exc,
-                        exc_info=True,
+                        file_path, exc
                     )
                     return None
 
@@ -121,7 +102,6 @@ class PhaseProcessor:
             if result:
                 results.append(result)
                 removed_scope_ids.update(result.removed_scope_ids)
-                folder_changes.extend(result.folder_changes)
 
         if removed_scope_ids:
             await self._batch_delete_scopes(list(removed_scope_ids))
@@ -130,43 +110,33 @@ class PhaseProcessor:
     async def process_analysis_phase(
         self,
         collection_results: List,
-        call_sync_service=None,
     ) -> None:
         """
-        Process Phase 2: Body Analysis (Calls).
+        Phase 2: Body Analysis (Calls).
 
-        Args:
-            collection_results: Results from collection phase
-            call_sync_service: Optional service to sync call chains after analysis
+        Orchestrates the BodyParser which uses the CallChainBuilder.
         """
-
-        all_processed_scope_ids = set()
-
         async def _process_single_file_analysis(result):
-            """Process a single file's AST analysis in a thread."""
+            """Process a single file's AST analysis."""
+            body_parser = BodyParser(
+                Path(self.project_path),
+                self.project_node.name,
+                self.repos,
+                self.jedi_manager,
+                batch_size=self._batch_size,
+            )
+
             with tracker.timer("phase2.analyze_file"):
                 async with self._file_semaphore:
                     try:
                         logger.info(
-                            "Analyzing changes for: %s",
-                            result.file_node.path,
+                            "Analyzing call graph for: %s",
+                            result.file_node.qname,
                         )
 
-                        # Create a new BodyParser for this thread/file
-                        body_parser = BodyParser(
-                            Path(self.project_path),
-                            self.project_node.name,
-                            self.repos,
-                            self.jedi_manager,
-                            batch_size=self._batch_size,
-                        )
-
-                        # Process File Body (Full Analysis)
-                        logger.info("Processing file body: %s",
-                                    result.file_node.qname)
-
-                        # Clear old calls for this file
-                        await self.repos.call_repo.delete_descendant_calls(result.file_node.id)
+                        # NOTE: Do NOT delete descendant calls here.
+                        # The BodyParser -> CallChainBuilder -> ScopeProcessor
+                        # will handle "Diffing" (Create/Keep/Delete) per function scope.
 
                         # Process AST
                         with tracker.timer("phase2.process_ast"):
@@ -175,16 +145,13 @@ class PhaseProcessor:
                                 timeout=self._file_timeout,
                             )
 
-                        # Return processed scope IDs (file ID mostly)
-                        return {result.file_node.id}
-
                     except Exception as exc:
-                        print(
-                            f"Error processing file {result.file_node.path}: {exc}")
-                        from traceback import format_exc
-                        print(format_exc())
-                        return set()
+                        logger.error(
+                            f"Error analyzing file {result.file_node.path}: {exc}",
+                            exc_info=True
+                        )
 
+        # Execute in parallel
         async with asyncio.TaskGroup() as tg:
             tasks = [
                 tg.create_task(_process_single_file_analysis(result))
@@ -192,31 +159,26 @@ class PhaseProcessor:
             ]
 
         for task in tasks:
-            processed_scope_ids = task.result()
-            all_processed_scope_ids.update(processed_scope_ids)
-
-        return all_processed_scope_ids
+            task.result()
 
     async def _batch_delete_scopes(self, scope_ids: List[str]) -> None:
         """Batch delete scopes with concurrency control."""
-        # For ArangoDB, we can just batch delete.
-        # But we need to know the keys.
-        keys = [sid.split("/")[-1] if "/" in sid else sid for sid in scope_ids]
-        if not keys:
+        clean_keys = [
+            sid.split("/")[-1] if "/" in sid else sid for sid in scope_ids]
+        if not clean_keys:
             return
 
+        # Using AQL is much faster than individual deletes
         async with self._db_semaphore:
-            # Repos don't have batch_delete generic helper yet, implement loop or AQL
-            # AQL is safest
             query = """
-                 FOR doc IN @@collection
+                 FOR doc IN nodes
                     FILTER doc._key IN @keys
-                    REMOVE doc IN @@collection
+                    REMOVE doc IN nodes
              """
             try:
                 await self.repos.nodes.db.aql.execute(
                     query,
-                    bind_vars={"@keys": keys, "@@collection": "nodes"}
+                    bind_vars={"keys": clean_keys}
                 )
             except Exception as e:
                 logger.error(f"Batch delete failed: {e}")

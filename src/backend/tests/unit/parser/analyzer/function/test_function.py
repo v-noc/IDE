@@ -47,6 +47,16 @@ def find_node_by_name(nodes: List[AnyTreeNode], name: str):
     return next((node for node in nodes if node.qname.split('.')[-1] == name), None)
 
 
+def find_node(node):
+    for child in node.children:
+        if child.node_type == "call":
+            return child
+        found = find_node(child)
+        if found:
+            return found
+    return None
+
+
 def find_node_by_qname(nodes: List[AnyTreeNode], qname: str):
     return next((node for node in nodes if getattr(node, "qname", None) == qname), None)
 
@@ -151,6 +161,9 @@ async def test_function_collector(setup_project):
         file_node.children, f"{file_node.qname}.curry_call"
     )
 
+    calls = find_node(factory_func)
+    print(f"calls: {calls}")
+
     # 3. Assert functions and calls within `factory` function
     assert len(factory_func.children) == 2
     add_func = find_node_by_qname(
@@ -159,9 +172,10 @@ async def test_function_collector(setup_project):
         factory_func.children, f"{factory_func.qname}.build"
     )
     assert add_func is not None and build_func is not None
+
     assert len(add_func.children) == 1
     build_call = find_node_by_qname(
-        add_func.children, f"{add_func.qname}::{build_func.qname}"
+        add_func.children, f"{add_func.id}::{build_func.id}"
     )
     assert build_call is not None
     assert build_call.node_type == 'call'
@@ -170,13 +184,13 @@ async def test_function_collector(setup_project):
     # 4. Assert calls within `main` function
     assert len(main_func.children) == 4
     main_factory_call = find_node_by_qname(
-        main_func.children, f"{main_func.qname}::{factory_call_func.qname}"
+        main_func.children, f"{main_func.id}::{factory_call_func.id}"
     )
     main_curry_call = find_node_by_qname(
-        main_func.children, f"{main_func.qname}::{curry_call_func.qname}"
+        main_func.children, f"{main_func.id}::{curry_call_func.id}"
     )
     main_factory_assign = find_node_by_qname(
-        main_func.children, f"{main_func.qname}::{factory_func.qname}"
+        main_func.children, f"{main_func.id}::{factory_func.id}"
     )
     main_call_back = find_node_by_qname(
         main_func.children, f"{main_func.qname}::{call_back_func.qname}"

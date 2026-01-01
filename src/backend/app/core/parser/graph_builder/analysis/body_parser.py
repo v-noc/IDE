@@ -1,22 +1,22 @@
 import logging
 import asyncio
 import aiofiles
-import uuid
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Dict
 
 from app.core.parser.ast.models import (
     BaseNode,
-    CallNode as ASTCallNode,
     ClassNode as ASTClassNode,
     FunctionNode as ASTFunctionNode
 )
-from app.core.model.nodes import FileNode, FunctionNode, ClassNode, CallNode, ContainerNode
+from app.core.model.nodes import FileNode, ContainerNode
 from app.core.parser.ast.scanner import scan
-from app.core.parser.graph_builder.analysis.call_chain_builder import CallChainBuilder
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
+
+# IMPORT YOUR NEW BUILDER
+from app.core.parser.graph_builder.call_graph.builder import CallChainBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -29,143 +29,103 @@ class BodyParser:
         repos: Repositories,
         jedi_manager: JediProjectManager,
         batch_size: int = 1000,
-        call_resolve_concurrency: int = 8,
     ):
         self.project_path = project_path
-        self.project_name = project_name
         self.repos = repos
-        self.jedi_manager = jedi_manager
-        self.batch_size = batch_size
-        self.call_resolve_concurrency = call_resolve_concurrency
-        self.processed_scope_ids = set()
 
+        # Initialize the NEW Builder here
         self.call_chain_builder = CallChainBuilder(
             project_path=project_path,
-            project_name=project_name,
             repos=repos,
-            jedi_manager=jedi_manager,
+            jedi_manager=jedi_manager
         )
 
     async def process_ast(self, file_node: FileNode):
         """
-        Phase 2: Analyze the AST tree for calls.
-        Traverses the tree, entering scopes (Function/Class) as encountered.
+        Phase 2: Analyze the AST tree.
+        Traverses the tree, finds DB nodes, and delegates call processing to CallChainBuilder.
         """
-        with tracker.timer("body_parser.process_ast_total"):
-            file_path = Path(file_node.path)
-            if not file_path.is_absolute():
-                file_path = Path(self.project_path) / file_path
+        file_path = Path(file_node.path)
+        if not file_path.is_absolute():
+            file_path = Path(self.project_path) / file_path
 
-            # Prefetch all function/class nodes for this file
-            # This allows us to map AST nodes to DB IDs
-            with tracker.timer("body_parser.prefetch_nodes"):
-                existing_tree = await self.repos.nodes.get_containment_tree(
-                    file_node.id,
-                    depth=50,
-                    exclude_types=["call"]
-                )
+        # 1. Prefetch DB nodes (Optimization)
+        existing_tree = await self.repos.nodes.get_containment_tree(
+            # We ignore existing calls here
+            file_node.id, depth=50, exclude_types=["call"]
+        )
 
-                # Map qname -> DB Node
-                node_map: Dict[str, ContainerNode] = {}
-                for item in existing_tree:
-                    vertex = item["vertex"]
-                    qname = vertex.get("qname")
-                    if qname:
-                        # Convert to model
-                        node_type = vertex.get("node_type")
-                        if node_type == "function":
-                            node_map[qname] = FunctionNode(**vertex)
-                        elif node_type == "class":
-                            node_map[qname] = ClassNode(**vertex)
-                        elif node_type == "file":
-                            node_map[qname] = FileNode(**vertex)
+        node_map: Dict[str, ContainerNode] = {}
+        for item in existing_tree:
+            vertex = item["vertex"]
+            if vertex.get("qname"):
+                # Simply storing the dict or converting to model depending on preference
+                # Assuming your Builder expects Pydantic models:
+                if vertex['node_type'] == 'function':
+                    node_map[vertex['qname']
+                             ] = self.repos.function_repo._validate(vertex)
+                elif vertex['node_type'] == 'class':
+                    node_map[vertex['qname']
+                             ] = self.repos.class_repo._validate(vertex)
 
-            try:
-                with tracker.timer("body_parser.read_file"):
-                    async with aiofiles.open(file_path, "r", encoding="utf-8") as source:
-                        content = await source.read()
-            except OSError as exc:
-                logger.error("Failed to read file %s: %s", file_path, exc)
-                return
+        # 2. Read Source
+        try:
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as source:
+                content = await source.read()
+        except OSError:
+            return
 
-            loop = asyncio.get_event_loop()
-            try:
-                # Keep processed_content: it matches node positions after ID injection.
-                with tracker.timer("body_parser.scan_ast"):
-                    nodes, processed_content = await loop.run_in_executor(
-                        None, scan, content, str(file_path)
-                    )
-            except Exception as exc:
-                logger.error("Failed to re-scan AST for %s: %s",
-                             file_path, exc)
-                return
+        # 3. Scan AST
+        loop = asyncio.get_event_loop()
+        try:
+            nodes, processed_content = await loop.run_in_executor(
+                None, scan, content, str(file_path)
+            )
+        except Exception:
+            return
 
-            # Start traversal from file scope
-            with tracker.timer("body_parser.traverse_ast_root"):
-                await self._traverse(
-                    nodes,
-                    file_node,
-                    node_map,
-                    file_path=file_path,
-                    source=processed_content,
-                )
-            self.processed_scope_ids.add(file_node.id)
+        # 4. Traverse and delegate to Builder
+        await self._traverse_and_process(
+            nodes,
+            file_node,
+            node_map,
+            file_path=file_path,
+            source=processed_content
+        )
 
-    async def _traverse(
+    async def _traverse_and_process(
         self,
         nodes: List[BaseNode],
-        current_node: ContainerNode,
+        current_scope: ContainerNode,
         node_map: Dict[str, ContainerNode],
-        *,
         file_path: Path,
         source: str,
     ):
         """
-        Traverse AST nodes in the current scope.
-        Definitions are processed sequentially.
-        Calls are resolved in parallel.
+        Recursive traversal. When a scope (Function/Class) is found:
+        1. Find its DB node.
+        2. Pass it to CallChainBuilder to handle call synchronization.
         """
-        call_nodes: List[ASTCallNode] = []
-
         for node in nodes:
             if isinstance(node, (ASTClassNode, ASTFunctionNode)):
-                # Calculate qname to find DB node
-                qname = f"{current_node.qname}.{node.name}"
+                # 1. Identify the DB Node
+                qname = f"{current_scope.qname}.{node.name}"
                 db_node = node_map.get(qname)
 
                 if not db_node:
                     continue
 
+                # 2. HANDOFF: Let the new builder handle logic for this specific scope
+                # This handles resolution, deduplication, and batch DB insertion
+
+                await self.call_chain_builder.process_node_scope(
+                    node=db_node,
+                    file_path=file_path,
+                    source_code=source
+                )
+
+                # 3. Recurse for nested definitions
                 if hasattr(node, "children"):
-                    await self._traverse(
-                        node.children, db_node, node_map,
-                        file_path=file_path, source=source,
+                    await self._traverse_and_process(
+                        node.children, db_node, node_map, file_path, source
                     )
-                self.processed_scope_ids.add(db_node.id)
-
-            elif isinstance(node, ASTCallNode):
-                # Ensure we are inside a function or class to attach the call
-                if current_node.node_type in ("function", "class"):
-                    call_nodes.append(node)
-
-        # Resolve calls in parallel
-        if call_nodes:
-            loop = asyncio.get_event_loop()
-
-            async def _resolve(n: ASTCallNode):
-                return n, await loop.run_in_executor(
-                    None,
-                    self.call_chain_builder.call_resolver.resolve_call,
-                    str(file_path), source, n.position.line, n.call_col_pos, None,
-                )
-
-            resolved = await asyncio.gather(*[_resolve(n) for n in call_nodes])
-
-            for n, resolutions in resolved:
-                await self.call_chain_builder.build_chain_from_resolutions(
-                    call_node=n,
-                    caller_node=current_node,
-                    resolutions=resolutions,
-                    depth=0,
-                    parent_context=None,
-                )

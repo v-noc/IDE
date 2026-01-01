@@ -171,7 +171,7 @@ class GraphBuilderOrchestrator:
             # Phase 2 refactoring is deferred.
             # We pass None for call_sync_service as we removed SyncService.
             await self.phase_processor.process_analysis_phase(
-                collection_results, None
+                collection_results
             )
             logger.info("Phase 2: Analysis completed")
             print("Phase 2: Analysis completed", flush=True)

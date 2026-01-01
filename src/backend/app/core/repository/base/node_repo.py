@@ -242,30 +242,40 @@ class NodeRepository(BaseRepository[T]):
         Returns a dict with keys file and project whose values are the raw
         vertex documents or None if not found.
         """
-        query = """
-        FOR v IN 1..50 INBOUND @start_node_id @@contains_collection
-            OPTIONS { order: "bfs" }
-            
-            COLLECT AGGREGATE 
-                file = FIRST(v.node_type == "file" ? v : null),
-                project = FIRST(v.node_type == "project" ? v : null)
-            
+        try:
+            query = """
+            LET file = FIRST(
+                FOR v IN 1..50 INBOUND @start_node_id @@contains_collection
+                    OPTIONS { order: "bfs" }
+                    FILTER v.node_type == "file"
+                    LIMIT 1
+                    RETURN v
+            )
+
+            LET project = FIRST(
+                FOR v IN 1..50 INBOUND @start_node_id @@contains_collection
+                    OPTIONS { order: "bfs" }
+                    FILTER v.node_type == "project"
+                    LIMIT 1
+                    RETURN v
+            )
+
             RETURN { file, project }
-        """
-        bind_vars = {
-            "start_node_id": node_id,
-            "@contains_collection": "contains_edges",
-        }
-        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-        # Buffer all results (for backwards compatibility)
+            """
+            bind_vars = {
+                "start_node_id": node_id,
+                "@contains_collection": "contains_edges",
+            }
+            cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+            result = None
+            async for row in cursor:
+                result = row
+                break  # Get first and exit
 
-        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-        result = None
-        async for row in cursor:
-            result = row
-            break  # Get first and exit
-
-        return result or {"file": None, "project": None}
+            return result or {"file": None, "project": None}
+        except Exception as e:
+            print(f"Error getting nearest file and project: {e}")
+            return {"file": None, "project": None}
 
     async def find_by_qname(self, qname: str) -> Optional[T]:
         return await self.find_one({"qname": qname})
