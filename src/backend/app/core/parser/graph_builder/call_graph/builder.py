@@ -119,78 +119,75 @@ class CallChainBuilder:
     ) -> List[ASTCallNode]:
         """
         Scans file and extracts AST CallNodes specifically belonging to target_node's body.
-        Excludes calls belonging to nested functions/classes defined within.
+        Only returns **direct-child** calls for the given scope:
+        - file: calls that appear at module level (not inside any class/function)
+        - class: calls that appear directly in the class body (not inside methods/nested defs)
+        - function: calls that appear directly in the function body (not inside nested defs)
         """
         # 1. Scan the AST
         loop = asyncio.get_event_loop()
         nodes, _ = await loop.run_in_executor(None, scan, source, str(path))
 
-        found_calls: List[ASTCallNode] = []
+        def _normalize_id(raw: Optional[str]) -> Optional[str]:
+            if not raw:
+                return None
+            # DB ids are often like "nodes/<uuid>" while AST ids are "<uuid>"
+            return raw.split("/")[-1]
 
-        # We need the start line to identify the correct AST node
-        target_line = target_node.position.line_no if target_node.position else 0
+        def _iter_scopes(node_list: List[BaseNode]) -> List[BaseNode]:
+            """Returns all AST class/function nodes in the tree (DFS)."""
+            scopes: List[BaseNode] = []
+            stack = list(node_list)
+            while stack:
+                n = stack.pop()
+                if isinstance(n, (ASTClassNode, ASTFunctionNode)):
+                    scopes.append(n)
+                    # nested defs live in children
+                    if getattr(n, "children", None):
+                        stack.extend(n.children)
+                else:
+                    # We only expect children on class/function nodes, but keep safe.
+                    if getattr(n, "children", None):
+                        stack.extend(n.children)
+            return scopes
 
-        # Strategy:
-        # 1. Find the AST node that corresponds to our target_node
-        # 2. Traverse ONLY that node's children to find calls
-        # 3. Do not enter nested Function/Class definitions
+        def _direct_calls(node_list: List[BaseNode]) -> List[ASTCallNode]:
+            """Only direct children that are calls (no recursion)."""
+            return [n for n in node_list if isinstance(n, ASTCallNode)]
 
-        def _find_target_ast_node(node_list: List[BaseNode]) -> Optional[BaseNode]:
-            """Recursively finds the AST node matching the target's line number."""
-            for node in node_list:
-                # Check if this node matches our target (Class or Function)
-                if isinstance(node, (ASTClassNode, ASTFunctionNode)):
-                    if node.position and node.position.line == target_line:
-                        return node
-
-                # If this node contains our target (based on lines), recurse down
-                if hasattr(node, "children"):
-                    # Optimization: Only look inside if target line is within this node's range
-                    # (Assuming node.position has end_line, otherwise just recurse)
-                    if hasattr(node, "position") and node.position:
-                        if node.position.line <= target_line <= node.position.end_line:
-                            found = _find_target_ast_node(node.children)
-                            if found:
-                                return found
-                    else:
-                        # Fallback for nodes without clear range
-                        found = _find_target_ast_node(node.children)
-                        if found:
-                            return found
-            return None
-
-        def _collect_direct_calls(node_list: List[BaseNode]):
-            """Collects calls in current scope, recursing into blocks (if/while) but NOT definitions."""
-            for node in node_list:
-                if isinstance(node, ASTCallNode):
-                    found_calls.append(node)
-
-                # Check children
-                if hasattr(node, "children"):
-                    # STOP recursion if we hit a scope boundary (another function/class)
-                    if isinstance(node, (ASTClassNode, ASTFunctionNode)):
-                        continue
-
-                    # Continue recursion for structural nodes (If, Else, Try, For, While, etc.)
-                    _collect_direct_calls(node.children)
-
-        # Execution Logic
-        target_ast_node = None
-
-        # Case A: target_node is the File itself
+        # Case A: file scope => top-level direct calls only
         if target_node.node_type == "file":
-            _collect_direct_calls(nodes)
-        else:
-            # Case B: target_node is a Function or Class
-            target_ast_node = _find_target_ast_node(nodes)
+            return _direct_calls(nodes)
 
-            if target_ast_node and hasattr(target_ast_node, "children"):
-                _collect_direct_calls(target_ast_node.children)
-            else:
-                # Log warning: Could not map DB node to AST node (out of sync?)
-                pass
+        # Case B: class/function scope => find matching AST scope node
+        target_id = _normalize_id(getattr(target_node, "id", None))
+        target_name = getattr(target_node, "name", None)
+        target_line = target_node.position.line_no if getattr(
+            target_node, "position", None) else None
 
-        return found_calls
+        matched_scope: Optional[BaseNode] = None
+        all_scopes = _iter_scopes(nodes)
+
+        # 1) Prefer exact ID match when possible
+        if target_id:
+            for s in all_scopes:
+                if _normalize_id(getattr(s, "id", None)) == target_id:
+                    matched_scope = s
+                    break
+
+        # 2) Fallback to (name + start line)
+        if not matched_scope and target_name and target_line is not None:
+            for s in all_scopes:
+                if getattr(s, "name", None) == target_name and getattr(s, "position", None):
+                    if s.position.line == target_line:
+                        matched_scope = s
+                        break
+
+        if not matched_scope:
+            # Could not map DB node -> AST node (likely out of sync); return nothing.
+            return []
+
+        return _direct_calls(getattr(matched_scope, "children", []) or [])
 
     async def _fetch_nodes_batch(self, node_ids: List[str]) -> List[ContainerNode]:
         """Fetch multiple nodes from DB."""
@@ -207,13 +204,18 @@ class CallChainBuilder:
 
     async def _load_node_context(self, node: ContainerNode):
         """Helper to load file path and source code for a DB node."""
+        file_path_str = ""
+        if node.node_type == "file":
+            file_path_str = node.path
 
-        file_info = await self.repos.nodes.get_nearest_file_and_project(node.id)
+        else:
+            file_info = await self.repos.nodes.get_nearest_file_and_project(node.id)
 
-        if not file_info or not file_info.get("file"):
-            return None, None
+            if not file_info or not file_info.get("file"):
+                return None, None
 
-        file_path_str = file_info["file"]["path"]
+            file_path_str = file_info["file"]["path"]
+
         abs_path = self.project_path / \
             file_path_str if not Path(
                 file_path_str).is_absolute() else Path(file_path_str)
@@ -231,6 +233,7 @@ class CallChainBuilder:
         node: ContainerNode,
         file_path: Optional[Path] = None,
         source_code: Optional[str] = None,
+        parent_call_node_id: Optional[str] = None,
         visited_ids: Optional[Set[str]] = None,
         current_depth: int = 0
     ):
@@ -242,9 +245,9 @@ class CallChainBuilder:
         if visited_ids is None:
             visited_ids = set()
 
-        if node.id in visited_ids:
-            return
-        visited_ids.add(node.id)
+        # if node.id in visited_ids:
+        #     return
+        # visited_ids.add(node.id)
 
         if current_depth >= self.max_depth:
             return
@@ -253,12 +256,10 @@ class CallChainBuilder:
         # If not provided (recursive step), we must load it.
         if not file_path or not source_code:
             file_path, source_code = await self._load_node_context(node)
-            print(f"file_path: {file_path}")
 
             if not file_path:
                 return
 
-        # 1. Extract AST calls specifically for this node's range
         # (You implement _extract_calls_from_source as discussed previously)
         ast_calls = await self._extract_calls_from_source(source_code, file_path, node)
 
@@ -266,26 +267,25 @@ class CallChainBuilder:
         resolved = await self.resolver.resolve_scope_calls(file_path, source_code, ast_calls)
 
         # 3. Sync to DB (Batch Create/Delete)
-        sync_result = await self.processor.sync_scope(node, resolved)
+        sync_result = await self.processor.sync_scope(node, resolved, parent_call_node_id=parent_call_node_id)
 
         # =========================================================
         # THE SPIDER LOGIC (Replicating your old logic)
         # =========================================================
         # We found targets (B, C). Now we must process THEM immediately.
 
-        target_ids_to_recurse = sync_result.all_active_targets
+        if sync_result.created_map:
+            #     # Fetch the actual Node objects for B and C
+            target_nodes = await self._fetch_nodes_batch(list(sync_result.created_map.keys()))
 
-        # if target_ids_to_recurse:
-        #     # Fetch the actual Node objects for B and C
-        #     target_nodes = await self._fetch_nodes_batch(list(target_ids_to_recurse))
-
-        #     for target_node in target_nodes:
-        #         # RECURSION: Process B immediately
-        #         # Note: We pass None for file/source to force re-loading context for the new node
-        #         await self.process_node_scope(
-        #             node=target_node,
-        #             file_path=None,
-        #             source_code=None,
-        #             visited_ids=visited_ids,
-        #             current_depth=current_depth + 1
-        #         )
+            for target_node in target_nodes:
+                # RECURSION: Process B immediately
+                # Note: We pass None for file/source to force re-loading context for the new node
+                await self.process_node_scope(
+                    node=target_node,
+                    parent_call_node_id=sync_result.created_map[target_node.id],
+                    file_path=None,
+                    source_code=None,
+                    visited_ids=visited_ids,
+                    current_depth=current_depth + 1
+                )

@@ -1,5 +1,5 @@
 import logging
-from typing import List, Set
+from typing import List, Set, Optional
 from .models import ResolvedCall, ScopeSyncResult
 from .repository_extension import CallGraphRepository
 from app.core.model.nodes import ContainerNode
@@ -14,7 +14,8 @@ class ScopeProcessor:
     async def sync_scope(
         self,
         parent_node: ContainerNode,
-        resolved_calls: List[ResolvedCall]
+        resolved_calls: List[ResolvedCall],
+        parent_call_node_id: Optional[str] = None
     ) -> ScopeSyncResult:
         """
         Synchronizes the DB for a specific parent node.
@@ -22,6 +23,11 @@ class ScopeProcessor:
         """
 
         parent_id = parent_node.id
+
+        if parent_call_node_id:
+            parent_id = parent_call_node_id
+
+        created_map = {}
 
         # 1. Identify what currently exists in DB
         # Map: target_id -> call_node_id
@@ -58,12 +64,13 @@ class ScopeProcessor:
                 if c.target_id in to_create_ids
             ]
             created_map = await self.repo.batch_create_call_nodes(parent_id, calls_to_create)
-            print(f"created_map: {parent_node.qname} <-> {created_map}")
+
             logger.debug(
                 f"Created {len(calls_to_create)} new calls in {parent_node.qname}")
 
         return ScopeSyncResult(
             parent_id=parent_id,
+            created_map=created_map,
             added_target_ids=to_create_ids,
             retained_target_ids=to_keep_ids,
             removed_target_ids=to_delete_targets

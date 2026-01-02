@@ -1,4 +1,4 @@
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Dict
 from dataclasses import dataclass
 from app.core.model.nodes import CodePosition
 
@@ -19,6 +19,7 @@ class ScopeSyncResult:
     added_target_ids: Set[str]
     retained_target_ids: Set[str]
     removed_target_ids: Set[str]
+    created_map: Dict[str, str]
 
     @property
     def all_active_targets(self) -> Set[str]:

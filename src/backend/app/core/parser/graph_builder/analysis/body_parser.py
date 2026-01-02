@@ -55,7 +55,7 @@ class BodyParser:
             file_node.id, depth=50, exclude_types=["call"]
         )
 
-        node_map: Dict[str, ContainerNode] = {}
+        node_map: Dict[str, ContainerNode] = {file_node.qname: file_node}
         for item in existing_tree:
             vertex = item["vertex"]
             if vertex.get("qname"):
@@ -106,6 +106,14 @@ class BodyParser:
         1. Find its DB node.
         2. Pass it to CallChainBuilder to handle call synchronization.
         """
+        # 2. HANDOFF: Let the new builder handle logic for this specific scope
+        # This handles resolution, deduplication, and batch DB insertion
+
+        await self.call_chain_builder.process_node_scope(
+            node=current_scope,
+            file_path=file_path,
+            source_code=source
+        )
         for node in nodes:
             if isinstance(node, (ASTClassNode, ASTFunctionNode)):
                 # 1. Identify the DB Node
@@ -114,15 +122,6 @@ class BodyParser:
 
                 if not db_node:
                     continue
-
-                # 2. HANDOFF: Let the new builder handle logic for this specific scope
-                # This handles resolution, deduplication, and batch DB insertion
-
-                await self.call_chain_builder.process_node_scope(
-                    node=db_node,
-                    file_path=file_path,
-                    source_code=source
-                )
 
                 # 3. Recurse for nested definitions
                 if hasattr(node, "children"):

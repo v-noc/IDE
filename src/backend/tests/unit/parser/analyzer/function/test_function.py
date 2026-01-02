@@ -5,13 +5,13 @@ from typing import List
 import pytest
 import pytest_asyncio
 
+from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.repository import Repositories
-from app.core.services.project_service import ProjectService
-from app.core.builder.tree_builder import TreeBuilder
 from app.core.schemas.tree import AnyTreeNode
 from app.core.services.function_service import FunctionService
+from app.core.services.project_service import ProjectService
 
 FIXTURE_PROJECT = Path(__file__).parent / "simple_function"
 PROJECT_NAME = "simple_function"
@@ -44,7 +44,7 @@ async def setup_project(tmp_path, arangodb_client):
 
 
 def find_node_by_name(nodes: List[AnyTreeNode], name: str):
-    return next((node for node in nodes if node.qname.split('.')[-1] == name), None)
+    return next((node for node in nodes if node.qname.split(".")[-1] == name), None)
 
 
 def find_node(node):
@@ -84,25 +84,23 @@ async def test_function_get_code(setup_project):
     file_node = tree[0]
     factory_qname = f"{file_node.qname}.factory"
     factory_func = find_node_by_qname(file_node.children, factory_qname)
-    assert factory_func is not None, (
-        "No 'factory' function node found"
-    )
+    assert factory_func is not None, "No 'factory' function node found"
 
     func_service = FunctionService(repos)
     snippet = await func_service.get_code(factory_func.id)
 
     assert snippet is not None, "get_code returned None"
-    assert 'code' in snippet, "snippet missing 'code' field"
-    assert snippet['name'] == 'factory'
-    assert isinstance(snippet['code'], str)
-    assert len(snippet['code']) > 0
+    assert "code" in snippet, "snippet missing 'code' field"
+    assert snippet["name"] == "factory"
+    assert isinstance(snippet["code"], str)
+    assert len(snippet["code"]) > 0
 
-    code = snippet['code']
+    code = snippet["code"]
     # Basic content checks aligned with simple_function/main.py
-    assert 'def factory' in code
-    assert 'def add' in code
-    assert 'def build' in code
-    assert 'return add' in code
+    assert "def factory" in code
+    assert "def add" in code
+    assert "def build" in code
+    assert "return add" in code
 
 
 @pytest.mark.asyncio
@@ -162,7 +160,6 @@ async def test_function_collector(setup_project):
     )
 
     calls = find_node(factory_func)
-    print(f"calls: {calls}")
 
     # 3. Assert functions and calls within `factory` function
     assert len(factory_func.children) == 2
@@ -178,7 +175,7 @@ async def test_function_collector(setup_project):
         add_func.children, f"{add_func.id}::{build_func.id}"
     )
     assert build_call is not None
-    assert build_call.node_type == 'call'
+    assert build_call.node_type == "call"
     assert build_call.target.id == build_func.id
 
     # 4. Assert calls within `main` function
@@ -193,7 +190,7 @@ async def test_function_collector(setup_project):
         main_func.children, f"{main_func.id}::{factory_func.id}"
     )
     main_call_back = find_node_by_qname(
-        main_func.children, f"{main_func.qname}::{call_back_func.qname}"
+        main_func.children, f"{main_func.id}::{call_back_func.id}"
     )
 
     # 4.1 Check `factory_call()` in `main`
@@ -203,16 +200,16 @@ async def test_function_collector(setup_project):
 
     assert len(main_factory_call.children) == 2
     inner_factory_call = find_node_by_qname(
-        main_factory_call.children, f"{main_factory_call.qname}::{factory_func.qname}"
+        main_factory_call.children, f"{main_factory_call.id}::{factory_func.id}"
     )
     inner_add_call = find_node_by_qname(
-        main_factory_call.children, f"{main_factory_call.qname}::{add_func.qname}"
+        main_factory_call.children, f"{main_factory_call.id}::{add_func.id}"
     )
     assert inner_factory_call.target.id == factory_func.id
     assert inner_add_call.target.id == add_func.id
     assert len(inner_add_call.children) == 1
     final_build_call = find_node_by_qname(
-        inner_add_call.children, f"{inner_add_call.qname}::{build_func.qname}"
+        inner_add_call.children, f"{inner_add_call.id}::{build_func.id}"
     )
     assert final_build_call.target.id == build_func.id
 
@@ -220,17 +217,17 @@ async def test_function_collector(setup_project):
     assert main_curry_call.target.id == curry_call_func.id
     assert len(main_curry_call.children) == 2
     curry_factory_call = find_node_by_qname(
-        main_curry_call.children, f"{main_curry_call.qname}::{factory_func.qname}"
+        main_curry_call.children, f"{main_curry_call.id}::{factory_func.id}"
     )
     curry_add_call = find_node_by_qname(
-        main_curry_call.children, f"{main_curry_call.qname}::{add_func.qname}"
+        main_curry_call.children, f"{main_curry_call.id}::{add_func.id}"
     )
     assert curry_factory_call.target.id == factory_func.id
 
     assert curry_add_call.target.id == add_func.id
     assert len(curry_add_call.children) == 1
     final_build_call = find_node_by_qname(
-        curry_add_call.children, f"{curry_add_call.qname}::{build_func.qname}"
+        curry_add_call.children, f"{curry_add_call.id}::{build_func.id}"
     )
     assert final_build_call.target.id == build_func.id
 
@@ -240,14 +237,12 @@ async def test_function_collector(setup_project):
     # 4.4 Check `call_back(builder)` in `main`
     assert main_call_back.target.id == call_back_func.id
     assert len(main_call_back.children) == 1
-    callback_add_call = find_node_by_qname(
-        main_call_back.children, f"{main_call_back.qname}::{add_func.qname}"
-    )
+    callback_add_call = main_call_back.children[0]
     assert callback_add_call.target.id == add_func.id
     assert len(callback_add_call.children) == 1
     final_build_call = find_node_by_qname(
         callback_add_call.children,
-        f"{callback_add_call.qname}::{build_func.qname}",
+        f"{callback_add_call.id}::{build_func.id}",
     )
     assert final_build_call.target.id == build_func.id
 
@@ -258,7 +253,7 @@ async def test_function_collector(setup_project):
         file_node.children, f"{file_node.qname}.main"
     )
     main_call_node = find_node_by_qname(
-        file_node.children, f"{file_node.qname}::{main_function_node.qname}"
+        file_node.children, f"{file_node.id}::{main_function_node.id}"
     )
 
     assert main_call_node is not None
