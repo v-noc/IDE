@@ -56,7 +56,9 @@ class BodyParser:
         )
 
         node_map: Dict[str, ContainerNode] = {file_node.qname: file_node}
+
         for item in existing_tree:
+
             vertex = item["vertex"]
             if vertex.get("qname"):
                 # Simply storing the dict or converting to model depending on preference

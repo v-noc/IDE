@@ -89,6 +89,7 @@ class PhaseProcessor:
                         "Error in collector.process_file for %s: %s",
                         file_path, exc
                     )
+
                     return None
 
         async with asyncio.TaskGroup() as tg:

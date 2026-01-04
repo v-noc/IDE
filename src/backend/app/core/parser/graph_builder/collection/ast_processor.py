@@ -42,6 +42,7 @@ class ASTProcessor:
         )
 
         existing_map = {}
+
         for item in existing_tree:
             vertex = item["vertex"]
             node_type = vertex.get("node_type")
@@ -91,9 +92,10 @@ class ASTProcessor:
                 continue
 
             node_id = ast_node.id
-            processed_ids.add(node_id)
+            processed_ids.add(f"nodes/" + node_id)
 
-            existing_entry = existing_map.get(node_id)
+            existing_entry = existing_map.get("nodes/" + node_id)
+
             existing_node = existing_entry["node"] if existing_entry else None
             existing_parent_id = existing_entry["parent_id"] \
                 if existing_entry else None
@@ -183,8 +185,8 @@ class ASTProcessor:
 
         if ids_to_delete:
             await self.repos.nodes.delete_batch(ids_to_delete)
-            logger.info(
-                f"Deleted {len(ids_to_delete)} stale nodes in {file_node.path}"
+            print(
+                f"Deleted {len(ids_to_delete)} stale nodes {ids_to_delete} in {file_node.path}"
             )
 
         return current_nodes

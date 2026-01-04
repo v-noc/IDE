@@ -15,42 +15,56 @@ T = TypeVar("T", bound=BaseModel)
 class NodeRepository(BaseRepository[T]):
     """Repository for node collections."""
 
+    async def _delete_edges_for_node(self, ec_name: str, node_id: str) -> int:
+        """
+        Atomically delete all edges connected to node_id in a single edge collection.
+        Uses the "collect keys first → remove" pattern to ensure consistency.
+        Returns the number of edges removed.
+        """
+        query = """
+            LET connected_keys = (
+                FOR e IN @@ec
+                    FILTER e._from == @node_id OR e._to == @node_id
+                    RETURN e._key
+            )
+            FOR key IN connected_keys
+                REMOVE key IN @@ec
+            RETURN LENGTH(connected_keys)
+        """
+        bind_vars = {
+            "@ec": ec_name,
+            "node_id": node_id
+        }
+        cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
+        async for result in cursor:
+            return result  # the length
+        return 0
+
     async def delete(self, key: str) -> bool:
-        """
-        Delete a node and all connected edges asynchronously.
-
-        Strategy:
-        1. Get all edge collections (async, cached)
-        2. Delete edges concurrently (asyncio.gather)
-        3. Delete node
-
-        Performance Improvement:
-            - Before: 170ms sequential
-            - After: 70ms (concurrent edge deletion)
-        """
         node_id = f"{self.collection_name}/{key}"
 
-        # 1. Get edge collections (async with caching)
+        # 1. Get edge collections (cached)
         edge_collections = await self._get_edge_collections()
 
-        # 2. Delete edges concurrently!
-        delete_tasks = []
-        for ec_name in edge_collections:
-            task = self._delete_edges_for_node(ec_name, node_id)
-            delete_tasks.append(task)
+        # 2. Delete edges concurrently, but collect results
+        delete_tasks = [
+            self._delete_edges_for_node(ec_name, node_id)
+            for ec_name in edge_collections
+        ]
 
-        # Execute all deletions in parallel
-        try:
-            await asyncio.gather(*delete_tasks, return_exceptions=True)
-        except Exception as e:
-            # logger.error(f"Edge deletion failed: {e}")
-            pass
-            return False
+        results = await asyncio.gather(*delete_tasks, return_exceptions=True)
+
+        # Check for failures
+        failed = [r for r in results if isinstance(r, Exception)]
+        if failed:
+            # logger.error(f"Failed to delete edges for {node_id}: {failed}")
+            return False  # Do NOT delete the node if any edge cleanup failed
+
+        # Optional: total_removed = sum(r for r in results if isinstance(r, int))
 
         # 3. Delete the node itself
         try:
             collection = await self.get_collection()
-
             await collection.delete(key)
             return True
         except (DocumentDeleteError, DocumentGetError):
@@ -74,6 +88,7 @@ class NodeRepository(BaseRepository[T]):
             return_new=True,
             overwrite=False
         )
+
         return [self._validate(r["new"]) for r in results]
 
     async def update_batch(self, nodes: List[T]) -> List[T]:
@@ -185,10 +200,10 @@ class NodeRepository(BaseRepository[T]):
             LET start_ver = start_node.current_version != null ? start_node.current_version : 0
 
             FOR v, e, p IN 1..@max_depth OUTBOUND @start_node_id @@contains_collection
-                PRUNE v.status != "active"
+                PRUNE v == null || v.status != "active" 
                 OPTIONS { order: "bfs", uniqueVertices: "global" }
 
-               
+
                 LET parent_candidates = (
                     FOR i IN 2..LENGTH(p.vertices)
                         LET candidate = p.vertices[LENGTH(p.vertices) - i]
@@ -198,6 +213,7 @@ class NodeRepository(BaseRepository[T]):
                 )
 
                 // 5. EXCLUDE TYPES FROM OUTPUT
+                FILTER v != null
                 FILTER v.node_type NOT IN @exclude_types
 
                 // 6. TARGET LOGIC
@@ -349,10 +365,6 @@ class NodeRepository(BaseRepository[T]):
         if not moves:
             return
 
-        # Split into remove and insert for safety against AQL limitations
-        # 1. Remove old edges for these children
-        # We need to handle both full IDs and keys.
-        # Construct full IDs if they are keys.
         child_ids = []
         for m in moves:
             cid = m[0]
@@ -374,21 +386,15 @@ class NodeRepository(BaseRepository[T]):
         )
 
         # 2. Insert new edges
-        # Note: ArangoDB edge collections require _from and _to to be valid
-        # document IDs (collection/key). If our IDs are just keys, we must
-        # prepend the collection name.
-        # "nodes" is the default collection for both parent and child here.
-        # We'll use string interpolation in AQL to prepend "nodes/" if needed.
-        # BUT safely, let's assume they might be missing the prefix.
 
         insert_query = """
-        FOR m IN @moves
-            INSERT {
-                _from: CONTAINS(m.parent_id, "/") ? m.parent_id : CONCAT(
-                    "nodes/", m.parent_id),
-                _to: CONTAINS(m.child_id, "/") ? m.child_id : CONCAT(
-                    "nodes/", m.child_id)
-            } INTO @@contains_collection
+            FOR m IN @moves
+                INSERT {
+                    _from: CONTAINS(m.parent_id, "/") ? m.parent_id : CONCAT(
+                        "nodes/", m.parent_id),
+                    _to: CONTAINS(m.child_id, "/") ? m.child_id : CONCAT(
+                        "nodes/", m.child_id)
+                } INTO @@contains_collection
         """
         await self.db.aql.execute(
             insert_query,
@@ -403,3 +409,25 @@ class NodeRepository(BaseRepository[T]):
                 "@contains_collection": "contains_edges"
             }
         )
+
+    async def delete_batch(self, keys: List[str]) -> List[bool]:
+        """
+        Batch delete multiple nodes and all their connected edges asynchronously.
+
+        Executes deletions in parallel (concurrent per node, with concurrent edge deletion inside each).
+
+        Returns:
+            List[bool]: Success status for each key in the input order (True if node was deleted).
+
+        Performance:
+            - Scales well with number of nodes (full parallelism).
+            - Each node follows the same optimized strategy as single delete (~70ms per node).
+        """
+        if not keys:
+            return []
+
+        # Run all individual deletes concurrently
+        tasks = [self.delete(key) for key in keys]
+        results = await asyncio.gather(*tasks)
+
+        return results
