@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 from pathlib import Path
 
 from app.core.parser.ast.models import CallNode as ASTCallNode
@@ -23,14 +23,15 @@ class CallResolverService:
         self,
         file_path: Path,
         source_code: str,
-        ast_calls: List[ASTCallNode]
-    ) -> List[ResolvedCall]:
+        ast_calls: List[ASTCallNode],
+        parent_context: Optional[Any] = None
+    ) -> Tuple[List[ResolvedCall], Dict[str, Any]]:
         """
         Resolves a batch of AST call nodes to DB IDs in parallel.
         Returns a list of ResolvedCall objects.
         """
         if not ast_calls:
-            return []
+            return [],  {}
 
         loop = asyncio.get_event_loop()
         tasks = []
@@ -45,7 +46,7 @@ class CallResolverService:
                     source_code,
                     ast_node.position.line,
                     ast_node.call_col_pos,
-                    None
+                    parent_context
                 )
             )
 
@@ -53,6 +54,7 @@ class CallResolverService:
         jedi_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         resolved_calls: List[ResolvedCall] = []
+        context_map: Dict[str, Any] = {}
         unique_target_check: Set[str] = set()
 
         for i, resolutions in enumerate(jedi_results):
@@ -79,6 +81,13 @@ class CallResolverService:
                 continue
 
             ast_node = ast_calls[i]
+            next_context = getattr(best_resolution, "execution_context", None)
+
+            db_target_id = f"nodes/{target_id}"
+
+            # If we have a valid context, store it for the builder to use
+            if next_context:
+                context_map[db_target_id] = next_context
 
             resolved_calls.append(ResolvedCall(
                 target_id=f"nodes/{target_id}",
@@ -93,4 +102,4 @@ class CallResolverService:
             ))
             unique_target_check.add(target_id)
 
-        return resolved_calls
+        return resolved_calls, context_map

@@ -2,7 +2,7 @@ import asyncio
 import aiofiles
 import logging
 from pathlib import Path
-from typing import Set, Dict, List, Optional
+from typing import Any, Set, Dict, List, Optional
 from collections import deque
 
 from app.core.parser.ast.models import (
@@ -195,9 +195,8 @@ class CallChainBuilder:
         results = []
         for nid in node_ids:
             # Try function
-            n = await self.repos.function_repo.get_by_id(nid)
-            if not n:
-                n = await self.repos.class_repo.get_by_id(nid)
+            n = await self.repos.nodes.get_by_id(nid)
+
             if n:
                 results.append(n)
         return results
@@ -235,7 +234,8 @@ class CallChainBuilder:
         source_code: Optional[str] = None,
         parent_call_node_id: Optional[str] = None,
         visited_ids: Optional[Dict[str, int]] = None,
-        current_depth: int = 0
+        current_depth: int = 0,
+        parent_context: Optional[Any] = None
     ):
         """
         Public entry point for BodyParser.
@@ -267,7 +267,7 @@ class CallChainBuilder:
         ast_calls = await self._extract_calls_from_source(source_code, file_path, node)
 
         # 2. Resolve calls in parallel
-        resolved = await self.resolver.resolve_scope_calls(file_path, source_code, ast_calls)
+        resolved, context_map = await self.resolver.resolve_scope_calls(file_path, source_code, ast_calls, parent_context=parent_context)
 
         # 3. Sync to DB (Batch Create/Delete)
         sync_result = await self.processor.sync_scope(node, resolved, parent_call_node_id=parent_call_node_id)
@@ -283,12 +283,13 @@ class CallChainBuilder:
 
             for target_node in target_nodes:
                 # RECURSION: Process B immediately
-                # Note: We pass None for file/source to force re-loading context for the new node
+                next_step_context = context_map.get(target_node.id)
                 await self.process_node_scope(
                     node=target_node,
                     parent_call_node_id=sync_result.created_map[target_node.id],
                     file_path=None,
                     source_code=None,
                     visited_ids=visited_ids.copy(),
-                    current_depth=current_depth + 1
+                    current_depth=current_depth + 1,
+                    parent_context=next_step_context
                 )
