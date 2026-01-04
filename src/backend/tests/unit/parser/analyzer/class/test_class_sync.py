@@ -125,7 +125,7 @@ async def test_class_sync_add_and_remove(setup_project):
     )
     assert tree, "No tree nodes built"
 
-    file_node = tree[1]
+    file_node = tree[0]
 
     # Snapshot current children names (unused, but ensures access is valid)
     _ = [getattr(c, "name", None) for c in file_node.children]
@@ -199,7 +199,8 @@ async def test_class_sync_add_and_remove_inside_class(setup_project):
         lines = _read_file(path).splitlines()
         block = [
             f"{' ' * indent}# SYNC_TEST_START\n\n",
-            f"{' ' * indent}class SyncAddedInner: pass",
+            f"{' ' * indent}class SyncAddedInner:",
+            f"{' ' * (indent+4)}pass",
             f"{' ' * indent}# SYNC_TEST_END",
         ]
         # Insert before the last line of the class's body
