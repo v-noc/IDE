@@ -1,5 +1,5 @@
 from app.core.schemas.tree import (
-    ProjectNode,
+    ProjectTreeNode,
     FileTreeNode,
     FolderTreeNode,
     AnyTreeNode,
@@ -31,7 +31,7 @@ def find_file_node(nodes: list[AnyTreeNode], file_name: str) -> FileTreeNode | N
 
 
 @pytest.mark.asyncio
-async def test_import_from_relative_path(project_tree: ProjectNode):
+async def test_import_from_relative_path(project_tree: ProjectTreeNode):
     file_node = find_file_node(project_tree.children, "import_relative")
     assert file_node is not None
     assert len(file_node.children) == 2
@@ -52,7 +52,7 @@ async def test_import_from_relative_path(project_tree: ProjectNode):
 
 
 @pytest.mark.asyncio
-async def test_import_from_wildcard(project_tree: ProjectNode):
+async def test_import_from_wildcard(project_tree: ProjectTreeNode):
     # Test relative wildcard import
     file_node_relative = find_file_node(
         project_tree.children, "import_wild_card")
@@ -80,7 +80,7 @@ async def test_import_from_wildcard(project_tree: ProjectNode):
 
 
 @pytest.mark.asyncio
-async def test_import_from_with_alias(project_tree: ProjectNode):
+async def test_import_from_with_alias(project_tree: ProjectTreeNode):
     file_node = find_file_node(project_tree.children, "import_alias")
     assert file_node is not None
     assert len(file_node.children) == 2
@@ -93,7 +93,7 @@ async def test_import_from_with_alias(project_tree: ProjectNode):
 
 
 @pytest.mark.asyncio
-async def test_import_from_init(project_tree: ProjectNode):
+async def test_import_from_init(project_tree: ProjectTreeNode):
     file_node = find_file_node(project_tree.children, "init_import")
 
     assert len(file_node.children) == 2
@@ -105,6 +105,6 @@ async def test_import_from_init(project_tree: ProjectNode):
         names.add(child.name)
         targets.add(child.target.qname)
 
-    assert names == {"create_user", "User"}
+    assert names == {"helper.create_user", "User"}
     assert targets == {"sample_import.utils.helper.create_user",
                        "sample_import.utils.data.user.User"}
