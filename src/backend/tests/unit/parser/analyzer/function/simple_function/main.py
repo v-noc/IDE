@@ -6,8 +6,8 @@ def factory():
 
     def build():
         """ID: 0af37d95-b990-4aa8-a6d8-f227f080aa11"""
-        # build()
-        pass
+        build()
+
     return add
 
 

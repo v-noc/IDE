@@ -234,7 +234,7 @@ class CallChainBuilder:
         file_path: Optional[Path] = None,
         source_code: Optional[str] = None,
         parent_call_node_id: Optional[str] = None,
-        visited_ids: Optional[Set[str]] = None,
+        visited_ids: Optional[Dict[str, int]] = None,
         current_depth: int = 0
     ):
         """
@@ -242,12 +242,16 @@ class CallChainBuilder:
         Analyzes a specific node's body using provided source code.
         """
         # 0. Recursion Guard
-        if visited_ids is None:
-            visited_ids = set()
 
-        # if node.id in visited_ids:
-        #     return
-        # visited_ids.add(node.id)
+        if visited_ids is None:
+            visited_ids = {}
+
+        if node.id in visited_ids:
+            visited_ids[node.id] = visited_ids[node.id] + 1
+            if visited_ids[node.id] > 2:
+                return
+        else:
+            visited_ids[node.id] = 1
 
         if current_depth >= self.max_depth:
             return
@@ -260,7 +264,6 @@ class CallChainBuilder:
             if not file_path:
                 return
 
-        # (You implement _extract_calls_from_source as discussed previously)
         ast_calls = await self._extract_calls_from_source(source_code, file_path, node)
 
         # 2. Resolve calls in parallel
@@ -286,6 +289,6 @@ class CallChainBuilder:
                     parent_call_node_id=sync_result.created_map[target_node.id],
                     file_path=None,
                     source_code=None,
-                    visited_ids=visited_ids,
+                    visited_ids=visited_ids.copy(),
                     current_depth=current_depth + 1
                 )

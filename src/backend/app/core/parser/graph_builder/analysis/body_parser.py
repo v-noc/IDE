@@ -2,7 +2,7 @@ import logging
 import asyncio
 import aiofiles
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from app.core.parser.ast.models import (
     BaseNode,
@@ -105,14 +105,15 @@ class BodyParser:
         Recursive traversal. When a scope (Function/Class) is found:
         1. Find its DB node.
         2. Pass it to CallChainBuilder to handle call synchronization.
+
+
         """
-        # 2. HANDOFF: Let the new builder handle logic for this specific scope
-        # This handles resolution, deduplication, and batch DB insertion
 
         await self.call_chain_builder.process_node_scope(
             node=current_scope,
             file_path=file_path,
-            source_code=source
+            source_code=source,
+            visited_ids=None,
         )
         for node in nodes:
             if isinstance(node, (ASTClassNode, ASTFunctionNode)):
@@ -126,5 +127,9 @@ class BodyParser:
                 # 3. Recurse for nested definitions
                 if hasattr(node, "children"):
                     await self._traverse_and_process(
-                        node.children, db_node, node_map, file_path, source
+                        node.children,
+                        db_node,
+                        node_map,
+                        file_path,
+                        source,
                     )
