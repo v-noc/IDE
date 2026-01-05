@@ -1,12 +1,11 @@
 import shutil
 from pathlib import Path
+import pytest
 
-from fastapi.testclient import TestClient
 
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 
@@ -28,7 +27,8 @@ def find_by_qname(nodes, qname: str):
     return None
 
 
-def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
+@pytest.mark.asyncio
+async def test_add_call(client, arangodb_client, create_repos, tmp_path):
     project_path = tmp_path / "sample_project"
     shutil.copytree(PROJECT_PATH, project_path)
 
@@ -41,23 +41,24 @@ def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
         qname="sample_import",
         path=str(project_path),
     )
-    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
+
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
-    project_node = project_service.create_node(project_node)
+    project_node = await project_service.create_node(project_node)
 
     orchestrator = GraphBuilderOrchestrator(
         project_node=project_node,
         db=arangodb_client,
         ignore_file_name=None,
-        scope_manager=scope_manager,
+
     )
-    orchestrator.resync()
+    await orchestrator.resync()
 
     project_service = ProjectService(create_repos)
-    project = project_service.get_all()[0]
+    projects = await project_service.get_all()
+    project = projects[0]
 
-    children = project_service.get_children(project.id)
+    children = await project_service.get_children(project.id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -69,7 +70,7 @@ def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
         tree, "sample_import.core.utils.helper.create_child"
     )
     # Create call
-    create_resp = client.post(
+    create_resp = await client.post(
         f"/api/v1/calls/{main_py_node.key}/add-call",
         json={
             "name": "Call1",
@@ -81,7 +82,7 @@ def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
     assert create_resp.status_code == 200
     assert create_resp.json() is not None
 
-    children = project_service.get_children(project.id)
+    children = await project_service.get_children(project.id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -91,7 +92,8 @@ def test_add_call(client: TestClient, arangodb_client, create_repos, tmp_path):
     assert len(main_py_node.children) == 3
 
 
-def test_remove_call(client: TestClient, arangodb_client, create_repos, tmp_path):
+@pytest.mark.asyncio
+async def test_remove_call(client, arangodb_client, create_repos, tmp_path):
     project_path = tmp_path / "sample_project"
     shutil.copytree(PROJECT_PATH, project_path)
 
@@ -104,23 +106,22 @@ def test_remove_call(client: TestClient, arangodb_client, create_repos, tmp_path
         qname="sample_import",
         path=str(project_path),
     )
-    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
-    project_node = project_service.create_node(project_node)
+    project_node = await project_service.create_node(project_node)
 
     orchestrator = GraphBuilderOrchestrator(
         project_node=project_node,
         db=arangodb_client,
         ignore_file_name=None,
-        scope_manager=scope_manager,
     )
-    orchestrator.resync()
+    await orchestrator.resync()
 
     project_service = ProjectService(create_repos)
-    project = project_service.get_all()[0]
+    projects = await project_service.get_all()
+    project = projects[0]
 
-    children = project_service.get_children(project.id)
+    children = await project_service.get_children(project.id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -138,16 +139,17 @@ def test_remove_call(client: TestClient, arangodb_client, create_repos, tmp_path
 
     assert call_key is not None
 
-    delete_resp = client.delete(
+    delete_resp = await client.delete(
         f"/api/v1/calls/{call_key}/remove-call",
     )
 
     assert delete_resp.status_code == 200
     assert delete_resp.json() == {"message": "Call removed successfully"}
 
-    project = project_service.get_all()[0]
+    projects = await project_service.get_all()
+    project = projects[0]
 
-    children = project_service.get_children(project.id)
+    children = await project_service.get_children(project.id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
