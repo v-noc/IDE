@@ -8,7 +8,6 @@ from app.core.socket.manager import get_socket_manager
 from .api import root
 from .db.client import get_db
 from .core.watcher.service import WatcherService
-from .utils.logging import setup_logging
 from .utils.exceptions import generic_exception_handler
 
 
@@ -20,9 +19,9 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     # setup_logging()
-    db = get_db()
+    db = await get_db()
     try:
-        db.properties()
+        await db.properties()
         print("✅ Database connection established successfully")
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
@@ -31,9 +30,12 @@ async def lifespan(app: FastAPI):
     # Initialize a process-wide watcher service singleton
     watcher_service = WatcherService()
     watcher_service.set_db(db)
-    # Set the main event loop so watcher can emit socket events from sync threads
+    # Set the main event loop so watcher can emit socket events
+    # from sync threads
     # Use get_running_loop() since we're in an async context
-    watcher_service.set_event_loop(asyncio.get_running_loop())
+    watcher_service.set_event_loop(
+        asyncio.get_running_loop()
+    )
     app.state.watcher_service = watcher_service
 
     # Init Socket Manager (creates the server instance)

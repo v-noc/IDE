@@ -1,232 +1,288 @@
-from app.core.parser.jedi_adapter.resolver import MROResolver
 import logging
-import uuid
 import hashlib
 import json
-from typing import List, Tuple, Any, Optional, Dict
+from typing import List, Optional, Dict, Any, Union
 
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import ScopeModel, ScopeType
-from app.core.parser.ast.models import BaseNode, ClassNode, FunctionNode
+from app.core.repository import Repositories
+from app.core.model.nodes import (
+    FileNode, FunctionNode, ClassNode, CodePosition, ContainerNode
+)
+from app.core.parser.ast.models import (
+    BaseNode,
+    ClassNode as ASTClassNode,
+    FunctionNode as ASTFunctionNode
+)
+from app.core.parser.jedi_adapter.resolver import MROResolver
 
 logger = logging.getLogger(__name__)
 
 
 class ASTProcessor:
-    def __init__(self, scope_manager: ScopeManager, mro_resolver: Optional[MROResolver] = None):
-        self.manager = scope_manager
+    def __init__(
+        self, repos: Repositories, mro_resolver: Optional[MROResolver] = None
+    ):
+        self.repos = repos
         self.mro_resolver = mro_resolver
 
-    def process_ast_nodes(self, nodes: List[BaseNode], parent_scope: ScopeModel, content: Optional[str] = None) -> List[tuple[ScopeModel, BaseNode]]:
-        """
-        Recursively create scopes for AST nodes and return created scopes with their AST nodes.
-        Uses batch operations for efficiency.
-        """
-        # First pass: collect all nodes and their metadata
-        node_data_list = []
-        self._collect_nodes_recursive(
-            nodes, parent_scope, content, node_data_list)
-
-        if not node_data_list:
-            return []
-
-        # Extract all scope IDs that need to be checked
-        scope_ids_to_check = [data["node_id"] for data in node_data_list]
-
-        # Batch check all existing scopes
-        existing_scopes = self.manager.batch_get_scopes_by_ids(
-            scope_ids_to_check)
-
-        # Collect scopes to create, update, and relationships to link
-        scopes_to_create: List[ScopeModel] = []
-        scopes_to_update: List[ScopeModel] = []
-        relationships_to_link: List[dict[str, str]] = []
-        scope_map: Dict[str, ScopeModel] = {}  # node_id -> scope
-
-        # Process each node data
-        for data in node_data_list:
-            node = data["node"]
-            node_id = data["node_id"]
-            scope = data["scope"]
-            parent_scope_obj = data["parent_scope"]
-
-            existing = existing_scopes.get(node_id)
-
-            if not existing:
-                # New scope - mark for creation
-                scopes_to_create.append(scope)
-                relationships_to_link.append({
-                    "parent_id": parent_scope_obj.id,
-                    "child_id": node_id
-                })
-                logger.debug(f"Will create new scope: {scope.qname}")
-            else:
-                # Existing scope - check if it needs updating
-                needs_update = False
-                needs_relink = False
-
-                # Check if checksum changed (content change)
-                if existing.checksum != scope.checksum:
-                    needs_update = True
-                    logger.debug(f"Scope content changed: {scope.qname}")
-
-                # Check if position changed
-                if (existing.start_line != scope.start_line or
-                    existing.start_col != scope.start_col or
-                    existing.end_line != scope.end_line or
-                        existing.end_col != scope.end_col):
-                    needs_update = True
-                    logger.debug(f"Scope position changed: {scope.qname}")
-
-                # Check if qname changed (moved to different parent or renamed)
-                if existing.qname != scope.qname:
-                    needs_update = True
-                    needs_relink = True
-                    logger.debug(
-                        f"Scope moved or renamed: {existing.qname} -> {scope.qname}")
-
-                # Check if MRO changed (if we have new MRO)
-                if scope.mro and existing.mro != scope.mro:
-                    needs_update = True
-                    logger.debug(f"Scope MRO changed: {scope.qname}")
-
-                if needs_update:
-                    scopes_to_update.append(scope)
-
-                if needs_relink:
-                    # TODO: Handle parent change - need to remove old parent link
-                    relationships_to_link.append({
-                        "parent_id": parent_scope_obj.id,
-                        "child_id": node_id
-                    })
-                    pass
-
-                # Use existing scope for the result
-                scope = existing
-
-            scope_map[node_id] = scope
-
-        # Batch create all scopes
-        if scopes_to_create:
-            self.manager.batch_create_scopes(scopes_to_create)
-
-        # Batch update all scopes
-        if scopes_to_update:
-            self.manager.batch_update_scopes(scopes_to_update)
-
-        # Batch link all parent-child relationships
-        if relationships_to_link:
-            self.manager.batch_link_parent_child(relationships_to_link)
-
-        # Build results list
-        results = []
-        for data in node_data_list:
-            node_id = data["node_id"]
-            node = data["node"]
-            scope = scope_map[node_id]
-            results.append((scope, node))
-
-        return results
-
-    def _collect_nodes_recursive(
+    async def sync_content(
         self,
+        file_node: FileNode,
         nodes: List[BaseNode],
-        parent_scope: ScopeModel,
-        content: Optional[str],
-        node_data_list: List[dict]
-    ) -> None:
-        """Recursively collect all nodes and build their scope models."""
-        for node in nodes:
-            if isinstance(node, (ClassNode, FunctionNode)):
-                node_data = self._prepare_node_scope(
-                    node, parent_scope, content)
-                node_data_list.append(node_data)
-
-                # Get the scope for recursion
-                scope = node_data["scope"]
-
-                # Recurse into children
-                if hasattr(node, "children"):
-                    self._collect_nodes_recursive(
-                        node.children, scope, content, node_data_list
-                    )
-
-    def _prepare_node_scope(self, node: BaseNode, parent_scope: ScopeModel, content: Optional[str] = None) -> dict:
+        content: Optional[str] = None
+    ) -> List[ContainerNode]:
         """
-        Prepare scope data for an AST node without creating it yet.
-        Returns a dict with node, node_id, scope, and parent_scope.
+        Synchronize AST nodes as descendants of the given file node.
+        Handles Creation, Updates, and Deletions of child nodes.
         """
-        # Determine ID: Use injected ID if available, else generate
-        node_id = node.id if node.id else str(uuid.uuid4())
-        node.id = node_id  # Persist ID on node for Phase 2
-
-        # Construct QName
-        qname = f"{parent_scope.qname}.{node.name}"
-
-        scope_type = ScopeType.CLASS if isinstance(
-            node, ClassNode) else ScopeType.FUNCTION
-
-        mro = []
-        name_column = node.position.column
-        if isinstance(node, ClassNode) and self.mro_resolver and content:
-            # Resolve MRO using Jedi
-            # Note: Jedi uses 1-based lines. Our AST scanner uses 1-based lines.
-            try:
-                name_column = self._get_name_column(content, node)
-                mro = self.mro_resolver.resolve_mro(
-                    file_path=parent_scope.file_path,
-                    source=content,
-                    line=node.position.line,
-                    column=name_column + (len(node.name))
-                )
-                if mro:
-                    logger.debug(f"Resolved MRO for {node.name}: {mro}")
-                    # Base classes are typically the immediate parents in MRO (excluding self and object)
-                    # But extracting exact base classes from MRO is tricky without AST analysis of bases.
-                    # For now, we can leave base_classes empty or try to parse them from AST if available.
-                    # The user asked for MRO specifically.
-            except Exception as e:
-                logger.error(f"Failed to resolve MRO for {node.name}: {e}")
-
-        # Compute Checksum
-        checksum = self._compute_checksum(node)
-
-        # Build the scope model
-        scope = ScopeModel(
-            id=node_id,
-            name=node.name,
-            qname=qname,
-            type=scope_type,
-            file_path=parent_scope.file_path,
-            start_line=node.position.line,
-            start_col=node.position.column,
-            end_line=node.position.end_line,
-            end_col=node.position.end_column,
-            mro=mro,
-            checksum=checksum,
-            parent_id=parent_scope.id
+        # 1. Fetch Full Scope Tree (Graph-based)
+        existing_tree = await self.repos.nodes.get_containment_tree(
+            file_node.id,
+            depth=50,
+            exclude_types=["call"]
         )
 
-        return {
-            "node": node,
-            "node_id": node_id,
-            "scope": scope,
-            "parent_scope": parent_scope
-        }
+        existing_map = {}
+
+        for item in existing_tree:
+            vertex = item["vertex"]
+            node_type = vertex.get("node_type")
+            if node_type == "function":
+                try:
+                    node = FunctionNode(**vertex)
+                except Exception as e:
+                    logger.warning(f"Failed to parse FunctionNode: {e}")
+                    continue
+            elif node_type == "class":
+                try:
+                    node = ClassNode(**vertex)
+                except Exception as e:
+                    logger.warning(f"Failed to parse ClassNode: {e}")
+                    continue
+            else:
+                continue
+
+            existing_map[node.id] = {
+                "node": node,
+                "parent_id": item["parent_id"]
+            }
+
+        # 2. Flatten AST & Prepare Nodes
+        desired_nodes_data = []
+        self._flatten_nodes(
+            nodes, file_node, file_node.path, content, desired_nodes_data
+        )
+
+        funcs_to_create: List[FunctionNode] = []
+        classes_to_create: List[ClassNode] = []
+
+        funcs_to_update: List[FunctionNode] = []
+        classes_to_update: List[ClassNode] = []
+
+        moves_to_execute: List[tuple[str, str]] = []  # (child_id, parent_id)
+
+        processed_ids = set()
+        current_nodes = []
+
+        for data in desired_nodes_data:
+            ast_node: BaseNode = data["node"]
+            node_data: Dict[str, Any] = data["node_data"]
+            parent_id: str = data["parent_id"]
+
+            if not ast_node.id:
+                continue
+
+            node_id = ast_node.id
+            processed_ids.add(f"nodes/" + node_id)
+
+            existing_entry = existing_map.get("nodes/" + node_id)
+
+            existing_node = existing_entry["node"] if existing_entry else None
+            existing_parent_id = existing_entry["parent_id"] \
+                if existing_entry else None
+
+            # Prepare Node Model
+            position = CodePosition(
+                line_no=ast_node.position.line,
+                col_offset=ast_node.position.column,
+                end_line_no=ast_node.position.end_line,
+                end_col_offset=ast_node.position.end_column
+            )
+
+            if node_data["type"] == "class":
+                mro = node_data.get("mro", [])
+                new_node = ClassNode(
+                    key=node_id,
+                    name=ast_node.name,
+                    qname=node_data["qname"],
+                    position=position,
+                    implements=mro,
+                    description=f"Class {ast_node.name}",
+                    node_type="class"
+                )
+            else:
+                new_node = FunctionNode(
+                    key=node_id,
+                    name=ast_node.name,
+                    qname=node_data["qname"],
+                    position=position,
+                    description=f"Function {ast_node.name}",
+                    node_type="function"
+                )
+
+            current_nodes.append(new_node)
+
+            if not existing_node:
+                if isinstance(new_node, ClassNode):
+                    classes_to_create.append(new_node)
+                else:
+                    funcs_to_create.append(new_node)
+
+                moves_to_execute.append((node_id, parent_id))
+                logger.debug(f"Will create new node: {new_node.qname}")
+            else:
+                # Update if changed
+                needs_update = (
+                    existing_node.name != new_node.name or
+                    existing_node.qname != new_node.qname or
+                    existing_node.position != new_node.position or
+                    (isinstance(existing_node, ClassNode) and
+                     isinstance(new_node, ClassNode) and
+                     existing_node.implements != new_node.implements)
+                )
+
+                if needs_update:
+                    if isinstance(new_node, ClassNode):
+                        classes_to_update.append(new_node)
+                    else:
+                        funcs_to_update.append(new_node)
+                    logger.debug(f"Node updated: {new_node.qname}")
+
+                if existing_parent_id != parent_id:
+                    logger.debug(
+                        f"Node moved: {existing_node.qname} -> "
+                        f"parent {parent_id}"
+                    )
+                    moves_to_execute.append((node_id, parent_id))
+
+        # 3. Calculate Deletes
+        ids_to_delete = [
+            sid for sid in existing_map if sid not in processed_ids
+        ]
+
+        # 4. Batch Execution
+        if funcs_to_create:
+            await self.repos.function_repo.create_batch(funcs_to_create)
+        if classes_to_create:
+            await self.repos.class_repo.create_batch(classes_to_create)
+
+        if funcs_to_update:
+            await self.repos.function_repo.update_batch(funcs_to_update)
+        if classes_to_update:
+            await self.repos.class_repo.update_batch(classes_to_update)
+
+        if moves_to_execute:
+            await self.repos.nodes.move_batch(moves_to_execute)
+
+        if ids_to_delete:
+            await self.repos.nodes.delete_batch(ids_to_delete)
+            print(
+                f"Deleted {len(ids_to_delete)} stale nodes {ids_to_delete} in {file_node.path}"
+            )
+
+        return current_nodes
+
+    def _flatten_nodes(
+        self,
+        nodes: List[BaseNode],
+        parent_node: Union[FileNode, FunctionNode, ClassNode],
+        file_path: str,
+        content: Optional[str],
+        result_list: List[dict]
+    ) -> None:
+        """Recursively flatten nodes and prepare their metadata."""
+        for node in nodes:
+            if isinstance(node, (ASTClassNode, ASTFunctionNode)):
+                qname = f"{parent_node.qname}.{node.name}"
+                node_type = (
+                    "class" if isinstance(node, ASTClassNode) else "function"
+                )
+
+                mro = []
+                if (isinstance(node, ASTClassNode) and
+                        self.mro_resolver and content):
+                    mro = self._resolve_mro(node, file_path, content)
+
+                node_data = {
+                    "qname": qname,
+                    "type": node_type,
+                    "mro": mro
+                }
+
+                result_list.append({
+                    "node": node,
+                    "node_data": node_data,
+                    "parent_id": parent_node.id
+                })
+
+                if node.id:
+                    node_id = node.id
+                else:
+                    continue
+
+                if node_type == "class":
+                    pseudo_parent = ClassNode(
+                        id=node_id,
+                        name=node.name,
+                        qname=qname,
+                        position=CodePosition(
+                            line_no=0, col_offset=0,
+                            end_line_no=0, end_col_offset=0
+                        ),
+                        implements=[],
+                        description=f"Class {node.name}",
+                        node_type="class"
+                    )
+                else:
+                    pseudo_parent = FunctionNode(
+                        id=node_id,
+                        name=node.name,
+                        qname=qname,
+                        position=CodePosition(
+                            line_no=0, col_offset=0,
+                            end_line_no=0, end_col_offset=0
+                        ),
+                        description=f"Function {node.name}",
+                        node_type="function"
+                    )
+
+                if hasattr(node, "children"):
+                    self._flatten_nodes(
+                        node.children, pseudo_parent, file_path,
+                        content, result_list
+                    )
+
+    def _resolve_mro(
+        self, node: ASTClassNode, file_path: str, content: str
+    ) -> List[str]:
+        try:
+            name_column = self._get_name_column(content, node)
+            return self.mro_resolver.resolve_mro(
+                file_path=file_path,
+                source=content,
+                line=node.position.line,
+                column=name_column + (len(node.name))
+            )
+        except Exception as e:
+            logger.error(f"Failed to resolve MRO for {node.name}: {e}")
+            return []
 
     def _get_name_column(self, content: str, node: BaseNode) -> int:
-        """
-        Approximate the column where the identifier name starts on its line.
-        Required for Jedi inference which expects the cursor on the identifier.
-        """
         line_index = node.position.line - 1
         if line_index < 0:
             return node.position.column
-
         lines = content.splitlines()
         if line_index >= len(lines):
             return node.position.column
-
         line = lines[line_index]
         name_idx = line.find(node.name)
         if name_idx == -1:
@@ -234,34 +290,8 @@ class ASTProcessor:
         return name_idx
 
     def _compute_checksum(self, node: BaseNode) -> str:
-        """
-        Compute a deterministic checksum for the AST node.
-        We use the node's name, type, and position (and children recursively?)
-        Actually, if content changes, position might change.
-        If we want to detect *content* change, we should ideally hash the source code.
-        But we don't have source code here easily (unless passed).
-        For now, let's hash the node attributes.
-        If we want to be strict, any change in children should bubble up?
-        The user said "if function or class change add append them and thier children".
-        This implies a change in a child might not affect the parent's *own* body (calls),
-        but we should process the child.
-        Let's hash the node's relevant fields.
-        """
-        # Simple hash of the node's dictionary representation
-        # We need to be careful about unstable fields (like ID if we just generated it, but we set it).
-        # We exclude ID from hash to check for content equality?
-        # No, we want to check if *this* version is different from DB.
-        # DB has checksum of previous version.
         data = node.model_dump(exclude={"id", "children"})
-        # We should also include children's checksums?
-        # If a child changes, does the parent change?
-        # Usually yes, but for "Scope" tracking, maybe not.
-        # But for "Body" analysis (Calls), if I change a call inside a function, the function checksum should change.
-        # Calls are children in the AST.
-        # So yes, we should include children in the hash.
-        # But `model_dump` with children might be recursive.
         data["children_hash"] = self._hash_children(node.children)
-
         encoded = json.dumps(data, sort_keys=True, default=str).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
@@ -270,7 +300,5 @@ class ASTProcessor:
             return ""
         hashes = []
         for child in children:
-            # We can't fully recurse if deep, but AST isn't too deep.
-            # We just need a representation.
             hashes.append(child.name + child.type + str(child.position))
         return hashlib.sha256("".join(hashes).encode("utf-8")).hexdigest()

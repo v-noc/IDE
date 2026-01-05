@@ -1,3 +1,4 @@
+import datetime
 from .base import BaseNode
 from .properties import CodePosition, ThemeConfig
 from typing import List, Optional, Literal
@@ -15,6 +16,20 @@ class ContainerNode(BaseNode):
 
     documents: List[str] = Field(
         default_factory=list, description="Documents held by the container."
+    )
+
+    # Soft delete fields
+    status: Literal["active", "orphaned", "deleted"] = Field(
+        default="active",
+        description="Node lifecycle status"
+    )
+    # status_changed_at: Optional[datetime] = Field(
+    #     default=None,
+    #     description="When status last changed"
+    # )
+    orphan_reason: Optional[str] = Field(
+        default=None,
+        description="Why node became orphaned"
     )
 
 

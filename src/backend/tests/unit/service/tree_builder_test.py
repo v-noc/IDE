@@ -5,9 +5,11 @@ from app.core.services.class_service import ClassService
 from app.core.services.file_service import FileService
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.services.folder_service import FolderService
+import pytest
 
 
-def test_build_tree(
+@pytest.mark.asyncio
+async def test_build_tree(
     create_project,
     create_function,
     create_class,
@@ -24,20 +26,20 @@ def test_build_tree(
     call_service = CallService(create_repos)
     class_service = ClassService(create_repos)
 
-    project_service.add_folder(
+    await project_service.add_folder(
         create_project.id, create_folder.id)
 
-    folder_service.add_file(create_folder.id, create_file.id)
+    await folder_service.add_file(create_folder.id, create_file.id)
 
     # Build a strict tree (no node has multiple parents):
     # project -> folder -> file -> class -> function -> call -> call2
-    file_service.add_class(create_file.id, create_class.id)
-    class_service.add_function(create_class.id, create_function.id)
-    function_service.add_call(create_function.id, create_call.id)
+    await file_service.add_class(create_file.id, create_class.id)
+    await class_service.add_function(create_class.id, create_function.id)
+    await function_service.add_call(create_function.id, create_call.id)
 
-    call_service.add_call(create_call.id, create_call2.id)
+    await call_service.add_call(create_call.id, create_call2.id)
 
-    project_tree = project_service.get_children(create_project.id)
+    project_tree = await project_service.get_children(create_project.id)
 
     tree_builder = TreeBuilder(project_tree)
     tree = tree_builder.build()

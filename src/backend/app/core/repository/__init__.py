@@ -1,4 +1,4 @@
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 
 from app.core.model import AllNodes, edges
 from app.core.repository.base.node_repo import NodeRepository
@@ -18,8 +18,9 @@ from .group_repo import GroupRepo
 class Repositories:
     """A container for all repository instances."""
 
-    def __init__(self, db: StandardDatabase):
+    def __init__(self, db: AsyncDatabase):
         # Generic Node Repo for mixed-type queries
+        self.db = db
         self.nodes = NodeRepository(db, "nodes", AllNodes)
 
         # Specific Node Repos for type-specific operations
@@ -54,3 +55,12 @@ class Repositories:
         # self.imports_edges = BaseRepository(
         #     db, "imports_edges", edges.ImportsEdge, is_edge=True
         # )
+
+    async def ensure_collections(self):
+        await self.nodes.get_collection()
+        await self.contains_edges.get_collection()
+        await self.targets_edges.get_collection()
+        await self.log_to_function_edges.get_collection()
+        await self.log_to_log_edges.get_collection()
+        await self.document_repo.get_collection()
+        await self.log_repo.get_collection()

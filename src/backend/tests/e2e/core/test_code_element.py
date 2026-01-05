@@ -1,3 +1,5 @@
+import pytest
+import textwrap
 from pathlib import Path
 
 
@@ -6,7 +8,6 @@ def slice_text_by_position(text: str, pos: dict) -> str:
     Replicate server-side slicing semantics (inclusive start, exclusive end).
     """
     start_line = max(1, pos.get("line_no"))
-    start_col = max(0, pos.get("col_offset"))
     end_line = pos.get("end_line_no")
     end_col = pos.get("end_col_offset")
 
@@ -18,21 +19,19 @@ def slice_text_by_position(text: str, pos: dict) -> str:
         line = raw_line[:-1] if raw_line.endswith("\n") else raw_line
 
         if end_line is None or idx < end_line:
-            if idx == start_line:
-                collected.append(line[start_col:])
-            else:
-                collected.append(line)
+            collected.append(line)
         elif idx == end_line:
             slice_end = None if end_col is None else end_col
-            if idx == start_line:
-                collected.append(line[start_col:slice_end])
-            else:
-                collected.append(line[:slice_end])
+            collected.append(line[:slice_end])
             break
         else:
             break
 
-    return "\n".join(collected)
+    if not collected:
+        return ""
+
+    joined = "\n".join(collected)
+    return textwrap.dedent(joined)
 
 
 def find_child(node, name):
@@ -43,10 +42,12 @@ def find_child(node, name):
     return None
 
 
-def test_get_code_for_function(client, sample_project_path):
+@pytest.mark.asyncio
+async def test_get_code_for_function(client, sample_project_path):
     # Create project from E2E sample
-    response = client.post(
-        "/api/v1/projects",
+    print(f"sample_project_path: {sample_project_path}")
+    response = await client.post(
+        "/api/v1/projects/",
         json={
             "name": "code_test_sample",
             "description": "code_test_sample",
@@ -65,7 +66,7 @@ def test_get_code_for_function(client, sample_project_path):
     utils_folder = find_child(core_folder, "utils")
     assert utils_folder is not None
 
-    helper_py = find_child(utils_folder, "helper.py")
+    helper_py = find_child(utils_folder, "helper")
     assert helper_py is not None
 
     create_child_func = find_child(helper_py, "create_child")
@@ -73,7 +74,7 @@ def test_get_code_for_function(client, sample_project_path):
 
     # Call get_code for function
     func_key = create_child_func["_key"]
-    r_func = client.get(f"/api/v1/code-elements/{func_key}/code")
+    r_func = await client.get(f"/api/v1/code-elements/{func_key}/code")
     assert r_func.status_code == 200
     payload = r_func.json()
     assert payload["node_type"] == "function"
@@ -94,10 +95,11 @@ def test_get_code_for_function(client, sample_project_path):
     assert expected_slice == payload["code"]
 
 
-def test_get_code_for_class(client, sample_project_path):
+@pytest.mark.asyncio
+async def test_get_code_for_class(client, sample_project_path):
     # Create project from E2E sample
-    response = client.post(
-        "/api/v1/projects",
+    response = await client.post(
+        "/api/v1/projects/",
         json={
             "name": "code_test_sample",
             "description": "code_test_sample",
@@ -115,14 +117,14 @@ def test_get_code_for_class(client, sample_project_path):
     model_folder = find_child(core_folder, "model")
     assert model_folder is not None
 
-    child_py = find_child(model_folder, "child.py")
+    child_py = find_child(model_folder, "child")
     assert child_py is not None
 
     child_class = find_child(child_py, "Child")
     assert child_class is not None
 
     class_key = child_class["_key"]
-    r_class = client.get(f"/api/v1/code-elements/{class_key}/code")
+    r_class = await client.get(f"/api/v1/code-elements/{class_key}/code")
     assert r_class.status_code == 200
     payload = r_class.json()
     assert payload["node_type"] == "class"
@@ -140,7 +142,8 @@ def test_get_code_for_class(client, sample_project_path):
     assert expected_slice == payload["code"]
 
 
-def test_get_code_for_nested_function(client):
+@pytest.mark.asyncio
+async def test_get_code_for_nested_function(client):
     # Use unit sample: simple_function to verify nested function extraction
     from pathlib import Path
 
@@ -149,8 +152,8 @@ def test_get_code_for_nested_function(client):
         / "unit/parser/analyzer/function/simple_function"
     )
 
-    response = client.post(
-        "/api/v1/projects",
+    response = await client.post(
+        "/api/v1/projects/",
         json={
             "name": "code_test_nested",
             "description": "code_test_nested",
@@ -162,7 +165,7 @@ def test_get_code_for_nested_function(client):
 
     # Navigate to main.py -> factory -> add
     project_tree["children"].sort(key=lambda x: x["name"])
-    main_py = find_child(project_tree, "main.py")
+    main_py = find_child(project_tree, "main")
     assert main_py is not None
 
     factory_func = find_child(main_py, "factory")
@@ -172,7 +175,7 @@ def test_get_code_for_nested_function(client):
     assert add_func is not None
 
     nested_key = add_func["_key"]
-    r_nested = client.get(f"/api/v1/code-elements/{nested_key}/code")
+    r_nested = await client.get(f"/api/v1/code-elements/{nested_key}/code")
     assert r_nested.status_code == 200
     payload = r_nested.json()
     assert payload["node_type"] == "function"
@@ -189,4 +192,5 @@ def test_get_code_for_nested_function(client):
     with open(source_abs, "r", encoding="utf-8") as f:
         source_text = f.read()
     expected_slice = slice_text_by_position(source_text, position)
+
     assert expected_slice == payload["code"]

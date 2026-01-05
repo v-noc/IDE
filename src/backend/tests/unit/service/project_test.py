@@ -1,15 +1,16 @@
 from app.core.services.project_service import ProjectService
-from app.core.repository import Repositories
+import pytest
 
 
-def test_create_project(create_repos):
+@pytest.mark.asyncio
+async def test_create_project(create_repos):
     print("creating project test")
 
     project_service = ProjectService(
         create_repos
     )
 
-    created_project = project_service.create(
+    created_project = await project_service.create(
         "Test Project",
         "This is a test project",
         "test_project"
@@ -21,19 +22,21 @@ def test_create_project(create_repos):
     assert created_project.description == "This is a test project"
 
 
-def test_get_project(create_repos, create_project):
+@pytest.mark.asyncio
+async def test_get_project(create_repos, create_project):
     print("getting project test")
 
     project_service = ProjectService(
         create_repos
     )
 
-    projects = project_service.get_all()
+    projects = await project_service.get_all()
 
     assert len(projects) == 1
 
 
-def update_project(create_project, create_repos):
+@pytest.mark.asyncio
+async def test_update_project(create_project, create_repos):
 
     project_service = ProjectService(
         create_repos
@@ -43,7 +46,7 @@ def update_project(create_project, create_repos):
     create_project.description = "This is an updated project"
     create_project.path = "updated_project"
 
-    updated_project = project_service.update(
+    updated_project = await project_service.update(
         create_project
     )
 
@@ -53,50 +56,53 @@ def update_project(create_project, create_repos):
     assert updated_project.path == "updated_project"
 
 
-def test_delete_project(create_project, create_repos):
+@pytest.mark.asyncio
+async def test_delete_project(create_project, create_repos):
     project_service = ProjectService(
         create_repos
     )
 
-    projects = project_service.get_all()
+    projects = await project_service.get_all()
 
-    project_service.delete(
+    await project_service.delete(
         create_project
     )
 
-    projects = project_service.get_all()
+    projects = await project_service.get_all()
 
     assert len(projects) == 0
 
 
-def test_add_folder_to_project(create_project, create_folder, create_repos):
+@pytest.mark.asyncio
+async def test_add_folder_to_project(create_project, create_folder, create_repos):
     project_service = ProjectService(
         create_repos
     )
 
-    project_service.add_folder(
+    await project_service.add_folder(
         create_project.id,
         create_folder.id
     )
 
-    children = project_service.get_children(
+    children = await project_service.get_children(
         create_project.id
     )
 
     assert len(children) == 1
 
 
-def test_add_file_to_project(create_project, create_file, create_repos):
+@pytest.mark.asyncio
+async def test_add_file_to_project(create_project, create_file, create_repos):
     project_service = ProjectService(
         create_repos
     )
 
-    project_service.add_file(
+    await project_service.add_file(
         create_project.id,
         create_file.id
     )
 
-    children = project_service.get_children(
+    children = await project_service.get_children(
         create_project.id
     )
 

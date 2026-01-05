@@ -10,7 +10,7 @@ class CallService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def create(
+    async def create(
         self,
         name: str,
         qname: str,
@@ -29,51 +29,51 @@ class CallService(ContainerService):
             current_version=current_version if current_version is not None else 0,
         )
 
-        new_call = self.repos.call_repo.create(call)
+        new_call = await self.repos.call_repo.create(call)
         target = TargetsEdge(
             from_id=new_call.id,
             to_id=target_id,
         )
-        self.repos.targets_edges.create(target)
+        await self.repos.targets_edges.create(target)
         return new_call
 
-    def get(self, call_id: str):
-        return self.repos.call_repo.get_by_id(call_id)
+    async def get(self, call_id: str):
+        return await self.repos.call_repo.get_by_id(call_id)
 
-    def update(self, call: CallNode):
-        return self.repos.call_repo.update(call.key, call)
+    async def update(self, call: CallNode):
+        return await self.repos.call_repo.update(call.key, call)
 
-    def delete(self, call_key: str):
+    async def delete(self, call_key: str):
         call_id = f"nodes/{call_key}"
 
-        descendants = self.repos.call_repo.get_containment_tree(
+        descendants = await self.repos.call_repo.get_containment_tree(
             call_id, depth="*")
 
         descendant_keys = [item["vertex"]["_key"] for item in descendants]
 
         for key in reversed(descendant_keys):
-            self.repos.nodes.delete(key)
+            await self.repos.nodes.delete(key)
 
-        return self.repos.call_repo.delete(call_key)
+        return await self.repos.call_repo.delete(call_key)
 
-    def add_call(self, parent_call_id: str, call_id: str):
-        return self.add_child_to_container(
+    async def add_call(self, parent_call_id: str, call_id: str):
+        return await self.add_child_to_container(
             parent_call_id,
             call_id,
             "call_to_call",
         )
 
-    def get_children(self, call_id: str):
-        return self.repos.call_repo.get_containment_tree(call_id)
+    async def get_children(self, call_id: str):
+        return await self.repos.call_repo.get_containment_tree(call_id)
 
-    def get_direct_call_children(self, parent_id: str):
+    async def get_direct_call_children(self, parent_id: str):
         """
         Get direct call-node children of a given parent (call/group/container).
 
         This only returns vertices whose node_type == \"call\" at depth 1,
         ignoring groups and deeper descendants.
         """
-        children = self.repos.call_repo.get_containment_tree(
+        children = await self.repos.call_repo.get_containment_tree(
             parent_id, depth=1
         )
         direct_calls = []
@@ -83,20 +83,20 @@ class CallService(ContainerService):
                 direct_calls.append(item)
         return direct_calls
 
-    def get_code(self, call_id: str):
-        call = self.repos.call_repo.get_by_id(call_id)
+    async def get_code(self, call_id: str):
+        call = await self.repos.call_repo.get_by_id(call_id)
         if not call:
             return None
 
-        file_doc, project_doc = self._resolve_file_and_project(call.id)
+        file_doc, project_doc = await self._resolve_file_and_project(call.id)
         if not file_doc or not project_doc:
             return None
 
-        abs_path = self._build_abs_file_path(
+        abs_path = await self._build_abs_file_path(
             project_doc.get("path"),
             file_doc.get("path"),
         )
-        code = self._extract_code_from_file(
+        code = await self._extract_code_from_file(
             abs_path,
             call.position,
         )
@@ -112,12 +112,12 @@ class CallService(ContainerService):
             "code": code,
         }
 
-    def get_call_with_parent_and_target(self, parent_id: str, target_id: str):
+    async def get_call_with_parent_and_target(self, parent_id: str, target_id: str):
         # Note: repository expects (target_id, parent_id)
-        return self.repos.call_repo.find_call_by_target_parent(
+        return await self.repos.call_repo.find_call_by_target_parent(
             target_id,
             parent_id,
         )
 
-    def get_call_parent_chain(self, call_id: str):
-        return self.repos.call_repo.find_upward_call_chain(call_id)
+    async def get_call_parent_chain(self, call_id: str):
+        return await self.repos.call_repo.find_upward_call_chain(call_id)

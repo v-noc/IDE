@@ -108,35 +108,35 @@ const Dashboard = () => {
   }, [projectData, searchParams, setProjectData]);
 
   // Apply focus from URL once project data is ready (and after group flattening if enabled)
-  useEffect(() => {
-    if (projectData == null) return;
-    const disable = searchParams.get("disable");
-    const disableGroup = disable?.split(",").includes("group") ?? false;
-    if (disableGroup && containsGroup(projectData)) return; // wait until flattened
-    const focusParam = searchParams.get("focus");
-    if (!focusParam) return;
+  // useEffect(() => {
+  //   if (projectData == null) return;
+  //   const disable = searchParams.get("disable");
+  //   const disableGroup = disable?.split(",").includes("group") ?? false;
+  //   if (disableGroup && containsGroup(projectData)) return; // wait until flattened
+  //   const focusParam = searchParams.get("focus");
+  //   if (!focusParam) return;
 
-    const target = findNodeByFocusToken(projectData, focusParam);
-    if (!target) return;
-    clearFocus();
-    pushFocus(target);
-  }, [projectData, searchParams, clearFocus, pushFocus]);
+  //   const target = findNodeByFocusToken(projectData, focusParam);
+  //   if (!target) return;
+  //   clearFocus();
+  //   pushFocus(target);
+  // }, [projectData, searchParams, clearFocus, pushFocus]);
 
-  // Keep URL 'focus' param in sync with active focus
-  useEffect(() => {
-    const currentFocused = focusStack[focusStack.length - 1] ?? null;
-    const currentToken = currentFocused
-      ? extractShortFocusToken(currentFocused._key)
-      : null;
-    const urlToken = searchParams.get("focus");
-    if (currentToken !== urlToken) {
-      const nextParams = new URLSearchParams(searchParams);
-      if (currentToken) {
-        nextParams.set("focus", currentToken);
-      }
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [focusStack, searchParams, setSearchParams]);
+  // // Keep URL 'focus' param in sync with active focus
+  // useEffect(() => {
+  //   const currentFocused = focusStack[focusStack.length - 1] ?? null;
+  //   const currentToken = currentFocused
+  //     ? extractShortFocusToken(currentFocused._key)
+  //     : null;
+  //   const urlToken = searchParams.get("focus");
+  //   if (currentToken !== urlToken) {
+  //     const nextParams = new URLSearchParams(searchParams);
+  //     if (currentToken) {
+  //       nextParams.set("focus", currentToken);
+  //     }
+  //     setSearchParams(nextParams, { replace: true });
+  //   }
+  // }, [focusStack, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (selectedNode == null && projectData != null) {

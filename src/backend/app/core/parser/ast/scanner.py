@@ -4,9 +4,9 @@ from .parser import JediParser
 from .id_injector import inject_ids
 
 
-def scan(content: str, file_path: Optional[str] = None) -> List[BaseNode]:
+def scan(content: str, file_path: Optional[str] = None) -> tuple[List[BaseNode], str]:
     """
-    Scans the content, injects IDs if missing (and updates file), and returns the parsed AST.
+    Scans the content, injects IDs if missing (and updates file), and returns the parsed AST and processed content.
     """
     # Step 1: Inject IDs
     # We only write to file if file_path is provided AND content was modified.
@@ -23,4 +23,4 @@ def scan(content: str, file_path: Optional[str] = None) -> List[BaseNode]:
 
     # Step 2: Parse with Jedi/Parso
     parser = JediParser(processed_content)
-    return parser.parse()
+    return parser.parse(), processed_content

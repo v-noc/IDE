@@ -1,14 +1,14 @@
 import pytest
+import pytest_asyncio
 from pathlib import Path
 import threading
 import time
 import socket
 import requests
 import shutil
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 from app.api.json_rpc.app import app as jsonrpc_app
@@ -16,18 +16,14 @@ from app.db.client import get_db
 import uvicorn
 
 current_file_path = Path(__file__).resolve()
-print("Current file path:", current_file_path)
 current_dir = current_file_path.parent
 PROJECT_PATH = Path(current_dir, "./sample_project").absolute()
 
 
-@pytest.fixture()
-def create_sample_project(arangodb_client, tmp_path):
+@pytest_asyncio.fixture()
+async def create_sample_project(arangodb_client: AsyncDatabase, tmp_path):
     project_path = tmp_path / "sample_project"
     shutil.copytree(PROJECT_PATH, project_path)
-
-    db_path = tmp_path / "db" / "Protector"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
 
     project_node = ProjectNode(
         name="Protector",
@@ -35,22 +31,21 @@ def create_sample_project(arangodb_client, tmp_path):
         qname="protector",
         path=str(project_path),
     )
-    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
     repos = Repositories(arangodb_client)
     project_service = ProjectService(repos)
-    project_node = project_service.create_node(project_node)
+    project_node = await project_service.create_node(project_node)
 
     orchestrator = GraphBuilderOrchestrator(
         project_node=project_node,
         db=arangodb_client,
         ignore_file_name=None,
-        scope_manager=scope_manager,
     )
-    orchestrator.resync()
+    await orchestrator.resync()
+    return project_node
 
 
 @pytest.fixture()
-def jsonrpc_url(arangodb_client: StandardDatabase) -> str:
+def jsonrpc_url(arangodb_client: AsyncDatabase) -> str:
     """Start a real uvicorn server for JSON-RPC and return its URL."""
 
     def override_get_db():

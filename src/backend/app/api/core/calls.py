@@ -24,7 +24,7 @@ class AddCallRequest(BaseModel):
 
 
 @router.post("/{caller_node_id}/add-call")
-def add_call(
+async def add_call(
     caller_node_id: str,
     add_call: AddCallRequest,
     call_service: CallService = Depends(get_call_service),
@@ -32,11 +32,11 @@ def add_call(
     container_service: ContainerService = Depends(get_container_service),
 ):
 
-    callee_function_node = function_service.get(add_call.callee_target_id)
+    callee_function_node = await function_service.get(add_call.callee_target_id)
     if not callee_function_node:
         raise HTTPException(status_code=404, detail="Function node not found")
 
-    parent_node = container_service.get(caller_node_id)
+    parent_node = await container_service.get(caller_node_id)
     if not parent_node:
         raise HTTPException(
             status_code=404, detail="Parent function node not found")
@@ -55,7 +55,7 @@ def add_call(
     if parent_version is None:
         parent_version = 0
 
-    call = call_service.create(
+    call = await call_service.create(
         name=add_call.name,
         qname=f"{callee_function_node.qname}L{0}C{0}",
         description=add_call.description,
@@ -70,7 +70,7 @@ def add_call(
         current_version=parent_version,
     )
 
-    container_service.add_child_to_container(
+    await container_service.add_child_to_container(
         parent_node.id,
         call.id,
         f"{parent_node.node_type}_to_call",
@@ -78,7 +78,7 @@ def add_call(
     )
 
     # Clone callee's internal call graph (calls and groups) under the new call
-    container_service.clone_callee_call_graph(
+    await container_service.clone_callee_call_graph(
         callee_function_node.id,
         call.id,
     )
@@ -87,12 +87,12 @@ def add_call(
 
 
 @router.delete("/{call_key}/remove-call")
-def remove_call(
+async def remove_call(
     call_key: str,
     call_service: CallService = Depends(get_call_service),
 ):
-    call = call_service.get(call_key)
+    call = await call_service.get(call_key)
     if not call:
         raise HTTPException(status_code=404, detail="Call not found")
-    call_service.delete(call_key)
+    await call_service.delete(call_key)
     return {"message": "Call removed successfully"}

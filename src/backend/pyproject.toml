@@ -23,6 +23,10 @@ dependencies = [
   "jedi>=0.19.2",
   "pyvis>=0.3.2",
   "python-socketio>=5.15.0",
+  "python-arango-async>=1.0.3",
+  "pytest-asyncio>=1.1.0",
+  "aiofiles>=25.1.0",
+  "asgi-lifespan>=2.1.0",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +36,12 @@ test = ["pytest", "httpx", "pytest-asyncio"]
 pythonpath = ["."]
 testpaths = ["tests/unit", "tests/e2e"]
 python_files = ["test_*.py", "*_test.py"]
+asyncio_mode = "strict"
+# Keep a single event loop for the whole test run so session-scoped async
+# fixtures (e.g. Arango/aiohttp clients) aren't created on a different loop
+# than the tests that use them.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 
 [tool.uv.scripts]
 dev = "uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"

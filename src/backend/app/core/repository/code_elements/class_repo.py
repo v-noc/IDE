@@ -1,25 +1,43 @@
+from typing import List, Dict
 from app.core.repository.base.node_repo import NodeRepository
 from app.core.model.nodes import ClassNode
-from arango.database import StandardDatabase
-from typing import List
-from app.core.model.nodes import CallNode
+from arangoasync.database import AsyncDatabase
 
 
 class ClassRepo(NodeRepository[ClassNode]):
-    def __init__(self, db: StandardDatabase):
+    def __init__(self, db: AsyncDatabase):
         super().__init__(db, "nodes", ClassNode)
 
-    def find_callers(self, function_id: str) -> List[CallNode]:
-        """Finds all CallNodes that target this function."""
+    async def get_by_qnames(self, qnames: List[str]) -> Dict[str, ClassNode]:
+        """Fetch multiple class nodes by their qualified names."""
+        if not qnames:
+            return {}
+
         query = """
-        FOR caller IN 1..1 INBOUND @start_node_id @@targets_collection
-            FILTER caller.node_type == 'call'
-            RETURN caller
+            FOR n IN @@collection
+                FILTER n.qname IN @qnames
+                FILTER n.node_type == "class"
+                RETURN n
         """
-        bind_vars = {
-            "start_node_id": function_id,
-            "@targets_collection": "targets",
-        }
-        # The core repo executes the query, but the LOGIC lives here.
-        callers = self._nodes.aql(query, bind_vars)
-        return [c for c in callers if isinstance(c, CallNode)]
+        cursor = await self.db.aql.execute(
+            query,
+            bind_vars={"@collection": self.collection_name, "qnames": qnames}
+        )
+        results = {}
+        async for doc in cursor:
+            node = self._validate(doc)
+            results[node.qname] = node
+        return results
+
+    async def delete_batch(self, ids: List[str]) -> bool:
+        """Batch delete multiple classes by ID."""
+        if not ids:
+            return True
+
+        clean_ids = [i.split("/")[-1] if "/" in i else i for i in ids]
+
+        success = True
+        for node_id in clean_ids:
+            if not await self.delete(node_id):
+                success = False
+        return success

@@ -4,16 +4,16 @@ from typing import Optional
 
 from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.builder.tree_builder import TreeBuilder
 from app.db.client import get_db
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 from app.api.dependencies import get_project_service
 from pathlib import Path
 from app.core.watcher.service import WatcherService, get_watcher_service
-import json
+from loguru import logger
+
 from app.core.model.nodes import ProjectNode
 
 
@@ -32,9 +32,9 @@ router = APIRouter()
 
 
 @router.post("/", response_model=ProjectTreeNode)
-def create_project(
+async def create_project(
     project: CreateProjectRequest,
-    db: StandardDatabase = Depends(get_db),
+    db: AsyncDatabase = Depends(get_db),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectTreeNode:
     """Create a project graph from a local path.
@@ -60,17 +60,14 @@ def create_project(
             qname=project.name.lower().replace(" ", "_"),
             path=project.path,
         )
-        repos = Repositories(db)
-        project_service_create = ProjectService(repos)
-        project_node = project_service_create.create_node(project_node)
+        project_node = await project_service.create_node(project_node)
 
-        scope_manager = ScopeManager(project_node.name)
         orchestrator = GraphBuilderOrchestrator(
             project_node=project_node,
             db=db,
-            scope_manager=scope_manager,
+
         )
-        orchestrator.resync()
+        await orchestrator.resync()
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -80,13 +77,11 @@ def create_project(
             },
         )
     except Exception as exc:
-        print(exc)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to build project graph",
-        )
+        # Let the global exception handler return 500, but preserve traceback
+        logger.exception(f"Failed to build project graph: {exc}")
+        raise
 
-    children = project_service.get_children(project_node.id)
+    children = await project_service.get_children(project_node.id)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -96,22 +91,22 @@ def create_project(
 
 
 @router.get("/", response_model=list[ProjectNode])
-def get_projects(
+async def get_projects(
     project_service: ProjectService = Depends(get_project_service),
 ) -> list[AnyTreeNode]:
-    projects = project_service.get_all()
+    projects = await project_service.get_all()
 
     return projects
 
 
 @router.get("/{project_id}/children", response_model=list[AnyTreeNode])
-def get_project_children(
+async def get_project_children(
     project_id: str,
     exclude_groups: bool = False,
     project_service: ProjectService = Depends(get_project_service),
 ) -> list[AnyTreeNode]:
-    project_node = project_service.get(project_id)
-    children = project_service.get_children(
+    project_node = await project_service.get(project_id)
+    children = await project_service.get_children(
         project_node.id, exclude_groups=exclude_groups)
 
     tree_builder = TreeBuilder(children)
@@ -121,23 +116,22 @@ def get_project_children(
 
 
 @router.get("/{project_id}", response_model=ProjectTreeNode)
-def get_project(
+async def get_project(
     project_id: str,
     exclude_groups: bool = False,
     project_service: ProjectService = Depends(get_project_service),
     watcher_service: WatcherService = Depends(get_watcher_service),
 ) -> ProjectTreeNode:
-    project_node = project_service.get(project_id)
+    project_node = await project_service.get(project_id)
     if project_node is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
         )
 
-    # TODO: reimplment
     watcher_service.start_watching(project_node)
 
-    children = project_service.get_children(
+    children = await project_service.get_children(
         project_node.id, exclude_groups=exclude_groups)
 
     tree_builder = TreeBuilder(children)
@@ -148,25 +142,24 @@ def get_project(
 
 
 @router.get("/", response_model=list[ProjectTreeNode])
-def get_all_projects(
+async def get_all_projects(
     project_service: ProjectService = Depends(get_project_service),
 ) -> list[AnyTreeNode]:
-    projects = project_service.get_all()
+    projects = await project_service.get_all()
     return projects
 
 
 @router.delete("/{project_id}", response_model=bool)
-def delete_project(
+async def delete_project(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service),
 ) -> bool:
-    project = project_service.get(project_id=project_id)
+    project = await project_service.get(project_id=project_id)
     if project:
-        result = project_service.delete(project)
+        result = await project_service.delete(project)
         if result is False:
             return False
-        scope_manager = ScopeManager(project.name)
-        scope_manager.delete_cache()
+
         return True
     else:
         raise HTTPException(
@@ -176,12 +169,12 @@ def delete_project(
 
 
 @router.put("/{project_id}", response_model=ProjectNode)
-def update_project(
+async def update_project(
     project_id: str,
     project: UpdateProjectRequest,
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectNode:
-    project_node = project_service.get(project_id)
+    project_node = await project_service.get(project_id)
     if project_node is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -191,4 +184,4 @@ def update_project(
         project_node.name = project.name
     if project.description is not None:
         project_node.description = project.description
-    return project_service.update(project_node)
+    return await project_service.update(project_node)

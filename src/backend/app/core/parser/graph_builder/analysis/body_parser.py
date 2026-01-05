@@ -1,13 +1,22 @@
 import logging
+import asyncio
+import aiofiles
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Dict, Optional
 
-from app.core.parser.ast.models import BaseNode, CallNode, ClassNode, FunctionNode
+from app.core.parser.ast.models import (
+    BaseNode,
+    ClassNode as ASTClassNode,
+    FunctionNode as ASTFunctionNode
+)
+from app.core.model.nodes import FileNode, ContainerNode
 from app.core.parser.ast.scanner import scan
-from app.core.parser.graph_builder.analysis.call_chain_builder import CallChainBuilder
 from app.core.parser.jedi_adapter.manager import JediProjectManager
-from app.core.parser.scope_manager.manager import ScopeManager
-from app.core.parser.scope_manager.models import ScopeModel
+from app.core.repository import Repositories
+from app.core.parser.graph_builder.performance import tracker
+
+# IMPORT YOUR NEW BUILDER
+from app.core.parser.graph_builder.call_graph.builder import CallChainBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -17,118 +26,112 @@ class BodyParser:
         self,
         project_path: Path,
         project_name: str,
-        scope_manager: ScopeManager,
+        repos: Repositories,
         jedi_manager: JediProjectManager,
         batch_size: int = 1000,
     ):
         self.project_path = project_path
-        self.project_name = project_name
-        self.manager = scope_manager
-        self.jedi_manager = jedi_manager
-        self.batch_size = batch_size
-        self.processed_scope_ids = set()
-        # Initialize CallChainBuilder for recursive call resolution
+        self.repos = repos
+
+        # Initialize the NEW Builder here
         self.call_chain_builder = CallChainBuilder(
             project_path=project_path,
-            project_name=project_name,
-            scope_manager=scope_manager,
-            jedi_manager=jedi_manager,
+            repos=repos,
+            jedi_manager=jedi_manager
         )
 
-    def flush_all_call_sites(self):
-        """Flush call sites and return processed scope IDs."""
-        self.call_chain_builder.flush_all_call_sites()
-        return self.processed_scope_ids.copy()
-
-    def get_stats(self) -> dict:
-        """Get statistics from the CallChainBuilder."""
-        return self.call_chain_builder.get_stats()
-
-    def process_ast(self, file_scope: ScopeModel):
+    async def process_ast(self, file_node: FileNode):
         """
-        Phase 2: Analyze the AST tree for calls.
-        Traverses the tree, entering scopes (Function/Class) as encountered.
+        Phase 2: Analyze the AST tree.
+        Traverses the tree, finds DB nodes, and delegates call processing to CallChainBuilder.
         """
-        file_path = Path(file_scope.file_path)
+        file_path = Path(file_node.path)
         if not file_path.is_absolute():
             file_path = Path(self.project_path) / file_path
 
-        try:
-            with open(file_path, "r", encoding="utf-8") as source:
-                content = source.read()
+        # 1. Prefetch DB nodes (Optimization)
+        existing_tree = await self.repos.nodes.get_containment_tree(
+            # We ignore existing calls here
+            file_node.id, depth=50, exclude_types=["call"]
+        )
 
-        except OSError as exc:
-            logger.error("Failed to read file %s: %s", file_path, exc)
+        node_map: Dict[str, ContainerNode] = {file_node.qname: file_node}
+
+        for item in existing_tree:
+
+            vertex = item["vertex"]
+            if vertex.get("qname"):
+                # Simply storing the dict or converting to model depending on preference
+                # Assuming your Builder expects Pydantic models:
+                if vertex['node_type'] == 'function':
+                    node_map[vertex['qname']
+                             ] = self.repos.function_repo._validate(vertex)
+                elif vertex['node_type'] == 'class':
+                    node_map[vertex['qname']
+                             ] = self.repos.class_repo._validate(vertex)
+
+        # 2. Read Source
+        try:
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as source:
+                content = await source.read()
+        except OSError:
             return
 
+        # 3. Scan AST
+        loop = asyncio.get_event_loop()
         try:
-
-            nodes = scan(content, str(file_path))
-        except Exception as exc:
-            logger.error("Failed to re-scan AST for %s: %s", file_path, exc)
+            nodes, processed_content = await loop.run_in_executor(
+                None, scan, content, str(file_path)
+            )
+        except Exception:
             return
 
-        # Start traversal from file scope
-        self._traverse(nodes, file_scope)
-        self.processed_scope_ids.add(file_scope.id)
+        # 4. Traverse and delegate to Builder
+        await self._traverse_and_process(
+            nodes,
+            file_node,
+            node_map,
+            file_path=file_path,
+            source=processed_content
+        )
 
-    def _traverse(
+    async def _traverse_and_process(
         self,
         nodes: List[BaseNode],
-        current_scope: ScopeModel,
-
+        current_scope: ContainerNode,
+        node_map: Dict[str, ContainerNode],
+        file_path: Path,
+        source: str,
     ):
         """
-        Traverse AST nodes in the current scope.
+        Recursive traversal. When a scope (Function/Class) is found:
+        1. Find its DB node.
+        2. Pass it to CallChainBuilder to handle call synchronization.
 
-        Call chain logic:
-        - Root calls (at scope level): prev_call_id = None (independent calls)
-        - Nested calls (in arguments): prev_call_id chains them together
 
-        Example:
-          func1()          # Root call, prev_call_id=None
-          func2(func3())   # func2 is root, func3 chains to func2's call site
         """
 
+        await self.call_chain_builder.process_node_scope(
+            node=current_scope,
+            file_path=file_path,
+            source_code=source,
+            visited_ids=None,
+        )
         for node in nodes:
-            # Auto-flush if buffer exceeds batch size
-            if len(self.call_chain_builder._call_site_buffer) >= self.batch_size:
-                self.flush_all_call_sites()  # Returns scope IDs but we don't need them here
+            if isinstance(node, (ASTClassNode, ASTFunctionNode)):
+                # 1. Identify the DB Node
+                qname = f"{current_scope.qname}.{node.name}"
+                db_node = node_map.get(qname)
 
-            if isinstance(node, (ClassNode, FunctionNode)):
-                # Enter child scope (function or class)
-                if not node.id:
-                    logger.warning(
-                        f"Node {node.name} has no ID in Phase 2. Skipping.")
+                if not db_node:
                     continue
 
-                child_scope = self.manager.get_scope(node.id)
-                if not child_scope:
-                    logger.warning(
-                        f"Scope not found for node {node.name} ({node.id}). Skipping."
-                    )
-                    continue
-
-                # Clear old calls for this scope before processing
-                self.manager.clear_calls(child_scope.id)
-
-                # Recurse into the scope to process its calls
-                # All calls in child scope are root calls (prev_call_id=None)
+                # 3. Recurse for nested definitions
                 if hasattr(node, "children"):
-                    self._traverse(node.children, child_scope)
-
-                self.processed_scope_ids.add(node.id)
-
-            elif isinstance(node, CallNode):
-                # Create call site (this is a root call at this scope level)
-                logger.debug(
-                    f"Processing CallNode: {node.name} at {node.position.line}:{node.position.column} in scope {current_scope.qname}"
-                )
-                call_site_id = self.call_chain_builder.build_chain(
-                    call_node=node,
-                    caller_scope=current_scope,
-                    current_call_id=None,  # Chain to previous if in nested context
-                    depth=0,
-                )
-
-                logger.debug(f"Created call site with ID: {call_site_id}")
+                    await self._traverse_and_process(
+                        node.children,
+                        db_node,
+                        node_map,
+                        file_path,
+                        source,
+                    )

@@ -1,5 +1,5 @@
 from fastapi import Depends, Body
-from arango.database import StandardDatabase
+from arangoasync.database import AsyncDatabase
 from typing import Optional
 from app.db.client import get_db
 from app.core.repository import Repositories
@@ -11,7 +11,7 @@ from app.core.services.call_service import CallService
 from app.core.services.log_service import LogService
 
 
-def get_services(db: StandardDatabase = Depends(get_db)):
+def get_services(db: AsyncDatabase = Depends(get_db)):
     repos = Repositories(db)
     return (
         ProjectService(repos),

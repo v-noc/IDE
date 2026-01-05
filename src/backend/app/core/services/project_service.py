@@ -7,16 +7,16 @@ class ProjectService(ContainerService):
     def __init__(self, repos: Repositories):
         self.repos = repos
 
-    def delete(self, project: ProjectNode):
-        return self.repos.project_repo.delete(project.key)
+    async def delete(self, project: ProjectNode):
+        return await self.repos.project_repo.delete(project.key)
 
-    def update(self, project: ProjectNode):
-        return self.repos.project_repo.update(project.key, project)
+    async def update(self, project: ProjectNode):
+        return await self.repos.project_repo.update(project.key, project)
 
-    def create_node(self, project: ProjectNode):
-        return self.repos.project_repo.create(project)
+    async def create_node(self, project: ProjectNode):
+        return await self.repos.project_repo.create(project)
 
-    def create(self, name: str, description: str, path: str):
+    async def create(self, name: str, description: str, path: str):
         project = ProjectNode(
             name=name,
             qname=name.lower().replace(" ", "_"),
@@ -24,43 +24,43 @@ class ProjectService(ContainerService):
             path=path,
             theme_config=None,
         )
-        return self.repos.project_repo.create(project)
+        return await self.repos.project_repo.create(project)
 
-    def get(self, project_id: str):
-        return self.repos.project_repo.get_by_id(project_id)
+    async def get(self, project_id: str):
+        return await self.repos.project_repo.get_by_id(project_id)
 
-    def get_all(self):
-        return self.repos.project_repo.get_all_projects()
+    async def get_all(self):
+        return await self.repos.project_repo.get_all_projects()
 
-    def add_folder(self, project_id: str, folder_id: str):
-        return self.add_child_to_container(
+    async def add_folder(self, project_id: str, folder_id: str):
+        return await self.add_child_to_container(
             project_id,
             folder_id,
             "project_to_folder",
         )
 
-    def add_file(self, project_id: str, file_id: str):
-        return self.add_child_to_container(
+    async def add_file(self, project_id: str, file_id: str):
+        return await self.add_child_to_container(
             project_id,
             file_id,
             "project_to_file",
         )
 
-    def get_children(self, project_id: str, exclude_groups: bool = False):
+    async def get_children(self, project_id: str, exclude_groups: bool = False):
         exclude_types = ["group"] if exclude_groups else None
-        return self.repos.project_repo.get_containment_tree(
+        return await self.repos.project_repo.get_containment_tree(
             project_id,
             50,
             exclude_types=exclude_types,
         )
 
-    def get_project_structure(
+    async def get_project_structure(
         self,
         project_id: str,
         exclude_groups: bool = False,
     ):
         exclude_types = ["group"] if exclude_groups else None
-        return self.repos.project_repo.get_containment_tree(
+        return await self.repos.project_repo.get_containment_tree(
             project_id,
             depth="*",
             exclude_types=exclude_types,
