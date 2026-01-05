@@ -21,3 +21,5 @@ class FileReader:
 
 a = Document()
 reader(a)
+file_reader = FileReader()
+reader(file_reader)
