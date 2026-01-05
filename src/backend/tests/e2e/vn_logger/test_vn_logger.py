@@ -17,20 +17,21 @@ def _find_fn(nodes, name: str):
 
 
 @pytest.mark.skip(reason="Skipping vn_logger test")
-def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
+@pytest.mark.asyncio
+async def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
     # Use real server URL; worker will use requests.post
     repos = Repositories(arangodb_client)
 
     proj_service = ProjectService(repos)
     log_service = LogService(repos)
 
-    project = proj_service.get_all()
+    project = await proj_service.get_all()
     assert project
     project_id = project[0].id
 
     from app.core.builder.tree_builder import TreeBuilder
 
-    children = proj_service.get_children(project[0].id)
+    children = await proj_service.get_children(project[0].id)
     tree = TreeBuilder(children).build()
     factory_fn = _find_fn(tree, "factory")
     add_fn = _find_fn(tree, "add")
@@ -55,8 +56,8 @@ def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
     # Ensure background thread shuts down cleanly
     stop_worker_thread()
 
-    add_log_tree = log_service.get_function_log(add_fn.id)
-    build_log_tree = log_service.get_function_log(build_fn.id)
+    add_log_tree = await log_service.get_function_log(add_fn.id)
+    build_log_tree = await log_service.get_function_log(build_fn.id)
 
     assert len(add_log_tree) == 1
     assert len(build_log_tree) == 1
