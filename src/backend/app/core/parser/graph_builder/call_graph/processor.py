@@ -68,9 +68,15 @@ class ScopeProcessor:
             logger.debug(
                 f"Created {len(calls_to_create)} new calls in {parent_node.qname}")
 
+        # Build a map of ALL active targets (retained + newly added)
+        # This is the "Merge Sync" key: we need to recurse for everything currently in code
+        active_call_map = {**existing_map, **created_map}
+        # Filter to only include targets present in the current code resolution
+        active_call_map = {tid: cid for tid, cid in active_call_map.items() if tid in code_targets}
+
         return ScopeSyncResult(
             parent_id=parent_id,
-            created_map=created_map,
+            created_map=active_call_map,  # Now contains all active mappings
             added_target_ids=to_create_ids,
             retained_target_ids=to_keep_ids,
             removed_target_ids=to_delete_targets

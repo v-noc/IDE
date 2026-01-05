@@ -15,6 +15,7 @@ from app.core.parser.ast.scanner import scan
 from app.core.parser.ast.models import CallNode as ASTCallNode
 from app.core.repository import Repositories
 from app.core.parser.jedi_adapter.manager import JediProjectManager
+from app.core.parser.graph_builder.call_graph.models import ResolvedCall
 
 
 from .resolver import CallResolverService
@@ -235,7 +236,7 @@ class CallChainBuilder:
         parent_call_node_id: Optional[str] = None,
         visited_ids: Optional[Dict[str, int]] = None,
         current_depth: int = 0,
-        parent_context: Optional[Any] = None
+        parent_contexts: List[Any] = [None]
     ):
         """
         Public entry point for BodyParser.
@@ -266,11 +267,37 @@ class CallChainBuilder:
 
         ast_calls = await self._extract_calls_from_source(source_code, file_path, node)
 
-        # 2. Resolve calls in parallel
-        resolved, context_map = await self.resolver.resolve_scope_calls(file_path, source_code, ast_calls, parent_context=parent_context)
+        # 2. Resolve calls in parallel (Merging Contexts)
+        all_resolved_map: Dict[str, ResolvedCall] = {}
+        merged_context_map: Dict[str, List[Any]] = {}
+
+        # If parent_contexts is empty or None, treat as [None]
+        if not parent_contexts:
+            parent_contexts = [None]
+
+        for ctx in parent_contexts:
+            resolved_list, c_map = await self.resolver.resolve_scope_calls(
+                file_path, source_code, ast_calls, parent_context=ctx
+            )
+
+            # Merge Resolved Calls (Deduplicate by target_id)
+            for r in resolved_list:
+                all_resolved_map[r.target_id] = r
+
+            # Merge Context Maps (Append list of contexts)
+            for tid, ctx_list in c_map.items():
+                if tid not in merged_context_map:
+                    merged_context_map[tid] = []
+                # ctx_list is now a list from the updated resolver
+                merged_context_map[tid].extend(ctx_list)
 
         # 3. Sync to DB (Batch Create/Delete)
-        sync_result = await self.processor.sync_scope(node, resolved, parent_call_node_id=parent_call_node_id)
+        # We pass the collected unique values
+        sync_result = await self.processor.sync_scope(
+            node,
+            list(all_resolved_map.values()),
+            parent_call_node_id=parent_call_node_id
+        )
 
         # =========================================================
         # THE SPIDER LOGIC (Replicating your old logic)
@@ -278,12 +305,14 @@ class CallChainBuilder:
         # We found targets (B, C). Now we must process THEM immediately.
 
         if sync_result.created_map:
-            #     # Fetch the actual Node objects for B and C
             target_nodes = await self._fetch_nodes_batch(list(sync_result.created_map.keys()))
 
             for target_node in target_nodes:
                 # RECURSION: Process B immediately
-                next_step_context = context_map.get(target_node.id)
+                # Get the list of contexts for this target from our merged map
+                next_step_contexts = merged_context_map.get(
+                    target_node.id, [None])
+
                 await self.process_node_scope(
                     node=target_node,
                     parent_call_node_id=sync_result.created_map[target_node.id],
@@ -291,5 +320,5 @@ class CallChainBuilder:
                     source_code=None,
                     visited_ids=visited_ids.copy(),
                     current_depth=current_depth + 1,
-                    parent_context=next_step_context
+                    parent_contexts=next_step_contexts
                 )
