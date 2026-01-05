@@ -1,3 +1,4 @@
+import pytest
 from pathlib import Path
 
 
@@ -43,10 +44,11 @@ def find_child(node, name):
     return None
 
 
-def test_get_code_for_function(client, sample_project_path):
+@pytest.mark.asyncio
+async def test_get_code_for_function(client, sample_project_path):
     # Create project from E2E sample
-    response = client.post(
-        "/api/v1/projects",
+    response = await client.post(
+        "/api/v1/projects/",
         json={
             "name": "code_test_sample",
             "description": "code_test_sample",
@@ -65,7 +67,7 @@ def test_get_code_for_function(client, sample_project_path):
     utils_folder = find_child(core_folder, "utils")
     assert utils_folder is not None
 
-    helper_py = find_child(utils_folder, "helper.py")
+    helper_py = find_child(utils_folder, "helper")
     assert helper_py is not None
 
     create_child_func = find_child(helper_py, "create_child")
@@ -73,7 +75,7 @@ def test_get_code_for_function(client, sample_project_path):
 
     # Call get_code for function
     func_key = create_child_func["_key"]
-    r_func = client.get(f"/api/v1/code-elements/{func_key}/code")
+    r_func = await client.get(f"/api/v1/code-elements/{func_key}/code")
     assert r_func.status_code == 200
     payload = r_func.json()
     assert payload["node_type"] == "function"
@@ -94,10 +96,11 @@ def test_get_code_for_function(client, sample_project_path):
     assert expected_slice == payload["code"]
 
 
-def test_get_code_for_class(client, sample_project_path):
+@pytest.mark.asyncio
+async def test_get_code_for_class(client, sample_project_path):
     # Create project from E2E sample
-    response = client.post(
-        "/api/v1/projects",
+    response = await client.post(
+        "/api/v1/projects/",
         json={
             "name": "code_test_sample",
             "description": "code_test_sample",
@@ -122,7 +125,7 @@ def test_get_code_for_class(client, sample_project_path):
     assert child_class is not None
 
     class_key = child_class["_key"]
-    r_class = client.get(f"/api/v1/code-elements/{class_key}/code")
+    r_class = await client.get(f"/api/v1/code-elements/{class_key}/code")
     assert r_class.status_code == 200
     payload = r_class.json()
     assert payload["node_type"] == "class"
@@ -140,7 +143,8 @@ def test_get_code_for_class(client, sample_project_path):
     assert expected_slice == payload["code"]
 
 
-def test_get_code_for_nested_function(client):
+@pytest.mark.asyncio
+async def test_get_code_for_nested_function(client):
     # Use unit sample: simple_function to verify nested function extraction
     from pathlib import Path
 
@@ -149,8 +153,8 @@ def test_get_code_for_nested_function(client):
         / "unit/parser/analyzer/function/simple_function"
     )
 
-    response = client.post(
-        "/api/v1/projects",
+    response = await client.post(
+        "/api/v1/projects/",
         json={
             "name": "code_test_nested",
             "description": "code_test_nested",
@@ -172,7 +176,7 @@ def test_get_code_for_nested_function(client):
     assert add_func is not None
 
     nested_key = add_func["_key"]
-    r_nested = client.get(f"/api/v1/code-elements/{nested_key}/code")
+    r_nested = await client.get(f"/api/v1/code-elements/{nested_key}/code")
     assert r_nested.status_code == 200
     payload = r_nested.json()
     assert payload["node_type"] == "function"

@@ -105,7 +105,7 @@ async def get_code(
         class_service,
         function_service,
         call_service,
-    ) = await _get_services(db)
+    ) = _get_services(db)
 
     if node_type == "file":
         code_details = await file_service.get_code(node_id)
