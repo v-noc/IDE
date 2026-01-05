@@ -25,6 +25,11 @@ async def arangodb_client() -> AsyncDatabase:
         await sys_db.create_database(TEST_DB_NAME)
 
     test_db = await client.db(TEST_DB_NAME, auth=auth)
+    
+    # Ensure all required collections exist before running tests
+    repos = Repositories(test_db)
+    await repos.ensure_collections()
+
     yield test_db
 
     # Teardown: drop the test DB.
