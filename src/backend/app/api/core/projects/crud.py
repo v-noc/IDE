@@ -4,7 +4,6 @@ from typing import Optional
 
 from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.parser.scope_manager.manager import ScopeManager
 from app.core.builder.tree_builder import TreeBuilder
 from app.db.client import get_db
 from arangoasync.database import AsyncDatabase
@@ -63,11 +62,10 @@ async def create_project(
         )
         project_node = await project_service.create_node(project_node)
 
-        scope_manager = ScopeManager(project_node.name)
         orchestrator = GraphBuilderOrchestrator(
             project_node=project_node,
             db=db,
-            scope_manager=scope_manager,
+
         )
         await orchestrator.resync()
     except FileNotFoundError as exc:
@@ -161,8 +159,7 @@ async def delete_project(
         result = await project_service.delete(project)
         if result is False:
             return False
-        scope_manager = ScopeManager(project.name)
-        await scope_manager.delete_cache()
+
         return True
     else:
         raise HTTPException(
