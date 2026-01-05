@@ -93,19 +93,34 @@ class CallGraphRepository:
 
     async def batch_delete_calls(self, call_ids: List[str]) -> None:
         """
-        Removes CallNodes and their associated edges.
+        Removes CallNodes and their associated edges safely.
+        Uses 'ignoreErrors: true' to prevent crashes if records are already deleted.
         """
         if not call_ids:
             return
 
-        # NodeRepository.delete usually handles edges, but for batch speed:
         query = """
-        FOR call_id IN @call_ids
-            // Remove edges connected to this call node
-            FOR e IN contains_edges FILTER e._to == call_id REMOVE e IN contains_edges
-            FOR e IN targets_edges FILTER e._from == call_id REMOVE e IN targets_edges
-            
-            // Remove the node itself
-            REMOVE call_id IN nodes
+            FOR call_id IN @call_ids
+                // 1. Collect and remove incoming contains_edges (parent -> call)
+                LET contain_keys = (
+                    FOR e IN contains_edges
+                        FILTER e._to == call_id
+                        RETURN e._key
+                )
+                FOR ck IN contain_keys
+                    REMOVE ck IN contains_edges OPTIONS { ignoreErrors: true }
+
+                // 2. Collect and remove outgoing targets_edges (call -> target)
+                LET target_keys = (
+                    FOR e IN targets_edges
+                        FILTER e._from == call_id
+                        RETURN e._key
+                )
+                FOR tk IN target_keys
+                    REMOVE tk IN targets_edges OPTIONS { ignoreErrors: true }
+
+                // 3. Remove the call node itself
+                REMOVE call_id IN nodes OPTIONS { ignoreErrors: true }
         """
+
         await self.db.aql.execute(query, bind_vars={"call_ids": call_ids})
