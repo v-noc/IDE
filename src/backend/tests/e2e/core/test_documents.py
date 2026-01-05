@@ -1,11 +1,14 @@
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
+import pytest
 
 
-def test_document_crud_endpoints(client: TestClient, sample_project_node):
+
+@pytest.mark.asyncio
+async def test_document_crud_endpoints(client: AsyncClient, sample_project_node):
     project_id = sample_project_node.key
 
     # Create document
-    create_resp = client.post(
+    create_resp = await client.post(
         "/api/v1/documents/",
         json={
             "name": "Doc1",
@@ -18,14 +21,14 @@ def test_document_crud_endpoints(client: TestClient, sample_project_node):
     document_key = document["_key"]
 
     # List documents for node
-    list_resp = client.get(f"/api/v1/documents/{project_id}")
+    list_resp = await client.get(f"/api/v1/documents/{project_id}")
     assert list_resp.status_code == 200
     docs = list_resp.json()
     assert isinstance(docs, list) and len(docs) == 1
     assert docs[0]["_key"] == document_key
 
     # Update document
-    update_resp = client.put(
+    update_resp = await client.put(
         f"/api/v1/documents/{document_key}",
         json={
             "name": "Doc1-upd",
@@ -41,13 +44,13 @@ def test_document_crud_endpoints(client: TestClient, sample_project_node):
     assert updated["data"] == "payload"
 
     # Delete document
-    del_resp = client.delete(
+    del_resp = await client.delete(
         f"/api/v1/documents/{document_key}", params={"node_id": project_id}
     )
     assert del_resp.status_code == 204
 
     # Verify list is empty
-    list_resp_2 = client.get(f"/api/v1/documents/{project_id}")
+    list_resp_2 = await client.get(f"/api/v1/documents/{project_id}")
 
     assert list_resp_2.status_code == 200
     assert list_resp_2.json() == []
