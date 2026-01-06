@@ -160,7 +160,7 @@ class FileService(ContainerService):
         if not project_doc:
             return None
 
-        project_path = project_doc.get("path")
+        project_path = project_doc.path
         file_path = effective_file.path
         abs_path = await self._build_abs_file_path(
             project_path,
