@@ -214,7 +214,7 @@ class LogRepository(BaseRepository[LogNode]):
 
         # Ensure edge collection exists and is properly configured
 
-        collection = await self.db.collection(collection_name)
+        collection = self.db.collection(collection_name)
 
         # Build edge documents for batch insert
         edge_docs = [
@@ -267,7 +267,7 @@ class LogRepository(BaseRepository[LogNode]):
 
         # Use insert_many which is much faster than loops
 
-        collection = await self.db.collection("logs")
+        collection = self.db.collection("logs")
         result = await collection.insert_many(docs, return_new=True)
 
         # Wrap results back into Pydantic models
