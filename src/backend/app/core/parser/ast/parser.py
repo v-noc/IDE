@@ -133,13 +133,15 @@ class JediParser:
         if node.type == 'lambdef':
             return None
         target_node = node
-        if node.parent and node.parent.type == 'async_funcdef':
-            target_node = node.parent
+
+        position = self._get_position(node)
+        if node.parent and node.parent.type == 'async_stmt':
+            position = self._get_position(node.parent)
 
         return FunctionNode(
             id=self._extract_id(target_node),
             name=node.name.value,
-            position=self._get_position(target_node),
+            position=position,
             children=self._scan_children(target_node)
         )
 

@@ -9,7 +9,7 @@ class MyClass:
     def my_method(self):
         my_call()
 """
-    nodes = scan(code)
+    nodes, _ = scan(code)
 
     # Check Class
     assert len(nodes) == 1
@@ -40,7 +40,7 @@ def my_func_123():
 
 call.me.maybe()
 """
-    nodes = scan(code)
+    nodes, _ = scan(code)
     print(nodes)
     cls = next(n for n in nodes if isinstance(n, ClassNode))
     assert cls.name == "ComplexName"
@@ -71,7 +71,7 @@ def scenario_test():
     lst = [list_call()]
     dct = {'k': dict_call()}
 """
-    nodes = scan(code)
+    nodes, _ = scan(code)
     func = nodes[0]
     calls = [n for n in func.children if isinstance(n, CallNode)]
     call_names = [c.name for c in calls]
@@ -80,21 +80,6 @@ def scenario_test():
     assert "assigned_call" in call_names
     assert "outer" in call_names
     assert "inner_call" in call_names
-
-    # For chain.call().final(), we expect "chain.call" and "chain.call().final"?
-    # Or just the top level calls?
-    # Our parser extracts all calls it finds.
-    # "chain.call" is a call. "chain.call().final" is a call.
-    # Let's see what the parser produces.
-    # Based on implementation:
-    # chain.call() -> CallNode(name="chain.call")
-    # chain.call().final() -> CallNode(name="chain.call().final"?? No, name extraction logic might be simple)
-
-    # Let's check what we actually get for nested calls.
-    # If logic is robust, we should see them.
-
-    # assert "chain.call" in call_names # Might depend on how we handle chains
-    # assert "final" in call_names # or "chain.call().final"
 
     assert "list_call" in call_names
     assert "dict_call" in call_names
@@ -107,7 +92,7 @@ def outer():
         inner_call()
     outer_call()
 """
-    nodes = scan(code)
+    nodes, _ = scan(code)
     outer = nodes[0]
 
     # Inner function should be a child
@@ -121,3 +106,16 @@ def outer():
     # Outer call should be inside outer function (sibling to inner def)
     outer_call = next(n for n in outer.children if isinstance(n, CallNode))
     assert outer_call.name == "outer_call"
+
+
+def test_async_functions():
+    code = """
+async def async_func():
+    pass
+"""
+    nodes, _ = scan(code)
+    print(f" nodes {nodes}")
+    async_func = nodes[0]
+
+    assert async_func.name == "async_func"
+    assert async_func.position.column == 0
