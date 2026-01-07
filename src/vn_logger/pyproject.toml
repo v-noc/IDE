@@ -1,6 +1,6 @@
 [project]
 name = "vn-logger"
-version = "0.1.19"
+version = "0.1.22"
 description = "Event and data logging service"
 readme = "README.md"
 requires-python = ">=3.12"

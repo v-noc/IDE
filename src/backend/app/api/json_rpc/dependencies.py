@@ -23,13 +23,13 @@ def get_services(db: AsyncDatabase = Depends(get_db)):
     )
 
 
-def get_project(
+async def get_project(
     project_id: str = Body(..., embed=True, alias="project_id"),
     services=Depends(get_services),
 ):
     try:
         project_service, *_ = services
-        project = project_service.get(project_id)
+        project = await project_service.get(project_id)
 
         return project
     except Exception as e:
@@ -42,7 +42,7 @@ def get_function_services(services=Depends(get_services)):
     return function_service
 
 
-def get_function(
+async def get_function(
     function_id: str = Body(..., embed=True, alias="function_id"),
     services=Depends(get_function_services),
 ):
@@ -50,7 +50,7 @@ def get_function(
     try:
         function_service = services
 
-        func_node = function_service.get(function_id)
+        func_node = await function_service.get(function_id)
 
     except Exception as e:
         print("Error getting function", e)
@@ -58,7 +58,7 @@ def get_function(
         return func_node
 
 
-def get_parent_function(
+async def get_parent_function(
     parent_function_id: Optional[str] = Body(
         None, embed=True, alias="parent_function_id"
     ),
@@ -69,7 +69,7 @@ def get_parent_function(
         function_service = services
 
         if parent_function_id is not None:
-            parent_func_node = function_service.get(parent_function_id)
+            parent_func_node = await function_service.get(parent_function_id)
 
     except Exception as e:
         print("Error getting function", e)
