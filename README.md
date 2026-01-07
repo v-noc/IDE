@@ -1,6 +1,8 @@
 
 # V-NOC (Visual Node Code) — *Placeholder Name*
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 **A code editor that shows you how your code *works*, not just where it's saved.**
 
 **Community & Support:** Join our Discord — [discord.gg/NKhbU9gf](https://discord.gg/J5nfPHqyBr)
@@ -154,3 +156,13 @@ make stop-db    # stop ArangoDB
 ```
 
 See the `Makefile` for additional commands.
+
+## License
+
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+
+- Community use: Free under AGPL-3.0 (with copyleft obligations).
+- Commercial/proprietary use (e.g., closed-source modifications, SaaS without source release): Available under a separate license — contact [your.email@example.com] for details.
+
+Full license: [LICENSE](LICENSE) file or https://www.gnu.org/licenses/agpl-3.0.html
+
