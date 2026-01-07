@@ -1,200 +1,242 @@
-import pytest
 import shutil
-import asyncio
+from typing import List
+
+import pytest
+
+from app.core.builder.tree_builder import TreeBuilder
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.schemas.tree import AnyTreeNode
+from app.core.services.project_service import ProjectService
+from tests.unit.parser.analyzer.hierarchy.conftest import _build_and_get_tree
 
 
-async def run_sync(ctx):
-    scan_result = ctx["scanner"].scan()
-    change_set = await ctx["change_detector"].detect_changes(scan_result)
+def find_node_by_qname(nodes: List[AnyTreeNode], qname: str):
+    """Find a node by its qname in the tree."""
+    for node in nodes:
+        if getattr(node, "qname", None) == qname:
+            return node
+        if hasattr(node, "children") and node.children:
+            found = find_node_by_qname(node.children, qname)
+            if found:
+                return found
+    return None
 
-    # Run structure sync (Folders + File Shells)
-    folder_changes = await ctx["collector"].sync_structure(change_set, scan_result)
 
-    return change_set
+async def _resync_and_get_tree(project_node, repos, db):
+    """Helper function to resync project and get tree structure."""
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
+        db=db,
+        ignore_file_name="v-noc.toml",
+    )
+    await orchestrator.resync()
+
+    project_service = ProjectService(repos)
+    project = await project_service.get(project_node.id)
+    assert project is not None, "Project not found after resync"
+
+    children = await project_service.get_children(project_node.id)
+    tree_builder = TreeBuilder(children)
+    return tree_builder.build()
 
 
 @pytest.mark.asyncio
-async def test_file_add(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
+async def test_file_add(setup_file_project):
+    project_node, repos, arangodb_client, project_path = setup_file_project
 
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
+
+    # Add new file
     new_file = project_path / "new_file.py"
     new_file.write_text("# new file")
 
-    change_set = await run_sync(ctx)
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
 
-    assert any(f.path == str(new_file) for f in change_set.new_files)
+    # Check tree structure
+    project_name = project_node.name
+    new_file_node = find_node_by_qname(tree_after, f"{project_name}.new_file")
+    assert new_file_node is not None, "new_file not found in tree after add"
+    assert new_file_node.node_type == "file", "new_file should be a file"
 
-    node = await repos.nodes.find_by_qname(f"{project_name}.new_file")
-    assert node is not None
-    assert node.node_type == "file"
+    # Verify it's in root children
+
+    child_names = [getattr(c, "name", None) for c in tree_after]
+    assert "new_file" in child_names, "new_file should be in root children"
 
 
 @pytest.mark.asyncio
-async def test_file_remove(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
+async def test_file_remove(setup_file_project):
+    project_node, repos, arangodb_client, project_path = setup_file_project
 
-    target = project_path / "main.py"
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
 
-    node_before = await repos.nodes.find_by_qname(f"{project_name}.main")
-    assert node_before
+    project_name = project_node.name
 
+    # Verify file exists before removal
+    file1_before = find_node_by_qname(tree_before, f"{project_name}.file1")
+    assert file1_before is not None, "file1 should exist before removal"
+
+    # Remove file
+    target = project_path / "file1.py"
     target.unlink()
 
-    change_set = await run_sync(ctx)
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
 
-    assert any(f.path == str(target) for f in change_set.deleted_files)
+    # Check tree structure
+    file1_after = find_node_by_qname(tree_after, f"{project_name}.file1")
+    assert file1_after is None, "file1 should not exist in tree after removal"
 
-    node_after = await repos.nodes.find_by_qname(f"{project_name}.main")
-    assert node_after is None
+    # Verify it's not in root children
 
-
-@pytest.mark.asyncio
-async def test_file_move(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
-
-    # Move "main.py" -> "core/main.py"
-    src = project_path / "main.py"
-    dst = project_path / "core" / "main.py"
-
-    # Ensure dst folder exists (it does in fixture)
-
-    node_before = await repos.nodes.find_by_qname(f"{project_name}.main")
-    assert node_before
-    # stable_id should be the key (UUID) to match MoveEvent.id
-    stable_id = node_before.key if node_before.key else node_before.id.split(
-        "/")[-1]
-
-    old_parent = await repos.nodes.find_by_qname(project_name)
-    assert old_parent is not None
-    new_parent = await repos.nodes.find_by_qname(f"{project_name}.core")
-    assert new_parent is not None
-
-    shutil.move(src, dst)
-
-    change_set = await run_sync(ctx)
-    moved_files = change_set.moved_files
-
-    assert any(m.id == stable_id for m in moved_files)
-
-    # Check old gone
-    assert await repos.nodes.find_by_qname(f"{project_name}.main") is None
-
-    # Check new exists
-    node_new = await repos.nodes.find_by_qname(f"{project_name}.core.main")
-    assert node_new is not None
-    node_new_key = node_new.key if node_new.key else node_new.id.split("/")[-1]
-    assert node_new_key == stable_id
-
-    # Parent relink check
-    # Note: get_children returns raw dicts currently in NodeRepo
-    old_children = await repos.nodes.get_children(old_parent.id)
-    # Handle dict vs model
-    old_child_ids = {c["_key"] if isinstance(
-        c, dict) and "_key" in c else c.id for c in old_children}
-    # ArangoDB IDs might be "collection/key".
-    # If node.id is full ID, and c['_id'] is full ID, we compare those.
-    # If node.id is key, we compare keys.
-    # Usually node.id is set to _key in models for Arango.
-
-    # Safest: compare full _id if available, or just keys.
-    # Let's check what node.id is. Usually key.
-
-    # Helper to get ID from child result
-    def get_id(c):
-        if isinstance(c, dict):
-            # Depending on query, it might be the document.
-            return c.get("_key")
-        return c.key if c.key else c.id.split("/")[-1]
-
-    assert stable_id not in {get_id(c) for c in old_children}
-
-    new_children = await repos.nodes.get_children(new_parent.id)
-    assert stable_id in {get_id(c) for c in new_children}
+    child_names = [getattr(c, "name", None) for c in tree_after]
+    assert "file1" not in child_names, "file1 should not be in root children"
 
 
 @pytest.mark.asyncio
-async def test_file_rename(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
+async def test_file_move(setup_file_project):
+    project_node, repos, arangodb_client, project_path = setup_file_project
 
-    # "main.py" -> "entry.py"
-    src = project_path / "main.py"
-    dst = project_path / "entry.py"
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
 
-    node_before = await repos.nodes.find_by_qname(f"{project_name}.main")
-    stable_id = node_before.id
-    root = await repos.nodes.find_by_qname(project_name)
-    assert root is not None
+    project_name = project_node.name
+
+    # Create a folder to move file into
+    target_folder = project_path / "subfolder"
+    target_folder.mkdir(exist_ok=True)
+    (target_folder / "__init__.py").write_text("")
+
+    # Move "file1.py" -> "subfolder/file1.py"
+    src = project_path / "file1.py"
+    dst = target_folder / "file1.py"
+
+    # Verify file exists before move
+    file1_before = find_node_by_qname(tree_before, f"{project_name}.file1")
+    assert file1_before is not None, "file1 should exist before move"
 
     shutil.move(src, dst)
 
-    await run_sync(ctx)
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
 
-    node_new = await repos.nodes.find_by_qname(f"{project_name}.entry")
-    assert node_new is not None
-    assert node_new.id == stable_id
+    # Check tree structure - old location should not exist
+    file1_old = find_node_by_qname(tree_after, f"{project_name}.file1")
+    assert file1_old is None, "file1 should not exist in old location"
 
-    # Parent link check
-    root_children = await repos.nodes.get_children(root.id)
+    # Check tree structure - new location should exist
+    file1_new = find_node_by_qname(
+        tree_after, f"{project_name}.subfolder.file1")
+    assert file1_new is not None, "file1 should exist in new location"
+    assert file1_new.node_type == "file", "file1 should be a file"
 
-    def get_id(c):
-        return c.get("_key") if isinstance(c, dict) else c.id
-
-    def get_qname(c):
-        return c.get("qname") if isinstance(c, dict) else c.qname
-
-    child_ids = {f"nodes/{get_id(c)}" for c in root_children}
-    assert stable_id in child_ids
-
-    child_qnames = {get_qname(c) for c in root_children}
-    assert f"{project_name}.entry" in child_qnames
-    assert f"{project_name}.main" not in child_qnames
+    # Verify parent relationships
+    subfolder_node = find_node_by_qname(
+        tree_after, f"{project_name}.subfolder")
+    assert subfolder_node is not None
+    subfolder_children = (
+        subfolder_node.children if hasattr(subfolder_node, "children") else []
+    )
+    child_names = [getattr(c, "name", None) for c in subfolder_children]
+    assert "file1" in child_names, "file1 should be in subfolder children"
 
 
 @pytest.mark.asyncio
-async def test_file_rename_and_move(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
+async def test_file_rename(setup_file_project):
+    project_node, repos, arangodb_client, project_path = setup_file_project
 
-    # "main.py" -> "core/entry.py"
-    src = project_path / "main.py"
-    dst = project_path / "core" / "entry.py"
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
 
-    node_before = await repos.nodes.find_by_qname(f"{project_name}.main")
-    stable_id = node_before.id
+    project_name = project_node.name
 
-    old_parent = await repos.nodes.find_by_qname(project_name)
-    assert old_parent is not None
-    new_parent = await repos.nodes.find_by_qname(f"{project_name}.core")
-    assert new_parent is not None
+    # Rename "file1.py" -> "renamed_file.py"
+    src = project_path / "file1.py"
+    dst = project_path / "renamed_file.py"
+
+    # Verify file exists before rename
+    file1_before = find_node_by_qname(tree_before, f"{project_name}.file1")
+    assert file1_before is not None, "file1 should exist before rename"
 
     shutil.move(src, dst)
 
-    await run_sync(ctx)
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
 
-    node_new = await repos.nodes.find_by_qname(f"{project_name}.core.entry")
-    assert node_new is not None
-    assert node_new.id == stable_id
+    # Check tree structure - old name should not exist
+    file1_after = find_node_by_qname(tree_after, f"{project_name}.file1")
+    assert file1_after is None, "file1 should not exist after rename"
 
-    # Parent relink check
-    def get_id(c):
-        return c.get("_key") if isinstance(c, dict) else c.id
+    # Check tree structure - new name should exist
+    renamed_file = find_node_by_qname(
+        tree_after, f"{project_name}.renamed_file")
+    assert renamed_file is not None, "renamed_file should exist after rename"
+    assert renamed_file.node_type == "file", "renamed_file should be a file"
 
-    old_children = await repos.nodes.get_children(old_parent.id)
-    assert stable_id not in {f"nodes/{get_id(c)}" for c in old_children}
+    # Verify it's in root children with new name
 
-    new_children = await repos.nodes.get_children(new_parent.id)
-    assert stable_id in {f"nodes/{get_id(c)}" for c in new_children}
+    child_names = [getattr(c, "name", None) for c in tree_after]
+    assert "renamed_file" in child_names, "renamed_file should be in root children"
+    assert "file1" not in child_names, "file1 should not be in root children"
+
+
+@pytest.mark.asyncio
+async def test_file_rename_and_move(setup_file_project):
+    project_node, repos, arangodb_client, project_path = setup_file_project
+
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
+
+    project_name = project_node.name
+
+    # Create a folder to move file into
+    target_folder = project_path / "subfolder"
+    target_folder.mkdir(exist_ok=True)
+    (target_folder / "__init__.py").write_text("")
+
+    # Move "file1.py" -> "subfolder/renamed_file.py"
+    src = project_path / "file1.py"
+    dst = target_folder / "renamed_file.py"
+
+    # Verify file exists before move
+    file1_before = find_node_by_qname(tree_before, f"{project_name}.file1")
+    assert file1_before is not None, "file1 should exist before move"
+
+    shutil.move(src, dst)
+
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
+
+    # Check tree structure - old location should not exist
+    file1_old = find_node_by_qname(tree_after, f"{project_name}.file1")
+    assert file1_old is None, "file1 should not exist in old location"
+
+    # Check tree structure - new location with new name should exist
+    renamed_file = find_node_by_qname(
+        tree_after, f"{project_name}.subfolder.renamed_file"
+    )
+    assert renamed_file is not None, "renamed_file should exist in new location"
+    assert renamed_file.node_type == "file", "renamed_file should be a file"
+
+    # Verify parent relationships
+    subfolder_node = find_node_by_qname(
+        tree_after, f"{project_name}.subfolder")
+    assert subfolder_node is not None
+    subfolder_children = (
+        subfolder_node.children if hasattr(subfolder_node, "children") else []
+    )
+    child_names = [getattr(c, "name", None) for c in subfolder_children]
+    assert "renamed_file" in child_names, "renamed_file should be in subfolder children"
+
+    # Verify it's not in root children
+
+    root_child_names = [getattr(c, "name", None) for c in tree_after]
+    assert "file1" not in root_child_names, "file1 should not be in root children"

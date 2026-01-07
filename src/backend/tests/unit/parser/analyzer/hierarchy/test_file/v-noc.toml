@@ -1,0 +1,5 @@
+name = "test_file"
+version = "0.1.0"
+authors = ["v-noc"]
+description = "Test project for file operations"
+

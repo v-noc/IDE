@@ -1,0 +1,8 @@
+name = "test_structure"
+version = "0.1.0"
+authors = ["v-noc"]
+description = "Test project for structure operations"
+
+[ignore]
+patterns = ["build/", "*.pyc"]
+

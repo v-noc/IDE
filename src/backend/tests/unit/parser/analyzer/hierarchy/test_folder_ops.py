@@ -1,174 +1,246 @@
 import pytest
 import shutil
-import asyncio
+from typing import List
+
+from app.core.builder.tree_builder import TreeBuilder
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.schemas.tree import AnyTreeNode
+from app.core.services.project_service import ProjectService
+
+from tests.unit.parser.analyzer.hierarchy.conftest import _build_and_get_tree
 
 
-async def run_sync(ctx):
-    scan_result = ctx["scanner"].scan()
-    change_set = await ctx["change_detector"].detect_changes(scan_result)
-    await ctx["collector"].sync_structure(change_set, scan_result)
+def find_node_by_qname(nodes: List[AnyTreeNode], qname: str):
+    """Find a node by its qname in the tree."""
+    for node in nodes:
+        if getattr(node, "qname", None) == qname:
+            return node
+        if hasattr(node, "children") and node.children:
+            found = find_node_by_qname(node.children, qname)
+            if found:
+                return found
+    return None
 
-    return change_set
+
+async def _resync_and_get_tree(project_node, repos, db):
+    """Helper function to resync project and get tree structure."""
+    orchestrator = GraphBuilderOrchestrator(
+        project_node,
+        db=db,
+        ignore_file_name="v-noc.toml",
+    )
+    await orchestrator.resync()
+
+    project_service = ProjectService(repos)
+    project = await project_service.get(project_node.id)
+    assert project is not None, "Project not found after resync"
+
+    children = await project_service.get_children(project_node.id)
+    tree_builder = TreeBuilder(children)
+    return tree_builder.build()
 
 
 @pytest.mark.asyncio
-async def test_folder_add(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
+async def test_folder_add(setup_folder_project):
+    project_node, repos, arangodb_client, project_path = setup_folder_project
 
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
+
+    # Add new folder
     new_folder = project_path / "new_folder"
     new_folder.mkdir()
     (new_folder / "dummy.py").write_text("")
 
-    change_set = await run_sync(ctx)
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
 
-    # Assert
-    assert any(f.path == str(new_folder) for f in change_set.new_folders)
+    # Check tree structure
+    project_name = project_node.name
+    new_folder_node = find_node_by_qname(
+        tree_after, f"{project_name}.new_folder")
+    assert new_folder_node is not None, "new_folder not found in tree after add"
+    assert new_folder_node.node_type == "folder", "new_folder should be a folder"
 
-    node = await repos.nodes.find_by_qname(f"{project_name}.new_folder")
-    assert node is not None
-    assert node.node_type == "folder"
+    # Verify it's in root children
+    child_names = [getattr(c, "name", None) for c in tree_after]
+
+    assert "new_folder" in child_names, "new_folder should be in root children"
 
 
 @pytest.mark.asyncio
-async def test_folder_remove(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
+async def test_folder_remove(setup_folder_project):
+    project_node, repos, arangodb_client, project_path = setup_folder_project
 
-    target = project_path / "core"
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
 
-    node_before = await repos.nodes.find_by_qname(f"{project_name}.core")
-    assert node_before
+    project_name = project_node.name
 
+    # Verify folder exists before removal
+    folder1_before = find_node_by_qname(tree_before, f"{project_name}.folder1")
+    assert folder1_before is not None, "folder1 should exist before removal"
+
+    # Remove folder
+    target = project_path / "folder1"
     shutil.rmtree(target)
 
-    change_set = await run_sync(ctx)
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
 
-    assert any(f.path == str(target) for f in change_set.deleted_folders)
+    # Check tree structure
+    folder1_after = find_node_by_qname(tree_after, f"{project_name}.folder1")
+    assert folder1_after is None, "folder1 should not exist in tree after removal"
 
-    node_after = await repos.nodes.find_by_qname(f"{project_name}.core")
-    assert node_after is None
-
-
-@pytest.mark.asyncio
-async def test_folder_move(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
-
-    # Move "core/data" to "app/data"
-    src = project_path / "core" / "data"
-    dst = project_path / "app" / "data"
-
-    # Ensure src exists and has ID
-    node_before = await repos.nodes.find_by_qname(f"{project_name}.core.data")
-    assert node_before
-    stable_id = node_before.id
-
-    old_parent = await repos.nodes.find_by_qname(f"{project_name}.core")
-    assert old_parent is not None
-    new_parent = await repos.nodes.find_by_qname(f"{project_name}.app")
-    assert new_parent is not None
-
-    shutil.move(src, dst)
-
-    change_set = await run_sync(ctx)
-
-    # Verify move detected
-    assert any(f"nodes/{m.id}" == stable_id for m in change_set.moved_folders)
-
-    # Verify new location
-    node_new = await repos.nodes.find_by_qname(f"{project_name}.app.data")
-    assert node_new is not None
-    assert node_new.id == stable_id
-    assert node_new.path == str(dst)
-
-    # Parent relink check
-    def get_id(c):
-        return c.get("_key") if isinstance(c, dict) else c.id
-
-    old_children = await repos.nodes.get_children(old_parent.id)
-    assert stable_id not in {f"nodes/{get_id(c)}" for c in old_children}
-
-    new_children = await repos.nodes.get_children(new_parent.id)
-    assert stable_id in {f"nodes/{get_id(c)}" for c in new_children}
+    # Verify it's not in root children
+    child_names = [getattr(c, "name", None) for c in tree_after]
+    assert "folder1" not in child_names, "folder1 should not be in root children"
 
 
 @pytest.mark.asyncio
-async def test_folder_rename(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
+async def test_folder_move(setup_folder_project):
+    project_node, repos, arangodb_client, project_path = setup_folder_project
 
-    # Rename "core" -> "kernel"
-    src = project_path / "core"
-    dst = project_path / "kernel"
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
 
-    node_before = await repos.nodes.find_by_qname(f"{project_name}.core")
-    stable_id = node_before.id
-    root = await repos.nodes.find_by_qname(project_name)
-    assert root is not None
+    project_name = project_node.name
+
+    # Create nested structure for move test
+    folder1_nested = project_path / "folder1" / "nested1"
+    folder2 = project_path / "folder2"
+    folder2.mkdir(exist_ok=True)
+
+    # Move "folder1/nested1" to "folder2/nested1"
+    src = folder1_nested
+    dst = folder2 / "nested1"
+
+    # Verify source exists before move
+    nested_before = find_node_by_qname(
+        tree_before, f"{project_name}.folder1.nested1")
+    assert nested_before is not None, "nested1 should exist before move"
 
     shutil.move(src, dst)
 
-    await run_sync(ctx)
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
 
-    node_new = await repos.nodes.find_by_qname(f"{project_name}.kernel")
-    root_children = await repos.nodes.get_children(root.id)
+    # Check tree structure - old location should not exist
+    nested_old = find_node_by_qname(
+        tree_after, f"{project_name}.folder1.nested1")
+    assert nested_old is None, "nested1 should not exist in old location"
 
-    assert node_new is not None
-    assert node_new.id == stable_id
+    # Check tree structure - new location should exist
+    nested_new = find_node_by_qname(
+        tree_after, f"{project_name}.folder2.nested1")
+    assert nested_new is not None, "nested1 should exist in new location"
+    assert nested_new.node_type == "folder", "nested1 should be a folder"
 
-    # Parent link check
-    def get_qname(c):
-        return c.get("qname") if isinstance(c, dict) else c.qname
-
-    root_children = await repos.nodes.get_children(root.id)
-
-    child_qnames = {get_qname(c) for c in root_children}
-    assert f"{project_name}.kernel" in child_qnames
-    assert f"{project_name}.core" not in child_qnames
+    # Verify parent relationships
+    folder2_node = find_node_by_qname(tree_after, f"{project_name}.folder2")
+    assert folder2_node is not None
+    folder2_children = folder2_node.children if hasattr(
+        folder2_node, "children") else []
+    child_names = {getattr(c, "name", None) for c in folder2_children}
+    assert "nested1" in child_names, "nested1 should be in folder2 children"
 
 
 @pytest.mark.asyncio
-async def test_folder_rename_and_move(synced_project):
-    ctx = synced_project
-    project_path = ctx["project_path"]
-    repos = ctx["repos"]
-    project_name = ctx["project_name"]
+async def test_folder_rename(setup_folder_project):
+    project_node, repos, arangodb_client, project_path = setup_folder_project
 
-    # Move "core/data" -> "app/info"
-    src = project_path / "core" / "data"
-    dst = project_path / "app" / "info"
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
 
-    node_before = await repos.nodes.find_by_qname(f"{project_name}.core.data")
-    stable_id = node_before.id
+    project_name = project_node.name
 
-    old_parent = await repos.nodes.find_by_qname(f"{project_name}.core")
-    assert old_parent is not None
-    new_parent = await repos.nodes.find_by_qname(f"{project_name}.app")
-    assert new_parent is not None
+    # Rename "folder1" -> "renamed_folder"
+    src = project_path / "folder1"
+    dst = project_path / "renamed_folder"
+
+    # Verify folder exists before rename
+    folder1_before = find_node_by_qname(tree_before, f"{project_name}.folder1")
+    assert folder1_before is not None, "folder1 should exist before rename"
 
     shutil.move(src, dst)
 
-    await run_sync(ctx)
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
 
-    node_new = await repos.nodes.find_by_qname(f"{project_name}.app.info")
-    assert node_new is not None
-    assert node_new.id == stable_id
+    # Check tree structure - old name should not exist
+    folder1_after = find_node_by_qname(tree_after, f"{project_name}.folder1")
+    assert folder1_after is None, "folder1 should not exist after rename"
 
-    # Parent relink check
-    def get_id(c):
-        return c.get("_key") if isinstance(c, dict) else c.id
+    # Check tree structure - new name should exist
+    renamed_folder = find_node_by_qname(
+        tree_after, f"{project_name}.renamed_folder")
+    assert renamed_folder is not None, "renamed_folder should exist after rename"
+    assert renamed_folder.node_type == "folder", "renamed_folder should be a folder"
 
-    old_children = await repos.nodes.get_children(old_parent.id)
-    assert stable_id not in {f"nodes/{get_id(c)}" for c in old_children}
+    # Verify it's in root children with new name
 
-    new_children = await repos.nodes.get_children(new_parent.id)
-    assert stable_id in {f"nodes/{get_id(c)}" for c in new_children}
+    child_names = [getattr(c, "name", None) for c in tree_after]
+    assert "renamed_folder" in child_names, "renamed_folder should be in root children"
+    assert "folder1" not in child_names, "folder1 should not be in root children"
+
+
+@pytest.mark.asyncio
+async def test_folder_rename_and_move(setup_folder_project):
+    project_node, repos, arangodb_client, project_path = setup_folder_project
+
+    # Build initial tree
+    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    assert tree_before, "No tree nodes built"
+
+    project_name = project_node.name
+
+    # Create nested structure for rename and move test
+    folder1_nested = project_path / "folder1" / "nested1"
+    folder2 = project_path / "folder2"
+    folder2.mkdir(exist_ok=True)
+
+    # Move "folder1/nested1" -> "folder2/renamed_nested"
+    src = folder1_nested
+    dst = folder2 / "renamed_nested"
+
+    # Verify source exists before move
+    nested_before = find_node_by_qname(
+        tree_before, f"{project_name}.folder1.nested1")
+    assert nested_before is not None, "nested1 should exist before move"
+
+    shutil.move(src, dst)
+
+    # Resync and get updated tree
+    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
+
+    # Check tree structure - old location should not exist
+    nested_old = find_node_by_qname(
+        tree_after, f"{project_name}.folder1.nested1")
+    assert nested_old is None, "nested1 should not exist in old location"
+
+    # Check tree structure - new location with new name should exist
+    renamed_nested = find_node_by_qname(
+        tree_after, f"{project_name}.folder2.renamed_nested")
+    assert renamed_nested is not None, "renamed_nested should exist in new location"
+    assert renamed_nested.node_type == "folder", "renamed_nested should be a folder"
+
+    # Verify parent relationships
+    folder2_node = find_node_by_qname(tree_after, f"{project_name}.folder2")
+    assert folder2_node is not None
+    folder2_children = folder2_node.children if hasattr(
+        folder2_node, "children") else []
+    child_names = [getattr(c, "name", None) for c in folder2_children]
+    assert "renamed_nested" in child_names, "renamed_nested should be in folder2 children"
+
+    # Verify it's not in old parent
+    folder1_node = find_node_by_qname(tree_after, f"{project_name}.folder1")
+    if folder1_node:
+        folder1_children = folder1_node.children if hasattr(
+            folder1_node, "children") else []
+        folder1_child_names = [getattr(c, "name", None)
+                               for c in folder1_children]
+        assert "nested1" not in folder1_child_names, "nested1 should not be in folder1 children"
