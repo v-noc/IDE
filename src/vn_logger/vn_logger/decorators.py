@@ -25,8 +25,6 @@ class LogScope:
         self.context_manager = None
 
     def __enter__(self):
-        # IMPORTANT: If project_id is not set, the logger does nothing.
-        # Ensure configure_logger() is called at the start of your app.
         if not project_id_var.get():
             return self
 
@@ -36,35 +34,35 @@ class LogScope:
             chain_id = str(uuid.uuid4())
             self.tokens["chain_id"] = chain_id_var.set(chain_id)
 
-        # 2. Capture Parent IDs from the context above us
+        # 2. Capture parent IDs
         parent_func_id = parent_function_id_var.get()
         parent_log_id = active_parent_log_id_var.get()
 
-        # 3. Create ID for THIS function execution
+        # 3. Create ID for this execution
         current_span_id = str(uuid.uuid4())
 
-        # 4. Update Context for children
+        # 4. Update context for children
         self.tokens["parent_function_id"] = parent_function_id_var.set(
             self.function_id)
         self.tokens["active_parent_log_id"] = active_parent_log_id_var.set(
             current_span_id)
 
-        # 5. Stamp EVERY log inside this function with these IDs
+        # 5. Contextualize all logs inside this scope
         self.context_manager = logger.contextualize(
             function_id=self.function_id,
             chain_id=chain_id,
             parent_function_id=parent_func_id,
-            parent_log_id=current_span_id  # Links sub-logs to this Enter log
+            parent_log_id=current_span_id,  # links internal logs to this Enter
         )
         self.context_manager.__enter__()
 
-        # 6. Log the 'Enter' event
+        # 6. Log Enter
         logger.bind(
             log_id=current_span_id,
             parent_log_id=parent_log_id,
             event_type="enter",
             args=self._serialize(self.args, self.input_serializer),
-            kwargs=self._serialize(self.kwargs, self.input_serializer)
+            kwargs=self._serialize(self.kwargs, self.input_serializer),
         ).info(f"Enter {self.function_name}")
 
         return self
@@ -73,8 +71,6 @@ class LogScope:
         if not project_id_var.get():
             return
         duration_ms = (time.perf_counter() - self.start_time) * 1000
-
-        # The parent of the Exit log is the Enter log of this function
         current_span_id = active_parent_log_id_var.get()
 
         logger.bind(
@@ -82,8 +78,8 @@ class LogScope:
             parent_log_id=current_span_id,
             event_type="exit",
             result=self._serialize(result, self.output_serializer),
-            duration_ms=duration_ms
-        ).info("Exit")
+            duration_ms=duration_ms,
+        ).info(f"Exit {self.function_name}")
 
     def log_error(self):
         if not project_id_var.get():
@@ -95,8 +91,8 @@ class LogScope:
             log_id=str(uuid.uuid4()),
             parent_log_id=current_span_id,
             event_type="error",
-            duration_ms=duration_ms
-        ).exception("Error in function")
+            duration_ms=duration_ms,
+        ).exception(f"Error in {self.function_name}")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not project_id_var.get():
@@ -108,12 +104,13 @@ class LogScope:
         if self.context_manager:
             self.context_manager.__exit__(exc_type, exc_val, exc_tb)
 
+        # Reset only what we set
         for var_name, token in self.tokens.items():
             if var_name == "chain_id":
                 chain_id_var.reset(token)
-            if var_name == "parent_function_id":
+            elif var_name == "parent_function_id":
                 parent_function_id_var.reset(token)
-            if var_name == "active_parent_log_id":
+            elif var_name == "active_parent_log_id":
                 active_parent_log_id_var.reset(token)
 
     def _serialize(self, obj, serializer):
@@ -125,7 +122,7 @@ class LogScope:
             if isinstance(obj, dict):
                 return {k: repr(v) for k, v in obj.items()}
             return repr(obj)
-        except:
+        except Exception:
             return "[Serialization Error]"
 
 
@@ -133,20 +130,33 @@ def context_logger(function_id: str, input_serializer=None, output_serializer=No
     serializers = (input_serializer, output_serializer)
 
     def decorator(func):
+        function_name = func.__qualname__
+
+        # Heuristic: if first parameter is named 'self' or 'cls' → bound method/classmethod
+        is_bound = (
+            func.__code__.co_argcount >= 1
+            and func.__code__.co_varnames[0] in ("self", "cls")
+        )
+
         if asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def wrapper(*args, **kwargs):
-                with LogScope(function_id, func.__qualname__, args, kwargs, serializers) as scope:
+                log_args = args[1:] if is_bound else args
+                with LogScope(function_id, function_name, log_args, kwargs, serializers) as scope:
                     result = await func(*args, **kwargs)
                     scope.log_success(result)
                     return result
+
             return wrapper
         else:
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
-                with LogScope(function_id, func.__qualname__, args, kwargs, serializers) as scope:
+                log_args = args[1:] if is_bound else args
+                with LogScope(function_id, function_name, log_args, kwargs, serializers) as scope:
                     result = func(*args, **kwargs)
                     scope.log_success(result)
                     return result
+
             return wrapper
+
     return decorator
