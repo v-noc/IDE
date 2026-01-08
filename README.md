@@ -7,7 +7,7 @@
 
 **Community & Support:** Join our Discord — [discord.gg/NKhbU9gf](https://discord.gg/J5nfPHqyBr)
 
-![V-NOC](/assets/logs.png)
+![V-NOC](/assets/v-noc.gif)
 
 ### The Problem: The Invisible Weight of Code
 
