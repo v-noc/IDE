@@ -68,6 +68,12 @@ Instead of a file tree, the core of V-NOC is an **interactive, multidimensional 
 
 ## 🚀 Quick Start
 
+The tools used in this project were chosen for speed and simplicity, allowing ideas to be prototyped, tested, and shipped quickly. Much of the system is experimental by design, which requires maximum flexibility and minimal friction during development.
+
+If the project gains enough traction and community support, I plan to migrate critical components—especially the sync pipeline—to Rust. That pipeline must be smooth, reliable, and frictionless for developers.
+
+I’ve already optimized the codebase as much as reasonably possible, but Python is unforgiving when it comes to performance mistakes. I’ve identified several performance bottlenecks, including in the call‑chain builder, and will continue investigating and optimizing other parts of the system as well.
+
 ### Prerequisites
 - **Python** 3.12+ (uv recommended)
 - **Node.js** 18+ (Yarn recommended)
