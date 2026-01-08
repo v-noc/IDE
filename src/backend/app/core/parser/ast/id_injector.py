@@ -1,6 +1,7 @@
 import libcst as cst
 from uuid import uuid4
 import re
+import textwrap
 from typing import Optional, Tuple, Dict
 
 
@@ -34,10 +35,21 @@ class IDInjector(cst.CSTTransformer):
             )
             content = pattern.sub("", content).strip()
 
+        # Format metadata lines cleanly
         kv_lines = [f"{k}: {v}" for k, v in new_metadata.items()]
         kv_text = "\n".join(kv_lines)
 
-        return f"{content}\n\n{kv_text}".strip() if content else kv_text
+        # Combine content and metadata with proper formatting
+        if content:
+            # Dedent and normalize the original content
+            dedented_content = textwrap.dedent(content).strip()
+            # Combine with metadata, ensuring proper spacing
+            result = f"{dedented_content}\n\n{kv_text}"
+        else:
+            result = kv_text
+
+        # Final dedent to ensure consistent indentation
+        return textwrap.dedent(result).strip()
 
     def _add_id_to_docstring(self, body: cst.IndentedBlock, current_doc: str | None) -> cst.IndentedBlock:
         # Check if ID exists
@@ -121,7 +133,7 @@ def inject_module_metadata(content: str, metadata: Dict[str, str]) -> Tuple[str,
     try:
         module = cst.parse_module(content)
         current_doc = module.get_docstring(clean=True)
-        
+
         injector = IDInjector()
         # Check if we actually need to change anything
         current_metadata = injector._extract_metadata(current_doc)
@@ -130,7 +142,7 @@ def inject_module_metadata(content: str, metadata: Dict[str, str]) -> Tuple[str,
             if current_metadata.get(k) != v:
                 needs_update = True
                 break
-        
+
         if not needs_update:
             return content, False
 
@@ -138,21 +150,22 @@ def inject_module_metadata(content: str, metadata: Dict[str, str]) -> Tuple[str,
         # We temporarily merge current and new metadata for the build
         combined_metadata = current_metadata.copy()
         combined_metadata.update(metadata)
-        
-        new_doc_content = injector._build_docstring(current_doc, metadata) # _build_docstring logic handles merging/replacing
+
+        # _build_docstring logic handles merging/replacing
+        new_doc_content = injector._build_docstring(current_doc, metadata)
 
         # Create new body with updated docstring
         statements = module.body
         new_body_statements = statements
 
         if current_doc is not None:
-             if (
-               statements
-               and isinstance(statements[0], cst.SimpleStatementLine)
-               and len(statements[0].body) == 1
-               and isinstance(statements[0].body[0], cst.Expr)
-               and isinstance(statements[0].body[0].value, cst.SimpleString)
-               ):
+            if (
+                statements
+                and isinstance(statements[0], cst.SimpleStatementLine)
+                and len(statements[0].body) == 1
+                and isinstance(statements[0].body[0], cst.Expr)
+                and isinstance(statements[0].body[0].value, cst.SimpleString)
+            ):
                 old_expr = statements[0].body[0]
                 new_expr = old_expr.with_changes(
                     value=cst.SimpleString(f'"""{new_doc_content}"""')

@@ -148,6 +148,12 @@ class CallResolver:
                 result.callee_id = self._extract_id_from_docstring(callee)
                 result.qname = self._extract_qualified_name(callee)
 
+                if result.callee_id is None:
+                    if "fastapi" in result.qname:
+                        print(
+                            f"No callee ID found for {result.qname} {file_path} {line}:{column}")
+                    return []
+
                 callee_for_args = callee
                 if hasattr(callee, "_original_value"):
                     callee_for_args = callee._original_value

@@ -38,7 +38,7 @@ class PhaseProcessor:
         jedi_manager: JediProjectManager,
         max_concurrent_files: int = 50,
         max_concurrent_db: int = 100,
-        file_timeout: float = 60.0,
+        file_timeout: float = 3*60.0,
         batch_size: int = 100,
     ):
         self.project_node = project_node
