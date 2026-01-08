@@ -95,19 +95,7 @@ make dev          # Start both Backend and Frontend
 > [!TIP]
 > Use `make help` to see all available commands.
 
----
 
-## 🖼️ Gallery
-
-````carousel
-![Logs Attribution](/assets/logs.png)
-<!-- slide -->
-![Focus Mode](/assets/focus.png)
-<!-- slide -->
-![Function Isolation](/assets/isolate_function.png)
-````
-
----
 
 ## 🤝 Community & License
 
