@@ -205,7 +205,7 @@ class ChangeDetector:
             moved,
         )
 
-    async def detect_changes(self, scan_result: ScanResult) -> ChangeSet:
+    async def detect_changes(self, scan_result: ScanResult, project_id: str) -> ChangeSet:
         """
         Compare current files from disk with those in the DB.
         """
@@ -214,8 +214,8 @@ class ChangeDetector:
 
         # 1) Fetch DB state in parallel
         db_file_snapshots, db_folder_snapshots = await asyncio.gather(
-            self.repos.file_repo.get_all_files_snapshot(),
-            self.repos.folder_repo.get_all_folders_snapshot(),
+            self.repos.file_repo.get_project_files(project_id),
+            self.repos.folder_repo.get_project_folders(project_id),
         )
 
         (

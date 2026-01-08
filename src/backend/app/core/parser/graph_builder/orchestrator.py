@@ -111,6 +111,8 @@ class GraphBuilderOrchestrator:
         await self.collector.ensure_project_root()
         self.project_node = self.collector.project_node
         self.phase_processor.project_node = self.project_node
+        project_id = self.project_node.id
+        print(f"project_id {project_id}")
 
         # 1. Scan Disk
         scan_result = self.file_scanner.scan()
@@ -121,7 +123,7 @@ class GraphBuilderOrchestrator:
         )
 
         # 2. Detect Changes
-        change_set = await self.change_detector.detect_changes(scan_result)
+        change_set = await self.change_detector.detect_changes(scan_result, project_id)
         logger.info(f"Detected changes: {change_set}")
 
         if (
