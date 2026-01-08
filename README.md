@@ -44,7 +44,11 @@ In a traditional IDE, every piece of information is a "side quest."
 In V-NOC, **everything is already there.** Logs, documentation, and code are all part of the same node in ArangoDB.
 
 ### 3. Flexibility Over Rigidity
-Knowledge graphs are flexible. V-NOC allows you to view your project based on your current needs—high-level architecture or deep-dive execution traces—without ever moving a file.
+Graphs are flexible by nature. V‑NOC lets you view and work on your project based on what you need at the moment—whether that’s a high‑level system overview or a deep dive into a single execution path—without moving or restructuring files.
+
+Even in a large codebase, you can isolate and focus on one feature at a time. This is similar to how hardware is repaired: if the power supply fails, you fix the power supply. You don’t need to understand or load the motherboard, RAM, or every other component. You only interact with what’s relevant.
+
+V‑NOC applies the same principle to software. Dependencies are connected and visible, making it easy to isolate a feature, create a sandbox or playground for it, and run or test it independently—manually or with an agent. No unnecessary context, no side quests, just the parts you need to get the job done.
 
 ![Advanced Visualization](/assets/base_class_mro.png)
 
