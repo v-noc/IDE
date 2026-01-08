@@ -58,16 +58,11 @@ V‑NOC applies the same principle to software. Dependencies are connected and v
 
 Instead of a file tree, the core of V-NOC is an **interactive, multidimensional map.**
 
-- **The Code is the Database:** Your project is stored as nodes (functions, classes, variables) and edges (calls, imports, dependencies).
-- **Hierarchical Context:** Logs follow the code's call graph. You see the "why" and the "how" in one view.
-- **The AI Superpower:** We give AI agents the structured context they need. They don't guess; they query the graph.
+- **The Code is the Database:** Your project is stored as nodes (functions, classes) and edges (calls, imports, dependencies).
+- **Hierarchical Context:** Logs follow the code's call graph. You see the "why" ,"where" and the "how" in one view.
+- **The AI Superpower:** We give AI agents the structured context they need. They don't guess; they query the graph. and easy to audit there work
 
-| Feature | Legacy IDE | V-NOC |
-| :--- | :--- | :--- |
-| **Storage** | Flat File System | ArangoDB Graph |
-| **Navigation** | Folders & Grep | Call Graph Traversal |
-| **Context** | Manual Linking | Automated Attribution |
-| **AI** | Text-based RAG | Graph-native Context |
+
 
 ---
 
