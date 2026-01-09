@@ -37,7 +37,7 @@ export default function Layout({ navbar, leftSidebar, main }: LayoutProps) {
           maxSize={30}
           onCollapse={leftPanel.onCollapse}
           onExpand={leftPanel.onExpand}
-          className="relative border-r bg-[var(--left-sidebar-color)] transition-colors"
+          className="relative border-r bg-(--left-sidebar-color) transition-colors"
         >
           {/* Collapse trigger */}
           <button
@@ -56,7 +56,7 @@ export default function Layout({ navbar, leftSidebar, main }: LayoutProps) {
         {/* Main Content */}
         <ResizablePanel defaultSize={80} className="flex flex-col">
           {/* Navbar Slot */}
-          <nav className="border-b bg-[var(--navbar-color)] transition-colors">
+          <nav className="border-b bg-(--navbar-color) transition-colors">
             {navbar}
           </nav>
 
