@@ -71,3 +71,60 @@ export function getSiblings(
   const children = parentNode.children ?? [];
   return children.filter((child) => child._key !== node._key) as AnyNodeTree[];
 }
+
+/**
+ * Check if any Group node exists in tree
+ */
+export function containsGroup(node: AnyNodeTree): boolean {
+  if (node.node_type === 'group') return true;
+  const children = (node as { children?: AnyNodeTree[] }).children ?? [];
+  return children.some(containsGroup);
+}
+
+/**
+ * Flatten Group nodes by lifting their children
+ */
+export function flattenGroups(node: AnyNodeTree): AnyNodeTree[] {
+  if (node.node_type === 'group') {
+    const children = (node as { children?: AnyNodeTree[] }).children ?? [];
+    return children.flatMap(flattenGroups);
+  }
+
+  const clone = { ...node } as AnyNodeTree;
+  const children = (node as { children?: AnyNodeTree[] }).children ?? [];
+
+  if (children.length > 0) {
+    (clone as { children?: AnyNodeTree[] }).children = children.flatMap(flattenGroups);
+  }
+
+  return [clone];
+}
+
+/**
+ * Extract short focus token from node key
+ */
+export function extractShortFocusToken(key: string): string {
+  const uuidRegex = /([0-9a-fA-F]{8})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-([0-9a-fA-F]{4})-([0-9a-fA-F]{12})/;
+  const match = key.match(uuidRegex);
+  return match ? match[4] : key.slice(0, 6);
+}
+
+/**
+ * Find node by focus token
+ */
+export function findNodeByFocusToken(
+  root: AnyNodeTree,
+  token: string
+): AnyNodeTree | null {
+  const stack: AnyNodeTree[] = [root];
+
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (extractShortFocusToken(node._key) === token) return node;
+
+    const children = (node as { children?: AnyNodeTree[] }).children ?? [];
+    stack.push(...[...children].reverse());
+  }
+
+  return null;
+}

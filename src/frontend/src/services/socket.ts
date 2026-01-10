@@ -1,7 +1,15 @@
-import type { DefaultEventsMap } from '@socket.io/component-emitter';
-import io, { Socket } from 'socket.io-client';
+import { useEffect } from 'react';
 
-let socket: Socket<DefaultEventsMap, DefaultEventsMap> | null = null;
+// ... existing code ...
+
+export const useSocketConnection = () => {
+  useEffect(() => {
+    initSocket();
+    return () => {
+      disconnectSocket();
+    };
+  }, []);
+};
 
 const getSocketConfig = (): { url: string; path: string } => {
   const envUrl = import.meta.env.VITE_SOCKET_URL;

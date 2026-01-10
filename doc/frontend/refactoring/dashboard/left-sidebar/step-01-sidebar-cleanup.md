@@ -1,111 +1,195 @@
-# Step 1: Left Sidebar - Cleanup SideBar.tsx
+# Step 1: Left Sidebar - Modal Store Pattern (Professional)
 
 ## Goal
-Simplify `SideBar.tsx` by extracting logic into hooks.
-
-## Current Files
-
-```
-Sidebar/components/
-├── SideBar.tsx           # Main component (~170 lines)
-├── ProjectTree.tsx       # Tree rendering
-├── SelectNodeDialog.tsx  # Node selection modal
-├── TreeNode/            # Node components
-└── VirtualFolders/      # Virtual folder feature
-```
+Eliminate the "Dialog Explosion" problem by hoisting modal state globally.
 
 ---
 
-## What to Refactor in SideBar.tsx
+## 🚨 Problem: Dialog in Every Node
 
-The component likely has:
-- Tree filtering logic
-- Expansion state management
-- Search functionality
-- Event handlers
-
-Let's extract into focused hooks.
-
----
-
-## NEW: `Sidebar/hooks/useTreeFilter.ts`
+Current anti-pattern - every TreeNode has its own dialog state:
 
 ```typescript
-import { useMemo, useState } from 'react';
+// ❌ CURRENT: Every node instance has these
+const TreeNode = ({ node }) => {
+  const [isCreateGroupsDialogOpen, setIsCreateGroupsDialogOpen] = useState(false);
+  const [isAddCallDialogOpen, setIsAddCallDialogOpen] = useState(false);
+  const [isManageGroupDialogOpen, setIsManageGroupDialogOpen] = useState(false);
+  // ... more useState for each dialog
+
+  return (
+    <>
+      <NodeContent />
+      <CreateGroupsDialog 
+        isOpen={isCreateGroupsDialogOpen} 
+        onClose={() => setIsCreateGroupsDialogOpen(false)} 
+      />
+      <AddCallDialog isOpen={isAddCallDialogOpen} {...} />
+      {/* 500 nodes = 500 hidden dialog instances in memory! */}
+    </>
+  );
+};
+```
+
+**Impact:**
+- 500 files = 500 dialog closures in memory
+- Heavy DOM weight
+- Hard to virtualize
+- SRP violation - TreeNode knows about Groups, Calls, Prompts, etc.
+
+---
+
+## ✅ Solution: Global Modal Store
+
+Only **ONE** instance of each dialog exists, controlled by a global store.
+
+### NEW: `features/Dashboard/store/useSidebarModalStore.ts`
+
+```typescript
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
 import type { AnyNodeTree } from '@/types/project';
 
-function filterTree(nodes: AnyNodeTree[], query: string): AnyNodeTree[] {
-  if (!query.trim()) return nodes;
+// All modal types in the sidebar
+type ModalType = 
+  | 'create-group' 
+  | 'manage-group' 
+  | 'add-call' 
+  | 'prompt-builder' 
+  | 'edit-virtual-folder'
+  | 'select-node'
+  | null;
+
+interface SidebarModalState {
+  // State
+  activeModal: ModalType;
+  targetNode: AnyNodeTree | null;
   
-  const lowerQuery = query.toLowerCase();
-  
-  return nodes.reduce<AnyNodeTree[]>((acc, node) => {
-    const nameMatch = node.name.toLowerCase().includes(lowerQuery);
-    
-    const children = 'children' in node ? node.children as AnyNodeTree[] : [];
-    const filteredChildren = filterTree(children, query);
-    
-    if (nameMatch || filteredChildren.length > 0) {
-      acc.push({
-        ...node,
-        children: filteredChildren,
-      } as AnyNodeTree);
-    }
-    
-    return acc;
-  }, []);
+  // Actions
+  openModal: (type: ModalType, node: AnyNodeTree) => void;
+  closeModal: () => void;
 }
 
-export function useTreeFilter(nodes: AnyNodeTree[] | undefined) {
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const filteredNodes = useMemo(() => {
-    if (!nodes) return [];
-    if (!searchQuery.trim()) return nodes;
-    return filterTree(nodes, searchQuery);
-  }, [nodes, searchQuery]);
-  
-  return {
-    searchQuery,
-    setSearchQuery,
-    filteredNodes,
-    isFiltering: searchQuery.trim().length > 0,
-  };
+export const useSidebarModalStore = create<SidebarModalState>()(
+  devtools(
+    (set) => ({
+      activeModal: null,
+      targetNode: null,
+
+      openModal: (type, node) => set({ 
+        activeModal: type, 
+        targetNode: node 
+      }),
+
+      closeModal: () => set({ 
+        activeModal: null, 
+        targetNode: null 
+      }),
+    }),
+    { name: 'sidebar-modals' }
+  )
+);
+
+// Selectors for performance
+export const useActiveModal = () => useSidebarModalStore((s) => s.activeModal);
+export const useTargetNode = () => useSidebarModalStore((s) => s.targetNode);
+export const useOpenModal = () => useSidebarModalStore((s) => s.openModal);
+export const useCloseModal = () => useSidebarModalStore((s) => s.closeModal);
+```
+
+---
+
+## NEW: `Sidebar/components/SidebarDialogs.tsx`
+
+Render dialogs **once** at the sidebar root:
+
+```typescript
+import { useSidebarModalStore } from '@/features/Dashboard/store/useSidebarModalStore';
+import CreateGroupsDialog from './dialogs/CreateGroupsDialog';
+import SelectNodeDialog from './SelectNodeDialog';
+import AddCallDialog from './dialogs/AddCallDialog';
+import PromptBuilderDialog from './dialogs/PromptBuilderDialog';
+import ManageGroupDialog from './dialogs/ManageGroupDialog';
+
+export function SidebarDialogs() {
+  const { activeModal, targetNode, closeModal } = useSidebarModalStore();
+
+  // No node = no dialogs
+  if (!targetNode) return null;
+
+  return (
+    <>
+      <CreateGroupsDialog
+        open={activeModal === 'create-group'}
+        onOpenChange={(open) => !open && closeModal()}
+        node={targetNode}
+      />
+
+      <SelectNodeDialog
+        open={activeModal === 'select-node'}
+        onOpenChange={(open) => !open && closeModal()}
+        sourceNode={targetNode}
+      />
+
+      <AddCallDialog
+        open={activeModal === 'add-call'}
+        onOpenChange={(open) => !open && closeModal()}
+        node={targetNode}
+      />
+
+      <PromptBuilderDialog
+        open={activeModal === 'prompt-builder'}
+        onOpenChange={(open) => !open && closeModal()}
+        node={targetNode}
+      />
+
+      <ManageGroupDialog
+        open={activeModal === 'manage-group'}
+        onOpenChange={(open) => !open && closeModal()}
+        node={targetNode}
+      />
+    </>
+  );
 }
 ```
 
 ---
 
-## Simplified SideBar.tsx Structure
+## Updated: `Sidebar/components/SideBar.tsx`
+
+Now clean and composable:
 
 ```typescript
-// Sidebar/components/SideBar.tsx
-import { useTreeFilter } from '../hooks/useTreeFilter';
-import useProjectStore from '@/features/Dashboard/store/useProjectStore';
+import { SidebarDialogs } from './SidebarDialogs';
 import { ProjectTree } from './ProjectTree';
 import { SearchInput } from './SearchInput';
+import { useTreeFilter } from '../hooks/useTreeFilter';
+import useProjectStore from '@/features/Dashboard/store/useProjectStore';
 
 export default function SideBar() {
   const projectData = useProjectStore((s) => s.projectData);
-  const { searchQuery, setSearchQuery, filteredNodes } = useTreeFilter(
+  const { filteredNodes, searchQuery, setSearchQuery } = useTreeFilter(
     projectData?.children
   );
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header with search */}
+    <div className="flex flex-col h-full">
+      {/* Header */}
       <div className="p-3 border-b">
         <SearchInput
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Search..."
+          placeholder="Search files..."
         />
       </div>
 
       {/* Tree */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto">
         <ProjectTree nodes={filteredNodes} />
       </div>
+
+      {/* Dialogs - Single instance at root */}
+      <SidebarDialogs />
     </div>
   );
 }
@@ -113,52 +197,27 @@ export default function SideBar() {
 
 ---
 
-## NEW: `Sidebar/components/SearchInput.tsx`
+## Benefits
 
-```typescript
-import { Search, X } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-
-interface SearchInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}
-
-export function SearchInput({ value, onChange, placeholder }: SearchInputProps) {
-  return (
-    <div className="relative">
-      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <Input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="pl-8 pr-8"
-      />
-      {value && (
-        <button
-          onClick={() => onChange('')}
-          className="absolute right-2 top-1/2 -translate-y-1/2"
-        >
-          <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-        </button>
-      )}
-    </div>
-  );
-}
-```
+| Metric | Before | After |
+|--------|--------|-------|
+| Dialog instances | 500+ (one per node) | 5 (one per type) |
+| useState in TreeNode | 6+ | 0 |
+| TreeNode lines | ~150 | ~50 |
+| Memory usage | High | Low |
+| Virtualization ready | No | Yes |
 
 ---
 
 ## Verification
 
-- [ ] Search still filters tree
-- [ ] Tree still renders correctly
-- [ ] Expansion still works
+- [ ] Dialogs still open from context menu
+- [ ] Correct node is passed to dialog
+- [ ] Dialog closes properly
+- [ ] Memory usage is lower (check React DevTools)
 
 ---
 
 ## Next Step
 
-👉 [step-02-tree-node.md](./step-02-tree-node.md)
+👉 [step-02-tree-node.md](./step-02-tree-node.md) - Clean TreeNode component

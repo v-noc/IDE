@@ -1,61 +1,47 @@
-# Step 1: Layout - Extract Theme Logic
+# Step 1: Layout - Theme as Derived State (React 19)
 
 ## Goal
-Move theme logic out of `Layout.tsx` into a dedicated hook.
+Replace `useEffect` sync with **derived state** - the modern React 19 pattern.
 
-## Why
-`Layout.tsx` (231 lines) mixes:
-- Theme resolution logic (lines 10-56)
-- Theme merging and normalization
-- Panel collapse/expand state
-- CSS variable generation
-- JSX rendering
+## Why This Matters
 
-This makes it hard to test and maintain.
-
----
-
-## Current State
-
+❌ **Old Pattern (Anti-pattern in React 19):**
 ```typescript
-// Layout.tsx - Theme logic mixed in
+// Calculates theme, then syncs to store via useEffect
+// Causes double-render: first with old value, then with new
+useEffect(() => {
+  if (resolvedTheme !== undefined) {
+    setTheme(resolvedTheme); // Side effect!
+  }
+}, [resolvedTheme, setTheme]);
+```
 
-const hasEffectiveTheme = (t: ThemeConfig | undefined): boolean => { ... }
-const THEME_KEYS = [ ... ]
-const normalizeTheme = (t: ThemeConfig | undefined | null): ThemeConfig | undefined => { ... }
-const mergeThemes = (baseTheme, overrideTheme): ThemeConfig => { ... }
-
-const Layout = ({ main, navbar, leftSidebar, rightSidebar }) => {
-  const { theme, setTheme } = useThemeStore();
-  const { projectData, selectedNode } = useProjectStore();
-  
-  // Complex path-finding logic
-  const selectedPath = useMemo(() => { ... }, [...]);
-  
-  // Complex theme resolution
-  const resolvedTheme = useMemo(() => { ... }, [...]);
-  
-  useEffect(() => {
-    if (resolvedTheme !== undefined) {
-      setTheme(resolvedTheme);
-    }
-  }, [resolvedTheme, setTheme]);
-  
-  // ... render
-};
+✅ **New Pattern (Derived State):**
+```typescript
+// Theme is calculated and returned directly
+// No sync, no double-render, no tearing
+const { theme, cssVariables } = useResolvedTheme();
 ```
 
 ---
 
-## What to Create
+## Key React 19 Principles
 
-### NEW: `features/Dashboard/hooks/useResolvedTheme.ts`
+1. **No `useEffect` for state sync** - React docs explicitly advise against this
+2. **Derived state** - Calculate on-the-fly, don't store duplicates
+3. **CSS Variables** - Browser handles repaint, React doesn't re-render children
+4. **React Compiler ready** - When you enable it, useMemo becomes optional
+
+---
+
+## NEW: `features/Dashboard/hooks/useResolvedTheme.ts`
 
 ```typescript
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import type { AnyNodeTree, ThemeConfig, ProjectNodeTree } from '@/types/project';
-import { useThemeStore } from '../store/useThemeStore';
 import useProjectStore from '../store/useProjectStore';
+
+// NOTE: We removed useThemeStore. No syncing to external store.
 
 // --- Theme utility functions ---
 
@@ -85,28 +71,26 @@ function normalizeTheme(t: ThemeConfig | undefined | null): ThemeConfig | undefi
 }
 
 function mergeThemes(
-  baseTheme: ThemeConfig | undefined,
-  overrideTheme: ThemeConfig | undefined
+  base: ThemeConfig | undefined,
+  override: ThemeConfig | undefined
 ): ThemeConfig {
-  const result: ThemeConfig = { ...(baseTheme ?? {}) };
+  const result: ThemeConfig = { ...(base ?? {}) };
   for (const key of THEME_KEYS) {
-    const value = overrideTheme?.[key];
+    const value = override?.[key];
     if (value) result[key] = value;
   }
   return result;
 }
 
-// --- Path finding ---
-
 function findSelectedPath(
   root: ProjectNodeTree | null,
-  selectedNode: AnyNodeTree | null
+  selected: AnyNodeTree | null
 ): AnyNodeTree[] {
-  if (!root || !selectedNode) return [];
+  if (!root || !selected) return [];
 
   const dfs = (node: AnyNodeTree, acc: AnyNodeTree[]): boolean => {
     acc.push(node);
-    if (node._id === selectedNode._id) return true;
+    if (node._id === selected._id) return true;
     if (node.children) {
       for (const child of node.children as AnyNodeTree[]) {
         if (dfs(child, acc)) return true;
@@ -121,19 +105,22 @@ function findSelectedPath(
   return [];
 }
 
-// --- Main hook ---
+// --- Main hook: Pure derived state ---
 
 export function useResolvedTheme() {
-  const { theme, setTheme } = useThemeStore();
-  const { projectData, selectedNode } = useProjectStore();
+  // 1. Select only what's needed (Zustand selector pattern)
+  const projectData = useProjectStore((s) => s.projectData);
+  const selectedNode = useProjectStore((s) => s.selectedNode);
 
+  // 2. Derive the path (memoized for DFS performance)
+  // With React Compiler, this useMemo becomes optional
   const selectedPath = useMemo(
     () => findSelectedPath(projectData, selectedNode),
     [projectData, selectedNode]
   );
 
-  const resolvedTheme = useMemo(() => {
-    // Merge themes along the path from root to selected node
+  // 3. Derive the theme (pure calculation, no side effects)
+  const theme = useMemo(() => {
     if (selectedNode && selectedPath.length > 0) {
       let merged: ThemeConfig | undefined = undefined;
       for (const node of selectedPath) {
@@ -141,21 +128,12 @@ export function useResolvedTheme() {
       }
       return hasEffectiveTheme(merged) ? merged : undefined;
     }
-
-    // No node selected → use project theme if available
     const projectTheme = normalizeTheme(projectData?.theme_config);
     return hasEffectiveTheme(projectTheme) ? projectTheme : undefined;
-  }, [selectedNode, selectedPath, projectData?.theme_config]);
+  }, [selectedNode, selectedPath, projectData]);
 
-  // Sync to store
-  useEffect(() => {
-    if (resolvedTheme !== undefined) {
-      setTheme(resolvedTheme);
-    }
-  }, [resolvedTheme, setTheme]);
-
-  // Generate CSS variables
-  const themeStyles: React.CSSProperties = theme
+  // 4. Generate CSS variables (pure derived data)
+  const cssVariables: React.CSSProperties = theme
     ? {
         '--navbar-color': theme.navbarColor,
         '--left-sidebar-color': theme.leftSidebarColor,
@@ -164,58 +142,57 @@ export function useResolvedTheme() {
         '--text-color': theme.textColor,
         '--icon-color': theme.iconColor,
         '--card-color': theme.cardColor,
-      }
+      } as React.CSSProperties
     : {};
 
-  return { theme, themeStyles };
+  return { theme, cssVariables };
 }
 ```
 
 ---
 
-## Update `Layout.tsx`
+## What We Removed
 
-### Before: 231 lines
-### After: ~100 lines
+- ❌ `useThemeStore` - No global theme sync
+- ❌ `useEffect` for syncing - Causes double-renders
+- ❌ `setTheme()` calls - No pushing to store
 
-```diff
-- import { useThemeStore } from "../store/useThemeStore";
-- import type { AnyNodeTree, ThemeConfig } from "@/types/project";
-- import useProjectStore from "../store/useProjectStore";
-+ import { useResolvedTheme } from "../hooks/useResolvedTheme";
+---
 
-- const hasEffectiveTheme = (t: ThemeConfig | undefined): boolean => { ... }
-- const THEME_KEYS = [ ... ]  
-- const normalizeTheme = (t: ThemeConfig | undefined | null): ThemeConfig | undefined => { ... }
-- const mergeThemes = (baseTheme, overrideTheme): ThemeConfig => { ... }
+## Optional: Theme Context with `use()`
 
-const Layout = ({ main, navbar, leftSidebar, rightSidebar }) => {
-  const [isRightOpen, setIsRightOpen] = useState(true);
-  const [isLeftOpen, setIsLeftOpen] = useState(true);
-  const leftPanelRef = useRef<ImperativePanelHandle>(null);
+If deep components need the theme object (not just CSS variables):
 
-- const { theme, setTheme } = useThemeStore();
-- const { projectData, selectedNode } = useProjectStore();
-- 
-- const selectedPath = useMemo(() => { ... }, [...]);
-- const resolvedTheme = useMemo(() => { ... }, [...]);
-- 
-- useEffect(() => {
--   if (resolvedTheme !== undefined) {
--     setTheme(resolvedTheme);
--   }
-- }, [resolvedTheme, setTheme]);
-- 
-- const style = theme ? { ... } : {};
-+ const { themeStyles } = useResolvedTheme();
+```typescript
+// ThemeContext.tsx
+import { createContext } from 'react';
+import type { ThemeConfig } from '@/types/project';
+
+export const ThemeContext = createContext<ThemeConfig | null>(null);
+
+// Layout.tsx
+import { ThemeContext } from './ThemeContext';
+
+export default function Layout({ navbar, leftSidebar, main }) {
+  const { theme, cssVariables } = useResolvedTheme();
 
   return (
--   <div className="..." style={style}>
-+   <div className="..." style={themeStyles}>
-      {/* ... rest unchanged */}
-    </div>
+    <ThemeContext.Provider value={theme}>
+      <div style={cssVariables}>
+        {/* children */}
+      </div>
+    </ThemeContext.Provider>
   );
-};
+}
+
+// DeepComponent.tsx - React 19 use() API
+import { use } from 'react';
+import { ThemeContext } from './ThemeContext';
+
+function DeepComponent() {
+  const theme = use(ThemeContext); // React 19 - replaces useContext
+  return <div style={{ color: theme?.textColor }}>...</div>;
+}
 ```
 
 ---
@@ -223,12 +200,12 @@ const Layout = ({ main, navbar, leftSidebar, rightSidebar }) => {
 ## Verification
 
 - [ ] Theme still applies when selecting nodes
-- [ ] Theme inheritance along path still works
-- [ ] Layout.tsx is now ~100 lines
-- [ ] No TypeScript errors
+- [ ] No console warnings about useEffect
+- [ ] Fewer re-renders (check React DevTools)
+- [ ] `useThemeStore` can be deleted if unused elsewhere
 
 ---
 
 ## Next Step
 
-👉 [Step 2: Layout Composition](./step-02-layout-composition.md)
+👉 [Step 2: Panel State Hook](./step-02-layout-composition.md)
