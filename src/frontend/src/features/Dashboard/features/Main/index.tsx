@@ -16,23 +16,16 @@ import { useGetDocuments, useUpdateDocument } from "./service/useDocuments";
 import { debounce } from "remeda";
 import Canvas from "./components/Canvas";
 import type { CallNodeTree } from "@/types/project";
-import {
-  useSocketListener,
-  useJoinProjectRoom,
-} from "../../hooks/useSocketListener";
-import { useQueryClient } from "@tanstack/react-query";
-
 const MainCanvas = () => {
-  const queryClient = useQueryClient();
   const {
     selectedNode,
     secondarySelectedNode,
     setSelectedNode,
     setSecondarySelectedNode,
     selectedDocumentId,
-    projectData,
     setSelectedDocumentId,
   } = useProjectStore();
+
   const effectiveNode = useMemo(() => {
     if (secondarySelectedNode) {
       if ((secondarySelectedNode as CallNodeTree).target) {
@@ -46,38 +39,6 @@ const MainCanvas = () => {
     return selectedNode;
   }, [secondarySelectedNode, selectedNode]);
 
-  const elementId = effectiveNode?._key ?? "";
-
-  // Join the project room to receive project-specific events
-  // Backend emits to rooms named by project ID (_id field)
-  useJoinProjectRoom(projectData?._id);
-
-  // Listen for sync events
-  useSocketListener({
-    event: "sync_started",
-    callback: (data) => {
-      console.log("Sync started:", data);
-    },
-  });
-
-  useSocketListener({
-    event: "sync_complete",
-    callback: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["projectTree", projectData?._key],
-      });
-      queryClient.refetchQueries({
-        queryKey: ["code", elementId],
-      });
-    },
-  });
-
-  useSocketListener({
-    event: "sync_error",
-    callback: (data) => {
-      console.error("Sync error:", data);
-    },
-  });
   const [tabValue, setTabValue] = useState("docs");
 
   const { suffixName, displayPath } = useMemo(() => {
@@ -246,9 +207,9 @@ const MainCanvas = () => {
                       document={
                         selectedDocument
                           ? {
-                              id: selectedDocument._key,
-                              data: selectedDocument.data,
-                            }
+                            id: selectedDocument._key,
+                            data: selectedDocument.data,
+                          }
                           : undefined
                       }
                       onChange={(data: string) => {
