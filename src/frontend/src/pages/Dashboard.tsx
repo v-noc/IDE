@@ -1,3 +1,4 @@
+import { useParams } from "react-router-dom";
 import Layout from "@/features/Dashboard/components/Layout";
 import SideBar from "@/features/Dashboard/features/Sidebar/components/SideBar";
 import Navbar from "@/features/Dashboard/features/Navbar/componets/Navbar";
@@ -7,18 +8,22 @@ import MainWithRightSidebar from "@/features/Dashboard/features/Main/MainWithRig
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { useEffect } from "react";
 import { useGroupFlattening } from "@/features/Dashboard/hooks/useGroupFlattening";
-import { useSocketConnection } from "@/services/socket";
+import { useSocketSync, useProjectRoom } from "@/services/socket";
 
 /**
  * Dashboard Page - Entry point for the IDE dashboard.
- * Orchestrates the high-level layout and global side effects.
+ * Orchestrates the high-level layout and global sub-systems.
  */
 const Dashboard = () => {
+  const { projectId } = useParams();
   const { selectedNode, projectData, setSelectedNode } = useProjectStore();
 
-  // Data processing hooks
+  // Socket and Data Sync hooks
+  useSocketSync();
+  useProjectRoom(projectId);
+
+  // Transformation hooks
   useGroupFlattening();
-  useSocketConnection();
 
   // Set default selection to project root if nothing is selected
   useEffect(() => {
