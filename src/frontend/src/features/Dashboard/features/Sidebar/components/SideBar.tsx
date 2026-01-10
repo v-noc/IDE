@@ -24,7 +24,7 @@ export default function SideBar() {
 
       {/* Tree */}
       <div className="flex-1 overflow-y-auto">
-        <ProjectTree projectTree={filteredNodes} />
+        <ProjectTree projectTree={projectData as AnyNodeTree} />
       </div>
 
       {/* Dialogs - Single instance at root */}
