@@ -12,9 +12,9 @@ export function useTreeNodeActions(node: ContainerNodeTree) {
   const projectKey = useProjectStore((s) => s.projectData?._key ?? '');
 
   // Lazy initialization - only create mutations when called
-  const addCall = useAddCall(node._key, projectKey);
+  const addCall = useAddCall(node?._key ?? '', projectKey);
   const removeCall = useRemoveCall(projectKey);
-  const deleteGroup = useDeleteGroup(node._key, projectKey);
+  const deleteGroup = useDeleteGroup(node?._key ?? '', projectKey);
 
   const handleAddCall = useCallback((targetNode: AnyNodeTree) => {
     addCall.mutate({
@@ -29,9 +29,9 @@ export function useTreeNodeActions(node: ContainerNodeTree) {
   }, [removeCall]);
 
   const handleDeleteGroup = useCallback(() => {
-    if (node.node_type !== 'group') return;
+    if (!node || node.node_type !== 'group') return;
     deleteGroup.mutate();
-  }, [node.node_type, deleteGroup]);
+  }, [node, deleteGroup]);
 
   return {
     handleAddCall,

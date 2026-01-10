@@ -16,14 +16,15 @@ export function useTreeNodeState(
   const activeNodeId = useProjectStore((s) => s.activeNodeId);
   const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
 
-  const isOpen = expandedNodeIds.includes(node._key);
-  const isSelected = selectedNodeKey === node._key || secondarySelectedKey === node._key;
-  const isActive = activeNodeId === node._key;
+  const isOpen = node ? expandedNodeIds.includes(node._key) : false;
+  const isSelected = node ? (selectedNodeKey === node._key || secondarySelectedKey === node._key) : false;
+  const isActive = node ? activeNodeId === node._key : false;
 
   const hasChildren = useMemo(() => {
+    if (!node) return false;
     const children = node.children ?? [];
     return children.some((child) => childFilter(child as ContainerNodeTree));
-  }, [node.children, childFilter]);
+  }, [node, childFilter]);
 
   return {
     isOpen,

@@ -22,12 +22,14 @@ export function useTreeNodeHandlers(node: ContainerNodeTree) {
 
   // Toggle expansion
   const handleToggle = useCallback((e: React.MouseEvent) => {
+    if (!node) return;
     e.stopPropagation();
     toggleNodeExpansion(node._key);
-  }, [node._key, toggleNodeExpansion]);
+  }, [node, toggleNodeExpansion]);
 
   // Select node
   const handleSelectNode = useCallback(() => {
+    if (!node) return;
     if (secondarySelectedNode) {
       setSecondarySelectedNode(null);
     }
@@ -37,6 +39,7 @@ export function useTreeNodeHandlers(node: ContainerNodeTree) {
 
   // Focus (zoom into node)
   const handleFocus = useCallback(() => {
+    if (!node) return;
     const lastFocused = focusStack[focusStack.length - 1];
     if (lastFocused?._key === node._key) return;
     pushFocus(node as AnyNodeTree);
@@ -44,11 +47,13 @@ export function useTreeNodeHandlers(node: ContainerNodeTree) {
 
   // Expand/collapse
   const handleExpand = useCallback(() => {
+    if (!node) return;
     toggleNodeExpansion(node._key);
-  }, [node._key, toggleNodeExpansion]);
+  }, [node, toggleNodeExpansion]);
 
   // Context menu actions - dispatch to modal store
   const handleContextAction = useCallback((action: string) => {
+    if (!node) return;
     switch (action) {
       case 'create-group':
       case 'manage-group':
@@ -58,7 +63,7 @@ export function useTreeNodeHandlers(node: ContainerNodeTree) {
         openModal(action as any, node as AnyNodeTree);
         break;
       case 'copy-path':
-        navigator.clipboard.writeText(node.path ?? node.name);
+        navigator.clipboard.writeText((node as any).path ?? node.name);
         break;
     }
   }, [node, openModal]);

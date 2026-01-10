@@ -38,3 +38,36 @@ export function shouldRenderChild(node: ContainerNodeTree): boolean {
 
   return true;
 }
+
+/**
+ * Recursively find the parent of a node in the tree.
+ */
+export function getParentNode(
+  node: AnyNodeTree,
+  root: ContainerNodeTree
+): ContainerNodeTree | null {
+  if (root.children?.some((child) => child._key === node._key)) {
+    return root;
+  }
+  for (const child of root.children ?? []) {
+    const parent = getParentNode(node, child as ContainerNodeTree);
+    if (parent) {
+      return parent;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find all siblings of a node.
+ */
+export function getSiblings(
+  node: AnyNodeTree,
+  root: ContainerNodeTree
+): AnyNodeTree[] {
+  const parentNode = getParentNode(node, root);
+  if (!parentNode) return [];
+  const children = parentNode.children ?? [];
+  return children.filter((child) => child._key !== node._key) as AnyNodeTree[];
+}
