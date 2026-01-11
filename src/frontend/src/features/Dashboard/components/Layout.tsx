@@ -67,9 +67,9 @@ export default function Layout({ navbar, leftSidebar, main }: LayoutProps) {
               <button
                 onClick={leftPanel.open}
                 aria-label="Expand sidebar"
-                className="absolute left-4 top-4 z-50 rounded-lg bg-white p-2 shadow-md hover:bg-gray-50"
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-50 p-1 py-2 bg-white border rounded-r-md shadow hover:bg-gray-50 cursor-pointer hover:shadow-md"
               >
-                <ChevronRight size={16} />
+                <ChevronRight className="h-4 w-4 translate-x-1" />
               </button>
             )}
 
