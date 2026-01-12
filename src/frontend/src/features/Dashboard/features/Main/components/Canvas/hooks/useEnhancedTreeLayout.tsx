@@ -11,7 +11,7 @@ import { DynamicIcon } from "@/components/DynamicIcon";
 import type {
   EnhancedNodeData,
   NodeMetadata,
-} from "../components/EnhancedNode";
+} from "../components/nodes/EnhancedNode";
 
 const EMPTY_METADATA_MAP = new Map<string, NodeMetadata>();
 
