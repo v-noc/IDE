@@ -27,27 +27,27 @@ export default function Sandbox() {
       onValueChange={setActiveTab}
       className="flex flex-col h-full"
     >
-      <TabsList className="p-0 w-full bg-[#f9f9f9] flex items-center border-b">
+      <TabsList className="p-0 w-full bg-[#f9f9f9] flex items-center">
         <TabsTrigger
           value="playground"
-          className="rounded-none shadow-sm data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white border-r h-10 px-4"
+          className="rounded-none shadow-sm  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
         >
           Playground
         </TabsTrigger>
         <TabsTrigger
           value="test"
-          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white border-r h-10 px-4"
+          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
         >
           Test
         </TabsTrigger>
         <TabsTrigger
           value="logs"
-          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white h-10 px-4"
+          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
         >
           Logs
         </TabsTrigger>
 
-        <div className="bg-white flex-1 flex items-center justify-end gap-2 pr-4 h-full">
+        <div className="border bg-white justify-end flex items-center gap-2 pr-2 w-full h-full">
           {activeTab === "playground" ? (
             <>
               <Button
@@ -89,7 +89,7 @@ export default function Sandbox() {
         </TabsContent>
 
         <TabsContent value="logs" className="m-0 h-full overflow-hidden outline-none">
-          <div className="h-full px-4 py-4 overflow-y-auto">
+          <div className="h-full p-2 overflow-y-auto">
             <LogsContainer />
           </div>
         </TabsContent>

@@ -12,9 +12,10 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import CodeEditor from "@/components/CodeEditor";
-import { useEditorCode } from "@/features/Dashboard/features/Main/components/Code/useEditorCode";
+import { useCode } from "@/services/code";
 import { useEditableCode } from "@/features/Dashboard/features/Main/components/Code/useEditableCode";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 
 export interface NodeMetadata {
   createdAt?: string;
@@ -73,13 +74,16 @@ const EnhancedNode: React.FC<{ data: EnhancedNodeData }> = ({ data }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const metadata = data.metadata || {};
 
+  const { projectData } = useProjectStore();
+  const projectId = projectData?._key;
+
   // Fetch code dynamically for the node
   const effectiveNodeId =
     data.nodeType === "call" && data.target
       ? data.target._key
       : data.nodeId || "";
 
-  const { data: codeData } = useEditorCode(
+  const { data: codeData } = useCode(
     showCode ? effectiveNodeId : undefined
   );
   const {
@@ -90,7 +94,7 @@ const EnhancedNode: React.FC<{ data: EnhancedNodeData }> = ({ data }) => {
     isSaving,
     handleEditorChange,
     handleSave,
-  } = useEditableCode(effectiveNodeId);
+  } = useEditableCode(effectiveNodeId, projectId);
 
   const hasCode =
     (codeData?.code && codeData.code.length > 0) ||

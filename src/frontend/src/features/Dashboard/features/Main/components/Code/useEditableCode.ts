@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useEditorCode } from "./useEditorCode";
+import { useCode, useWriteCode } from "@/services/code";
 
 export interface UseEditableCodeResult {
   editorValue: string;
@@ -16,9 +16,9 @@ export interface UseEditableCodeResult {
  * Shared hook for managing editable code editor state, change tracking, and save functionality.
  * Can be used by both the main editor and node editors.
  */
-export function useEditableCode(elementId: string): UseEditableCodeResult {
-  const { data, isLoading, isError, saveCode, isSaving } =
-    useEditorCode(elementId);
+export function useEditableCode(elementId: string, projectId?: string): UseEditableCodeResult {
+  const { data, isLoading, isError } = useCode(elementId);
+  const { mutate: saveCode, isPending: isSaving } = useWriteCode();
 
   const [editorValue, setEditorValue] = useState<string>("");
   const [hasChanges, setHasChanges] = useState(false);
@@ -37,8 +37,8 @@ export function useEditableCode(elementId: string): UseEditableCodeResult {
   };
 
   const handleSave = () => {
-    if (hasChanges && !isSaving) {
-      saveCode(editorValue);
+    if (hasChanges && !isSaving && elementId) {
+      saveCode({ elementId, code: editorValue, projectId });
       setHasChanges(false);
     }
   };
