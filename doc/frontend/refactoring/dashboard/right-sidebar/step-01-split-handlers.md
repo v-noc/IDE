@@ -1,228 +1,177 @@
-# Step 1: Right Sidebar - Extract Handlers
+# Step 1: Right Sidebar - Hooks Architecture
 
 ## Goal
-Move update handlers out of `RightSidebar/index.tsx` (245 lines) into a dedicated hook.
+Architect the Right Sidebar hooks to follow the Single Responsibility Principle, matching the standard set by the Left Sidebar refactoring.
 
-## Why
-The component mixes:
-- Tree mutation logic (`updateNodeInTree`)
-- Theme change handlers (`onChangeTheme`)
-- Basic info handlers (`onChangeBasicInfo`)
-- JSX rendering
+**Pattern:** Split hooks into **State** (Derived), **Actions** (Mutations), and **Handlers** (Events).
 
 ---
 
 ## Current State
 
-```typescript
-// RightSidebar/index.tsx
-export const RightSidebar = ({ className, onToggle }) => {
-  const { selectedNode, projectData, setProjectData, setSelectedNode } = useProjectStore();
-  const { mutate: updateBasicInfo } = useUpdateBasicInfo(selectedNode?._key ?? '');
+**File:** `RightSidebar/index.tsx` (Contains mixed logic)
 
-  // ❌ 60+ lines of handler logic mixed with component
-  const updateNodeInTree = useCallback(...);
-  const onChangeTheme = useCallback(...);
-  const onChangeBasicInfo = useCallback(...);
-  const sidebarProps = useMemo(...);
+### Issues
+- `onChangeTheme` mixes state updates + API logic.
+- `onChangeBasicInfo` mixes form logic + optimistic updates + API calls.
+- `updateNodeInTree` helper is mixed with component logic.
 
-  return ( ... );
-};
+---
+
+## Proposed Solution
+
+```
+hooks/
+├── useRightSidebarState.ts      # Derived state (readonly)
+├── useRightSidebarActions.ts    # Mutations (API calls)
+└── useRightSidebarHandlers.ts   # Event handlers (connecting UI to Actions/Store)
 ```
 
 ---
 
-## What to Create
+## Step 1a: Actions Hook (Mutations)
 
-### NEW: `RightSidebar/hooks/useNodeUpdates.ts`
+### NEW: `RightSidebar/hooks/useRightSidebarActions.ts`
+
+Responsible **only** for executing side effects (API calls) and complex store updates (tree traversal).
 
 ```typescript
 import { useCallback } from 'react';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
+import { useUpdateBasicInfo } from '../../service/useContainer';
 import type { AnyNodeTree, ProjectNodeTree, ThemeConfig } from '@/types/project';
-import { getIcons } from '@/features/Dashboard/utils';
-import { useUpdateBasicInfo } from '../../../service/useContainer';
 
-type NodeWithChildren = AnyNodeTree & { children?: AnyNodeTree[] };
-
-export interface BasicInfoData {
-  name: string;
-  description?: string;
-  icon?: string;
-}
-
-export interface CustomizationData {
-  iconColor?: string;
-  cardColor?: string;
-  navbarColor?: string;
-  backgroundColor?: string;
-  leftSidebarColor?: string;
-  rightSidebarColor?: string;
-  textColor?: string;
-}
-
-/**
- * Update a node in the tree immutably
- */
+// Helper: Pure function to walk tree (extracted outside hook)
 function updateNodeInTree(
   tree: ProjectNodeTree,
   key: string,
   updater: (node: AnyNodeTree) => AnyNodeTree
 ): ProjectNodeTree {
-  const walk = (node: AnyNodeTree): AnyNodeTree => {
-    if (node._key === key) {
-      return updater({ ...node });
-    }
-    const children = (node as NodeWithChildren).children;
-    if (Array.isArray(children) && children.length) {
-      return {
-        ...node,
-        children: children.map((c) => walk(c)),
-      } as AnyNodeTree;
-    }
-    return node;
-  };
-
-  return walk(tree) as ProjectNodeTree;
+  // ... implementation ...
+  return tree; // placeholder
 }
 
-export function useNodeUpdates() {
+export function useRightSidebarActions() {
   const { selectedNode, projectData, setProjectData, setSelectedNode } = useProjectStore();
-  const { mutate: updateBasicInfo } = useUpdateBasicInfo(selectedNode?._key ?? '');
+  const { mutate: updateBasicInfoApi } = useUpdateBasicInfo(selectedNode?._key ?? '');
 
-  const handleThemeChange = useCallback(
-    (data: CustomizationData) => {
-      if (!selectedNode || !projectData) return;
+  const updateTheme = useCallback((theme: ThemeConfig) => {
+    if (!selectedNode || !projectData) return;
+    // 1. Optimistic Update Tree
+    const updatedTree = updateNodeInTree(projectData, selectedNode._key, (n) => ({ ...n, theme_config: theme }));
+    setProjectData(updatedTree);
+    
+    // 2. Update Selection
+    setSelectedNode({ ...selectedNode, theme_config: theme } as AnyNodeTree);
+    
+    // 3. API Call (if theme is saved to backend, or just local state)
+    // ...
+  }, [projectData, selectedNode, setProjectData, setSelectedNode]);
 
-      const theme: ThemeConfig = {
-        iconColor: data.iconColor,
-        cardColor: data.cardColor,
-        navbarColor: data.navbarColor,
-        leftSidebarColor: data.leftSidebarColor ?? '#f9f9f9',
-        rightSidebarColor: data.rightSidebarColor ?? '#f9f9f9',
-        backgroundColor: data.backgroundColor ?? '#f9f9f9',
-        textColor: data.textColor,
-      };
+  const updateBasicInfo = useCallback((info: { name: string; description: string; icon: string }) => {
+    if (!selectedNode || !projectData) return;
+    
+    // 1. Optimistic Update Tree
+    const updatedTree = updateNodeInTree(projectData, selectedNode._key, (n) => ({ ...n, ...info }));
+    setProjectData(updatedTree);
 
-      const updatedTree = updateNodeInTree(projectData, selectedNode._key, (node) => ({
-        ...node,
-        theme_config: theme,
-      }));
+    // 2. Update Selection
+    setSelectedNode({ ...selectedNode, ...info } as AnyNodeTree);
 
-      setProjectData(updatedTree);
-      setSelectedNode({ ...selectedNode, theme_config: theme } as AnyNodeTree);
-    },
-    [projectData, selectedNode, setProjectData, setSelectedNode]
-  );
-
-  const handleBasicInfoChange = useCallback(
-    (data: BasicInfoData) => {
-      if (!selectedNode || !projectData) return;
-
-      const nextIcon = data.icon || getIcons(selectedNode?.node_type ?? 'project');
-
-      const shouldUpdate =
-        selectedNode?.name !== data.name ||
-        (selectedNode?.description ?? '') !== (data.description ?? '') ||
-        (selectedNode.icon ?? '') !== (nextIcon ?? '');
-
-      if (!shouldUpdate) return;
-
-      const updates = {
-        name: data.name,
-        description: data.description ?? '',
-        icon: nextIcon,
-      };
-
-      // API call
-      updateBasicInfo(updates);
-
-      // Optimistic update
-      const updatedTree = updateNodeInTree(projectData, selectedNode._key, (node) => ({
-        ...node,
-        ...updates,
-      }));
-
-      setProjectData(updatedTree);
-      setSelectedNode({ ...selectedNode, ...updates } as AnyNodeTree);
-    },
-    [projectData, selectedNode, setProjectData, updateBasicInfo, setSelectedNode]
-  );
+    // 3. API Call
+    updateBasicInfoApi(info);
+  }, [projectData, selectedNode, setProjectData, setSelectedNode, updateBasicInfoApi]);
 
   return {
-    handleThemeChange,
-    handleBasicInfoChange,
+    updateTheme,
+    updateBasicInfo,
   };
 }
 ```
 
 ---
 
-## Simplified `RightSidebar/index.tsx`
+## Step 1b: Handlers Hook (Events)
+
+### NEW: `RightSidebar/hooks/useRightSidebarHandlers.ts`
+
+Responsible for mapping UI events to Actions. Validates inputs if needed.
 
 ```typescript
-import React from 'react';
-import { ChevronRight } from 'lucide-react';
-import { ResizableHandle, ResizablePanelGroup, Panel as ResizablePanel } from 'react-resizable-panels';
-import ConfigSidebarContent from './components/SidebarTabs';
-import { BottomTabs } from './components/BottomTabs';
-import { useNodeUpdates } from './hooks/useNodeUpdates';
-import { useSidebarProps } from './hooks/useSidebarProps';
+import { useCallback } from 'react';
+import { useRightSidebarActions } from './useRightSidebarActions';
+import type { BasicInfoData, CustomizationData } from './types'; // Define types
 
-interface RightSidebarProps {
-  className?: string;
-  onToggle?: () => void;
+export function useRightSidebarHandlers() {
+  const { updateTheme, updateBasicInfo } = useRightSidebarActions();
+
+  const handleThemeChange = useCallback((data: CustomizationData) => {
+    // Transform form data to domain object
+    const theme = {
+      iconColor: data.iconColor,
+      cardColor: data.cardColor,
+      // ... map fields
+    };
+    updateTheme(theme);
+  }, [updateTheme]);
+
+  const handleBasicInfoChange = useCallback((data: BasicInfoData) => {
+    // Validation logic (if any) could go here
+    updateBasicInfo({
+      name: data.name,
+      description: data.description ?? '',
+      icon: data.icon ?? '', // Default handling
+    });
+  }, [updateBasicInfo]);
+
+  return {
+    handleThemeChange,
+    handleBasicInfoChange
+  };
 }
+```
 
-export const RightSidebar: React.FC<RightSidebarProps> = ({ className, onToggle }) => {
-  const { handleThemeChange, handleBasicInfoChange } = useNodeUpdates();
-  const sidebarProps = useSidebarProps({ 
-    onChangeBasicInfo: handleBasicInfoChange, 
-    onChangeTheme: handleThemeChange 
-  });
+---
 
-  return (
-    <aside className={`relative h-full w-full bg-[var(--right-sidebar-color)] border-l shadow-sm flex flex-col ${className ?? ''}`}>
-      {onToggle && (
-        <button
-          onClick={onToggle}
-          aria-label="Hide right sidebar"
-          className="absolute group-hover:flex hidden -left-3 top-1/2 z-20 -translate-y-1/2 rounded-md border bg-background/80 p-1 py-2 shadow hover:bg-accent"
-        >
-          <ChevronRight className="size-4" />
-        </button>
-      )}
+## Step 1c: State Hook (Derived)
 
-      <ResizablePanelGroup direction="vertical" className="h-full min-h-0">
-        {/* Top: Config */}
-        <ResizablePanel collapsible defaultSize={65} minSize={35}>
-          <div className="h-full min-h-0 overflow-auto">
-            <ConfigSidebarContent {...sidebarProps} />
-          </div>
-        </ResizablePanel>
+### NEW: `RightSidebar/hooks/useRightSidebarState.ts`
 
-        <ResizableHandle className="h-px bg-border shrink-0 border-t-2" withHandle />
+Responsible for preparing the initial state for the form.
 
-        {/* Bottom: Tabs */}
-        <ResizablePanel collapsible defaultSize={35} minSize={20}>
-          <BottomTabs />
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </aside>
-  );
-};
+```typescript
+import { useMemo } from 'react';
+import useProjectStore from '@/features/Dashboard/store/useProjectStore';
+import { getIcons } from '@/features/Dashboard/utils';
+
+export function useRightSidebarState() {
+  const selectedNode = useProjectStore((s) => s.selectedNode);
+
+  return useMemo(() => ({
+    initialBasicInfo: {
+      name: selectedNode?.name ?? '',
+      description: selectedNode?.description ?? '',
+      icon: selectedNode ? (selectedNode.icon || getIcons(selectedNode.node_type)) : '',
+    },
+    initialCustomization: {
+      iconColor: selectedNode?.theme_config?.iconColor,
+      // ... map fields
+    },
+    // Useful derived flags
+    hasSelection: !!selectedNode,
+    nodeType: selectedNode?.node_type,
+  }), [selectedNode]);
+}
 ```
 
 ---
 
 ## Verification
 
-- [ ] Theme changes still apply
-- [ ] Basic info updates still work
-- [ ] RightSidebar is now ~50 lines
+- [ ] Separation of Concerns: Actions don't know about form events; Handlers don't know about Store internals.
+- [ ] No Logic Change: The net effect of `handleThemeChange` -> `updateTheme` is identical to the old `onChangeTheme`.
 
 ---
 
 ## Next Step
-
-👉 [step-02-top-section.md](./step-02-top-section.md)
+👉 [step-02-prop-drilling.md](./step-02-prop-drilling.md)

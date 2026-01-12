@@ -34,10 +34,12 @@ Step-by-step refactoring guide for Dashboard components, organized by visual lay
 | [6](./left-sidebar/step-04-node-content.md) | `NodeContent.tsx` | Split into pieces | 30 min |
 | [7](./left-sidebar/step-05-use-tree-node.md) | `useTreeNode.ts` | Split into 3 hooks | 25 min |
 | [8](./left-sidebar/step-06-context-menu.md) | `NodeContextMenu.tsx` | Single onAction prop | 15 min |
-| [9](./main/step-01-main-cleanup.md) | `Main/` | Clean up index | 20 min |
-| [10](./right-sidebar/step-01-split-handlers.md) | `RightSidebar/` | Extract handlers | 30 min |
-| [11](./right-sidebar/step-02-top-section.md) | `RightSidebar/` | Config section | 20 min |
-| [12](./right-sidebar/step-03-bottom-section.md) | `RightSidebar/` | Tabs section | 20 min |
+| [9](./main/step-01-main-cleanup.md) | `Main/` | Clean up Dashboard.tsx | 20 min |
+| [10](./main/step-02-canvas-modularization.md) | `Main/` | Split MainCanvas | 25 min |
+| [11](./right-sidebar/step-00-reorganization.md) | `RightSidebar/` | Fix folder structure | 15 min |
+| [12](./right-sidebar/step-01-split-handlers.md) | `RightSidebar/` | Extract handlers | 30 min |
+| [13](./right-sidebar/step-02-top-section.md) | `RightSidebar/` | Config section | 20 min |
+| [14](./right-sidebar/step-03-bottom-section.md) | `RightSidebar/` | Tabs section | 20 min |
 
 ---
 
@@ -47,9 +49,8 @@ Step-by-step refactoring guide for Dashboard components, organized by visual lay
 |------|-------|--------|
 | `pages/Dashboard.tsx` | 169 | Utility functions mixed in, socket init logic |
 | `components/Layout.tsx` | 231 | Theme logic embedded, too many responsibilities |
-| `Main/MainWithRightSidebar.tsx` | 71 | Good, minor cleanup |
-| `RightSidebar/index.tsx` | 245 | Update handlers embedded, tree mutation logic |
-| `Sidebar/components/SideBar.tsx` | ~170 | Mixed concerns |
+| `Main/index.tsx` | 278 | Large component (~280 lines), multiple concerns |
+| `RightSidebar/index.tsx` | 245 | Mixed mutation logic and UI, nested in Main/components |
 
 ---
 

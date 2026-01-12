@@ -77,18 +77,24 @@ export default function Sandbox() {
       </TabsList>
 
       <div className="flex-1 min-h-0 relative bg-white/30">
-        <TabsContent value="playground" className="m-0 h-full overflow-hidden outline-none">
-          <Playground
-            ref={playgroundRef}
-            onRunningChange={setIsRunning}
-          />
+        <TabsContent
+          value="playground"
+          className="m-0 h-full overflow-hidden outline-none"
+        >
+          <Playground ref={playgroundRef} onRunningChange={setIsRunning} />
         </TabsContent>
 
-        <TabsContent value="test" className="m-0 h-full overflow-hidden p-6 outline-none">
+        <TabsContent
+          value="test"
+          className="m-0 h-full overflow-hidden p-6 outline-none"
+        >
           <Test />
         </TabsContent>
 
-        <TabsContent value="logs" className="m-0 h-full overflow-hidden outline-none">
+        <TabsContent
+          value="logs"
+          className="m-0 h-full overflow-hidden outline-none"
+        >
           <div className="h-full p-2 overflow-y-auto">
             <LogsContainer />
           </div>
