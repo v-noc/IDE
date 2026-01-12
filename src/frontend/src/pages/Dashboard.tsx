@@ -2,9 +2,9 @@ import { useParams } from "react-router-dom";
 import Layout from "@/features/Dashboard/components/Layout";
 import SideBar from "@/features/Dashboard/features/Sidebar/components/SideBar";
 import Navbar from "@/features/Dashboard/features/Navbar/componets/Navbar";
-import MainCanvas from "@/features/Dashboard/features/Main";
+import Workspace from "@/features/Dashboard/features/Main";
 import { ResizablePanelGroup } from "@/components/ui/resizable";
-import MainWithRightSidebar from "@/features/Dashboard/features/Main/MainWithRightSidebar";
+import { RightSidebar } from "@/features/Dashboard/features/Main/components/RightSidebar";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { useEffect } from "react";
 import { useGroupFlattening } from "@/features/Dashboard/hooks/useGroupFlattening";
@@ -35,7 +35,11 @@ const Dashboard = () => {
   return (
     <ResizablePanelGroup direction="horizontal">
       <Layout
-        main={<MainWithRightSidebar left={<MainCanvas />} />}
+        main={
+          <RightSidebar>
+            <Workspace />
+          </RightSidebar>
+        }
         navbar={<Navbar />}
         leftSidebar={<SideBar />}
       />

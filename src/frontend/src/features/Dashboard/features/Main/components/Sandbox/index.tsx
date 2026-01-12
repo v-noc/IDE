@@ -4,6 +4,7 @@ import PlayGround, { type PlayGroundHandle } from "./components/PlayGround";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Play, Settings } from "lucide-react";
+import LogsSection from "../RightSidebar/components/sections/LogsSection";
 
 export default function Sandbox() {
   const [activeTab, setActiveTab] = useState("playground");
@@ -28,6 +29,12 @@ export default function Sandbox() {
           className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
         >
           Test
+        </TabsTrigger>
+        <TabsTrigger
+          value="logs"
+          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+        >
+          Logs
         </TabsTrigger>
         <div className="border bg-white justify-end flex items-center gap-2 pr-2 w-full h-full">
           {activeTab === "playground" ? (
@@ -65,6 +72,11 @@ export default function Sandbox() {
           ref={playgroundRef}
           onRunningChange={(r) => setIsRunning(r)}
         />
+      </TabsContent>
+      <TabsContent value="logs" className="mt-2 h-full overflow-hidden">
+        <div className="h-full overflow-y-auto px-2">
+          <LogsSection />
+        </div>
       </TabsContent>
     </Tabs>
   );
