@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { NodeMetadata } from "../components/EnhancedNode";
+import type { NodeMetadata } from "@/features/Dashboard/features/Main/components/Canvas/components/nodes/EnhancedNode";
 import type { BaseNode } from "@/types/project";
 
 /**
