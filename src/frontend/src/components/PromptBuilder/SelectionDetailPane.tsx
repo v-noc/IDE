@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import type { AnyNodeTree } from "@/types/project";
 import { supportsCode } from "./types";
 import { useGetDocuments } from "@/features/Dashboard/features/Main/service/useDocuments";
-import { useGetCodeForNode } from "@/features/Dashboard/features/Main/service/useCodeElement";
+import { useCode } from "@/services/code";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -40,7 +40,7 @@ export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
   }, [node, checked, includeDocs, docsQuery.data, setDocumentsForNode]);
 
   // Code fetch when toggled on and supported type
-  const codeQuery = useGetCodeForNode(nodeId);
+  const codeQuery = useCode(nodeId);
   useEffect(() => {
     if (node && checked && includeCode && codeQuery.data?.code) {
       setCodeForNode(node._key, codeQuery.data.code);

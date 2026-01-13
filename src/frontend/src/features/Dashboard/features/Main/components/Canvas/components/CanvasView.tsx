@@ -12,9 +12,13 @@ import {
 import "@xyflow/react/dist/style.css";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { SimpleTreeNode } from "./nodeUtils";
-import EnhancedNode from "./EnhancedNode";
+import EnhancedNode from "./nodes/EnhancedNode";
 import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
+
+const nodeTypes = {
+  enhanced: EnhancedNode,
+};
 
 interface CanvasViewProps {
   projectId?: string;
@@ -28,8 +32,10 @@ const fitViewOptions: FitViewOptions = {
 
 const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
   void _projectId;
-  const { selectedNode, expandedNodeIds, toggleNodeExpansion, projectData } =
-    useProjectStore();
+  const selectedNode = useProjectStore((s) => s.selectedNode);
+  const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
+  const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
+  const projectData = useProjectStore((s) => s.projectData);
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -57,10 +63,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
   React.useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
-    console.log(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
-  const nodeTypes = useMemo(() => ({ enhanced: EnhancedNode }), []);
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstanceRef.current = instance;

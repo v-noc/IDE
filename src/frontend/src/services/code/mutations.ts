@@ -9,9 +9,16 @@ import queryKeys from "@/lib/queryKeys";
 export const useWriteCode = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ elementId, code }: { elementId: string; code: string }) => codeApi.writeCode(elementId, code),
-    onSuccess: (_, { elementId }) => {
+    mutationFn: ({ elementId, code }: { elementId: string; code: string; projectId?: string }) =>
+      codeApi.writeCode(elementId, code),
+    onSuccess: (_, { elementId, projectId }) => {
+      // Invalidate specific code detail
       queryClient.invalidateQueries({ queryKey: queryKeys.code.detail(elementId) });
+
+      // Invalidate project tree if projectId provided
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects.tree(projectId) });
+      }
     },
   });
 }

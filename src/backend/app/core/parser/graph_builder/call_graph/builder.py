@@ -322,3 +322,5 @@ class CallChainBuilder:
                     current_depth=current_depth + 1,
                     parent_contexts=next_step_contexts
                 )
+
+            merged_context_map.clear()

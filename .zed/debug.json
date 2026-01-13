@@ -8,8 +8,8 @@
     "args": ["app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
-      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"
-    }
+      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
+    },
   },
   {
     "label": "debug test",
@@ -19,12 +19,12 @@
     "module": "pytest",
     "args": [
       "-s",
-      "tests/unit/parser/analyzer/calls/test_call_sync.py::test_call_sync_add_and_remove"
+      "tests/unit/parser/analyzer/hierarchy/test_folder_ops.py::test_folder_add",
     ],
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
-      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend"
-    }
+      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
+    },
   },
   {
     "label": "prototype",
@@ -35,7 +35,7 @@
 
     "cwd": "/Users/yared/Documents/Programing/ide/v-noc/src/backend",
     "env": {
-      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/"
-    }
-  }
+      "PYTHONPATH": "/Users/yared/Documents/Programing/ide/v-noc/",
+    },
+  },
 ]

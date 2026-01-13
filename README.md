@@ -18,7 +18,6 @@ Programming isn't hard because logic is complex; it’s hard because our tools a
 > [!IMPORTANT]
 > **The Mental Model Debt**
 > When you open a project, you don't see how the code works; you see where it is stored. Current "AI IDEs" try to fix this with Chat, but that's just hiding trash under the bed. It looks clean until the complexity piles up and blows up in your face because nobody actually understands the "trust me bro" logic the AI generated.
-> 
 
 To fix a bug or add a feature today, you are forced to:
 
@@ -77,11 +76,12 @@ Instead of a file tree, the core of V-NOC is an **interactive, multidimensional 
 
 ---
 
-## � Project Vision & Future
+## 🔮 Project Vision & Future
 
 The tools used in this project were chosen for speed and simplicity, allowing ideas to be prototyped, tested, and shipped quickly. Much of the system is experimental by design, which requires maximum flexibility and minimal friction during development.
 
 > [!NOTE]
+>
 > If the project gains enough traction and community support, I plan to migrate critical components—especially the sync pipeline—to **Rust**. That pipeline must be smooth, reliable, and frictionless for developers.
 
 I’ve already optimized the codebase as much as reasonably possible, but Python is unforgiving when it comes to performance mistakes. I’ve identified several performance bottlenecks, including in the call‑chain builder, and will continue investigating and optimizing other parts of the system as well.
@@ -110,6 +110,7 @@ make dev          # Start both Backend and Frontend
 ```
 
 > [!TIP]
+>
 > Use `make help` to see all available commands.
 
 

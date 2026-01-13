@@ -147,15 +147,14 @@ class LogService:
         If the ID matches a function, return its log tree. If it matches a
         call, return the call log tree. Otherwise, return an empty list.
         """
-        # Try function first
-        fn = await self.repos.function_repo.get_by_id(node_id)
-        if fn is not None:
-            return await self.get_function_log(fn.id)
+        node = await self.repos.nodes.get_by_id(node_id)
+        if node is None:
+            return []
 
-        # Then try call
-        call = await self.repos.call_repo.get_by_id(node_id)
-        if call is not None:
-            return await self.get_call_log(call.id)
+        if node.node_type == "function":
+            return await self.get_function_log(node.id)
+        elif node.node_type == "call":
+            return await self.get_call_log(node.id)
 
         return []
 

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import { useEditorCode } from "./useEditorCode";
+import { useCode } from "@/services/code";
 import { useEditableCode } from "./useEditableCode";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
 import CodeEditor from "@/components/CodeEditor";
@@ -9,7 +9,7 @@ import { Save } from "lucide-react";
 import type { CallNodeTree } from "@/types/project";
 
 const EditorCode = () => {
-  const { selectedNode, secondarySelectedNode } = useProjectStore();
+  const { selectedNode, secondarySelectedNode, projectData } = useProjectStore();
   const effectiveNode = useMemo(() => {
     if (secondarySelectedNode) {
       if ((secondarySelectedNode as CallNodeTree).target) {
@@ -24,7 +24,8 @@ const EditorCode = () => {
   }, [secondarySelectedNode, selectedNode]);
 
   const elementId = effectiveNode?._key ?? "";
-  const { data } = useEditorCode(elementId);
+  const projectId = projectData?._key;
+  const { data } = useCode(elementId);
   const {
     editorValue,
     hasChanges,
@@ -33,7 +34,7 @@ const EditorCode = () => {
     isSaving,
     handleEditorChange,
     handleSave,
-  } = useEditableCode(elementId);
+  } = useEditableCode(elementId, projectId);
 
   const language = useMemo(
     () => detectLanguage(data?.file_name || data?.file_path || ""),

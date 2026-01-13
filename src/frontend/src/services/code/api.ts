@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import API_ROUTES from '@/lib/apiRoutes';
 
 export interface CodeData {
   file_id: string;
@@ -10,8 +11,8 @@ export interface CodeData {
 }
 
 export const codeApi = {
-  getCode: (elementId: string): Promise<CodeData> => api(`/code-elements/${elementId}/code`),
-  writeCode: (elementId: string, code: string): Promise<void> => api(`/code-elements/${elementId}/write-code`, {
+  getCode: (elementId: string): Promise<CodeData> => api(`${API_ROUTES.CODE_ELEMENTS}${elementId}/code`),
+  writeCode: (elementId: string, code: string): Promise<void> => api(`${API_ROUTES.CODE_ELEMENTS}${elementId}/write-code`, {
     method: 'POST',
     body: { code },
   }),

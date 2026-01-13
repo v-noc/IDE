@@ -7,7 +7,6 @@ import {
   type BasicInfoData,
   type CustomizationData,
 } from "../hooks/useConfigSidebarForm";
-import LogsSection from "./sections/LogsSection";
 import DocumentsList from "./sections/DocumentsList";
 
 export type ConfigSidebarContentProps = {
@@ -54,12 +53,6 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
             Basic Info
           </TabsTrigger>
 
-          <TabsTrigger
-            className="rounded-none bg-white shadow-sm data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
-            value="logs"
-          >
-            Logs
-          </TabsTrigger>
         </TabsList>
         <div className="mt-2 flex-1 min-h-0 overflow-y-auto p-3 py-0 pb-4 ">
           <TabsContent value="basic" className="flex flex-col gap-2 pr-2">
@@ -73,9 +66,6 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
             />
           </TabsContent>
 
-          <TabsContent value="logs" className="h-full">
-            <LogsSection />
-          </TabsContent>
 
           <TabsContent value="documents">
             <DocumentsList />

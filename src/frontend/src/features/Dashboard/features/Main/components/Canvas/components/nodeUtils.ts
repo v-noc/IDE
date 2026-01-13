@@ -1,26 +1,6 @@
 import type { AnyNodeTree } from "@/types/project";
-import type { NodeMetadata } from "./EnhancedNode";
+import type { NodeMetadata } from "./nodes/EnhancedNode";
 
-export const iconForType = (nodeType: AnyNodeTree["node_type"]): string => {
-  switch (nodeType) {
-    case "project":
-      return "📦";
-    case "folder":
-      return "📁";
-    case "file":
-      return "📄";
-    case "class":
-      return "🏷️";
-    case "function":
-      return "ƒ";
-    case "call":
-      return "🔗";
-    case "group":
-      return "🗂️";
-    default:
-      return "📌";
-  }
-};
 
 export interface SimpleTreeNode {
   _key: string;

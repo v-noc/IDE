@@ -3,7 +3,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { Position } from "@xyflow/react";
 import dagre from "dagre"; // Import dagre
 import type { SimpleTreeNode } from "../components/nodeUtils";
-import { iconForType } from "../components/nodeUtils";
+
 import { LAYOUT_CONFIG } from "../components/layoutConfig"; // Assuming dimensions are here
 import getNodeStyle from "@/features/Dashboard/utils/getNodeStyle";
 import type { AnyNodeTree, ContainerNodeTree } from "@/types/project";
@@ -11,7 +11,8 @@ import { DynamicIcon } from "@/components/DynamicIcon";
 import type {
   EnhancedNodeData,
   NodeMetadata,
-} from "../components/EnhancedNode";
+} from "../components/nodes/EnhancedNode";
+import { getIcons } from "@/features/Dashboard/utils";
 
 const EMPTY_METADATA_MAP = new Map<string, NodeMetadata>();
 
@@ -89,9 +90,9 @@ export const useEnhancedTreeLayout = ({
           mainIcon: node.icon ? (
             <DynamicIcon iconName={node.icon} />
           ) : (
-            iconForType(node.node_type)
+            <DynamicIcon iconName={getIcons(node.node_type)} />
           ),
-          cornerIcon: iconForType(node.node_type),
+          cornerIcon: getIcons(node.node_type),
           bgColor: nodeStyle.cardColor ?? nodeStyle.backgroundColor ?? "white",
           textColor: nodeStyle.textColor,
           iconColor: nodeStyle.iconColor,

@@ -7,103 +7,71 @@ import {
 import { Separator } from "@/components/ui/separator";
 import type { AnyNodeTree } from "@/types/project";
 import { Crosshair, Expand, Group, Link, Trash, FileCode } from "lucide-react";
-import { useState } from "react";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface NodeContextMenuProps {
   children: React.ReactNode;
   node: AnyNodeTree;
-  onFocus: () => void;
-  onExpand: () => void;
-  onRemoveCall: () => void;
-  onAddCall: () => void;
-  onEdit?: () => void;
-  onCreateGroup: () => void;
-  onDeleteGroup: () => void;
-  onManageGroup?: () => void;
-  onBuildPrompt?: () => void;
+  onAction: (action: string) => void;
 }
 
 export const NodeContextMenu = ({
   children,
   node,
-  onFocus,
-  onExpand,
-  onAddCall,
-  onRemoveCall,
-  onCreateGroup,
-  onManageGroup,
-  onDeleteGroup,
-  onBuildPrompt,
+  onAction,
 }: NodeContextMenuProps) => {
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const nodeType = node.node_type;
 
   return (
-    <>
-      <ContextMenu>
-        <ContextMenuTrigger>
-          <div>{children}</div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={onFocus}>
-            <Crosshair />
-            Focus
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div>{children}</div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={() => onAction("focus")}>
+          <Crosshair className="mr-2 h-4 w-4" />
+          Focus
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onAction("expand")}>
+          <Expand className="mr-2 h-4 w-4" />
+          Expand
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onAction("prompt-builder")}>
+          <FileCode className="mr-2 h-4 w-4" />
+          Build Prompt
+        </ContextMenuItem>
+        <Separator />
+        {["function", "class", "call", "file"].includes(nodeType) && (
+          <ContextMenuItem onClick={() => onAction("add-call")}>
+            <Link className="mr-2 h-4 w-4" />
+            Add Call
           </ContextMenuItem>
-          <ContextMenuItem onClick={onExpand}>
-            <Expand />
-            Expand
+        )}
+        {nodeType === "call" && (node as any)?.manually_created && (
+          <ContextMenuItem onClick={() => onAction("remove-call")}>
+            <Trash className="mr-2 h-4 w-4" />
+            Remove Call
           </ContextMenuItem>
-          {onBuildPrompt && (
-            <ContextMenuItem onClick={onBuildPrompt}>
-              <FileCode />
-              Build Prompt
+        )}
+        {nodeType === "group" && (
+          <>
+            <ContextMenuItem onClick={() => onAction("manage-group")}>
+              <Group className="mr-2 h-4 w-4" />
+              Edit Group
             </ContextMenuItem>
-          )}
-          <Separator />
-          {(node.node_type == "function" ||
-            node.node_type == "class" ||
-            node.node_type == "call" ||
-            node.node_type == "file") && (
-            <ContextMenuItem onClick={onAddCall}>
-              <Link />
-              Add Call
+            <ContextMenuItem onClick={() => onAction("delete-group")}>
+              <Trash className="mr-2 h-4 w-4" />
+              Delete Group
             </ContextMenuItem>
-          )}
-          {node.node_type === "call" && node?.manually_created && (
-            <ContextMenuItem onClick={() => onRemoveCall()}>
-              <Trash />
-              Remove Call
-            </ContextMenuItem>
-          )}
-          {node.node_type === "group" && onManageGroup && (
-            <>
-              <ContextMenuItem onClick={onManageGroup}>
-                <Group />
-                Edit Group
-              </ContextMenuItem>
-              <ContextMenuItem onClick={() => setIsDeleteDialogOpen(true)}>
-                <Trash />
-                Delete Group
-              </ContextMenuItem>
-            </>
-          )}
-          {node.node_type !== "project" && (
-            <ContextMenuItem onClick={onCreateGroup}>
-              <Group />
-              Create Group
-            </ContextMenuItem>
-          )}
-        </ContextMenuContent>
-      </ContextMenu>
-      <ConfirmDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        title="Delete this group?"
-        description="This action cannot be undone. This will permanently remove the group and its associations."
-        confirmLabel="Delete"
-        actionClassName="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-        onConfirm={onDeleteGroup}
-      />
-    </>
+          </>
+        )}
+        {nodeType !== "project" && (
+          <ContextMenuItem onClick={() => onAction("create-group")}>
+            <Group className="mr-2 h-4 w-4" />
+            Create Group
+          </ContextMenuItem>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 };
+

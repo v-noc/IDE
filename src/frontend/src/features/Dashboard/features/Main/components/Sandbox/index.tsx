@@ -1,20 +1,31 @@
-import { useRef, useState } from "react";
-import Test from "./components/Test";
-import PlayGround, { type PlayGroundHandle } from "./components/PlayGround";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Play, Settings } from "lucide-react";
+import Playground from "./features/Playground";
+import LogsContainer from "./features/Logs";
+import Test from "./features/Test";
+import { useSandboxState } from "./hooks/useSandboxState";
 
+/**
+ * Sandbox Component.
+ * Orchestrates multiple features (Playground, Test, Logs) in a tabbed interface.
+ */
 export default function Sandbox() {
-  const [activeTab, setActiveTab] = useState("playground");
-  const [isRunning, setIsRunning] = useState(false);
-  const playgroundRef = useRef<PlayGroundHandle>(null);
+  const {
+    activeTab,
+    setActiveTab,
+    isRunning,
+    setIsRunning,
+    playgroundRef,
+    handleRun,
+    handleOpenSettings,
+  } = useSandboxState();
 
   return (
     <Tabs
       value={activeTab}
       onValueChange={setActiveTab}
-      className="flex flex-col h-full "
+      className="flex flex-col h-full"
     >
       <TabsList className="p-0 w-full bg-[#f9f9f9] flex items-center">
         <TabsTrigger
@@ -29,43 +40,66 @@ export default function Sandbox() {
         >
           Test
         </TabsTrigger>
+        <TabsTrigger
+          value="logs"
+          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+        >
+          Logs
+        </TabsTrigger>
+
         <div className="border bg-white justify-end flex items-center gap-2 pr-2 w-full h-full">
           {activeTab === "playground" ? (
             <>
               <Button
                 size="sm"
-                onClick={() => playgroundRef.current?.run()}
+                onClick={handleRun}
                 disabled={isRunning}
-                className="rounded-full bg-green-500 text-xs h-6"
+                className="rounded-full bg-green-500 hover:bg-green-600 text-xs h-7 gap-2 px-4 shadow-sm transition-all active:scale-95"
               >
-                <Play className=" h-1 w-1" />
+                <Play className="size-3 fill-current" />
                 {isRunning ? "Running..." : "Run"}
               </Button>
               <Button
-                className="w-6 h-6 rounded-full flex items-center justify-center"
+                size="sm"
                 variant="outline"
-                onClick={() => playgroundRef.current?.openSettings()}
+                className="size-7 rounded-full p-0 flex items-center justify-center hover:bg-accent border shadow-sm transition-all active:scale-95"
+                onClick={handleOpenSettings}
               >
-                <Settings className=" h-4 w-4" />
+                <Settings className="size-3.5 text-muted-foreground" />
               </Button>
             </>
           ) : (
-            <div className="text-xs text-muted-foreground">Test actions</div>
+            <div className="text-[10px] font-bold text-muted-foreground/60 px-2 uppercase tracking-widest">
+              {activeTab} Mode
+            </div>
           )}
         </div>
       </TabsList>
-      <TabsContent
-        value="test"
-        className="mt-2 h-full w-full overflow-hidden p-2"
-      >
-        <Test />
-      </TabsContent>
-      <TabsContent value="playground" className="mt-2 overflow-hidden">
-        <PlayGround
-          ref={playgroundRef}
-          onRunningChange={(r) => setIsRunning(r)}
-        />
-      </TabsContent>
+
+      <div className="flex-1 min-h-0 relative bg-white/30">
+        <TabsContent
+          value="playground"
+          className="m-0 h-full overflow-hidden outline-none"
+        >
+          <Playground ref={playgroundRef} onRunningChange={setIsRunning} />
+        </TabsContent>
+
+        <TabsContent
+          value="test"
+          className="m-0 h-full overflow-hidden p-6 outline-none"
+        >
+          <Test />
+        </TabsContent>
+
+        <TabsContent
+          value="logs"
+          className="m-0 h-full overflow-hidden outline-none"
+        >
+          <div className="h-full p-2 overflow-y-auto">
+            <LogsContainer />
+          </div>
+        </TabsContent>
+      </div>
     </Tabs>
   );
 }

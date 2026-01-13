@@ -2,13 +2,7 @@ import { api } from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 import type { ProjectNodeTree } from "@/types/project";
 import { useQuery } from "@tanstack/react-query";
-
-// import getIcons from "@/features/Dashboard/utils/getIcons";
-
-export interface AddCodeElementRequest {
-  element_id: string;
-  parent_folder_key: string;
-}
+import queryKeys from "@/lib/queryKeys";
 
 const getProjectTreeWithKey = async (key: string): Promise<ProjectNodeTree> => {
   const response = await api(`${API_ROUTES.PROJECTS}${key}`);
@@ -16,7 +10,7 @@ const getProjectTreeWithKey = async (key: string): Promise<ProjectNodeTree> => {
 };
 export const useGetProjectTreeWithKeyProject = ({ key }: { key: string }) => {
   return useQuery({
-    queryKey: ["projectTree", key],
+    queryKey: queryKeys.projects.tree(key),
     queryFn: () => getProjectTreeWithKey(key),
     enabled: key != null,
   });

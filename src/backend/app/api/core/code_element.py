@@ -54,7 +54,7 @@ async def write_code(
     """
     Writes a block of code to the location of a given code element.
     """
-    project_service, file_service, _, _, _ = await _get_services(db)
+    project_service, file_service, _, _, _ = _get_services(db)
 
     # Ensure the project's watcher is running for this element
     try:
