@@ -4999,7 +4999,7 @@ __metadata:
     react-hook-form: ^7.61.1
     react-icons: ^5.5.0
     react-resizable-panels: ^3.0.3
-    react-router: ^7.7.1
+    react-router: ^7.12.0
     react-router-dom: ^7.7.1
     remeda: ^2.32.0
     socket.io-client: ^4.8.1
@@ -7307,7 +7307,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-router@npm:7.9.5, react-router@npm:^7.7.1":
+"react-router@npm:7.9.5":
   version: 7.9.5
   resolution: "react-router@npm:7.9.5"
   dependencies:
@@ -7320,6 +7320,22 @@ __metadata:
     react-dom:
       optional: true
   checksum: e961816b4096a6ca97fc53626fc6532014c0de4c45bf6c234b8205eb4f94be8f357d67819e4f4f58507f79ef9bda4c3f70031a8dd13c7045e3ad0ecb12f819e3
+  languageName: node
+  linkType: hard
+
+"react-router@npm:^7.12.0":
+  version: 7.12.0
+  resolution: "react-router@npm:7.12.0"
+  dependencies:
+    cookie: ^1.0.1
+    set-cookie-parser: ^2.6.0
+  peerDependencies:
+    react: ">=18"
+    react-dom: ">=18"
+  peerDependenciesMeta:
+    react-dom:
+      optional: true
+  checksum: 8/f59b399a968cdd9254b711be74e35e1ae365e00a7c908e22a5d80a45ef3ff6ecaf5add40b31ecedfdbe1f82455bb451e0d3b053d64fa2dfb9364af0942c88ea6
   languageName: node
   linkType: hard
 
