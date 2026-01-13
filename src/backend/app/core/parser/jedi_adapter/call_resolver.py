@@ -216,10 +216,10 @@ class CallResolver:
             print(
                 f"Error resolving call at {file_path} {line}:{column}:  {e}"
             )
-            if file_path.endswith("diff.py"):
-                with open("demo.txt", "w") as f:
-                    import traceback
-                    f.write(traceback.format_exc())
+            # if file_path.endswith("main.py"):
+            #     with open("demo.txt", "w") as f:
+            #         import traceback
+            #         f.write(traceback.format_exc())
             return []
 
     def _extract_id_from_docstring(self, value) -> Optional[str]:
