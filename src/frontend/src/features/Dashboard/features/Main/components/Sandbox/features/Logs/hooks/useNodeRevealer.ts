@@ -15,21 +15,17 @@ export const useNodeRevealer = () => {
     } = useProjectStore();
 
     const revealNode = useCallback((targetLogNode: LogNode, rootLogNode: LogNode) => {
-        if (!selectedNode || !targetLogNode.function_id) {
+        if (!selectedNode || !targetLogNode.function_id || !rootLogNode.function_id) {
             return;
         }
 
-        // User requirement: "if selected id == root log.function id"
         // We only proceed if the current canvas selection matches the trace root.
-        if (selectedNode._id !== rootLogNode.function_id) {
-            console.info("[useNodeRevealer] Canvas selection doesn't match Trace root", {
-                selectedNodeId: selectedNode._id,
-                rootLogFunctionId: rootLogNode.function_id
-            });
+        const selectedKey = selectedNode._id.split("/").pop();
+        const rootKey = rootLogNode.function_id.split("/").pop();
+
+        if (selectedKey !== rootKey) {
             return;
         }
-
-        console.log("[useNodeRevealer] Searching for node", targetLogNode.function_id);
 
         // Search within the CURRENTLY SELECTED tree scope.
         const targetCanvasNode = findNodeByFunctionId(selectedNode, targetLogNode.function_id);
@@ -39,8 +35,6 @@ export const useNodeRevealer = () => {
             return;
         }
 
-
-
         // Find path from selection root to target
         const path = findPathToNode(selectedNode, targetCanvasNode._id);
 
@@ -48,7 +42,9 @@ export const useNodeRevealer = () => {
         if (path) {
             path.forEach(id => {
                 if (!expandedNodeIds.includes(id)) {
-                    expandNode(id);
+                    // Collect key after the last slash
+                    const key = id.includes("/") ? id.split("/").pop()! : id;
+                    expandNode(key);
                 }
             });
 
