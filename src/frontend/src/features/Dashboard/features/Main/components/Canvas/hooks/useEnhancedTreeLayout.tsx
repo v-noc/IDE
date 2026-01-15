@@ -106,7 +106,10 @@ export const useEnhancedTreeLayout = ({
           nodeType: node.node_type,
           nodeId: nodeId,
           target: node.target,
-          focused: focusTargetId ? nodeId === focusTargetId.replace("nodes/", "") : false,
+          focused: focusTargetId
+            ? nodeId === (focusTargetId.includes("/") ? focusTargetId.split("/").pop() : focusTargetId)
+            : false,
+          selected: nodeId === centerNode?._key,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,

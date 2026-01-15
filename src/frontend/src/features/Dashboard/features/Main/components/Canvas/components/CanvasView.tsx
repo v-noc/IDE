@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef, useEffect, useEffectEvent } from "react";
 import {
   Background,
   Controls,
@@ -63,29 +63,51 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
+  const lastCenteredTargetIdRef = useRef<string | null>(null);
 
-  React.useEffect(() => {
-    if (focusTargetId && nodes.length > 0 && reactFlowInstanceRef.current) {
-      const cleanId = focusTargetId.replace("nodes/", "");
-      const rfNode = nodes.find((n) => n.id === cleanId);
-      if (rfNode) {
+  const centerOnTarget = useEffectEvent(() => {
+    if (!focusTargetId || nodes.length === 0 || !reactFlowInstanceRef.current) {
+      return;
+    }
+
+    // Robustly extract the key from the ID
+    const cleanId = focusTargetId.includes("/")
+      ? focusTargetId.split("/").pop()!
+      : focusTargetId;
+
+    const rfNode = nodes.find((n) => n.id === cleanId);
+
+    // Check if node exists and has been measured (width > 0)
+    if (rfNode && rfNode.measured?.width) {
+      if (lastCenteredTargetIdRef.current !== focusTargetId) {
         reactFlowInstanceRef.current.setCenter(
-          rfNode.position.x + (rfNode.measured?.width || 200) / 2,
-          rfNode.position.y + (rfNode.measured?.height || 60) / 2,
+          rfNode.position.x + rfNode.measured.width / 2,
+          rfNode.position.y + rfNode.measured.height / 2,
           {
             zoom: 1,
             duration: 300,
           }
         );
+        lastCenteredTargetIdRef.current = focusTargetId;
       }
+    } else {
+      // If node not found yet or dimensions not measured, retry next frame.
+      requestAnimationFrame(centerOnTarget);
     }
-  }, [focusTargetId]); // Only trigger when focusTargetId changes
+  });
 
+  useEffect(() => {
+    if (focusTargetId) {
+      centerOnTarget();
+    } else {
+      lastCenteredTargetIdRef.current = null;
+    }
+  }, [focusTargetId]);
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstanceRef.current = instance;
@@ -93,15 +115,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
 
   const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      // Find the actual node tree data by key
       const nodeKey = node.id;
       if (projectData && nodeKey && reactFlowInstanceRef.current) {
         const foundNode = findNodeByKey(projectData, nodeKey);
         if (foundNode) {
-          // Set as selected node
-          // setSelectedNode(foundNode);
-
-          // Center the view on this node
           reactFlowInstanceRef.current.setCenter(
             node.position.x + (node.measured?.width || 0) / 2,
             node.position.y + (node.measured?.height || 0) / 2,

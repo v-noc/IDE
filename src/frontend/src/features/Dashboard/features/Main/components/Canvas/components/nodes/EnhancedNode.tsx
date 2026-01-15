@@ -33,6 +33,7 @@ export interface EnhancedNodeData {
   nodeType?: string;
   target?: { _key: string };
   focused?: boolean;
+  selected?: boolean;
   [key: string]: unknown;
 }
 
@@ -65,12 +66,14 @@ const EnhancedNode = memo(
 
     return (
       <div
-        className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${data.focused ? "ring-4 ring-blue-400 ring-offset-2 scale-[1.02]" : ""
-          }`}
+        className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${
+          data.focused ? "ring-4 ring-blue-400 ring-offset-2 scale-[1.02]" : 
+          data.selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
+        }`}
         style={{
           backgroundColor: data.bgColor,
           color: data.textColor,
-          borderColor: data.focused ? "#3b82f6" : data.borderColor,
+          borderColor: data.focused ? "#3b82f6" : data.selected ? "#f59e0b" : data.borderColor,
           ...statusStyles,
         }}
       >
@@ -129,6 +132,7 @@ const EnhancedNode = memo(
       prev.data.name === next.data.name &&
       prev.data.expanded === next.data.expanded &&
       prev.data.focused === next.data.focused &&
+      prev.data.selected === next.data.selected &&
       prev.data.metadata?.status === next.data.metadata?.status &&
       prev.data.metadata?.updatedAt === next.data.metadata?.updatedAt
     );
