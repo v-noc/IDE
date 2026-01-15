@@ -189,6 +189,13 @@ class CallResolver:
                         init_method = list(inits)[0]
                         if hasattr(init_method, "_original_value"):
                             init_method = init_method._original_value
+                        init_id = self._extract_id_from_docstring(init_method)
+                        init_qname = self._extract_qualified_name(callee)
+
+                        if init_id:
+
+                            result.callee_id = init_id
+                            result.qname = init_qname
                         bound_method = BoundMethod(
                             created_instance, callee_for_args, init_method
                         )
