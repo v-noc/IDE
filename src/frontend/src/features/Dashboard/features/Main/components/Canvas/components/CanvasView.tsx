@@ -50,11 +50,14 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
     []
   );
 
+  const focusTargetId = useProjectStore((s) => s.focusTargetId);
+
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
     centerNode,
     expandedNodeIds,
     toggleNodeExpansion,
     layoutConfig,
+    focusTargetId,
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -64,6 +67,24 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+
+  React.useEffect(() => {
+    if (focusTargetId && nodes.length > 0 && reactFlowInstanceRef.current) {
+      const cleanId = focusTargetId.replace("nodes/", "");
+      const rfNode = nodes.find((n) => n.id === cleanId);
+      if (rfNode) {
+        reactFlowInstanceRef.current.setCenter(
+          rfNode.position.x + (rfNode.measured?.width || 200) / 2,
+          rfNode.position.y + (rfNode.measured?.height || 60) / 2,
+          {
+            zoom: 1,
+            duration: 300,
+          }
+        );
+      }
+    }
+  }, [focusTargetId]); // Only trigger when focusTargetId changes
 
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
