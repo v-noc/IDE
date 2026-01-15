@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { type LogTreeNode } from "@/services/logs";
 import { useResizeObserver } from "@/hooks/useResizeObserver";
-import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useNodeRevealer } from "./hooks/useNodeRevealer";
+import type { LogNode } from "@/services/logs/api";
 
 /**
  * Logs Feature.
@@ -19,7 +20,7 @@ export const LogsContainer: React.FC = () => {
   const [selectedLogForChart, setSelectedLogForChart] =
     useState<LogTreeNode | null>(null);
   const { ref, width } = useResizeObserver();
-  const { setSelectedNode } = useProjectStore();
+  const { revealNode } = useNodeRevealer();
 
   const handleViewFlameChart = (node: LogTreeNode) => {
     setSelectedLogForChart(node);
@@ -66,13 +67,10 @@ export const LogsContainer: React.FC = () => {
             width={width - 32} // Padding adjustment
             rowHeight={20}
             onSelect={(n) => {
-              if (n.functionId) {
-                const [collection, key] = n.functionId.split("/");
-                setSelectedNode({
-                  _id: n.functionId,
-                  _key: key || n.functionId,
-                  node_type: "function",
-                } as any);
+              if (n.functionId && selectedLogForChart) {
+                // Map FlameGraphNode back to a partial LogNode for revealNode
+                console.log("[Logs] onSelect FlameGraphNode", n);
+                revealNode({ function_id: n.functionId } as LogNode, selectedLogForChart);
               }
             }}
           />
