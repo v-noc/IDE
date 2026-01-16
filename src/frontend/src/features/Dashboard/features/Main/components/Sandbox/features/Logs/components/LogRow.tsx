@@ -24,13 +24,16 @@ interface LogRowProps {
   node: LogTreeNode;
   depth?: number;
   onViewFlameChart?: () => void;
+  onSelect?: (target: LogTreeNode, root: LogTreeNode) => void;
+  rootNode?: LogTreeNode;
 }
 
 /**
  * Functional row for the Logs table with expandable details and nested children.
  */
-export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChart }) => {
+export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChart, onSelect, rootNode }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const effectiveRoot = rootNode || node;
 
   const filteredChildren = (node.children || []).filter(
     (c) => c.event_type !== "exit" && c.event_type !== "error"
@@ -117,9 +120,10 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
       {/* Main Row */}
       <div
         className={cn(
-          "group flex items-center py-2.5 px-4 transition-all duration-200 border-b",
+          "group flex items-center py-2.5 px-4 transition-all duration-200 border-b cursor-pointer active:opacity-70",
           statusClasses
         )}
+        onClick={() => onSelect?.(node, effectiveRoot)}
       >
         <div className="w-[120px] shrink-0 flex items-center gap-2">
           <div style={{ width: `${depth * 16}px` }} className="shrink-0" />
@@ -138,7 +142,10 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
                     ? "hover:bg-amber-200/50 text-amber-400 group-hover:text-amber-600"
                     : "hover:bg-slate-200 text-slate-400 group-hover:text-slate-600"
               )}
-              onClick={() => setIsExpanded((v) => !v)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded((v) => !v);
+              }}
             >
               {isExpanded ? (
                 <ChevronDown className="size-3.5" />
@@ -186,13 +193,16 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
 
         <div className="w-[40px] shrink-0 flex justify-end">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
                 <MoreHorizontal className="size-4 text-slate-400" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onViewFlameChart}>
+              <DropdownMenuItem onClick={(e) => {
+                e.stopPropagation();
+                onViewFlameChart?.();
+              }}>
                 <Activity className="mr-2 size-4" />
                 <span>View Flame Chart</span>
               </DropdownMenuItem>
@@ -238,7 +248,9 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
             key={child._id}
             node={child}
             depth={depth + 1}
-            onViewFlameChart={() => onViewFlameChart && onViewFlameChart()}
+            onViewFlameChart={onViewFlameChart}
+            onSelect={onSelect}
+            rootNode={effectiveRoot}
           />
         ))}
     </div>
