@@ -35,7 +35,9 @@ export const TabContextStack = memo(function TabContextStack({
                         />
                     )}
                     <ResizablePanel
-                        minSize={15}
+                        id={tab.id}
+                        order={index}
+                        minSize={10}
                         defaultSize={100 / tabStack.length}
                         className="flex flex-col overflow-hidden"
                     >

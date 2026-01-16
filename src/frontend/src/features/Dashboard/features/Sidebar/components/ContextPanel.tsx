@@ -1,6 +1,5 @@
 import { memo } from "react";
 import { cn } from "@/lib/utils";
-import { ResizablePanel } from "@/components/ui/resizable";
 import { FolderTree, X, Box } from "lucide-react";
 import ProjectTree from "./ProjectTree";
 import type { TabData } from "@/types/tabs";
@@ -28,11 +27,9 @@ export const ContextPanel = memo(function ContextPanel({
   const Icon = isRoot ? FolderTree : Box;
 
   return (
-    <ResizablePanel
-      defaultSize={isRoot ? 40 : 60}
-      minSize={10}
+    <div
       className={cn(
-        "flex flex-col border-b last:border-b-0",
+        "flex flex-col border-b last:border-b-0 h-full w-full",
         isActive ? "bg-background" : "bg-muted/10 opacity-70"
       )}
       onClick={onActivate}
@@ -76,6 +73,6 @@ export const ContextPanel = memo(function ContextPanel({
       <div className="flex-1 overflow-auto p-2">
         <ProjectTree projectTree={projectTree} tabId={tab.id} />
       </div>
-    </ResizablePanel>
+    </div>
   );
 });
