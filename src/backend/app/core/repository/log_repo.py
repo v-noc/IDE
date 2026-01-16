@@ -145,8 +145,14 @@ class LogRepository(BaseRepository[LogNode]):
             FOR start IN start_logs
                 FOR v, e, p IN 0..@max_depth INBOUND start._id @@log_to_log_edges
                     OPTIONS { order: "bfs" }
+                    LET corresponding_function = FIRST(
+                        FOR fe IN @@log_to_function_edges
+                            FILTER fe._from == v._id
+                            RETURN DOCUMENT(fe._to)
+                    )
                     RETURN {
                         "vertex": v,
+                        "function_id": corresponding_function._id,
                         "parent_id": LENGTH(p.vertices) >= 2
                             ? p.vertices[-2]._id
                             : null

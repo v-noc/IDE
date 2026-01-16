@@ -26,6 +26,7 @@ interface UseEnhancedTreeLayoutProps {
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
+  focusTargetId?: string | null;
 }
 
 export const useEnhancedTreeLayout = ({
@@ -34,6 +35,7 @@ export const useEnhancedTreeLayout = ({
   toggleNodeExpansion,
   nodeMetadataMap,
   layoutConfig: _layoutConfig,
+  focusTargetId,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
 
@@ -104,6 +106,10 @@ export const useEnhancedTreeLayout = ({
           nodeType: node.node_type,
           nodeId: nodeId,
           target: node.target,
+          focused: focusTargetId
+            ? nodeId === (focusTargetId.includes("/") ? focusTargetId.split("/").pop() : focusTargetId)
+            : false,
+          selected: nodeId === centerNode?._key,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,
@@ -172,5 +178,5 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap, toggleNodeExpansion]);
+  }, [centerNode, expandedNodeIds, metadataMap, toggleNodeExpansion, focusTargetId]);
 };

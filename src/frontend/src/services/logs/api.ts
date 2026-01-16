@@ -3,18 +3,19 @@ import API_ROUTES from "@/lib/apiRoutes";
 
 export interface LogNode {
   _id: string;
-  created_at: string;
+  _key: string;
   timestamp: string;
-  event_type: string;
+  event_type: "enter" | "exit" | "error" | "log";
   message: string;
+  level_name: string | null;
   duration_ms: number | null;
   chain_id: string | null;
-  payload: Record<string, unknown> | null;
+  payload: { [key: string]: unknown } | null;
   result: unknown | null;
-  error: Record<string, unknown> | null;
-  level_name: string | null;
+  error: { [key: string]: unknown } | null;
+  created_at: string;
+  function_id: string | null;
 }
-
 
 export interface LogTreeNode extends LogNode {
   children: LogTreeNode[];

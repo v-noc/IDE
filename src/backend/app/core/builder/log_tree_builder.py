@@ -15,7 +15,14 @@ class LogTreeBuilder:
         # Create nodes
         for item in self.flat_logs:
             vertex = item["vertex"]
-            node = LogTreeNode.model_validate(vertex)
+            function_id = item["function_id"]
+
+            if not function_id:
+                function_id = ""
+            node = LogTreeNode.model_validate(
+                {**vertex, "function_id": function_id}
+            )
+
             self.nodes_map[node.id] = node
 
         # Link children via parent_id

@@ -1,4 +1,47 @@
-import type { AnyNodeTree, ContainerNodeTree } from '@/types/project';
+import type { AnyNodeTree, ContainerNodeTree, CallNodeTree } from '@/types/project';
+
+export const findNodeByFunctionId = (
+  root: AnyNodeTree,
+  targetFunctionId: string
+): AnyNodeTree | null => {
+  // Check current node
+  if (root._id === targetFunctionId) return root;
+
+  // Check if it's a CallNode and its target matches
+  if (
+    root.node_type === "call" &&
+    (root as CallNodeTree).target?._id === targetFunctionId
+  ) {
+    return root;
+  }
+
+  // Check children
+  if (root.children) {
+    for (const child of root.children) {
+      const found = findNodeByFunctionId(child as AnyNodeTree, targetFunctionId);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+export const findPathToNode = (
+  root: AnyNodeTree,
+  targetId: string,
+  path: string[] = []
+): string[] | null => {
+  if (root._id === targetId) return path;
+  if (root.children) {
+    for (const child of root.children) {
+      const result = findPathToNode(child as AnyNodeTree, targetId, [
+        ...path,
+        root._id,
+      ]);
+      if (result) return result;
+    }
+  }
+  return null;
+};
 
 /**
  * Collect ancestor keys path to a target key (for auto-expansion)
