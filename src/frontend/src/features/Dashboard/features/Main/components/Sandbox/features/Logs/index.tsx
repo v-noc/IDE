@@ -69,7 +69,7 @@ export const LogsContainer: React.FC = () => {
             onSelect={(n) => {
               if (n.functionId && selectedLogForChart) {
                 // Map FlameGraphNode back to a partial LogNode for revealNode
-                console.log("[Logs] onSelect FlameGraphNode", n);
+
                 revealNode(
                   { function_id: n.functionId } as LogNode,
                   selectedLogForChart

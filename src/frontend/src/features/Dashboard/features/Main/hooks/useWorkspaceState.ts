@@ -2,16 +2,16 @@ import { useMemo } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { CallNodeTree } from "@/types/project";
 
+import type { ProjectStore } from "@/features/Dashboard/store/useProjectStore";
+
 /**
  * Derived state for the Workspace.
  * Handles node resolution, path display, and active content detection.
  */
-export function useWorkspaceState() {
-    const {
-        selectedNode,
-        secondarySelectedNode,
-        selectedDocumentId,
-    } = useProjectStore();
+export function useWorkspaceState(tabId: string) {
+    const selectedNode = useProjectStore((s: ProjectStore) => s.selectedNode[tabId]);
+    const secondarySelectedNode = useProjectStore((s: ProjectStore) => s.secondarySelectedNode[tabId]);
+    const selectedDocumentId = useProjectStore((s: ProjectStore) => s.selectedDocumentId[tabId]);
 
     const effectiveNode = useMemo(() => {
         if (secondarySelectedNode) {
@@ -47,5 +47,7 @@ export function useWorkspaceState() {
         suffixName,
         isCodeActive,
         selectedDocumentId,
+        selectedNode,
+        secondarySelectedNode,
     };
 }

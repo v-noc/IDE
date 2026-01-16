@@ -7,20 +7,18 @@ import { debounce } from "remeda";
  * Mutation actions for the Workspace.
  * Handles node promotion and document content updates.
  */
-export function useWorkspaceActions() {
-    const {
-        selectedNode,
-        secondarySelectedNode,
-        setSelectedNode,
-        setSecondarySelectedNode,
-    } = useProjectStore();
+export function useWorkspaceActions(tabId: string) {
+    const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
+    const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[tabId]);
+    const handleNodeSelection = useProjectStore((s) => s.handleNodeSelection);
+    const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
 
     const handlePromote = useCallback(() => {
         if (secondarySelectedNode) {
-            setSelectedNode(secondarySelectedNode);
-            setSecondarySelectedNode(null);
+            handleNodeSelection(tabId, secondarySelectedNode);
+            setSecondarySelectedNode(tabId, null);
         }
-    }, [secondarySelectedNode, setSelectedNode, setSecondarySelectedNode]);
+    }, [secondarySelectedNode, tabId, handleNodeSelection, setSecondarySelectedNode]);
 
     const updateMutation = useUpdateDocument(selectedNode?._key || "");
 

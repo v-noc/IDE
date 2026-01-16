@@ -2,18 +2,19 @@ import type { StateCreator } from 'zustand';
 import type { SelectionSlice } from './selectionSlice';
 import type { FocusSlice } from './focusSlice';
 import type { DataSlice } from './dataSlice';
+import type { TabsSlice } from './tabsSlice';
 
 export interface UISlice {
-  expandedNodeIds: string[];
-  activeNodeId: string | null;
+  expandedNodeIds: Record<string, string[]>;
+  activeNodeId: Record<string, string | null>;
 
-  toggleNodeExpansion: (nodeId: string) => void;
-  expandNode: (nodeId: string) => void;
-  collapseNode: (nodeId: string) => void;
-  setActiveNodeId: (id: string | null) => void;
+  toggleNodeExpansion: (tabId: string, nodeId: string) => void;
+  expandNode: (tabId: string, nodeId: string) => void;
+  collapseNode: (tabId: string, nodeId: string) => void;
+  setActiveNodeId: (tabId: string, id: string | null) => void;
 }
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice;
+type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TabsSlice;
 
 export const createUISlice: StateCreator<
   ProjectStore,
@@ -21,30 +22,39 @@ export const createUISlice: StateCreator<
   [],
   UISlice
 > = (set) => ({
-  expandedNodeIds: [],
-  activeNodeId: null,
+  expandedNodeIds: {},
+  activeNodeId: {},
 
-  toggleNodeExpansion: (nodeId) => set((state) => {
-    const index = state.expandedNodeIds.indexOf(nodeId);
+  toggleNodeExpansion: (tabId, nodeId) => set((state) => {
+    if (!state.expandedNodeIds[tabId]) {
+      state.expandedNodeIds[tabId] = [];
+    }
+    const index = state.expandedNodeIds[tabId].indexOf(nodeId);
     if (index > -1) {
-      state.expandedNodeIds.splice(index, 1);
+      state.expandedNodeIds[tabId].splice(index, 1);
     } else {
-      state.expandedNodeIds.push(nodeId);
+      state.expandedNodeIds[tabId].push(nodeId);
     }
   }),
 
-  expandNode: (nodeId) => set((state) => {
-    if (!state.expandedNodeIds.includes(nodeId)) {
-      state.expandedNodeIds.push(nodeId);
+  expandNode: (tabId, nodeId) => set((state) => {
+    if (!state.expandedNodeIds[tabId]) {
+      state.expandedNodeIds[tabId] = [];
+    }
+    if (!state.expandedNodeIds[tabId].includes(nodeId)) {
+      state.expandedNodeIds[tabId].push(nodeId);
     }
   }),
 
-  collapseNode: (nodeId) => set((state) => {
-    const index = state.expandedNodeIds.indexOf(nodeId);
+  collapseNode: (tabId, nodeId) => set((state) => {
+    if (!state.expandedNodeIds[tabId]) return;
+    const index = state.expandedNodeIds[tabId].indexOf(nodeId);
     if (index > -1) {
-      state.expandedNodeIds.splice(index, 1);
+      state.expandedNodeIds[tabId].splice(index, 1);
     }
   }),
 
-  setActiveNodeId: (id) => set({ activeNodeId: id }),
+  setActiveNodeId: (tabId, id) => set((state) => {
+    state.activeNodeId[tabId] = id;
+  }),
 });

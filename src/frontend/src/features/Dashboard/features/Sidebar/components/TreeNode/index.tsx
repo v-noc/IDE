@@ -8,6 +8,7 @@ import { useTreeNodeActions } from "../../hooks/useTreeNodeAction";
 
 interface TreeNodeProps {
   node: ContainerNodeTree;
+  tabId: string;
   nestingLevel?: number;
   childFilter?: (node: ContainerNodeTree) => boolean;
   onSelect?: (node: ContainerNodeTree) => void;
@@ -15,24 +16,24 @@ interface TreeNodeProps {
 
 export const TreeNode = ({
   node,
+  tabId,
   nestingLevel = 0,
   childFilter,
   onSelect,
 }: TreeNodeProps) => {
-  const {
-    isOpen,
-    isSelected,
-    isActive,
-    hasChildren
-  } = useTreeNodeState(node, childFilter);
+  const { isOpen, isSelected, isActive, hasChildren } = useTreeNodeState(
+    node,
+    childFilter,
+    tabId
+  );
 
   const {
     handleToggle,
     handleSelectNode,
     handleFocus,
     handleExpand,
-    handleContextAction
-  } = useTreeNodeHandlers(node);
+    handleContextAction,
+  } = useTreeNodeHandlers(node, tabId);
 
   const { handleRemoveCall, handleDeleteGroup } = useTreeNodeActions(node);
 
@@ -59,18 +60,16 @@ export const TreeNode = ({
       handleExpand();
       return;
     }
-    // All other actions (add-call, create-group, manage-group, prompt-builder) 
+    // All other actions (add-call, create-group, manage-group, prompt-builder)
     // are handled by the handlers hook which opens the global modal store
     handleContextAction(action);
   };
 
   return (
-    <NodeContextMenu
-      node={node as AnyNodeTree}
-      onAction={onAction}
-    >
+    <NodeContextMenu node={node as AnyNodeTree} onAction={onAction}>
       <NodeContent
         node={node}
+        tabId={tabId}
         isOpen={isOpen}
         isSelected={isSelected}
         isActive={isActive}

@@ -6,8 +6,9 @@ import { createSelectionSlice, type SelectionSlice } from './slices/selectionSli
 import { createFocusSlice, type FocusSlice } from './slices/focusSlice';
 import { createUISlice, type UISlice } from './slices/uiSlice';
 import { createDataSlice, type DataSlice } from './slices/dataSlice';
+import { createTabsSlice, type TabsSlice } from './slices/tabsSlice';
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice;
+export type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TabsSlice;
 
 const useProjectStore = create<ProjectStore>()(
   devtools(
@@ -16,6 +17,7 @@ const useProjectStore = create<ProjectStore>()(
       ...createFocusSlice(...a),
       ...createUISlice(...a),
       ...createDataSlice(...a),
+      ...createTabsSlice(...a),
     })),
     { name: 'project-store' }
   )

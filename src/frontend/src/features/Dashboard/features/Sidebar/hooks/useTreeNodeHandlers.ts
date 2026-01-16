@@ -7,15 +7,15 @@ import type { AnyNodeTree, ContainerNodeTree } from '@/types/project';
  * Event handlers for tree node interactions.
  * All mutations dispatch to modal store or API.
  */
-export function useTreeNodeHandlers(node: ContainerNodeTree) {
+export function useTreeNodeHandlers(node: ContainerNodeTree, tabId: string) {
   // Store actions
-  const setSelectedNode = useProjectStore((s) => s.setSelectedNode);
+  const handleNodeSelection = useProjectStore((s) => s.handleNodeSelection);
   const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
-  const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode);
-  const selectedNode = useProjectStore((s) => s.selectedNode);
+  const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[tabId]);
+  const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
   const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
   const pushFocus = useProjectStore((s) => s.pushFocus);
-  const focusStack = useProjectStore((s) => s.focusStack);
+  const focusStack = useProjectStore((s) => s.focusStack[tabId] ?? []);
 
   // Modal store
   const openModal = useSidebarModalStore((s) => s.openModal);
@@ -24,32 +24,32 @@ export function useTreeNodeHandlers(node: ContainerNodeTree) {
   const handleToggle = useCallback((e: React.MouseEvent) => {
     if (!node) return;
     e.stopPropagation();
-    toggleNodeExpansion(node._key);
-  }, [node, toggleNodeExpansion]);
+    toggleNodeExpansion(tabId, node._key);
+  }, [node, tabId, toggleNodeExpansion]);
 
   // Select node
   const handleSelectNode = useCallback(() => {
     if (!node) return;
     if (secondarySelectedNode) {
-      setSecondarySelectedNode(null);
+      setSecondarySelectedNode(tabId, null);
     }
     if (selectedNode?._key === node._key) return;
-    setSelectedNode(node as AnyNodeTree);
-  }, [node, selectedNode, secondarySelectedNode, setSelectedNode, setSecondarySelectedNode]);
+    handleNodeSelection(tabId, node as AnyNodeTree);
+  }, [node, tabId, selectedNode, secondarySelectedNode, handleNodeSelection, setSecondarySelectedNode]);
 
   // Focus (zoom into node)
   const handleFocus = useCallback(() => {
     if (!node) return;
     const lastFocused = focusStack[focusStack.length - 1];
     if (lastFocused?._key === node._key) return;
-    pushFocus(node as AnyNodeTree);
-  }, [node, focusStack, pushFocus]);
+    pushFocus(tabId, node as AnyNodeTree);
+  }, [node, tabId, focusStack, pushFocus]);
 
   // Expand/collapse
   const handleExpand = useCallback(() => {
     if (!node) return;
-    toggleNodeExpansion(node._key);
-  }, [node, toggleNodeExpansion]);
+    toggleNodeExpansion(tabId, node._key);
+  }, [node, tabId, toggleNodeExpansion]);
 
   // Context menu actions - dispatch to modal store
   const handleContextAction = useCallback((action: string) => {

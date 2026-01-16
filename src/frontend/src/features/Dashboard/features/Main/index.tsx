@@ -14,17 +14,17 @@ import type { CallNodeTree } from "@/types/project";
  * Workspace Container - Manages the state, logic, and data flow for the central central area.
  * Composes presentational components to render the UI.
  */
-const Workspace = () => {
-  const {
-    selectedNode,
-    secondarySelectedNode,
-    selectedDocumentId,
-    setSelectedDocumentId,
-  } = useProjectStore();
+interface WorkspaceProps {
+  tabId: string;
+}
+
+const Workspace = ({ tabId }: WorkspaceProps) => {
+  const selectedDocumentId = useProjectStore((s) => s.selectedDocumentId[tabId]);
+  const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
 
   // 1. Logic & State hooks
-  const { effectiveNode, displayPath, suffixName, isCodeActive } = useWorkspaceState();
-  const { handlePromote, updateDocumentDebounced } = useWorkspaceActions();
+  const { effectiveNode, displayPath, suffixName, isCodeActive, selectedNode, secondarySelectedNode } = useWorkspaceState(tabId);
+  const { handlePromote, updateDocumentDebounced } = useWorkspaceActions(tabId);
 
   const [tabValue, setTabValue] = useState("docs");
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
@@ -51,9 +51,9 @@ const Workspace = () => {
         !currentSelected?.documents.includes(`documents/${selectedDocumentId}`)) &&
       documents.length > 0
     ) {
-      setSelectedDocumentId(documents[0]._key);
+      setSelectedDocumentId(tabId, documents[0]._key);
     }
-  }, [documents, selectedDocumentId, selectedNode, secondarySelectedNode, setSelectedDocumentId]);
+  }, [tabId, documents, selectedDocumentId, selectedNode, secondarySelectedNode, setSelectedDocumentId]);
 
   // Derived content
   const selectedDocument = useMemo(

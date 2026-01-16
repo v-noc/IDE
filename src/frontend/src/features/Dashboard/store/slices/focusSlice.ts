@@ -3,19 +3,20 @@ import type { AnyNodeTree } from '@/types/project';
 import type { SelectionSlice } from './selectionSlice';
 import type { UISlice } from './uiSlice';
 import type { DataSlice } from './dataSlice';
+import type { TabsSlice } from './tabsSlice';
 
 export interface FocusSlice {
-  focusStack: AnyNodeTree[];
-  focusedNode: AnyNodeTree | null;
-  focusTargetId: string | null;
+  focusStack: Record<string, AnyNodeTree[]>;
+  focusedNode: Record<string, AnyNodeTree | null>;
+  focusTargetId: Record<string, string | null>;
 
-  pushFocus: (node: AnyNodeTree) => void;
-  popFocus: () => void;
-  clearFocus: () => void;
-  setFocusTargetId: (id: string | null) => void;
+  pushFocus: (tabId: string, node: AnyNodeTree) => void;
+  popFocus: (tabId: string) => void;
+  clearFocus: (tabId: string) => void;
+  setFocusTargetId: (tabId: string, id: string | null) => void;
 }
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice;
+type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TabsSlice;
 
 export const createFocusSlice: StateCreator<
   ProjectStore,
@@ -23,21 +24,33 @@ export const createFocusSlice: StateCreator<
   [],
   FocusSlice
 > = (set) => ({
-  focusStack: [],
-  focusedNode: null,
-  focusTargetId: null,
+  focusStack: {},
+  focusedNode: {},
+  focusTargetId: {},
 
-  pushFocus: (node) => set((state) => {
-    state.focusStack.push(node);
-    state.focusedNode = node;
+  pushFocus: (tabId, node) => set((state) => {
+    if (!state.focusStack[tabId]) {
+      state.focusStack[tabId] = [];
+    }
+    state.focusStack[tabId].push(node);
+    state.focusedNode[tabId] = node;
   }),
 
-  popFocus: () => set((state) => {
-    state.focusStack.pop();
-    state.focusedNode = state.focusStack[state.focusStack.length - 1] ?? null;
+  popFocus: (tabId) => set((state) => {
+    const stack = state.focusStack[tabId];
+    if (stack && stack.length > 0) {
+      stack.pop();
+      state.focusedNode[tabId] = stack[stack.length - 1] ?? null;
+    }
   }),
 
-  clearFocus: () => set({ focusStack: [], focusedNode: null, focusTargetId: null }),
+  clearFocus: (tabId) => set((state) => {
+    state.focusStack[tabId] = [];
+    state.focusedNode[tabId] = null;
+    state.focusTargetId[tabId] = null;
+  }),
 
-  setFocusTargetId: (id) => set({ focusTargetId: id }),
+  setFocusTargetId: (tabId, id) => set((state) => {
+    state.focusTargetId[tabId] = id;
+  }),
 });

@@ -1,0 +1,38 @@
+import type { TabData } from '@/types/tabs';
+import type { ProjectStore } from '../useProjectStore';
+
+/**
+ * Returns the stack of tabs from the root to the active tab ID.
+ */
+export const selectTabStack = (state: ProjectStore): TabData[] => {
+    const stack: TabData[] = [];
+    let currentId: string | null = state.activeTabId;
+    console.log("currentId ", currentId);
+    while (currentId && state.tabs[currentId]) {
+        const tab: TabData = state.tabs[currentId];
+        stack.unshift(tab);
+        currentId = tab.parentId;
+    }
+
+    return stack;
+};
+
+/**
+ * Returns the lineage for a specific tab ID.
+ */
+export const selectTabLineage = (state: ProjectStore, tabId: string): TabData[] => {
+    const stack: TabData[] = [];
+    let currentId: string | null = tabId;
+
+    while (currentId && state.tabs[currentId]) {
+        const tab: TabData = state.tabs[currentId];
+        stack.unshift(tab);
+        currentId = tab.parentId;
+    }
+
+    return stack;
+};
+
+export const selectActiveTab = (state: ProjectStore): TabData | undefined => {
+    return state.tabs[state.activeTabId];
+};

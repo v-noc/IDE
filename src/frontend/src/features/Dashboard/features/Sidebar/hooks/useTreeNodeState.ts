@@ -8,13 +8,14 @@ import type { ContainerNodeTree } from '@/types/project';
  */
 export function useTreeNodeState(
   node: ContainerNodeTree,
-  childFilter: (node: ContainerNodeTree) => boolean = () => true
+  childFilter: (node: ContainerNodeTree) => boolean = () => true,
+  tabId: string
 ) {
   // Selective subscriptions - only re-render when these change
-  const selectedNodeKey = useProjectStore((s) => s.selectedNode?._key);
-  const secondarySelectedKey = useProjectStore((s) => s.secondarySelectedNode?._key);
-  const activeNodeId = useProjectStore((s) => s.activeNodeId);
-  const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
+  const selectedNodeKey = useProjectStore((s) => s.selectedNode[tabId]?._key);
+  const secondarySelectedKey = useProjectStore((s) => s.secondarySelectedNode[tabId]?._key);
+  const activeNodeId = useProjectStore((s) => s.activeNodeId[tabId]);
+  const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds[tabId] ?? []);
 
   const isOpen = node ? expandedNodeIds.includes(node._key) : false;
   const isSelected = node ? (selectedNodeKey === node._key || secondarySelectedKey === node._key) : false;
