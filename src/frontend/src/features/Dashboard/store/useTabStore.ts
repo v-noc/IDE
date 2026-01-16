@@ -91,16 +91,20 @@ const useTabStore = create<TabStore>()(
         const currentTab = get().tabs[tabId];
         if (!currentTab) return;
 
-        // 1. Destroy existing children branch
+        // 1. selective child tabs destruction
+        // If we select a node that is NOT the source of an existing child tab, destroy that child tab
         currentTab.childrenIds.forEach((childId) => {
-          get().destroyTabBranch(childId);
+          const childTab = get().tabs[childId];
+          if (childTab && childTab.sourceCallNodeId !== node?._key) {
+            get().destroyTabBranch(childId);
+          }
         });
 
         // 2. Update selection for the current tab in project store
         useProjectStore.getState().setSelectedNode(tabId, node);
         console.log("node", node);
 
-        // 3. If it's a CallNode, create a new child tab (Portal)
+        // 2. If it's a CallNode, create a new child tab (Portal)
         if (node && node.node_type === 'call') {
           // Check if parent has valid focus context (at least one node in focus stack)
           const parentFocusStack = useProjectStore.getState().focusStack[tabId];
@@ -110,6 +114,10 @@ const useTabStore = create<TabStore>()(
           const target = callNode.target;
 
           if (target) {
+            // Check if we already have a tab for this specific call node
+            const existingChildId = currentTab.childrenIds.find(id => get().tabs[id]?.sourceCallNodeId === node._key);
+            if (existingChildId) return;
+
             const projectData = useProjectStore.getState().projectData;
             const lineage = findNodeLineage(projectData, target._key);
 
@@ -132,22 +140,15 @@ const useTabStore = create<TabStore>()(
               // Initialize focus stack with lineage
               useProjectStore.getState().pushFocusBulk(newTabId, lineage);
 
-              // Auto-expand folders/files/classes in the lineage
-              const expandKeys = lineage
-                .filter((n: AnyNodeTree) =>
-                  n.node_type === 'folder' ||
-                  n.node_type === 'file' ||
-                  n.node_type === 'class'
-                )
-                .map((n: AnyNodeTree) => n._key);
+              // Auto-expand folders/files/nodes in the lineage including target
+              const expandKeys = lineage.map((n: AnyNodeTree) => n._key);
               useProjectStore.getState().expandNodesBulk(newTabId, expandKeys);
             } else {
               // Fallback
               useProjectStore.getState().pushFocus(newTabId, target as any);
             }
 
-            // Auto-activate the new tab
-            get().setActiveTabId(newTabId);
+            // Note: Auto-activation removed based on user request "it wont be active if the user did not click on it"
           }
         }
       },

@@ -6,14 +6,17 @@ import type { TabStore } from '../useTabStore';
  */
 export const selectTabStack = (state: TabStore): TabData[] => {
     const stack: TabData[] = [];
-    let currentId: string | null = state.activeTabId;
-    console.log("currentId ", currentId);
-    while (currentId && state.tabs[currentId]) {
-        const tab: TabData = state.tabs[currentId];
-        stack.unshift(tab);
-        currentId = tab.parentId;
-    }
 
+    const traverse = (id: string) => {
+        const tab = state.tabs[id];
+        if (!tab) return;
+        stack.push(tab);
+        if (tab.childrenIds) {
+            tab.childrenIds.forEach(traverse);
+        }
+    };
+
+    traverse(state.rootTabId);
     return stack;
 };
 
