@@ -1,18 +1,10 @@
-import { memo, Fragment } from "react";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import { ContextPanel } from "./ContextPanel";
-import { selectTabStack } from "../../../store/selectors/tabSelectors";
-import useProjectStore from "../../../store/useProjectStore";
+import { memo } from "react";
 import { SidebarHeader } from "./SidebarHeader";
 import { SidebarDialogs } from "./SidebarDialogs";
+import { TabContextStack } from "./TabContextStack";
 
 import { useSidebarData } from "../hooks/useSidebarData";
-
-import { useShallow } from "zustand/react/shallow";
+import useProjectStore from "../../../store/useProjectStore";
 
 /**
  * Main Sidebar Container
@@ -20,13 +12,7 @@ import { useShallow } from "zustand/react/shallow";
  * Supports hierarchical Context Panels.
  */
 export const SideBar = memo(function SideBar() {
-  const activeTabId = useProjectStore((s) => s.activeTabId);
-  const setActiveTabId = useProjectStore((s) => s.setActiveTabId);
-  const destroyTabBranch = useProjectStore((s) => s.destroyTabBranch);
   const projectData = useProjectStore((s) => s.projectData);
-
-  const tabStack = useProjectStore(useShallow(selectTabStack));
-
   const { filteredProjectData, searchQuery, setSearchQuery } = useSidebarData();
 
   if (!projectData) {
@@ -49,31 +35,10 @@ export const SideBar = memo(function SideBar() {
 
       {/* 2. Dynamic Context Stack */}
       <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction="vertical" className="h-full">
-          {tabStack.map((tab, index) => (
-            <Fragment key={tab.id}>
-              {index > 0 && (
-                <ResizableHandle
-                  withHandle
-                  className="bg-border hover:bg-primary/20 transition-colors h-px"
-                />
-              )}
-              <ResizablePanel
-                minSize={15}
-                defaultSize={100 / tabStack.length}
-                className="flex flex-col overflow-hidden"
-              >
-                <ContextPanel
-                  tab={tab}
-                  projectTree={filteredProjectData ?? projectData}
-                  isActive={tab.id === activeTabId}
-                  onActivate={() => setActiveTabId(tab.id)}
-                  onClose={() => destroyTabBranch(tab.id)}
-                />
-              </ResizablePanel>
-            </Fragment>
-          ))}
-        </ResizablePanelGroup>
+        <TabContextStack
+          projectData={projectData}
+          filteredProjectData={filteredProjectData}
+        />
       </div>
 
       {/* 3. Global Modals/Dialogs */}

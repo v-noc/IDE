@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/useProject";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useTreeFilter } from "./useTreeFilter";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 
@@ -26,7 +27,7 @@ export function useSidebarData() {
   const rawProjectData = useProjectStore((s) => s.projectData);
   const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
   const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
-  const activeTabId = useProjectStore((s) => s.activeTabId);
+  const activeTabId = useTabStore((s) => s.activeTabId);
 
   /*
    * Sync server data to store.

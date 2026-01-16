@@ -4,14 +4,15 @@ import { findNodeByKey } from '@/features/Dashboard/utils/findNode';
 import type { SelectionSlice } from './selectionSlice';
 import type { FocusSlice } from './focusSlice';
 import type { UISlice } from './uiSlice';
-import type { TabsSlice } from './tabsSlice';
 
 export interface DataSlice {
   projectData: ProjectNodeTree | null;
   setProjectData: (data: ProjectNodeTree | null) => void;
 }
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TabsSlice;
+type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
+  cleanupTabData: (tabId: string) => void;
+};
 
 export const createDataSlice: StateCreator<
   ProjectStore,

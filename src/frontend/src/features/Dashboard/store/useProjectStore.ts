@@ -6,18 +6,30 @@ import { createSelectionSlice, type SelectionSlice } from './slices/selectionSli
 import { createFocusSlice, type FocusSlice } from './slices/focusSlice';
 import { createUISlice, type UISlice } from './slices/uiSlice';
 import { createDataSlice, type DataSlice } from './slices/dataSlice';
-import { createTabsSlice, type TabsSlice } from './slices/tabsSlice';
 
-export type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TabsSlice;
+export type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
+  cleanupTabData: (tabId: string) => void;
+};
 
 const useProjectStore = create<ProjectStore>()(
   devtools(
-    immer((...a) => ({
-      ...createSelectionSlice(...a),
-      ...createFocusSlice(...a),
-      ...createUISlice(...a),
-      ...createDataSlice(...a),
-      ...createTabsSlice(...a),
+    immer((set, get, store) => ({
+      ...createSelectionSlice(set, get, store),
+      ...createFocusSlice(set, get, store),
+      ...createUISlice(set, get, store),
+      ...createDataSlice(set, get, store),
+
+      cleanupTabData: (tabId: string) =>
+        set((state: ProjectStore) => {
+          delete state.focusStack[tabId];
+          delete state.focusedNode[tabId];
+          delete state.focusTargetId[tabId];
+          delete state.selectedNode[tabId];
+          delete state.secondarySelectedNode[tabId];
+          delete state.selectedDocumentId[tabId];
+          delete state.expandedNodeIds[tabId];
+          delete state.activeNodeId[tabId];
+        }),
     })),
     { name: 'project-store' }
   )

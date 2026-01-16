@@ -1,5 +1,6 @@
 import { memo } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useShallow } from "zustand/react/shallow";
 
 interface FocusBreadcrumbProps {
   tabId: string;
@@ -10,7 +11,9 @@ export const FocusBreadcrumb = memo(function FocusBreadcrumb({
 }: FocusBreadcrumbProps) {
   // Selectors - only subscribe to what's needed
   const focusedNode = useProjectStore((s) => s.focusedNode[tabId]);
-  const focusStack = useProjectStore((s) => s.focusStack[tabId] ?? []);
+  const focusStack = useProjectStore(
+    useShallow((s) => s.focusStack[tabId] ?? [])
+  );
   const popFocus = useProjectStore((s) => s.popFocus);
   const clearFocus = useProjectStore((s) => s.clearFocus);
 

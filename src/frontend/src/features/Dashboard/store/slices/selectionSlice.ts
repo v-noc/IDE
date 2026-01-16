@@ -3,7 +3,6 @@ import type { AnyNodeTree } from '@/types/project';
 import type { FocusSlice } from './focusSlice';
 import type { UISlice } from './uiSlice';
 import type { DataSlice } from './dataSlice';
-import type { TabsSlice } from './tabsSlice';
 
 export interface SelectionSlice {
   selectedNode: Record<string, AnyNodeTree | null>;
@@ -16,7 +15,9 @@ export interface SelectionSlice {
   clearSelection: (tabId: string) => void;
 }
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TabsSlice;
+type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
+  cleanupTabData: (tabId: string) => void;
+};
 
 export const createSelectionSlice: StateCreator<
   ProjectStore,

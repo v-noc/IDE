@@ -6,6 +6,7 @@ import Workspace from "@/features/Dashboard/features/Main";
 import { ResizablePanelGroup } from "@/components/ui/resizable";
 import { RightSidebar } from "@/features/Dashboard/features/Main/components/RightSidebar";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useEffect } from "react";
 import { useGroupFlattening } from "@/features/Dashboard/hooks/useGroupFlattening";
 import { useSocketSync, useProjectRoom } from "@/services/socket";
@@ -21,12 +22,12 @@ import { useShallow } from "zustand/react/shallow";
  */
 const Dashboard = () => {
   const { projectId } = useParams();
-  const activeTabId = useProjectStore((s) => s.activeTabId);
+  const activeTabId = useTabStore((s) => s.activeTabId);
   const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
   const projectData = useProjectStore((s) => s.projectData);
-  const handleNodeSelection = useProjectStore((s) => s.handleNodeSelection);
+  const handleNodeSelection = useTabStore((s) => s.handleNodeSelection);
 
-  const tabStack = useProjectStore(useShallow(selectTabStack));
+  const tabStack = useTabStore(useShallow(selectTabStack));
 
   // Socket and Data Sync hooks
   useSocketSync();

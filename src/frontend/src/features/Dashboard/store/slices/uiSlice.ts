@@ -2,7 +2,6 @@ import type { StateCreator } from 'zustand';
 import type { SelectionSlice } from './selectionSlice';
 import type { FocusSlice } from './focusSlice';
 import type { DataSlice } from './dataSlice';
-import type { TabsSlice } from './tabsSlice';
 
 export interface UISlice {
   expandedNodeIds: Record<string, string[]>;
@@ -14,7 +13,9 @@ export interface UISlice {
   setActiveNodeId: (tabId: string, id: string | null) => void;
 }
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TabsSlice;
+type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
+  cleanupTabData: (tabId: string) => void;
+};
 
 export const createUISlice: StateCreator<
   ProjectStore,

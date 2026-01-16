@@ -3,7 +3,6 @@ import type { AnyNodeTree } from '@/types/project';
 import type { SelectionSlice } from './selectionSlice';
 import type { UISlice } from './uiSlice';
 import type { DataSlice } from './dataSlice';
-import type { TabsSlice } from './tabsSlice';
 
 export interface FocusSlice {
   focusStack: Record<string, AnyNodeTree[]>;
@@ -16,7 +15,9 @@ export interface FocusSlice {
   setFocusTargetId: (tabId: string, id: string | null) => void;
 }
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TabsSlice;
+type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
+  cleanupTabData: (tabId: string) => void;
+};
 
 export const createFocusSlice: StateCreator<
   ProjectStore,
@@ -29,6 +30,7 @@ export const createFocusSlice: StateCreator<
   focusTargetId: {},
 
   pushFocus: (tabId, node) => set((state) => {
+    console.log("pushFocus", tabId, node);
     if (!state.focusStack[tabId]) {
       state.focusStack[tabId] = [];
     }
@@ -37,6 +39,7 @@ export const createFocusSlice: StateCreator<
   }),
 
   popFocus: (tabId) => set((state) => {
+    console.log("popFocus", tabId);
     const stack = state.focusStack[tabId];
     if (stack && stack.length > 0) {
       stack.pop();
@@ -45,12 +48,14 @@ export const createFocusSlice: StateCreator<
   }),
 
   clearFocus: (tabId) => set((state) => {
+    console.log("clearFocus", tabId);
     state.focusStack[tabId] = [];
     state.focusedNode[tabId] = null;
     state.focusTargetId[tabId] = null;
   }),
 
   setFocusTargetId: (tabId, id) => set((state) => {
+    console.log("setFocusTargetId", tabId, id);
     state.focusTargetId[tabId] = id;
   }),
 });
