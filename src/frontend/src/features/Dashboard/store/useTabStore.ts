@@ -133,8 +133,11 @@ const useTabStore = create<TabStore>()(
             // Add the tab
             get().addTab(newTab);
 
+            // Use the full node from projectData (via lineage) for selection if available
+            const fullTargetNode = lineage?.[lineage.length - 1] ?? target;
+
             // Set selected node for the NEW tab
-            useProjectStore.getState().setSelectedNode(newTabId, target);
+            useProjectStore.getState().setSelectedNode(newTabId, fullTargetNode);
 
             if (lineage && lineage.length > 0) {
               // Initialize focus stack with lineage
