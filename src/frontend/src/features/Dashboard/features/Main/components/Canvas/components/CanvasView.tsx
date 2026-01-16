@@ -88,9 +88,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   useEffect(() => {
-    console.log("initialNodes", initialNodes);
-    // setNodes(initialNodes);
-    // setEdges(initialEdges);
+    setNodes(initialNodes);
+    setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
