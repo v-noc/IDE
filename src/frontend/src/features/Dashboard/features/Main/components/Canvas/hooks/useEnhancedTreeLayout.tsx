@@ -38,7 +38,7 @@ export const useEnhancedTreeLayout = ({
   focusTargetId,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
-  console.log("focusTargetId", focusTargetId);
+
   // TODO: Use layoutConfig for dagre spacing configuration if needed
   void _layoutConfig;
 
@@ -108,9 +108,9 @@ export const useEnhancedTreeLayout = ({
           target: node.target,
           focused: focusTargetId
             ? nodeId ===
-              (focusTargetId.includes("/")
-                ? focusTargetId.split("/").pop()
-                : focusTargetId)
+            (focusTargetId.includes("/")
+              ? focusTargetId.split("/").pop()
+              : focusTargetId)
             : false,
           selected: nodeId === centerNode?._key,
         } as EnhancedNodeData,

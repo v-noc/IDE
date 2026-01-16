@@ -22,6 +22,7 @@ import EnhancedNode from "./nodes/EnhancedNode";
 import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 import { useShallow } from "zustand/react/shallow";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
@@ -54,6 +55,9 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     useShallow((s) => s.toggleNodeExpansion)
   );
   const projectData = useProjectStore(useShallow((s) => s.projectData));
+  const handleNodeSelection = useTabStore(
+    useShallow((s) => s.handleNodeSelection)
+  );
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -67,7 +71,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     }),
     []
   );
-  console.log("whhaht");
+
   const focusTargetId = useProjectStore(
     useShallow((s) => s.focusTargetId[tabId])
   );
@@ -85,8 +89,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   useEffect(() => {
     console.log("initialNodes", initialNodes);
-    setNodes(initialNodes);
-    setEdges(initialEdges);
+    // setNodes(initialNodes);
+    // setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
@@ -155,6 +159,19 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     [projectData]
   );
 
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const nodeKey = node.id;
+      if (projectData && nodeKey) {
+        const foundNode = findNodeByKey(projectData, nodeKey);
+        if (foundNode) {
+          handleNodeSelection(tabId, foundNode);
+        }
+      }
+    },
+    [projectData, handleNodeSelection, tabId]
+  );
+
   return (
     <div className="h-full w-full bg-slate-50">
       <ReactFlow
@@ -166,6 +183,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
         onEdgesChange={onEdgesChange}
         onInit={onInit}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeClick={onNodeClick}
         nodesDraggable={true}
         minZoom={0.01}
         nodesConnectable={false}

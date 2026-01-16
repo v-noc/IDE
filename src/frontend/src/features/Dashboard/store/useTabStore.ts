@@ -97,7 +97,7 @@ const useTabStore = create<TabStore>()(
 
         // 2. Update selection for the current tab in project store
         useProjectStore.getState().setSelectedNode(tabId, node);
-
+        console.log("node", node);
         // 3. If it's a CallNode, create a new child tab (Portal)
         if (node && node.node_type === 'call') {
           const callNode = node as any;

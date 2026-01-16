@@ -67,13 +67,20 @@ const EnhancedNode = memo(
     return (
       <div
         className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${
-          data.focused ? "ring-4 ring-blue-400 ring-offset-2 scale-[1.02]" : 
-          data.selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
+          data.focused
+            ? "ring-4 ring-blue-400 ring-offset-2 scale-[1.02]"
+            : data.selected
+            ? "ring-4 ring-amber-400 ring-offset-1"
+            : ""
         }`}
         style={{
           backgroundColor: data.bgColor,
           color: data.textColor,
-          borderColor: data.focused ? "#3b82f6" : data.selected ? "#f59e0b" : data.borderColor,
+          borderColor: data.focused
+            ? "#3b82f6"
+            : data.selected
+            ? "#f59e0b"
+            : data.borderColor,
           ...statusStyles,
         }}
       >

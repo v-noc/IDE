@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
 import type { ContainerNodeTree } from '@/types/project';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Core tree node state - selection, expansion, children.
@@ -15,7 +16,7 @@ export function useTreeNodeState(
   const selectedNodeKey = useProjectStore((s) => s.selectedNode[tabId]?._key);
   const secondarySelectedKey = useProjectStore((s) => s.secondarySelectedNode[tabId]?._key);
   const activeNodeId = useProjectStore((s) => s.activeNodeId[tabId]);
-  const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds[tabId] ?? []);
+  const expandedNodeIds = useProjectStore(useShallow((s) => s.expandedNodeIds[tabId] ?? []));
 
   const isOpen = node ? expandedNodeIds.includes(node._key) : false;
   const isSelected = node ? (selectedNodeKey === node._key || secondarySelectedKey === node._key) : false;
