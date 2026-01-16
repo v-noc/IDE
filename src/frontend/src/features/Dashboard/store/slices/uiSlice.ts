@@ -11,6 +11,7 @@ export interface UISlice {
   expandNode: (tabId: string, nodeId: string) => void;
   collapseNode: (tabId: string, nodeId: string) => void;
   setActiveNodeId: (tabId: string, id: string | null) => void;
+  expandNodesBulk: (tabId: string, nodeIds: string[]) => void;
 }
 
 type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
@@ -57,5 +58,16 @@ export const createUISlice: StateCreator<
 
   setActiveNodeId: (tabId, id) => set((state) => {
     state.activeNodeId[tabId] = id;
+  }),
+
+  expandNodesBulk: (tabId: string, nodeIds: string[]) => set((state) => {
+    if (!state.expandedNodeIds[tabId]) {
+      state.expandedNodeIds[tabId] = [];
+    }
+    nodeIds.forEach(id => {
+      if (!state.expandedNodeIds[tabId].includes(id)) {
+        state.expandedNodeIds[tabId].push(id);
+      }
+    });
   }),
 });

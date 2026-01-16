@@ -10,6 +10,7 @@ export interface FocusSlice {
   focusTargetId: Record<string, string | null>;
 
   pushFocus: (tabId: string, node: AnyNodeTree) => void;
+  pushFocusBulk: (tabId: string, nodes: AnyNodeTree[]) => void;
   popFocus: (tabId: string) => void;
   clearFocus: (tabId: string) => void;
   setFocusTargetId: (tabId: string, id: string | null) => void;
@@ -29,13 +30,22 @@ export const createFocusSlice: StateCreator<
   focusedNode: {},
   focusTargetId: {},
 
-  pushFocus: (tabId, node) => set((state) => {
+  pushFocus: (tabId: string, node: AnyNodeTree) => set((state) => {
     console.log("pushFocus", tabId, node);
     if (!state.focusStack[tabId]) {
       state.focusStack[tabId] = [];
     }
     state.focusStack[tabId].push(node);
     state.focusedNode[tabId] = node;
+  }),
+
+  pushFocusBulk: (tabId: string, nodes: AnyNodeTree[]) => set((state) => {
+    console.log("pushFocusBulk", tabId, nodes);
+    if (!state.focusStack[tabId]) {
+      state.focusStack[tabId] = [];
+    }
+    state.focusStack[tabId].push(...nodes);
+    state.focusedNode[tabId] = nodes[nodes.length - 1] ?? state.focusedNode[tabId];
   }),
 
   popFocus: (tabId) => set((state) => {

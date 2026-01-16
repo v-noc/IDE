@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { TabData } from '@/types/tabs';
+import type { AnyNodeTree } from '@/types/project';
 import useProjectStore from './useProjectStore';
+import { findNodeLineage } from '../utils/findNode';
 
 export interface TabState {
   tabs: Record<string, TabData>;
@@ -86,7 +88,6 @@ const useTabStore = create<TabStore>()(
       },
 
       handleNodeSelection: (tabId, node) => {
-
         const currentTab = get().tabs[tabId];
         if (!currentTab) return;
 
@@ -98,12 +99,20 @@ const useTabStore = create<TabStore>()(
         // 2. Update selection for the current tab in project store
         useProjectStore.getState().setSelectedNode(tabId, node);
         console.log("node", node);
+
         // 3. If it's a CallNode, create a new child tab (Portal)
         if (node && node.node_type === 'call') {
+          // Check if parent has valid focus context (at least one node in focus stack)
+          const parentFocusStack = useProjectStore.getState().focusStack[tabId];
+          if (!parentFocusStack || parentFocusStack.length === 0) return;
+
           const callNode = node as any;
           const target = callNode.target;
 
           if (target) {
+            const projectData = useProjectStore.getState().projectData;
+            const lineage = findNodeLineage(projectData, target._key);
+
             const newTabId = crypto.randomUUID();
             const newTab: TabData = {
               id: newTabId,
@@ -116,8 +125,26 @@ const useTabStore = create<TabStore>()(
             // Add the tab
             get().addTab(newTab);
 
-            // Initialize the new tab's focus stack with the target in project store
-            useProjectStore.getState().pushFocus(newTabId, target as any);
+            // Set selected node for the NEW tab
+            useProjectStore.getState().setSelectedNode(newTabId, target);
+
+            if (lineage && lineage.length > 0) {
+              // Initialize focus stack with lineage
+              useProjectStore.getState().pushFocusBulk(newTabId, lineage);
+
+              // Auto-expand folders/files/classes in the lineage
+              const expandKeys = lineage
+                .filter((n: AnyNodeTree) =>
+                  n.node_type === 'folder' ||
+                  n.node_type === 'file' ||
+                  n.node_type === 'class'
+                )
+                .map((n: AnyNodeTree) => n._key);
+              useProjectStore.getState().expandNodesBulk(newTabId, expandKeys);
+            } else {
+              // Fallback
+              useProjectStore.getState().pushFocus(newTabId, target as any);
+            }
 
             // Auto-activate the new tab
             get().setActiveTabId(newTabId);
