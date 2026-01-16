@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
+import useTabStore from '@/features/Dashboard/store/useTabStore';
 import { getIcons } from '@/features/Dashboard/utils';
 
 /**
@@ -7,7 +8,8 @@ import { getIcons } from '@/features/Dashboard/utils';
  * Primarily used for initializing form data.
  */
 export function useRightSidebarState() {
-    const selectedNode = useProjectStore((s) => s.selectedNode);
+    const activeTabId = useTabStore((s) => s.activeTabId);
+    const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
 
     return useMemo(() => {
         const initialBasicInfo = {

@@ -74,11 +74,13 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
 
   return (
     <WorkspaceLayout
+      tabId={tabId}
       bottomPanelRef={bottomPanelRef}
       isSandboxOpen={isSandboxOpen}
       onToggleSandbox={setIsSandboxOpen}
       topPanelContent={
         <WorkspaceTabs
+          tabId={tabId}
           isCodeActive={isCodeActive}
           tabValue={tabValue}
           onTabValueChange={setTabValue}

@@ -14,13 +14,13 @@ import type { LogNode } from "@/services/logs/api";
  * Logs Feature.
  * Selection-based log viewer for execution traces.
  */
-export const LogsContainer: React.FC = () => {
-  const { logs, isLoading, hasSelection } = useLogsState();
+export const LogsContainer: React.FC<{ tabId: string }> = ({ tabId }) => {
+  const { logs, isLoading, hasSelection } = useLogsState(tabId);
   const [viewMode, setViewMode] = useState<"list" | "chart">("list");
   const [selectedLogForChart, setSelectedLogForChart] =
     useState<LogTreeNode | null>(null);
   const { ref, width } = useResizeObserver();
-  const { revealNode } = useNodeRevealer();
+  const { revealNode } = useNodeRevealer(tabId);
 
   const handleViewFlameChart = (node: LogTreeNode) => {
     setSelectedLogForChart(node);

@@ -10,7 +10,7 @@ import { useSandboxState } from "./hooks/useSandboxState";
  * Sandbox Component.
  * Orchestrates multiple features (Playground, Test, Logs) in a tabbed interface.
  */
-export default function Sandbox() {
+export default function Sandbox({ tabId }: { tabId: string }) {
   const {
     activeTab,
     setActiveTab,
@@ -96,7 +96,7 @@ export default function Sandbox() {
           className="m-0 h-full overflow-hidden outline-none"
         >
           <div className="h-full p-2 overflow-y-auto">
-            <LogsContainer />
+            <LogsContainer tabId={tabId} />
           </div>
         </TabsContent>
       </div>

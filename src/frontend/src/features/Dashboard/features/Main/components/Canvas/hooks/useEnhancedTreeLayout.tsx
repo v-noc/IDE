@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import { Position } from "@xyflow/react";
 import dagre from "dagre"; // Import dagre
@@ -38,11 +38,11 @@ export const useEnhancedTreeLayout = ({
   focusTargetId,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
-
+  console.log("focusTargetId", focusTargetId);
   // TODO: Use layoutConfig for dagre spacing configuration if needed
   void _layoutConfig;
 
-  return useMemo(() => {
+  const { initialNodes, initialEdges } = useMemo(() => {
     if (!centerNode) {
       return { initialNodes: [], initialEdges: [] };
     }
@@ -107,7 +107,10 @@ export const useEnhancedTreeLayout = ({
           nodeId: nodeId,
           target: node.target,
           focused: focusTargetId
-            ? nodeId === (focusTargetId.includes("/") ? focusTargetId.split("/").pop() : focusTargetId)
+            ? nodeId ===
+              (focusTargetId.includes("/")
+                ? focusTargetId.split("/").pop()
+                : focusTargetId)
             : false,
           selected: nodeId === centerNode?._key,
         } as EnhancedNodeData,
@@ -178,5 +181,6 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap, toggleNodeExpansion, focusTargetId]);
+  }, [centerNode, expandedNodeIds, metadataMap, focusTargetId]);
+  return { initialNodes, initialEdges };
 };

@@ -21,12 +21,14 @@ import type { SimpleTreeNode } from "./nodeUtils";
 import EnhancedNode from "./nodes/EnhancedNode";
 import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
+import { useShallow } from "zustand/react/shallow";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
 };
 
 interface CanvasViewProps {
+  tabId: string;
   projectId?: string;
 }
 
@@ -36,12 +38,22 @@ const fitViewOptions: FitViewOptions = {
   maxZoom: 1.5,
 };
 
-const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
+const CanvasView: React.FC<CanvasViewProps> = ({
+  tabId,
+  projectId: _projectId,
+}) => {
   void _projectId;
-  const selectedNode = useProjectStore((s) => s.selectedNode);
-  const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
-  const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
-  const projectData = useProjectStore((s) => s.projectData);
+
+  const selectedNode = useProjectStore(
+    useShallow((s) => s.selectedNode[tabId])
+  );
+  const expandedNodeIds = useProjectStore(
+    useShallow((s) => s.expandedNodeIds[tabId] ?? [])
+  );
+  const toggleNodeExpansion = useProjectStore(
+    useShallow((s) => s.toggleNodeExpansion)
+  );
+  const projectData = useProjectStore(useShallow((s) => s.projectData));
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -55,13 +67,15 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
     }),
     []
   );
-
-  const focusTargetId = useProjectStore((s) => s.focusTargetId);
+  console.log("whhaht");
+  const focusTargetId = useProjectStore(
+    useShallow((s) => s.focusTargetId[tabId])
+  );
 
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
     centerNode,
     expandedNodeIds,
-    toggleNodeExpansion,
+    toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
     focusTargetId,
   });
@@ -70,6 +84,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   useEffect(() => {
+    console.log("initialNodes", initialNodes);
     setNodes(initialNodes);
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
@@ -92,8 +107,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
     if (rfNode && rfNode.measured?.width) {
       if (lastCenteredTargetIdRef.current !== focusTargetId) {
         reactFlowInstanceRef.current.setCenter(
-          rfNode.position.x + rfNode.measured.width / 2,
-          rfNode.position.y + rfNode.measured.height / 2,
+          rfNode.position.x + (rfNode.measured?.width ?? 0) / 2,
+          rfNode.position.y + (rfNode.measured?.height ?? 0) / 2,
           {
             zoom: 1,
             duration: 300,
@@ -109,6 +124,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
 
   useEffect(() => {
     if (focusTargetId) {
+      console.log("focusTargetId ", focusTargetId);
       centerOnTarget();
     } else {
       lastCenteredTargetIdRef.current = null;

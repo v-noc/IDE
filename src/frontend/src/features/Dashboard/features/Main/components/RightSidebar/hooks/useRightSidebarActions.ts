@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
+import useTabStore from '@/features/Dashboard/store/useTabStore';
 import { useUpdateBasicInfo } from '@/features/Dashboard/features/Main/service/useContainer';
 import type { AnyNodeTree, ProjectNodeTree, ThemeConfig } from '@/types/project';
 
@@ -36,7 +37,12 @@ function updateNodeInTree(
  * Handles the logic of updating the project tree and selection.
  */
 export function useRightSidebarActions() {
-  const { selectedNode, projectData, setProjectData, setSelectedNode } = useProjectStore();
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
+  const projectData = useProjectStore((s) => s.projectData);
+  const setProjectData = useProjectStore((s) => s.setProjectData);
+  const setSelectedNode = useProjectStore((s) => s.setSelectedNode);
+
   const { mutate: updateBasicInfoApi } = useUpdateBasicInfo(selectedNode?._key ?? '');
 
   const updateTheme = useCallback((theme: ThemeConfig) => {
@@ -57,7 +63,7 @@ export function useRightSidebarActions() {
     );
 
     setProjectData(updatedTree);
-    setSelectedNode(updatedSelected);
+    setSelectedNode(activeTabId, updatedSelected);
   }, [projectData, selectedNode, setProjectData, setSelectedNode]);
 
   const updateBasicInfo = useCallback((info: { name: string; description: string; icon: string }) => {
@@ -79,7 +85,7 @@ export function useRightSidebarActions() {
 
     updateBasicInfoApi(info);
     setProjectData(updatedTree);
-    setSelectedNode(updatedSelected);
+    setSelectedNode(activeTabId, updatedSelected);
   }, [projectData, selectedNode, setProjectData, setSelectedNode, updateBasicInfoApi]);
 
   return {

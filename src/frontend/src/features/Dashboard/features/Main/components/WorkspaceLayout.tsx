@@ -9,6 +9,7 @@ import Sandbox from "./Sandbox";
 
 interface WorkspaceLayoutProps {
   topPanelContent: React.ReactNode;
+  tabId: string;
   isSandboxOpen: boolean;
   onToggleSandbox: (open: boolean) => void;
   bottomPanelRef: React.RefObject<any>;
@@ -20,6 +21,7 @@ interface WorkspaceLayoutProps {
  */
 export function WorkspaceLayout({
   topPanelContent,
+  tabId,
   isSandboxOpen,
   onToggleSandbox,
   bottomPanelRef,
@@ -47,7 +49,7 @@ export function WorkspaceLayout({
           collapsible
           className="relative rounded group"
         >
-          <Sandbox />
+          <Sandbox tabId={tabId} />
           {/* Close button near the handle */}
           <button
             type="button"
