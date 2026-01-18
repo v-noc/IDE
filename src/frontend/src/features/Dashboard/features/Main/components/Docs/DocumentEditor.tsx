@@ -96,6 +96,9 @@ export function DocumentEditor({
       debounce(
         (payload: { id: string; data: string }) => {
           if (autoSave && nodeId) {
+            // Update lastAppliedDataRef to the data we're about to save
+            // This prevents reloading when cache updates with the same content
+            lastAppliedDataRef.current = payload.data;
             updateMutation.mutate({ id: payload.id, data: payload.data });
           }
         },
@@ -123,7 +126,25 @@ export function DocumentEditor({
     const data = document.data ?? "";
 
     // Skip if we've already applied this exact content
+    // Compare by value, not reference, to handle cache updates with same content
     if (lastAppliedDataRef.current === data) return;
+
+    // Also check if the content is semantically the same (normalized JSON comparison)
+    // This handles cases where cache updates might have slightly different formatting
+    if (lastAppliedDataRef.current && data) {
+      try {
+        const currentParsed = JSON.parse(lastAppliedDataRef.current);
+        const newParsed = JSON.parse(data);
+        // Deep equality check for JSON content
+        if (JSON.stringify(currentParsed) === JSON.stringify(newParsed)) {
+          // Content is the same, just update the ref and skip reloading
+          lastAppliedDataRef.current = data;
+          return;
+        }
+      } catch {
+        // If parsing fails, fall through to normal comparison
+      }
+    }
 
     applyingRemoteContent.current = true;
 
