@@ -8,7 +8,7 @@ export interface SimpleTreeNode {
   icon?: string;
   node_type: AnyNodeTree["node_type"];
   children?: AnyNodeTree[];
-  target?: { _key: string };
+  target?: { _key: string, node_type: AnyNodeTree["node_type"] };
   metadata?: Partial<NodeMetadata>;
   created_at?: string;
   updated_at?: string;

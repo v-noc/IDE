@@ -78,10 +78,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const focusTargetId = useProjectStore(
     useShallow((s) => s.focusTargetId[tabId])
   );
-  const effectiveSelectedNode = secondarySelectedNode ? secondarySelectedNode : centerNode;
+  const effectiveSelectedNode = secondarySelectedNode
+    ? secondarySelectedNode
+    : centerNode;
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
     centerNode: centerNode,
-    selectedNode: effectiveSelectedNode,
+    selectedNode: effectiveSelectedNode as SimpleTreeNode,
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import { Position } from "@xyflow/react";
 import dagre from "dagre"; // Import dagre
@@ -94,7 +94,11 @@ export const useEnhancedTreeLayout = ({
           mainIcon: node.icon ? (
             <DynamicIcon iconName={node.icon} />
           ) : (
-            <DynamicIcon iconName={getIcons(node.node_type)} />
+            <DynamicIcon
+              iconName={getIcons(
+                node.target ? node.target.node_type : node.node_type
+              )}
+            />
           ),
           cornerIcon: getIcons(node.node_type),
           bgColor: nodeStyle.cardColor ?? nodeStyle.backgroundColor ?? "white",
@@ -110,9 +114,9 @@ export const useEnhancedTreeLayout = ({
           target: node.target,
           focused: focusTargetId
             ? nodeId ===
-            (focusTargetId.includes("/")
-              ? focusTargetId.split("/").pop()
-              : focusTargetId)
+              (focusTargetId.includes("/")
+                ? focusTargetId.split("/").pop()
+                : focusTargetId)
             : false,
           selected: nodeId === selectedNode?._key,
         } as EnhancedNodeData,
