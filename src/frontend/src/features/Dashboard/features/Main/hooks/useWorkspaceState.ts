@@ -26,10 +26,8 @@ export function useWorkspaceState(tabId: string) {
         return selectedNode;
     }, [secondarySelectedNode, selectedNode]);
 
-    const { suffixName, displayPath } = useMemo(() => {
-        const display = effectiveNode?.qname?.replace(/\./g, " / ") ?? "";
-        const suffix = effectiveNode?.name ?? "";
-        return { suffixName: suffix, displayPath: display };
+    const displayPath = useMemo(() => {
+        return effectiveNode?.qname?.replace(/\./g, " / ") ?? "";
     }, [effectiveNode]);
 
     const isCodeActive = useMemo(() => {
@@ -40,7 +38,6 @@ export function useWorkspaceState(tabId: string) {
     return {
         effectiveNode,
         displayPath,
-        suffixName,
         isCodeActive,
         selectedDocumentId,
         selectedNode,

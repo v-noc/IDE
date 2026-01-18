@@ -23,7 +23,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
   const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
 
   // 1. Logic & State hooks
-  const { effectiveNode, displayPath, suffixName, isCodeActive, selectedNode, secondarySelectedNode } = useWorkspaceState(tabId);
+  const { effectiveNode, displayPath, isCodeActive, selectedNode, secondarySelectedNode } = useWorkspaceState(tabId);
   const { handlePromote, updateDocumentDebounced } = useWorkspaceActions(tabId);
 
   const [tabValue, setTabValue] = useState("docs");
@@ -96,7 +96,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
           headerSlot={
             <WorkspaceHeader
               displayPath={displayPath}
-              suffixName={suffixName}
+              showPromote={Boolean(secondarySelectedNode)}
               onPromote={handlePromote}
             />
           }

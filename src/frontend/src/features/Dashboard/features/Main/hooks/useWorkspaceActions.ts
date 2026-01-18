@@ -15,10 +15,15 @@ export function useWorkspaceActions(tabId: string) {
   const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
 
   const handlePromote = useCallback(() => {
+
     if (secondarySelectedNode) {
-      console.log("handlePromote", tabId, secondarySelectedNode);
-      handleNodeSelection(tabId, secondarySelectedNode);
-      setSecondarySelectedNode(tabId, null);
+      if (secondarySelectedNode.node_type == "call") {
+        handleNodeSelection(tabId, secondarySelectedNode.target);
+        setSecondarySelectedNode(tabId, null);
+      } else {
+        handleNodeSelection(tabId, secondarySelectedNode);
+        setSecondarySelectedNode(tabId, null);
+      }
     }
   }, [secondarySelectedNode, tabId, handleNodeSelection, setSecondarySelectedNode]);
 
