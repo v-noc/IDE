@@ -48,6 +48,9 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const selectedNode = useProjectStore(
     useShallow((s) => s.selectedNode[tabId])
   );
+  const secondarySelectedNode = useProjectStore(
+    useShallow((s) => s.secondarySelectedNode[tabId])
+  );
   const expandedNodeIds = useProjectStore(
     useShallow((s) => s.expandedNodeIds[tabId] ?? [])
   );
@@ -75,9 +78,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const focusTargetId = useProjectStore(
     useShallow((s) => s.focusTargetId[tabId])
   );
-
+  const effectiveSelectedNode = secondarySelectedNode ? secondarySelectedNode : centerNode;
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
-    centerNode,
+    centerNode: centerNode,
+    selectedNode: effectiveSelectedNode,
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
@@ -162,12 +166,14 @@ const CanvasView: React.FC<CanvasViewProps> = ({
       const nodeKey = node.id;
       if (projectData && nodeKey) {
         const foundNode = findNodeByKey(projectData, nodeKey);
-        if (foundNode?._key) {
+        if (foundNode?._key && foundNode?._key !== centerNode?._key) {
           handleNodeSelection(tabId, foundNode, "secondary");
+        } else {
+          handleNodeSelection(tabId, foundNode, "primary");
         }
       }
     },
-    [projectData, handleNodeSelection, tabId]
+    [projectData, handleNodeSelection, tabId, centerNode]
   );
 
   return (

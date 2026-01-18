@@ -23,6 +23,7 @@ const NODE_HEIGHT = 150;
 interface UseEnhancedTreeLayoutProps {
   centerNode: SimpleTreeNode | null;
   expandedNodeIds: string[];
+  selectedNode: SimpleTreeNode | null;
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
@@ -31,6 +32,7 @@ interface UseEnhancedTreeLayoutProps {
 
 export const useEnhancedTreeLayout = ({
   centerNode,
+  selectedNode,
   expandedNodeIds,
   toggleNodeExpansion,
   nodeMetadataMap,
@@ -112,7 +114,7 @@ export const useEnhancedTreeLayout = ({
               ? focusTargetId.split("/").pop()
               : focusTargetId)
             : false,
-          selected: nodeId === centerNode?._key,
+          selected: nodeId === selectedNode?._key,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,
@@ -181,6 +183,6 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap, focusTargetId]);
+  }, [centerNode, expandedNodeIds, metadataMap, focusTargetId, selectedNode]);
   return { initialNodes, initialEdges };
 };
