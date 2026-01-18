@@ -1,11 +1,11 @@
 import { DocumentEditor } from "./DocumentEditor";
-import type { DocumentType } from "../../service/useDocuments";
+import type { DocumentData } from "@/services/documents";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { X, ChevronDown } from "lucide-react";
 
 interface DocSidebarProps {
-  documents: DocumentType[];
+  documents: DocumentData[];
   selectedDocumentId: string | null;
   nodeId: string;
   onSelectDocument: (id: string) => void;

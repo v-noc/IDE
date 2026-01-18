@@ -2,17 +2,16 @@ import React, { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import {
-  useGetDocuments,
+  useDocuments,
   useCreateDocument,
   useUpdateDocument,
   useDeleteDocument,
-  type DocumentType,
-} from "@/features/Dashboard/features/Main/service/useDocuments";
+  type DocumentData,
+} from "@/services/documents";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -39,9 +38,7 @@ const DocumentsList: React.FC = () => {
     }
     return selectedNode?._key;
   }, [selectedNode, secondarySelectedNode]);
-  const queryClient = useQueryClient();
-
-  const { data: docs = [], isLoading } = useGetDocuments(nodeKey ?? "");
+  const { data: docs = [], isLoading } = useDocuments(nodeKey ?? undefined);
   const createMutation = useCreateDocument();
   const updateMutation = useUpdateDocument(nodeKey ?? "");
   const deleteMutation = useDeleteDocument();
@@ -54,9 +51,6 @@ const DocumentsList: React.FC = () => {
 
   const canUseDocs = useMemo(() => Boolean(nodeKey), [nodeKey]);
 
-  const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ["documents", nodeKey] });
-
   const openCreateDialog = () => {
     setEditingId(null);
     setFormName("");
@@ -64,7 +58,7 @@ const DocumentsList: React.FC = () => {
     setOpen(true);
   };
 
-  const startEdit = (doc: DocumentType) => {
+  const startEdit = (doc: DocumentData) => {
     setEditingId(doc._key);
     setFormName(doc.name);
     setFormDesc(doc.description);
@@ -89,16 +83,16 @@ const DocumentsList: React.FC = () => {
     }
     setOpen(false);
     setEditingId(null);
-    refresh();
+    // Cache updates are handled automatically by mutations
   };
 
-  const onDelete = async (doc: DocumentType) => {
+  const onDelete = async (doc: DocumentData) => {
     if (!canUseDocs) return;
     await deleteMutation.mutateAsync({
       documentId: doc._key,
       nodeId: nodeKey ?? "",
     });
-    refresh();
+    // Cache updates are handled automatically by mutations
   };
 
   if (!selectedNode) {

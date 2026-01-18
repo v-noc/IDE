@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useMemo } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { type CallNodeTree } from "@/types/project";
-import { useGetDocuments } from "../service/useDocuments";
+import { useDocuments } from "@/services/documents";
 
 /**
  * Hook to manage document fetching and selection state for a workspace tab.
@@ -24,7 +24,7 @@ export function useWorkspaceDocs(
     const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
 
     const nodeKey = effectiveNode?._key || "";
-    const { data: documents = [] } = useGetDocuments(nodeKey);
+    const { data: documents = [] } = useDocuments(nodeKey);
 
     const selectedDocument = useMemo(
         () => documents.find((d) => d._key === selectedDocumentId) || null,

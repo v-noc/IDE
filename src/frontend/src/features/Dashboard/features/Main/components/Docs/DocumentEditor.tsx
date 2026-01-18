@@ -13,14 +13,14 @@ import { useEffect, useRef, useMemo } from "react";
 import { FileText } from "lucide-react";
 import { filterSuggestionItems } from "@blocknote/core/extensions";
 import { debounce } from "remeda";
-import { useUpdateDocument } from "../../service/useDocuments";
-import type { DocumentType } from "../../service/useDocuments";
+import { useUpdateDocument } from "@/services/documents";
+import type { DocumentData } from "@/services/documents";
 
 export interface DocumentEditorProps {
   /**
    * The document to edit. If undefined, shows empty state.
    */
-  document?: DocumentType | null;
+  document?: DocumentData | null;
 
   /**
    * Optional callback when document content changes.

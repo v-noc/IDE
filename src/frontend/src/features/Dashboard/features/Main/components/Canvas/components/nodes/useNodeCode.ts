@@ -17,8 +17,13 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
 
   // Fetch code dynamically for the node
   const effectiveNodeId = nodeType === "call" && targetKey ? targetKey : nodeId;
+  // For call nodes, use the target's node type, otherwise use the node's type
+  const effectiveNodeType = nodeType === "call" ? "call" : nodeType;
 
-  const { data: codeData } = useCode(showCode ? effectiveNodeId : undefined);
+  const { data: codeData } = useCode(
+    showCode ? effectiveNodeId : undefined,
+    effectiveNodeType
+  );
 
   const {
     editorValue,
@@ -28,7 +33,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
     isSaving,
     handleEditorChange,
     handleSave,
-  } = useEditableCode(effectiveNodeId, projectId);
+  } = useEditableCode(effectiveNodeId, projectId, effectiveNodeType);
 
   const hasCode =
     (codeData?.code && codeData.code.length > 0) ||

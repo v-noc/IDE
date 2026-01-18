@@ -1,12 +1,12 @@
 import { DocumentEditor } from "./DocumentEditor";
-import type { DocumentType } from "../../service/useDocuments";
+import type { DocumentData } from "@/services/documents";
 
 type DocumentsProps = {
   /**
    * Document to edit. Can be DocumentType or legacy format { id, data }.
    * If undefined, shows empty state.
    */
-  document?: DocumentType | { id: string; data?: string } | null;
+  document?: DocumentData | { id: string; data?: string } | null;
 
   /**
    * Callback when document content changes.
@@ -30,9 +30,9 @@ type DocumentsProps = {
  */
 const Documents = ({ document, onChange, nodeId }: DocumentsProps) => {
   // Convert legacy format to DocumentType
-  const doc: DocumentType | null = document
+  const doc: DocumentData | null = document
     ? "_key" in document
-      ? (document as DocumentType)
+      ? (document as DocumentData)
       : {
           _key: document.id,
           _id: document.id,

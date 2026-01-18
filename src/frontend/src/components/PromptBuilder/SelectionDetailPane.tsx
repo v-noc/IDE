@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import type { AnyNodeTree } from "@/types/project";
 import { supportsCode } from "./types";
-import { useGetDocuments } from "@/features/Dashboard/features/Main/service/useDocuments";
+import { useDocuments } from "@/services/documents";
 import { useCode } from "@/services/code";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -32,7 +32,7 @@ export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
   const nodeId = node?._key ?? "";
 
   // Documents fetch when toggled on and node checked/selected
-  const docsQuery = useGetDocuments(nodeId);
+  const docsQuery = useDocuments(nodeId || undefined);
   useEffect(() => {
     if (node && checked && includeDocs && docsQuery.data) {
       setDocumentsForNode(node._key, docsQuery.data);
@@ -40,7 +40,7 @@ export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
   }, [node, checked, includeDocs, docsQuery.data, setDocumentsForNode]);
 
   // Code fetch when toggled on and supported type
-  const codeQuery = useCode(nodeId);
+  const codeQuery = useCode(nodeId || undefined, node?.node_type);
   useEffect(() => {
     if (node && checked && includeCode && codeQuery.data?.code) {
       setCodeForNode(node._key, codeQuery.data.code);

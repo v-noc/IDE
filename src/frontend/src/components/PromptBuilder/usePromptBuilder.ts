@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { AnyNodeTree, ContainerNodeTree } from "@/types/project";
-import type { DocumentType } from "@/features/Dashboard/features/Main/service/useDocuments";
+import type { DocumentData } from "@/services/documents";
 import { supportsCode } from "./types";
 
 export interface UsePromptBuilderState {
@@ -14,7 +14,7 @@ export interface UsePromptBuilderState {
   toggleIncludeDocs: (key: string) => void;
   toggleIncludeCode: (key: string) => void;
   toggleExpanded: (key: string) => void;
-  setDocumentsForNode: (key: string, docs: DocumentType[]) => void;
+  setDocumentsForNode: (key: string, docs: DocumentData[]) => void;
   setCodeForNode: (key: string, code: string) => void;
   generateXml: () => string;
 }
@@ -25,7 +25,7 @@ export const usePromptBuilder = (rootNode: ContainerNodeTree): UsePromptBuilderS
   const [includeCode, setIncludeCode] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ [rootNode._key]: true });
   const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(rootNode._key);
-  const [documentsByNode, setDocumentsByNode] = useState<Record<string, DocumentType[]>>({});
+  const [documentsByNode, setDocumentsByNode] = useState<Record<string, DocumentData[]>>({});
   const [codeByNode, setCodeByNode] = useState<Record<string, string>>({});
 
   const toggle = (mapSetter: React.Dispatch<React.SetStateAction<Record<string, boolean>>>) =>
@@ -36,7 +36,7 @@ export const usePromptBuilder = (rootNode: ContainerNodeTree): UsePromptBuilderS
   const toggleIncludeCode = toggle(setIncludeCode);
   const toggleExpanded = toggle(setExpanded);
 
-  const setDocumentsForNode = useCallback((key: string, docs: DocumentType[]) => {
+  const setDocumentsForNode = useCallback((key: string, docs: DocumentData[]) => {
     setDocumentsByNode(prev => ({ ...prev, [key]: docs }));
   }, []);
 

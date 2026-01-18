@@ -16,8 +16,12 @@ export interface UseEditableCodeResult {
  * Shared hook for managing editable code editor state, change tracking, and save functionality.
  * Can be used by both the main editor and node editors.
  */
-export function useEditableCode(elementId: string, projectId?: string): UseEditableCodeResult {
-  const { data, isLoading, isError } = useCode(elementId);
+export function useEditableCode(
+  elementId: string,
+  projectId?: string,
+  nodeType?: string
+): UseEditableCodeResult {
+  const { data, isLoading, isError } = useCode(elementId, nodeType);
   const { mutate: saveCode, isPending: isSaving } = useWriteCode();
 
   const [editorValue, setEditorValue] = useState<string>("");

@@ -30,8 +30,9 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
   }, [secondarySelectedNode, selectedNode]);
 
   const elementId = effectiveNode?._key ?? "";
+  const nodeType = effectiveNode?.node_type;
   const projectId = projectData?._key;
-  const { data } = useCode(elementId);
+  const { data } = useCode(elementId, nodeType);
   const {
     editorValue,
     hasChanges,
@@ -40,7 +41,7 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
     isSaving,
     handleEditorChange,
     handleSave,
-  } = useEditableCode(elementId, projectId);
+  } = useEditableCode(elementId, projectId, nodeType);
 
   const language = useMemo(
     () => detectLanguage(data?.file_name || data?.file_path || ""),
