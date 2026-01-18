@@ -1,65 +1,77 @@
 import { useEffect, useEffectEvent, useMemo } from "react";
-import { debounce } from "remeda";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { type CallNodeTree } from "@/types/project";
-import { useGetDocuments, useUpdateDocument } from "../service/useDocuments";
+import { useGetDocuments } from "../service/useDocuments";
 
 /**
- * Hook to manage document state and sync logic for a workspace tab.
+ * Hook to manage document fetching and selection state for a workspace tab.
+ * 
+ * Responsibilities:
+ * - Fetch documents for the effective node
+ * - Manage selected document ID in global store
+ * - Sync selection when node changes
+ * 
+ * Note: Document editing, saving, and API calls are handled by DocumentEditor component.
  * Uses React 19 rules and useEffectEvent for non-reactive logic.
  */
-export function useWorkspaceDocs(tabId: string, effectiveNode: any, selectedNode: any, secondarySelectedNode: any) {
+export function useWorkspaceDocs(
+    tabId: string,
+    effectiveNode: any,
+    selectedNode: any,
+    secondarySelectedNode: any
+) {
     const selectedDocumentId = useProjectStore((s) => s.selectedDocumentId[tabId]);
     const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
 
     const nodeKey = effectiveNode?._key || "";
     const { data: documents = [] } = useGetDocuments(nodeKey);
 
-    const updateMutation = useUpdateDocument(selectedNode?._key || "");
-
-    const updateDocumentDebounced = useMemo(
-        () =>
-            debounce(
-                (payload: { id: string; data: string }) => {
-                    updateMutation.mutate({ id: payload.id, data: payload.data });
-                },
-                { waitMs: 1000 }
-            ),
-        [updateMutation]
-    );
-
     const selectedDocument = useMemo(
         () => documents.find((d) => d._key === selectedDocumentId) || null,
         [documents, selectedDocumentId]
     );
 
-    // Sync effect - wrapped logic in useEffectEvent to isolate non-reactive parts
+    // Sync document selection when node changes
+    // Wrapped logic in useEffectEvent to isolate non-reactive parts
     const syncDocumentSelection = useEffectEvent(() => {
         const currentSelected = secondarySelectedNode
             ? (secondarySelectedNode as CallNodeTree)?.target ?? selectedNode
             : selectedNode;
 
-        if (
-            (!selectedDocumentId ||
-                !currentSelected?.documents.includes(`documents/${selectedDocumentId}`)) &&
-            documents.length > 0
-        ) {
-            setSelectedDocumentId(tabId, documents[0]._key);
+        // Get current node key for comparison
+        const currentNodeKey = currentSelected?._key || "";
+        
+        // If no node is selected, clear document selection
+        if (!currentSelected) {
+            if (selectedDocumentId) {
+                setSelectedDocumentId(tabId, null);
+            }
+            return;
+        }
+
+        // Check if selected document belongs to current node
+        const documentBelongsToNode = selectedDocumentId
+            ? currentSelected?.documents?.includes(`documents/${selectedDocumentId}`)
+            : false;
+
+        // If we have documents and either:
+        // - No document is selected, OR
+        // - Selected document doesn't belong to current node
+        if (documents.length > 0) {
+            if (!selectedDocumentId || !documentBelongsToNode) {
+                setSelectedDocumentId(tabId, documents[0]._key);
+            }
+        } else {
+            // No documents available, clear selection
+            if (selectedDocumentId) {
+                setSelectedDocumentId(tabId, null);
+            }
         }
     });
 
     useEffect(() => {
         syncDocumentSelection();
-    }, [tabId, documents, selectedNode, secondarySelectedNode]);
-
-    const handleDocumentChange = (data: string) => {
-        if (selectedDocumentId) {
-            updateDocumentDebounced.call({
-                id: selectedDocumentId,
-                data,
-            });
-        }
-    };
+    }, [tabId, documents, selectedNode?._key, secondarySelectedNode?._key, syncDocumentSelection]);
 
     const selectDocument = (id: string) => {
         setSelectedDocumentId(tabId, id);
@@ -69,7 +81,7 @@ export function useWorkspaceDocs(tabId: string, effectiveNode: any, selectedNode
         documents,
         selectedDocumentId,
         selectedDocument,
-        handleDocumentChange,
+        nodeKey,
         selectDocument,
     };
 }

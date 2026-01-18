@@ -21,13 +21,23 @@ interface WorkspaceProps {
 
 const Workspace = ({ tabId }: WorkspaceProps) => {
   // 1. Logic & State hooks
-  const { effectiveNode, displayPath, isCodeActive, selectedNode, secondarySelectedNode } = useWorkspaceState(tabId);
+  const {
+    effectiveNode,
+    displayPath,
+    isCodeActive,
+    selectedNode,
+    secondarySelectedNode,
+  } = useWorkspaceState(tabId);
   const { handlePromote } = useWorkspaceActions(tabId);
 
   const [tabValue, setTabValue] = useState("docs");
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
-  const isDocSidebarOpen = useProjectStore((s: ProjectStore) => s.isDocSidebarOpen[tabId]);
-  const setDocSidebarOpen = useProjectStore((s: ProjectStore) => s.setDocSidebarOpen);
+  const isDocSidebarOpen = useProjectStore(
+    (s: ProjectStore) => s.isDocSidebarOpen[tabId]
+  );
+  const setDocSidebarOpen = useProjectStore(
+    (s: ProjectStore) => s.setDocSidebarOpen
+  );
   const bottomPanelRef = useRef<ImperativePanelHandle>(null);
 
   // 2. Docs logic (using React 19 rules & useEffectEvent)
@@ -35,9 +45,14 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
     documents,
     selectedDocumentId: activeDocId,
     selectedDocument,
-    handleDocumentChange,
+    nodeKey,
     selectDocument,
-  } = useWorkspaceDocs(tabId, effectiveNode, selectedNode, secondarySelectedNode);
+  } = useWorkspaceDocs(
+    tabId,
+    effectiveNode,
+    selectedNode,
+    secondarySelectedNode
+  );
 
   // 3. Effects
   useEffect(() => {
@@ -46,12 +61,9 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
     }
   }, [effectiveNode, isCodeActive, tabValue]);
 
-  // Close sidebar when the node changes (unless we are in the docs tab)
-  useEffect(() => {
-    if (tabValue !== "docs") {
-      setDocSidebarOpen(tabId, false);
-    }
-  }, [effectiveNode?._key, tabId, tabValue]);
+  // Sidebar state is persisted in the store (isDocSidebarOpen[tabId])
+  // It will remember its open/closed state across node changes
+  // We don't force close on node change - let the user control it
 
   // 4. Sync panel collapsed state
   useEffect(() => {
@@ -75,8 +87,8 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
           <DocSidebar
             documents={documents}
             selectedDocumentId={activeDocId}
+            nodeId={nodeKey}
             onSelectDocument={selectDocument}
-            onDocumentChange={handleDocumentChange}
             onClose={() => setDocSidebarOpen(tabId, false)}
           />
         ) : undefined
@@ -88,7 +100,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
           tabValue={tabValue}
           onTabValueChange={setTabValue}
           selectedDocument={selectedDocument}
-          onDocumentChange={handleDocumentChange}
+          nodeId={nodeKey}
           headerSlot={
             <WorkspaceHeader
               displayPath={displayPath}

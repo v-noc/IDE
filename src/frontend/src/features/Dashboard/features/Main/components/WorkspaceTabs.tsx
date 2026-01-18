@@ -12,7 +12,7 @@ interface WorkspaceTabsProps {
     headerSlot: React.ReactNode;
     // Document props
     selectedDocument: any;
-    onDocumentChange: (data: string) => void;
+    nodeId?: string;
 }
 
 /**
@@ -26,7 +26,7 @@ export function WorkspaceTabs({
     onTabValueChange,
     headerSlot,
     selectedDocument,
-    onDocumentChange,
+    nodeId,
 }: WorkspaceTabsProps) {
     return (
         <Tabs
@@ -89,7 +89,7 @@ export function WorkspaceTabs({
                                     }
                                     : undefined
                             }
-                            onChange={onDocumentChange}
+                            nodeId={nodeId}
                         />
                     </div>
                 </div>

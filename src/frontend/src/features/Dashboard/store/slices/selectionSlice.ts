@@ -30,11 +30,23 @@ export const createSelectionSlice: StateCreator<
   selectedDocumentId: {},
 
   setSelectedNode: (tabId, node) => set((state) => {
+    const previousNode = state.selectedNode[tabId];
     state.selectedNode[tabId] = node;
     state.secondarySelectedNode[tabId] = null;
+    
+    // Clear document selection when node changes (will be synced by useWorkspaceDocs)
+    if (previousNode?._key !== node?._key) {
+      state.selectedDocumentId[tabId] = null;
+    }
   }),
   setSecondarySelectedNode: (tabId, node) => set((state) => {
+    const previousSecondaryNode = state.secondarySelectedNode[tabId];
     state.secondarySelectedNode[tabId] = node;
+    
+    // Clear document selection when secondary node changes (will be synced by useWorkspaceDocs)
+    if (previousSecondaryNode?._key !== node?._key) {
+      state.selectedDocumentId[tabId] = null;
+    }
   }),
   setSelectedDocumentId: (tabId, id) => set((state) => {
     state.selectedDocumentId[tabId] = id;
