@@ -31,6 +31,7 @@ export const createSelectionSlice: StateCreator<
 
   setSelectedNode: (tabId, node) => set((state) => {
     state.selectedNode[tabId] = node;
+    state.secondarySelectedNode[tabId] = null;
   }),
   setSecondarySelectedNode: (tabId, node) => set((state) => {
     state.secondarySelectedNode[tabId] = node;

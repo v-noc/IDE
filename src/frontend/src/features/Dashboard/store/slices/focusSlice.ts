@@ -31,21 +31,27 @@ export const createFocusSlice: StateCreator<
   focusTargetId: {},
 
   pushFocus: (tabId: string, node: AnyNodeTree) => set((state) => {
-    console.log("pushFocus", tabId, node);
     if (!state.focusStack[tabId]) {
       state.focusStack[tabId] = [];
     }
     state.focusStack[tabId].push(node);
     state.focusedNode[tabId] = node;
+    state.selectedNode[tabId] = node;
+    state.secondarySelectedNode[tabId] = null;
   }),
 
   pushFocusBulk: (tabId: string, nodes: AnyNodeTree[]) => set((state) => {
-    console.log("pushFocusBulk", tabId, nodes);
+
     if (!state.focusStack[tabId]) {
       state.focusStack[tabId] = [];
     }
     state.focusStack[tabId].push(...nodes);
-    state.focusedNode[tabId] = nodes[nodes.length - 1] ?? state.focusedNode[tabId];
+    const lastNode = nodes[nodes.length - 1];
+    if (lastNode) {
+      state.focusedNode[tabId] = lastNode;
+      state.selectedNode[tabId] = lastNode;
+      state.secondarySelectedNode[tabId] = null;
+    }
   }),
 
   popFocus: (tabId) => set((state) => {
