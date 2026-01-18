@@ -10,6 +10,10 @@ export interface TabData {
      */
     sourceCallNodeId: string | null;
     childrenIds: string[];
+    /**
+     * The percentage size of the tab in the resizable stack.
+     */
+    layoutSize?: number;
 }
 
 export interface TabsSlice {
@@ -26,7 +30,12 @@ export interface TabsSlice {
      */
     destroyTabBranch: (tabId: string) => void;
     /**
+     * Updates the layout sizes for the given tabs.
+     */
+    updateTabLayouts: (layouts: { tabId: string; size: number }[]) => void;
+    /**
      * High-level selection handler for the hierarchical tab system.
+
      */
     handleNodeSelection: (tabId: string, node: AnyNodeTree | null) => void;
 }

@@ -22,10 +22,23 @@ export const TabContextStack = memo(function TabContextStack({
     const activeTabId = useTabStore((s) => s.activeTabId);
     const setActiveTabId = useTabStore((s) => s.setActiveTabId);
     const destroyTabBranch = useTabStore((s) => s.destroyTabBranch);
+    const updateTabLayouts = useTabStore((s) => s.updateTabLayouts);
     const tabStack = useTabStore(useShallow(selectTabStack));
 
+    const handleLayout = (sizes: number[]) => {
+        const layouts = tabStack.map((tab, i) => ({
+            tabId: tab.id,
+            size: sizes[i],
+        }));
+        updateTabLayouts(layouts);
+    };
+
     return (
-        <ResizablePanelGroup direction="vertical" className="h-full">
+        <ResizablePanelGroup
+            direction="vertical"
+            className="h-full"
+            onLayout={handleLayout}
+        >
             {tabStack.map((tab, index) => (
                 <Fragment key={tab.id}>
                     {index > 0 && (
@@ -38,7 +51,7 @@ export const TabContextStack = memo(function TabContextStack({
                         id={tab.id}
                         order={index}
                         minSize={10}
-                        defaultSize={100 / tabStack.length}
+                        defaultSize={tab.layoutSize ?? 100 / tabStack.length}
                         className="flex flex-col overflow-hidden"
                     >
                         <ContextPanel

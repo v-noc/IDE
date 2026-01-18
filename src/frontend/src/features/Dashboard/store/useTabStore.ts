@@ -17,6 +17,7 @@ export interface TabActions {
   removeTab: (tabId: string) => void;
   setActiveTabId: (tabId: string) => void;
   destroyTabBranch: (tabId: string) => void;
+  updateTabLayouts: (layouts: { tabId: string; size: number }[]) => void;
   handleNodeSelection: (tabId: string, node: any, selectionType: "promte" | "secondary" | "primary") => void;
 }
 
@@ -86,6 +87,15 @@ const useTabStore = create<TabStore>()(
         // Remove this tab (which also cleans up its slice state)
         get().removeTab(tabId);
       },
+
+      updateTabLayouts: (layouts: { tabId: string; size: number }[]) =>
+        set((state) => {
+          layouts.forEach(({ tabId, size }) => {
+            if (state.tabs[tabId]) {
+              state.tabs[tabId].layoutSize = size;
+            }
+          });
+        }),
 
       handleNodeSelection: (tabId, node, selectionType: "promte" | "secondary" | "primary") => {
         const currentTab = get().tabs[tabId];
