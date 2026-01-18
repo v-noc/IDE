@@ -27,14 +27,10 @@ export function useWorkspaceState(tabId: string) {
     }, [secondarySelectedNode, selectedNode]);
 
     const { suffixName, displayPath } = useMemo(() => {
-        const base = selectedNode?.qname?.replace(/\./g, " / ") ?? "";
-        const hasSuffix = Boolean(
-            secondarySelectedNode && secondarySelectedNode._key !== selectedNode?._key
-        );
-        const suffix = hasSuffix ? secondarySelectedNode?.name ?? "" : "";
-        const display = hasSuffix ? (base ? `${base} / ${suffix}` : suffix) : base;
+        const display = effectiveNode?.qname?.replace(/\./g, " / ") ?? "";
+        const suffix = effectiveNode?.name ?? "";
         return { suffixName: suffix, displayPath: display };
-    }, [selectedNode?.qname, selectedNode?._key, secondarySelectedNode]);
+    }, [effectiveNode]);
 
     const isCodeActive = useMemo(() => {
         const t = effectiveNode?.node_type;
