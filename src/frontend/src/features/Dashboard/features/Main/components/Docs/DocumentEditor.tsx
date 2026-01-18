@@ -21,28 +21,28 @@ export interface DocumentEditorProps {
    * The document to edit. If undefined, shows empty state.
    */
   document?: DocumentType | null;
-  
+
   /**
    * Optional callback when document content changes.
    * Called immediately (debouncing is handled internally).
    */
   onChange?: (data: string) => void;
-  
+
   /**
    * Optional node ID for API calls. Required if auto-save is enabled.
    */
   nodeId?: string;
-  
+
   /**
    * Whether to auto-save changes to the API. Defaults to true.
    */
   autoSave?: boolean;
-  
+
   /**
    * Debounce delay in milliseconds for auto-save. Defaults to 1000ms.
    */
   debounceMs?: number;
-  
+
   /**
    * Custom padding class for the editor container.
    */
@@ -51,13 +51,13 @@ export interface DocumentEditorProps {
 
 /**
  * Self-contained document editor component.
- * 
+ *
  * Handles:
  * - Editor initialization and configuration
  * - Document loading and syncing
  * - Auto-save with debouncing
  * - Empty state display
- * 
+ *
  * Usage:
  * ```tsx
  * <DocumentEditor
@@ -111,11 +111,8 @@ export function DocumentEditor({
     if (!document) {
       // Clear editor if no document
       try {
-        // Use markdown parsing to get empty blocks (safer than direct replacement)
-        const emptyBlocks = editor.tryParseMarkdownToBlocks("") || [];
-        if (emptyBlocks.length > 0) {
-          editor.replaceBlocks(editor.document, emptyBlocks);
-        }
+        // Replace with empty blocks array
+        editor.replaceBlocks(editor.document, []);
         lastAppliedDataRef.current = null;
       } catch (err) {
         console.error("Error clearing editor:", err);
@@ -129,19 +126,30 @@ export function DocumentEditor({
     if (lastAppliedDataRef.current === data) return;
 
     applyingRemoteContent.current = true;
-    
+
     const loadContent = async () => {
       try {
-        // Try JSON (BlockNote blocks) first
+        // Parse JSON (BlockNote blocks)
         const parsedDocument = JSON.parse(data);
-        
+
         // Validate that parsedDocument is an array of blocks
-        if (Array.isArray(parsedDocument) && parsedDocument.length > 0) {
-          // Validate blocks have required structure
+        if (Array.isArray(parsedDocument)) {
+          // Validate blocks have required structure (if array is not empty)
+          if (parsedDocument.length === 0) {
+            // Empty content - clear editor
+            editor.replaceBlocks(editor.document, []);
+            lastAppliedDataRef.current = data;
+            return;
+          }
+
           const isValidBlocks = parsedDocument.every(
-            (block: any) => block && typeof block === 'object' && block.id
+            (block: unknown) =>
+              block &&
+              typeof block === "object" &&
+              block !== null &&
+              "id" in block
           );
-          
+
           if (isValidBlocks) {
             // Replace all blocks at once - BlockNote handles the replacement
             editor.replaceBlocks(editor.document, parsedDocument);
@@ -149,33 +157,19 @@ export function DocumentEditor({
             return;
           }
         }
-        
-        // If JSON parsing fails or invalid format, fall through to markdown
-        throw new Error("Invalid block format, falling back to markdown");
-      } catch (jsonErr) {
-        // Fallback: treat as Markdown
-        try {
-          if (!data.trim()) {
-            // Empty content - clear editor
-            const emptyBlocks = editor.tryParseMarkdownToBlocks("") || [];
-            editor.replaceBlocks(editor.document, emptyBlocks);
-            lastAppliedDataRef.current = data;
-            return;
-          }
 
-          // Parse markdown to blocks
-          const blocks = editor.tryParseMarkdownToBlocks(data);
-          if (blocks && blocks.length > 0) {
-            editor.replaceBlocks(editor.document, blocks);
-            lastAppliedDataRef.current = data;
-          } else {
-            // If parsing fails, try pasteMarkdown as last resort
-            editor.pasteMarkdown(data);
-            lastAppliedDataRef.current = data;
-          }
-        } catch (mdErr) {
-          console.error("Error applying document data:", mdErr);
-          // On error, at least clear the lastAppliedDataRef so we can retry
+        // If JSON parsing fails or invalid format, clear editor
+        console.error("Invalid block format, clearing editor");
+        editor.replaceBlocks(editor.document, []);
+        lastAppliedDataRef.current = "";
+      } catch (jsonErr) {
+        // If JSON parsing fails, treat as empty and clear editor
+        console.error("Error parsing document JSON:", jsonErr);
+        try {
+          editor.replaceBlocks(editor.document, []);
+          lastAppliedDataRef.current = "";
+        } catch (clearErr) {
+          console.error("Error clearing editor:", clearErr);
           lastAppliedDataRef.current = null;
         }
       } finally {
@@ -193,16 +187,16 @@ export function DocumentEditor({
   const handleChange = async (currentEditor: typeof editor) => {
     if (applyingRemoteContent.current) return;
 
-    const markdown = await currentEditor?.blocksToMarkdownLossy();
-    
+    const jsonData = JSON.stringify(currentEditor.document);
+
     // Call onChange callback immediately
-    onChange?.(markdown);
+    onChange?.(jsonData);
 
     // Auto-save if enabled and document exists
     if (autoSave && document?._key && nodeId) {
       saveDocumentDebounced.call({
         id: document._key,
-        data: markdown,
+        data: jsonData,
       });
     }
   };
@@ -225,12 +219,15 @@ export function DocumentEditor({
   }
 
   // Editor view
-  const defaultPadding = "mx-auto max-w-4xl xl:max-w-5xl px-6 sm:px-8 lg:px-16 py-12";
+  const defaultPadding =
+    "mx-auto max-w-4xl xl:max-w-5xl px-6 sm:px-8 lg:px-16 py-12";
   const paddingClass = containerClassName || defaultPadding;
 
   return (
     <div className="h-full w-full overflow-auto bg-background text-foreground">
-      <div className={`${paddingClass} font-sans text-[17px] leading-8 antialiased`}>
+      <div
+        className={`${paddingClass} font-sans text-[17px] leading-8 antialiased`}
+      >
         <BlockNoteView
           className="rounded-none docs-editor"
           theme="light"
@@ -250,4 +247,3 @@ export function DocumentEditor({
     </div>
   );
 }
-
