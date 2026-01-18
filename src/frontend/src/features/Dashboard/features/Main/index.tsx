@@ -3,6 +3,8 @@ import type { ImperativePanelHandle } from "react-resizable-panels";
 
 import { useWorkspaceState } from "./hooks/useWorkspaceState";
 import { useWorkspaceActions } from "./hooks/useWorkspaceActions";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import type { ProjectStore } from "@/features/Dashboard/store/useProjectStore";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { WorkspaceTabs } from "./components/WorkspaceTabs";
 import { WorkspaceLayout } from "./components/WorkspaceLayout";
@@ -24,6 +26,8 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
 
   const [tabValue, setTabValue] = useState("docs");
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
+  const isDocSidebarOpen = useProjectStore((s: ProjectStore) => s.isDocSidebarOpen[tabId]);
+  const setDocSidebarOpen = useProjectStore((s: ProjectStore) => s.setDocSidebarOpen);
   const bottomPanelRef = useRef<ImperativePanelHandle>(null);
 
   // 2. Docs logic (using React 19 rules & useEffectEvent)
@@ -41,6 +45,13 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
       setTabValue("docs");
     }
   }, [effectiveNode, isCodeActive, tabValue]);
+
+  // Close sidebar when the node changes (unless we are in the docs tab)
+  useEffect(() => {
+    if (tabValue !== "docs") {
+      setDocSidebarOpen(tabId, false);
+    }
+  }, [effectiveNode?._key, tabId, tabValue]);
 
   // 4. Sync panel collapsed state
   useEffect(() => {
@@ -60,12 +71,13 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
       isSandboxOpen={isSandboxOpen}
       onToggleSandbox={setIsSandboxOpen}
       rightSidebarContent={
-        tabValue !== "docs" ? (
+        tabValue !== "docs" && documents.length > 0 && isDocSidebarOpen ? (
           <DocSidebar
             documents={documents}
             selectedDocumentId={activeDocId}
             onSelectDocument={selectDocument}
             onDocumentChange={handleDocumentChange}
+            onClose={() => setDocSidebarOpen(tabId, false)}
           />
         ) : undefined
       }

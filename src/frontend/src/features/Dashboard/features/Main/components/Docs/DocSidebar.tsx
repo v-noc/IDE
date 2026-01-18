@@ -1,14 +1,16 @@
 
 import Documents from "./index";
 import type { DocumentType } from "../../service/useDocuments";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { X, ChevronDown } from "lucide-react";
 
 interface DocSidebarProps {
     documents: DocumentType[];
     selectedDocumentId: string | null;
     onDocumentChange: (data: string) => void;
     onSelectDocument: (id: string) => void;
+    onClose?: () => void;
 }
 
 export function DocSidebar({
@@ -16,37 +18,48 @@ export function DocSidebar({
     selectedDocumentId,
     onDocumentChange,
     onSelectDocument,
+    onClose,
 }: DocSidebarProps) {
     const selectedDocument = documents.find((d) => d._key === selectedDocumentId);
 
     return (
         <div className="flex flex-col h-full bg-white">
-            {/* Doc list on top */}
-            <div className="p-3 border-b bg-(--background-color)">
-                <h3 className="text-sm font-semibold mb-2 px-1 text-muted-foreground">Documents</h3>
-                <ScrollArea className="h-40">
-                    <div className="space-y-1">
+            {/* Header with Horizontal Doc list */}
+            <div className="flex items-center border-b bg-(--background-color) pr-2">
+                <ScrollArea className="flex-1 whitespace-nowrap">
+                    <div className="flex p-1 gap-1">
                         {documents.map((doc) => (
                             <button
                                 key={doc._key}
                                 onClick={() => onSelectDocument(doc._key)}
                                 className={cn(
-                                    "w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors cursor-pointer",
+                                    "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all cursor-pointer whitespace-nowrap",
                                     selectedDocumentId === doc._key
-                                        ? "bg-white border border-border shadow-sm font-semibold"
-                                        : "hover:bg-white/50 text-muted-foreground border border-transparent"
+                                        ? "bg-white border border-border shadow-sm font-semibold text-foreground ring-1 ring-black/5"
+                                        : "hover:bg-white/50 text-muted-foreground border border-transparent hover:text-foreground"
                                 )}
                             >
-                                {doc.name || "Untitled Document"}
+                                <span className="truncate max-w-[120px]">
+                                    {doc.name || "Untitled"}
+                                </span>
+                                {selectedDocumentId === doc._key && (
+                                    <ChevronDown className="h-3 w-3 opacity-50" />
+                                )}
                             </button>
                         ))}
-                        {documents.length === 0 && (
-                            <div className="text-xs text-muted-foreground px-2 py-1">
-                                No documents available
-                            </div>
-                        )}
                     </div>
+                    <ScrollBar orientation="horizontal" className="hidden" />
                 </ScrollArea>
+
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 hover:bg-white/50 rounded-md transition-colors text-muted-foreground hover:text-foreground ml-2 cursor-pointer"
+                        aria-label="Close sidebar"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
             </div>
 
             {/* Editor below */}

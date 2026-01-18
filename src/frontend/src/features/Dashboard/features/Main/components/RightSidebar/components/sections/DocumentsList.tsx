@@ -192,8 +192,9 @@ const DocumentsList: React.FC = () => {
                   : "")
               }
               onClick={() => {
-                console.log("Doc", doc._key);
+
                 setSelectedDocumentId(activeTabId, doc._key);
+                useProjectStore.getState().setDocSidebarOpen(activeTabId, true);
               }}
             >
               <div className="flex items-start justify-between gap-2">

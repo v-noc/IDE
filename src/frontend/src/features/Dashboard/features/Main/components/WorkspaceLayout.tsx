@@ -39,19 +39,19 @@ export function WorkspaceLayout({
           minSize={40}
           className="flex flex-col border-b bg-white"
         >
-          {rightSidebarContent ? (
-            <ResizablePanelGroup direction="horizontal" className="h-full">
-              <ResizablePanel defaultSize={70} minSize={30}>
-                <div className="h-full w-full overflow-hidden">{topPanelContent}</div>
-              </ResizablePanel>
-              <ResizableHandle className="w-1 bg-border" />
-              <ResizablePanel defaultSize={30} minSize={20}>
-                <div className="h-full w-full overflow-hidden">{rightSidebarContent}</div>
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          ) : (
-            <div className="flex-1 overflow-hidden">{topPanelContent}</div>
-          )}
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel defaultSize={rightSidebarContent ? 70 : 100} minSize={30}>
+              <div className="h-full w-full overflow-hidden">{topPanelContent}</div>
+            </ResizablePanel>
+            {rightSidebarContent && (
+              <>
+                <ResizableHandle className="w-1 bg-border" />
+                <ResizablePanel defaultSize={30} minSize={20}>
+                  <div className="h-full w-full overflow-hidden">{rightSidebarContent}</div>
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
         </ResizablePanel>
 
         <ResizableHandle className="bg-border" />
