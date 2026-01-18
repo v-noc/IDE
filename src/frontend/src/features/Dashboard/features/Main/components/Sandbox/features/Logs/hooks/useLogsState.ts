@@ -5,8 +5,8 @@ import { useLogTree } from "@/services/logs";
  * Hook to manage the state and data fetching for logs.
  * Now uses the global consolidated logs service.
  */
-export function useLogsState() {
-    const { selectedNode } = useProjectStore();
+export function useLogsState(tabId: string) {
+    const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
     const nodeId = selectedNode?._key || "";
 
     const { data: logs, isLoading } = useLogTree(nodeId);

@@ -4,14 +4,16 @@ import CanvasView from "./components/CanvasView";
 // import useProjectStore from "@/features/Dashboard/store/useProjectStore";,
 
 interface CanvasProps {
+  tabId: string;
   projectId?: string;
 }
 
-const Canvas: React.FC<CanvasProps> = ({ projectId }) => {
+const Canvas: React.FC<CanvasProps> = ({ tabId, projectId }) => {
   // const { selectedNode, projectData, focusedNode } = useProjectStore();
+
   return (
     <ReactFlowProvider>
-      <CanvasView projectId={projectId} />
+      <CanvasView tabId={tabId} projectId={projectId} />
     </ReactFlowProvider>
   );
 };

@@ -1,6 +1,6 @@
 interface WorkspaceHeaderProps {
     displayPath: string;
-    suffixName: string;
+    showPromote: boolean;
     onPromote: () => void;
 }
 
@@ -8,11 +8,11 @@ interface WorkspaceHeaderProps {
  * Presentational component for the Workspace Header.
  * Displays the current path and 'promote' action for secondary selections.
  */
-export function WorkspaceHeader({ displayPath, suffixName, onPromote }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ displayPath, showPromote, onPromote }: WorkspaceHeaderProps) {
     return (
         <div className="px-2 text-xs text-muted-foreground truncate">
             {displayPath || "No selection"}
-            {suffixName && (
+            {showPromote && (
                 <>
                     {" "}
                     <button

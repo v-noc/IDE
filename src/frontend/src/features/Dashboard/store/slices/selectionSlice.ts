@@ -5,17 +5,19 @@ import type { UISlice } from './uiSlice';
 import type { DataSlice } from './dataSlice';
 
 export interface SelectionSlice {
-  selectedNode: AnyNodeTree | null;
-  secondarySelectedNode: AnyNodeTree | null;
-  selectedDocumentId: string | null;
+  selectedNode: Record<string, AnyNodeTree | null>;
+  secondarySelectedNode: Record<string, AnyNodeTree | null>;
+  selectedDocumentId: Record<string, string | null>;
 
-  setSelectedNode: (node: AnyNodeTree | null) => void;
-  setSecondarySelectedNode: (node: AnyNodeTree | null) => void;
-  setSelectedDocumentId: (id: string | null) => void;
-  clearSelection: () => void;
+  setSelectedNode: (tabId: string, node: AnyNodeTree | null) => void;
+  setSecondarySelectedNode: (tabId: string, node: AnyNodeTree | null) => void;
+  setSelectedDocumentId: (tabId: string, id: string | null) => void;
+  clearSelection: (tabId: string) => void;
 }
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice;
+type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
+  cleanupTabData: (tabId: string) => void;
+};
 
 export const createSelectionSlice: StateCreator<
   ProjectStore,
@@ -23,16 +25,23 @@ export const createSelectionSlice: StateCreator<
   [],
   SelectionSlice
 > = (set) => ({
-  selectedNode: null,
-  secondarySelectedNode: null,
-  selectedDocumentId: null,
+  selectedNode: {},
+  secondarySelectedNode: {},
+  selectedDocumentId: {},
 
-  setSelectedNode: (node) => set({ selectedNode: node }),
-  setSecondarySelectedNode: (node) => set({ secondarySelectedNode: node }),
-  setSelectedDocumentId: (id) => set({ selectedDocumentId: id }),
-  clearSelection: () => set({
-    selectedNode: null,
-    secondarySelectedNode: null,
-    selectedDocumentId: null,
+  setSelectedNode: (tabId, node) => set((state) => {
+    state.selectedNode[tabId] = node;
+    state.secondarySelectedNode[tabId] = null;
+  }),
+  setSecondarySelectedNode: (tabId, node) => set((state) => {
+    state.secondarySelectedNode[tabId] = node;
+  }),
+  setSelectedDocumentId: (tabId, id) => set((state) => {
+    state.selectedDocumentId[tabId] = id;
+  }),
+  clearSelection: (tabId) => set((state) => {
+    state.selectedNode[tabId] = null;
+    state.secondarySelectedNode[tabId] = null;
+    state.selectedDocumentId[tabId] = null;
   }),
 });

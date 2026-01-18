@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 import {
   useGetDocuments,
   useCreateDocument,
@@ -25,12 +26,11 @@ import { Plus, Pencil, Trash2, FileText } from "lucide-react";
 import type { CallNodeTree } from "@/types/project";
 
 const DocumentsList: React.FC = () => {
-  const {
-    selectedNode,
-    selectedDocumentId,
-    setSelectedDocumentId,
-    secondarySelectedNode,
-  } = useProjectStore();
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
+  const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[activeTabId]);
+  const selectedDocumentId = useProjectStore((s) => s.selectedDocumentId[activeTabId]);
+  const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
   const nodeKey = useMemo(() => {
     if (secondarySelectedNode) {
       return (secondarySelectedNode as CallNodeTree).target
@@ -193,7 +193,7 @@ const DocumentsList: React.FC = () => {
               }
               onClick={() => {
                 console.log("Doc", doc._key);
-                setSelectedDocumentId(doc._key);
+                setSelectedDocumentId(activeTabId, doc._key);
               }}
             >
               <div className="flex items-start justify-between gap-2">

@@ -8,8 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import type { CallNodeTree } from "@/types/project";
 
-const EditorCode = () => {
-  const { selectedNode, secondarySelectedNode, projectData } = useProjectStore();
+interface EditorCodeProps {
+  tabId: string;
+}
+
+const EditorCode = ({ tabId }: EditorCodeProps) => {
+  const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
+  const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[tabId]);
+  const projectData = useProjectStore((s) => s.projectData);
   const effectiveNode = useMemo(() => {
     if (secondarySelectedNode) {
       if ((secondarySelectedNode as CallNodeTree).target) {

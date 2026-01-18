@@ -10,7 +10,9 @@ export interface DataSlice {
   setProjectData: (data: ProjectNodeTree | null) => void;
 }
 
-type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice;
+type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
+  cleanupTabData: (tabId: string) => void;
+};
 
 export const createDataSlice: StateCreator<
   ProjectStore,
@@ -23,23 +25,36 @@ export const createDataSlice: StateCreator<
   setProjectData: (data) => set((state) => {
     state.projectData = data;
 
-    // Remap focus stack to new tree
-    if (data && state.focusStack.length > 0) {
-      const remapped = state.focusStack
-        .map((n) => findNodeByKey(data, n._key))
-        .filter((n): n is AnyNodeTree => n != null);
-      state.focusStack = remapped;
-      state.focusedNode = remapped[remapped.length - 1] ?? null;
-    } else if (!data) {
-      state.focusStack = [];
-      state.focusedNode = null;
-    }
+    if (data) {
+      // Remap focus stack for each tab
+      Object.keys(state.focusStack).forEach((tabId) => {
+        const stack = state.focusStack[tabId];
+        if (stack && stack.length > 0) {
+          const remapped = stack
+            .map((n) => findNodeByKey(data, n._key))
+            .filter((n): n is AnyNodeTree => n != null);
+          state.focusStack[tabId] = remapped;
+          state.focusedNode[tabId] = remapped[remapped.length - 1] ?? null;
+        }
+      });
 
-    // Remap selected node
-    if (data && state.selectedNode) {
-      state.selectedNode = findNodeByKey(data, state.selectedNode._key) ?? null;
-    } else if (!data) {
-      state.selectedNode = null;
+      // Remap selected node for each tab
+      Object.keys(state.selectedNode).forEach((tabId) => {
+        const selected = state.selectedNode[tabId];
+        if (selected) {
+          state.selectedNode[tabId] = findNodeByKey(data, selected._key) ?? null;
+        }
+      });
+    } else {
+      // Clear all tabs if no data
+      state.focusStack = {};
+      state.focusedNode = {};
+      state.selectedNode = {};
+      state.secondarySelectedNode = {};
+      state.selectedDocumentId = {};
+      state.expandedNodeIds = {};
+      state.activeNodeId = {};
+      state.focusTargetId = {};
     }
   }),
 });

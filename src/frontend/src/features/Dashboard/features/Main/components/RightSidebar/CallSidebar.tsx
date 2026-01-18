@@ -1,4 +1,6 @@
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
+import { useShallow } from 'zustand/react/shallow';
 import { useMemo } from "react";
 import { TreeNode } from "../../../Sidebar/components/TreeNode";
 import {
@@ -12,8 +14,10 @@ type CallSidebarProps = {
 };
 
 const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
-  const { focusStack, selectedNode, setSecondarySelectedNode } =
-    useProjectStore();
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
+  const focusStack = useProjectStore(useShallow((s) => s.focusStack[activeTabId] ?? []));
+  const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
 
   const callChildren = useMemo(() => {
     if (selectedNode && selectedNode.children) {
@@ -55,12 +59,13 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
             <TreeNode
               key={call_node._key}
               node={call_node as ContainerNodeTree}
+              tabId={activeTabId}
               childFilter={(node) =>
                 node.node_type === "call" ||
                 (node.node_type == "group" &&
                   (node as unknown as GroupNode).group_type == "call")
               }
-              onSelect={(n) => setSecondarySelectedNode(n as AnyNodeTree)}
+              onSelect={(n) => setSecondarySelectedNode(activeTabId, n as AnyNodeTree)}
             />
           ))
         )}

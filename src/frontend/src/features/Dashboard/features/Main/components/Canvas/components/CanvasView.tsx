@@ -21,12 +21,15 @@ import type { SimpleTreeNode } from "./nodeUtils";
 import EnhancedNode from "./nodes/EnhancedNode";
 import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
+import { useShallow } from "zustand/react/shallow";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
 };
 
 interface CanvasViewProps {
+  tabId: string;
   projectId?: string;
 }
 
@@ -36,12 +39,28 @@ const fitViewOptions: FitViewOptions = {
   maxZoom: 1.5,
 };
 
-const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
+const CanvasView: React.FC<CanvasViewProps> = ({
+  tabId,
+  projectId: _projectId,
+}) => {
   void _projectId;
-  const selectedNode = useProjectStore((s) => s.selectedNode);
-  const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
-  const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
-  const projectData = useProjectStore((s) => s.projectData);
+
+  const selectedNode = useProjectStore(
+    useShallow((s) => s.selectedNode[tabId])
+  );
+  const secondarySelectedNode = useProjectStore(
+    useShallow((s) => s.secondarySelectedNode[tabId])
+  );
+  const expandedNodeIds = useProjectStore(
+    useShallow((s) => s.expandedNodeIds[tabId] ?? [])
+  );
+  const toggleNodeExpansion = useProjectStore(
+    useShallow((s) => s.toggleNodeExpansion)
+  );
+  const projectData = useProjectStore(useShallow((s) => s.projectData));
+  const handleNodeSelection = useTabStore(
+    useShallow((s) => s.handleNodeSelection)
+  );
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -56,12 +75,17 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
     []
   );
 
-  const focusTargetId = useProjectStore((s) => s.focusTargetId);
-
+  const focusTargetId = useProjectStore(
+    useShallow((s) => s.focusTargetId[tabId])
+  );
+  const effectiveSelectedNode = secondarySelectedNode
+    ? secondarySelectedNode
+    : centerNode;
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
-    centerNode,
+    centerNode: centerNode,
+    selectedNode: effectiveSelectedNode as SimpleTreeNode,
     expandedNodeIds,
-    toggleNodeExpansion,
+    toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
     focusTargetId,
   });
@@ -92,8 +116,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
     if (rfNode && rfNode.measured?.width) {
       if (lastCenteredTargetIdRef.current !== focusTargetId) {
         reactFlowInstanceRef.current.setCenter(
-          rfNode.position.x + rfNode.measured.width / 2,
-          rfNode.position.y + rfNode.measured.height / 2,
+          rfNode.position.x + (rfNode.measured?.width ?? 0) / 2,
+          rfNode.position.y + (rfNode.measured?.height ?? 0) / 2,
           {
             zoom: 1,
             duration: 300,
@@ -139,6 +163,21 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
     [projectData]
   );
 
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const nodeKey = node.id;
+      if (projectData && nodeKey) {
+        const foundNode = findNodeByKey(projectData, nodeKey);
+        if (foundNode?._key && foundNode?._key !== centerNode?._key) {
+          handleNodeSelection(tabId, foundNode, "secondary");
+        } else {
+          handleNodeSelection(tabId, foundNode, "primary");
+        }
+      }
+    },
+    [projectData, handleNodeSelection, tabId, centerNode]
+  );
+
   return (
     <div className="h-full w-full bg-slate-50">
       <ReactFlow
@@ -150,6 +189,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({ projectId: _projectId }) => {
         onEdgesChange={onEdgesChange}
         onInit={onInit}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeClick={onNodeClick}
         nodesDraggable={true}
         minZoom={0.01}
         nodesConnectable={false}

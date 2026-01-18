@@ -5,6 +5,7 @@ import Documents from "./Docs";
 import Canvas from "./Canvas";
 
 interface WorkspaceTabsProps {
+    tabId: string;
     isCodeActive: boolean;
     tabValue: string;
     onTabValueChange: (value: string) => void;
@@ -19,6 +20,7 @@ interface WorkspaceTabsProps {
  * Manages the layout and content of the Code, Docs, and Canvas tabs.
  */
 export function WorkspaceTabs({
+    tabId,
     isCodeActive,
     tabValue,
     onTabValueChange,
@@ -66,7 +68,7 @@ export function WorkspaceTabs({
                     className="flex-1 flex flex-col overflow-hidden bg-white border-t p-0"
                 >
                     <div className="h-full w-full py-4 overflow-auto">
-                        <EditorCode />
+                        <EditorCode tabId={tabId} />
                     </div>
                 </TabsContent>
             )}
@@ -98,7 +100,7 @@ export function WorkspaceTabs({
             >
                 <div className="flex-1 overflow-hidden">
                     <div className="h-full w-full overflow-auto">
-                        <Canvas />
+                        <Canvas tabId={tabId} />
                     </div>
                 </div>
             </TabsContent>

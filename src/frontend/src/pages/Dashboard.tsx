@@ -6,9 +6,15 @@ import Workspace from "@/features/Dashboard/features/Main";
 import { ResizablePanelGroup } from "@/components/ui/resizable";
 import { RightSidebar } from "@/features/Dashboard/features/Main/components/RightSidebar";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useEffect } from "react";
 import { useGroupFlattening } from "@/features/Dashboard/hooks/useGroupFlattening";
 import { useSocketSync, useProjectRoom } from "@/services/socket";
+
+import { selectTabStack } from "@/features/Dashboard/store/selectors/tabSelectors";
+import { cn } from "@/lib/utils";
+
+import { useShallow } from "zustand/react/shallow";
 
 /**
  * Dashboard Page - Entry point for the IDE dashboard.
@@ -16,7 +22,12 @@ import { useSocketSync, useProjectRoom } from "@/services/socket";
  */
 const Dashboard = () => {
   const { projectId } = useParams();
-  const { selectedNode, projectData, setSelectedNode } = useProjectStore();
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
+  const projectData = useProjectStore((s) => s.projectData);
+  const handleNodeSelection = useTabStore((s) => s.handleNodeSelection);
+
+  const tabStack = useTabStore(useShallow(selectTabStack));
 
   // Socket and Data Sync hooks
   useSocketSync();
@@ -25,19 +36,29 @@ const Dashboard = () => {
   // Transformation hooks
   useGroupFlattening();
 
-  // Set default selection to project root if nothing is selected
+  // Set default selection for the active tab if nothing is selected
   useEffect(() => {
-    if (selectedNode == null && projectData != null) {
-      setSelectedNode(projectData);
+    if (!selectedNode && projectData != null) {
+      handleNodeSelection(activeTabId, projectData, "primary");
     }
-  }, [selectedNode, projectData, setSelectedNode]);
+  }, [selectedNode, projectData, handleNodeSelection, activeTabId]);
 
   return (
     <ResizablePanelGroup direction="horizontal">
       <Layout
         main={
           <RightSidebar>
-            <Workspace />
+            {tabStack.map((tab) => (
+              <div
+                key={tab.id}
+                className={cn(
+                  "h-full w-full",
+                  tab.id !== activeTabId && "hidden"
+                )}
+              >
+                <Workspace tabId={tab.id} />
+              </div>
+            ))}
           </RightSidebar>
         }
         navbar={<Navbar />}

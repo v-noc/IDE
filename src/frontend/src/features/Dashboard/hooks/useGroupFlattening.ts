@@ -9,22 +9,22 @@ import type { ProjectNodeTree } from '@/types/project';
  * if '?disable=group' is present in the URL.
  */
 export function useGroupFlattening() {
-    const [searchParams] = useSearchParams();
-    const { projectData, setProjectData } = useProjectStore();
+  const [searchParams] = useSearchParams();
+  const { projectData, setProjectData } = useProjectStore();
 
-    useEffect(() => {
-        if (!projectData) return;
+  useEffect(() => {
+    if (!projectData) return;
 
-        const disable = searchParams.get('disable');
-        const disableGroup = disable?.split(',').includes('group');
+    const disable = searchParams.get('disable');
+    const disableGroup = disable?.split(',').includes('group');
 
-        if (!disableGroup || !containsGroup(projectData)) return;
+    if (!disableGroup || !containsGroup(projectData)) return;
 
-        const flattened = flattenGroups(projectData);
-        const newRoot = flattened[0] as ProjectNodeTree;
-
-        if (newRoot?.node_type === 'project') {
-            setProjectData(newRoot);
-        }
-    }, [projectData, searchParams, setProjectData]);
+    const flattened = flattenGroups(projectData);
+    const newRoot = flattened[0] as ProjectNodeTree;
+    console.log("newRoot", newRoot);
+    if (newRoot?.node_type === 'project') {
+      setProjectData(newRoot);
+    }
+  }, [projectData, searchParams, setProjectData]);
 }

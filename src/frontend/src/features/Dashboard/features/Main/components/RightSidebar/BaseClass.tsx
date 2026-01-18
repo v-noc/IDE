@@ -1,4 +1,5 @@
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useMemo, useState } from "react";
 import type {
   AnyNodeTree,
@@ -32,8 +33,10 @@ const findNodeByQName = (
 };
 
 const BaseClass = () => {
-  const { selectedNode, projectData, setSecondarySelectedNode } =
-    useProjectStore();
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
+  const projectData = useProjectStore((s) => s.projectData);
+  const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
   const [showMethods, setShowMethods] = useState(false);
 
   const baseClassNodes = useMemo(() => {
@@ -112,7 +115,8 @@ const BaseClass = () => {
               <TreeNode
                 key={method._key}
                 node={method}
-                onSelect={(n) => setSecondarySelectedNode(n as AnyNodeTree)}
+                tabId={activeTabId}
+                onSelect={(n) => setSecondarySelectedNode(activeTabId, n as AnyNodeTree)}
               />
             ))
           )}
@@ -128,7 +132,8 @@ const BaseClass = () => {
               <TreeNode
                 key={node._key}
                 node={node as ContainerNodeTree}
-                onSelect={(n) => setSecondarySelectedNode(n as AnyNodeTree)}
+                tabId={activeTabId}
+                onSelect={(n) => setSecondarySelectedNode(activeTabId, n as AnyNodeTree)}
               />
             ))
           )}

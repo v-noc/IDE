@@ -9,6 +9,7 @@ import type { ContainerNodeTree } from "@/types/project";
 
 interface NodeContentProps {
   node: ContainerNodeTree;
+  tabId: string;
   isOpen: boolean;
   isSelected: boolean;
   isActive: boolean;
@@ -22,6 +23,7 @@ interface NodeContentProps {
 
 export const NodeContent = memo(function NodeContent({
   node,
+  tabId,
   isOpen,
   isSelected,
   isActive,
@@ -66,6 +68,7 @@ export const NodeContent = memo(function NodeContent({
             <CollapsibleContent>
               <NodeChildren
                 node={node}
+                tabId={tabId}
                 nestingLevel={nestingLevel}
                 childFilter={childFilter}
                 onSelect={onSelect}

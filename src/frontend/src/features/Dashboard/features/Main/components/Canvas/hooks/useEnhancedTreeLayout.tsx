@@ -23,6 +23,7 @@ const NODE_HEIGHT = 150;
 interface UseEnhancedTreeLayoutProps {
   centerNode: SimpleTreeNode | null;
   expandedNodeIds: string[];
+  selectedNode: SimpleTreeNode | null;
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
@@ -31,6 +32,7 @@ interface UseEnhancedTreeLayoutProps {
 
 export const useEnhancedTreeLayout = ({
   centerNode,
+  selectedNode,
   expandedNodeIds,
   toggleNodeExpansion,
   nodeMetadataMap,
@@ -42,7 +44,7 @@ export const useEnhancedTreeLayout = ({
   // TODO: Use layoutConfig for dagre spacing configuration if needed
   void _layoutConfig;
 
-  return useMemo(() => {
+  const { initialNodes, initialEdges } = useMemo(() => {
     if (!centerNode) {
       return { initialNodes: [], initialEdges: [] };
     }
@@ -92,7 +94,11 @@ export const useEnhancedTreeLayout = ({
           mainIcon: node.icon ? (
             <DynamicIcon iconName={node.icon} />
           ) : (
-            <DynamicIcon iconName={getIcons(node.node_type)} />
+            <DynamicIcon
+              iconName={getIcons(
+                node.target ? node.target.node_type : node.node_type
+              )}
+            />
           ),
           cornerIcon: getIcons(node.node_type),
           bgColor: nodeStyle.cardColor ?? nodeStyle.backgroundColor ?? "white",
@@ -107,9 +113,12 @@ export const useEnhancedTreeLayout = ({
           nodeId: nodeId,
           target: node.target,
           focused: focusTargetId
-            ? nodeId === (focusTargetId.includes("/") ? focusTargetId.split("/").pop() : focusTargetId)
+            ? nodeId ===
+              (focusTargetId.includes("/")
+                ? focusTargetId.split("/").pop()
+                : focusTargetId)
             : false,
-          selected: nodeId === centerNode?._key,
+          selected: nodeId === selectedNode?._key,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,
@@ -178,5 +187,6 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap, toggleNodeExpansion, focusTargetId]);
+  }, [centerNode, expandedNodeIds, metadataMap, focusTargetId, selectedNode]);
+  return { initialNodes, initialEdges };
 };

@@ -5,6 +5,7 @@ import type { ContainerNodeTree } from "@/types/project";
 
 interface NodeChildrenProps {
   node: ContainerNodeTree;
+  tabId: string;
   nestingLevel: number;
   childFilter?: (node: ContainerNodeTree) => boolean;
   onSelect?: (node: ContainerNodeTree) => void;
@@ -12,6 +13,7 @@ interface NodeChildrenProps {
 
 export const NodeChildren = memo(function NodeChildren({
   node,
+  tabId,
   nestingLevel,
   childFilter,
   onSelect,
@@ -31,6 +33,7 @@ export const NodeChildren = memo(function NodeChildren({
         <TreeNode
           key={child._key}
           node={child}
+          tabId={tabId}
           nestingLevel={nestingLevel + 1}
           childFilter={childFilter}
           onSelect={onSelect}

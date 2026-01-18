@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useUpdateDocument } from "@/features/Dashboard/features/Main/service/useDocuments";
 import { debounce } from "remeda";
 
@@ -7,36 +8,37 @@ import { debounce } from "remeda";
  * Mutation actions for the Workspace.
  * Handles node promotion and document content updates.
  */
-export function useWorkspaceActions() {
-    const {
-        selectedNode,
-        secondarySelectedNode,
-        setSelectedNode,
-        setSecondarySelectedNode,
-    } = useProjectStore();
+export function useWorkspaceActions(tabId: string) {
+  const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
+  const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[tabId]);
+  const handleNodeSelection = useTabStore((s) => s.handleNodeSelection);
+  const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
 
-    const handlePromote = useCallback(() => {
-        if (secondarySelectedNode) {
-            setSelectedNode(secondarySelectedNode);
-            setSecondarySelectedNode(null);
-        }
-    }, [secondarySelectedNode, setSelectedNode, setSecondarySelectedNode]);
+  const handlePromote = useCallback(() => {
 
-    const updateMutation = useUpdateDocument(selectedNode?._key || "");
+    if (secondarySelectedNode) {
 
-    const updateDocumentDebounced = useMemo(
-        () =>
-            debounce(
-                (payload: { id: string; data: string }) => {
-                    updateMutation.mutate({ id: payload.id, data: payload.data });
-                },
-                { waitMs: 1000 }
-            ),
-        [updateMutation]
-    );
+      handleNodeSelection(tabId, secondarySelectedNode, "promte");
+      setSecondarySelectedNode(tabId, null);
 
-    return {
-        handlePromote,
-        updateDocumentDebounced,
-    };
+    }
+  }, [secondarySelectedNode, tabId, handleNodeSelection, setSecondarySelectedNode]);
+
+  const updateMutation = useUpdateDocument(selectedNode?._key || "");
+
+  const updateDocumentDebounced = useMemo(
+    () =>
+      debounce(
+        (payload: { id: string; data: string }) => {
+          updateMutation.mutate({ id: payload.id, data: payload.data });
+        },
+        { waitMs: 1000 }
+      ),
+    [updateMutation]
+  );
+
+  return {
+    handlePromote,
+    updateDocumentDebounced,
+  };
 }

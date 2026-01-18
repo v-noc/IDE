@@ -6,13 +6,11 @@ import type { LogNode } from "@/services/logs/api";
 /**
  * Hook to reveal and focus a node in the Canvas based on log selection.
  */
-export const useNodeRevealer = () => {
-    const {
-        selectedNode,
-        expandedNodeIds,
-        expandNode,
-        setFocusTargetId
-    } = useProjectStore();
+export const useNodeRevealer = (tabId: string) => {
+    const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
+    const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds[tabId] ?? []);
+    const expandNode = useProjectStore((s) => s.expandNode);
+    const setFocusTargetId = useProjectStore((s) => s.setFocusTargetId);
 
     const revealNode = useCallback((targetLogNode: LogNode, rootLogNode: LogNode) => {
         if (!selectedNode || !targetLogNode.function_id || !rootLogNode.function_id) {
@@ -44,12 +42,12 @@ export const useNodeRevealer = () => {
                 if (!expandedNodeIds.includes(id)) {
                     // Collect key after the last slash
                     const key = id.includes("/") ? id.split("/").pop()! : id;
-                    expandNode(key);
+                    expandNode(tabId, key);
                 }
             });
 
             // Set focus target for CanvasView to react
-            setFocusTargetId(targetCanvasNode._id);
+            setFocusTargetId(tabId, targetCanvasNode._id);
         }
     }, [selectedNode, expandedNodeIds, expandNode, setFocusTargetId]);
 
