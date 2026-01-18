@@ -20,7 +20,7 @@ import {
   MoreHorizontal,
   Trash,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { truncatePath } from "@/utils";
 import type { ProjectNode } from "@/types/project";
 import { useDeleteProject } from "../hook/useProject";
