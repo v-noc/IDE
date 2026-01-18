@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 
 import { useWorkspaceState } from "./hooks/useWorkspaceState";
@@ -6,9 +6,8 @@ import { useWorkspaceActions } from "./hooks/useWorkspaceActions";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { WorkspaceTabs } from "./components/WorkspaceTabs";
 import { WorkspaceLayout } from "./components/WorkspaceLayout";
-import { useGetDocuments } from "./service/useDocuments";
-import useProjectStore from "../../store/useProjectStore";
-import type { CallNodeTree } from "@/types/project";
+import { DocSidebar } from "./components/Docs/DocSidebar";
+import { useWorkspaceDocs } from "./hooks/useWorkspaceDocs";
 
 /**
  * Workspace Container - Manages the state, logic, and data flow for the central central area.
@@ -19,20 +18,22 @@ interface WorkspaceProps {
 }
 
 const Workspace = ({ tabId }: WorkspaceProps) => {
-  const selectedDocumentId = useProjectStore((s) => s.selectedDocumentId[tabId]);
-  const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
-
   // 1. Logic & State hooks
   const { effectiveNode, displayPath, isCodeActive, selectedNode, secondarySelectedNode } = useWorkspaceState(tabId);
-  const { handlePromote, updateDocumentDebounced } = useWorkspaceActions(tabId);
+  const { handlePromote } = useWorkspaceActions(tabId);
 
   const [tabValue, setTabValue] = useState("docs");
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
   const bottomPanelRef = useRef<ImperativePanelHandle>(null);
 
-  // 2. Data Fetching
-  const nodeKey = effectiveNode?._key || "";
-  const { data: documents = [] } = useGetDocuments(nodeKey);
+  // 2. Docs logic (using React 19 rules & useEffectEvent)
+  const {
+    documents,
+    selectedDocumentId: activeDocId,
+    selectedDocument,
+    handleDocumentChange,
+    selectDocument,
+  } = useWorkspaceDocs(tabId, effectiveNode, selectedNode, secondarySelectedNode);
 
   // 3. Effects
   useEffect(() => {
@@ -40,26 +41,6 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
       setTabValue("docs");
     }
   }, [effectiveNode, isCodeActive, tabValue]);
-
-  useEffect(() => {
-    const currentSelected = secondarySelectedNode
-      ? (secondarySelectedNode as CallNodeTree)?.target ?? selectedNode
-      : selectedNode;
-
-    if (
-      (!selectedDocumentId ||
-        !currentSelected?.documents.includes(`documents/${selectedDocumentId}`)) &&
-      documents.length > 0
-    ) {
-      setSelectedDocumentId(tabId, documents[0]._key);
-    }
-  }, [tabId, documents, selectedDocumentId, selectedNode, secondarySelectedNode, setSelectedDocumentId]);
-
-  // Derived content
-  const selectedDocument = useMemo(
-    () => documents.find((d) => d._key === selectedDocumentId) || null,
-    [documents, selectedDocumentId]
-  );
 
   // 4. Sync panel collapsed state
   useEffect(() => {
@@ -78,6 +59,16 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
       bottomPanelRef={bottomPanelRef}
       isSandboxOpen={isSandboxOpen}
       onToggleSandbox={setIsSandboxOpen}
+      rightSidebarContent={
+        tabValue !== "docs" ? (
+          <DocSidebar
+            documents={documents}
+            selectedDocumentId={activeDocId}
+            onSelectDocument={selectDocument}
+            onDocumentChange={handleDocumentChange}
+          />
+        ) : undefined
+      }
       topPanelContent={
         <WorkspaceTabs
           tabId={tabId}
@@ -85,14 +76,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
           tabValue={tabValue}
           onTabValueChange={setTabValue}
           selectedDocument={selectedDocument}
-          onDocumentChange={(data) => {
-            if (selectedDocumentId) {
-              updateDocumentDebounced.call({
-                id: selectedDocument?._key || "",
-                data,
-              });
-            }
-          }}
+          onDocumentChange={handleDocumentChange}
           headerSlot={
             <WorkspaceHeader
               displayPath={displayPath}
