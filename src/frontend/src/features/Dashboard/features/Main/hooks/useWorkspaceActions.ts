@@ -17,13 +17,10 @@ export function useWorkspaceActions(tabId: string) {
   const handlePromote = useCallback(() => {
 
     if (secondarySelectedNode) {
-      if (secondarySelectedNode.node_type == "call") {
-        handleNodeSelection(tabId, secondarySelectedNode.target);
-        setSecondarySelectedNode(tabId, null);
-      } else {
-        handleNodeSelection(tabId, secondarySelectedNode);
-        setSecondarySelectedNode(tabId, null);
-      }
+
+      handleNodeSelection(tabId, secondarySelectedNode, "promte");
+      setSecondarySelectedNode(tabId, null);
+
     }
   }, [secondarySelectedNode, tabId, handleNodeSelection, setSecondarySelectedNode]);
 

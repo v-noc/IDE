@@ -36,8 +36,8 @@ export function useTreeNodeHandlers(node: ContainerNodeTree, tabId: string) {
       setSecondarySelectedNode(tabId, null);
     }
     if (selectedNode?._key === node._key) return;
-    handleNodeSelection(tabId, node as AnyNodeTree);
-    console.log("useTreeNodeHandlers handleSelectNode", tabId, node);
+    handleNodeSelection(tabId, node as AnyNodeTree, "primary");
+
   }, [node, tabId, selectedNode, secondarySelectedNode, handleNodeSelection, setSecondarySelectedNode]);
 
   // Focus (zoom into node)

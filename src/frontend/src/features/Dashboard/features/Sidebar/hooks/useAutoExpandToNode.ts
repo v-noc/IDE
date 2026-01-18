@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
 import { collectAncestorKeys } from '@/features/Dashboard/utils/treeUtils';
-import type { AnyNodeTree, CallNodeTree } from '@/types/project';
+import type { AnyNodeTree } from '@/types/project';
 
 /**
  * When a call node is selected, expand ancestors and scroll to target.
@@ -18,11 +18,11 @@ export function useAutoExpandToNode(projectTree: AnyNodeTree | null, tabId: stri
    * Handle auto-expansion logic.
    * Wrapped in useEffectEvent to avoid reactive loops with expandedNodeIds.
    */
-  const handleAutoExpand = useEffectEvent((node: CallNodeTree) => {
+  const handleAutoExpand = useEffectEvent((node: AnyNodeTree) => {
     if (!projectTree) return;
 
-    const target = node.target;
-    const targetKey = target?._key;
+
+    const targetKey = node._key;
     if (!targetKey) return;
 
     // Access current state directly to check before dispatching
@@ -40,12 +40,13 @@ export function useAutoExpandToNode(projectTree: AnyNodeTree | null, tabId: stri
   });
 
   useEffect(() => {
-    if (selectedNode && selectedNode.node_type === 'call' && projectTree) {
-      handleAutoExpand(selectedNode as CallNodeTree);
+
+    if (selectedNode && projectTree) {
+      handleAutoExpand(selectedNode);
     } else {
       scrollTargetRef.current = null;
     }
-  }, [selectedNode, projectTree]); // Only rerun when selection actually changes
+  }, [selectedNode]); // Only rerun when selection actually changes
 
   // Scroll effect - runs after expansion
   useEffect(() => {

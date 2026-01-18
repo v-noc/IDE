@@ -17,7 +17,7 @@ export interface TabActions {
   removeTab: (tabId: string) => void;
   setActiveTabId: (tabId: string) => void;
   destroyTabBranch: (tabId: string) => void;
-  handleNodeSelection: (tabId: string, node: any) => void;
+  handleNodeSelection: (tabId: string, node: any, selectionType: "promte" | "secondary" | "primary") => void;
 }
 
 export type TabStore = TabState & TabActions;
@@ -87,7 +87,7 @@ const useTabStore = create<TabStore>()(
         get().removeTab(tabId);
       },
 
-      handleNodeSelection: (tabId, node) => {
+      handleNodeSelection: (tabId, node, selectionType: "promte" | "secondary" | "primary") => {
         const currentTab = get().tabs[tabId];
         if (!currentTab) return;
 
@@ -100,9 +100,18 @@ const useTabStore = create<TabStore>()(
           }
         });
 
-        // 2. Update selection for the current tab in project store
-        useProjectStore.getState().setSelectedNode(tabId, node);
+        if (selectionType == "promte") {
+          if (node.node_type === 'call') {
+            useProjectStore.getState().setSelectedNode(tabId, node.target);
+          }
 
+        }
+        else if (selectionType == "secondary") {
+          useProjectStore.getState().setSecondarySelectedNode(tabId, node);
+        }
+        else if (selectionType == "primary") {
+          useProjectStore.getState().setSelectedNode(tabId, node);
+        }
 
         // 2. If it's a CallNode, create a new child tab (Portal)
         if (node && node.node_type === 'call') {

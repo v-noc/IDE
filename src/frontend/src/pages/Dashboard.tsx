@@ -39,7 +39,7 @@ const Dashboard = () => {
   // Set default selection for the active tab if nothing is selected
   useEffect(() => {
     if (!selectedNode && projectData != null) {
-      handleNodeSelection(activeTabId, projectData);
+      handleNodeSelection(activeTabId, projectData, "primary");
     }
   }, [selectedNode, projectData, handleNodeSelection, activeTabId]);
 

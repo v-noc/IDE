@@ -127,7 +127,6 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   useEffect(() => {
     if (focusTargetId) {
-      console.log("focusTargetId ", focusTargetId);
       centerOnTarget();
     } else {
       lastCenteredTargetIdRef.current = null;
@@ -163,8 +162,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({
       const nodeKey = node.id;
       if (projectData && nodeKey) {
         const foundNode = findNodeByKey(projectData, nodeKey);
-        if (foundNode) {
-          handleNodeSelection(tabId, foundNode);
+        if (foundNode?._key) {
+          handleNodeSelection(tabId, foundNode, "secondary");
         }
       }
     },
