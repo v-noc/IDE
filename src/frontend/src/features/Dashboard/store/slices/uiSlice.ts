@@ -7,6 +7,7 @@ export interface UISlice {
   expandedNodeIds: Record<string, string[]>;
   activeNodeId: Record<string, string | null>;
   isDocSidebarOpen: Record<string, boolean>;
+  docSidebarSize: Record<string, number>;
 
   toggleNodeExpansion: (tabId: string, nodeId: string) => void;
   expandNode: (tabId: string, nodeId: string) => void;
@@ -14,6 +15,7 @@ export interface UISlice {
   setActiveNodeId: (tabId: string, id: string | null) => void;
   expandNodesBulk: (tabId: string, nodeIds: string[]) => void;
   setDocSidebarOpen: (tabId: string, open: boolean) => void;
+  setDocSidebarSize: (tabId: string, size: number) => void;
 }
 
 type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
@@ -29,6 +31,7 @@ export const createUISlice: StateCreator<
   expandedNodeIds: {},
   activeNodeId: {},
   isDocSidebarOpen: {},
+  docSidebarSize: {},
 
   toggleNodeExpansion: (tabId, nodeId) => set((state) => {
     if (!state.expandedNodeIds[tabId]) {
@@ -76,5 +79,9 @@ export const createUISlice: StateCreator<
 
   setDocSidebarOpen: (tabId, open) => set((state) => {
     state.isDocSidebarOpen[tabId] = open;
+  }),
+
+  setDocSidebarSize: (tabId, size) => set((state) => {
+    state.docSidebarSize[tabId] = size;
   }),
 });

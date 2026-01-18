@@ -29,6 +29,8 @@ const useProjectStore = create<ProjectStore>()(
           delete state.selectedDocumentId[tabId];
           delete state.expandedNodeIds[tabId];
           delete state.activeNodeId[tabId];
+          delete state.isDocSidebarOpen[tabId];
+          delete state.docSidebarSize[tabId];
         }),
     })),
     { name: 'project-store' }

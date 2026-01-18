@@ -6,6 +6,8 @@ import {
 } from "@/components/ui/resizable";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import Sandbox from "./Sandbox";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import type { ProjectStore } from "@/features/Dashboard/store/useProjectStore";
 
 interface WorkspaceLayoutProps {
   topPanelContent: React.ReactNode;
@@ -28,6 +30,29 @@ export function WorkspaceLayout({
   onToggleSandbox,
   bottomPanelRef,
 }: WorkspaceLayoutProps) {
+  const docSidebarSize = useProjectStore(
+    (s: ProjectStore) => s.docSidebarSize[tabId]
+  );
+  const setDocSidebarSize = useProjectStore(
+    (s: ProjectStore) => s.setDocSidebarSize
+  );
+
+  const handleHorizontalLayout = (sizes: number[]) => {
+    // When rightSidebarContent exists, sizes[0] is main content, sizes[1] is DocSidebar
+    // We want to persist the DocSidebar size (index 1)
+    if (rightSidebarContent && sizes.length > 1) {
+      setDocSidebarSize(tabId, sizes[1]);
+    }
+  };
+
+  // Calculate default sizes based on persisted state
+  const mainContentDefaultSize = rightSidebarContent
+    ? docSidebarSize
+      ? 100 - docSidebarSize
+      : 70
+    : 100;
+  const sidebarDefaultSize = docSidebarSize ?? 30;
+
   return (
     <div className="relative h-full w-full bg-(--background-color)">
       <ResizablePanelGroup
@@ -39,14 +64,18 @@ export function WorkspaceLayout({
           minSize={40}
           className="flex flex-col border-b bg-white"
         >
-          <ResizablePanelGroup direction="horizontal" className="h-full">
-            <ResizablePanel defaultSize={rightSidebarContent ? 70 : 100} minSize={30}>
+          <ResizablePanelGroup
+            direction="horizontal"
+            className="h-full"
+            onLayout={handleHorizontalLayout}
+          >
+            <ResizablePanel defaultSize={mainContentDefaultSize} minSize={30}>
               <div className="h-full w-full overflow-hidden">{topPanelContent}</div>
             </ResizablePanel>
             {rightSidebarContent && (
               <>
                 <ResizableHandle className="w-1 bg-border" />
-                <ResizablePanel defaultSize={30} minSize={20}>
+                <ResizablePanel defaultSize={sidebarDefaultSize} minSize={20}>
                   <div className="h-full w-full overflow-hidden">{rightSidebarContent}</div>
                 </ResizablePanel>
               </>
