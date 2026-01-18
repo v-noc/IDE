@@ -1,9 +1,10 @@
 import "@blocknote/core/fonts/inter.css";
+import { createCodeBlockSpec } from "@blocknote/core";
+import { codeBlockOptions } from "@blocknote/code-block";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
-import { BlockNoteSchema, defaultBlockSpecs } from "@blocknote/core";
-import { type BlockSpecs } from "@blocknote/core";
+import { BlockNoteSchema } from "@blocknote/core";
 // import { ReactMermaidBlock } from "./blocks/MermaidBlock";
 import {
   SuggestionMenuController,
@@ -11,17 +12,14 @@ import {
 } from "@blocknote/react";
 import { useEffect, useRef } from "react";
 import { FileText } from "lucide-react";
-import { createHighlighter } from "./shiki.bundle";
+
+import { filterSuggestionItems } from "@blocknote/core/extensions";
 
 // Creates a new editor instance with Mermaid block registered.
 // const customBlockSpecs = {
 //   mermaid: ReactMermaidBlock,
 // } satisfies BlockSpecs;
-const schema = BlockNoteSchema.create({
-  blockSpecs: {
-    ...defaultBlockSpecs,
-  } as BlockSpecs,
-});
+
 type DocumentsProps = {
   document?: { id: string; data?: string };
   onChange?: (data: string) => void;
@@ -29,23 +27,11 @@ type DocumentsProps = {
 
 const Documents = ({ document, onChange }: DocumentsProps) => {
   const editor = useCreateBlockNote({
-    schema,
-    initialContent: undefined,
-    codeBlock: {
-      indentLineWithTab: true,
-      defaultLanguage: "python",
-      supportedLanguages: {
-        python: {
-          name: "Python",
-          aliases: ["py"],
-        },
+    schema: BlockNoteSchema.create().extend({
+      blockSpecs: {
+        codeBlock: createCodeBlockSpec(codeBlockOptions),
       },
-      createHighlighter: () =>
-        createHighlighter({
-          themes: ["github-dark"],
-          langs: [],
-        }),
-    },
+    }),
   });
   const applyingRemoteContent = useRef(false);
   const lastAppliedDataRef = useRef<string | null>(null);

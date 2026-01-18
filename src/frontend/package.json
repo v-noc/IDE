@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@blocknote/code-block": "^0.38.0",
-    "@blocknote/core": "^0.38.0",
-    "@blocknote/react": "^0.38.0",
-    "@blocknote/shadcn": "^0.38.0",
+    "@blocknote/code-block": "^0.46.1",
+    "@blocknote/core": "^0.46.1",
+    "@blocknote/react": "^0.46.1",
+    "@blocknote/shadcn": "^0.46.1",
     "@hookform/resolvers": "^5.2.1",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-accordion": "^1.2.11",
