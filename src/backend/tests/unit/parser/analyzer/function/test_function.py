@@ -81,7 +81,7 @@ async def test_function_get_code(setup_project):
 
     assert tree, "No tree nodes built"
 
-    file_node = tree[0]
+    file_node = tree[1]
     factory_qname = f"{file_node.qname}.factory"
     factory_func = find_node_by_qname(file_node.children, factory_qname)
     assert factory_func is not None, "No 'factory' function node found"
@@ -124,9 +124,9 @@ async def test_function_collector(setup_project):
     tree = tree_builder.build()
 
     # 1. Project structure assertions
-    assert len(tree) == 1
+    assert len(tree) == 2
 
-    file_node = tree[0]
+    file_node = tree[1]
 
     # 2. Function definitions in main.py
     file_functions = [
@@ -145,10 +145,8 @@ async def test_function_collector(setup_project):
     )
     assert func_qnames == expected_func_qnames
 
-    main_func = find_node_by_qname(
-        file_node.children, f"{file_node.qname}.main")
-    factory_func = find_node_by_qname(
-        file_node.children, f"{file_node.qname}.factory")
+    main_func = find_node_by_qname(file_node.children, f"{file_node.qname}.main")
+    factory_func = find_node_by_qname(file_node.children, f"{file_node.qname}.factory")
     call_back_func = find_node_by_qname(
         file_node.children, f"{file_node.qname}.call_back"
     )
@@ -163,8 +161,7 @@ async def test_function_collector(setup_project):
 
     # 3. Assert functions and calls within `factory` function
     assert len(factory_func.children) == 2
-    add_func = find_node_by_qname(
-        factory_func.children, f"{factory_func.qname}.add")
+    add_func = find_node_by_qname(factory_func.children, f"{factory_func.qname}.add")
     build_func = find_node_by_qname(
         factory_func.children, f"{factory_func.qname}.build"
     )
@@ -195,8 +192,7 @@ async def test_function_collector(setup_project):
 
     # 4.1 Check `factory_call()` in `main`
     assert main_factory_call.target.id == factory_call_func.id
-    children = [{child.name: child.node_type}
-                for child in main_factory_call.children]
+    children = [{child.name: child.node_type} for child in main_factory_call.children]
 
     assert len(main_factory_call.children) == 2
     inner_factory_call = find_node_by_qname(

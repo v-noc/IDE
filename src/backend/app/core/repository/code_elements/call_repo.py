@@ -86,29 +86,16 @@ class CallRepo(NodeRepository[CallNode]):
         cursor = await self.db.aql.execute(query, bind_vars={"parent_id": parent_id})
         return [CallNode(**doc) async for doc in cursor]
 
-    async def find_call_by_pair(self, parent_id: str, target_id: str) -> Optional[CallNode]:
-        """
-        Check if a call already exists (deduplication).
-        Returns first matching call or None.
-        """
-        return await self.find_call_by_target_parent(target_id, parent_id)
-
-    async def find_calls_by_targets(
+    async def find_call_by_target_parent(
         self,
-        target_pairs: List[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], CallNode]:
+        target_id: str,
+        parent_id: str,
+    ) -> Optional[CallNode]:
         """
-        Batch fetch existing calls.
-        Returns: {(parent_id, target_id): CallNode, ...}
+        Find call node by parent and target.
         """
-        return await self.find_calls_by_target_parent_batch(target_pairs)
-
-    async def count_recursion_depth(self, parent_id: str, target_id: str) -> int:
-        """
-        Count how many times parent->target calls are nested.
-        Wrapper for count_recursive_calls_upward.
-        """
-        return await self.count_recursive_calls_upward(parent_id, target_id)
+        results = await self.find_calls_by_target_parent_batch([(parent_id, target_id)])
+        return results.get((parent_id, target_id))
 
     async def get_target(self, call_node_id: str) -> Optional[ClassNode | FunctionNode]:
         """Find the function or class that this CallNode targets."""
@@ -135,43 +122,6 @@ class CallRepo(NodeRepository[CallNode]):
             return ClassNode.model_validate(doc)
         return None
 
-    async def find_call_by_target_parent(
-        self,
-        target_id: str,
-        parent_id: str,
-    ) -> Optional[CallNode]:
-        """
-        Find call node by parent and target.
-        """
-        query = """
-        FOR c IN 1..1 OUTBOUND @parent_id contains_edges
-            FILTER c.node_type == "call"
-            LET t = FIRST(
-                FOR target IN 1..1 OUTBOUND c targets_edges
-                    RETURN target
-            )
-            FILTER t != null && t._id == @target_id
-            LIMIT 1
-            RETURN c
-        """
-
-        bind_vars = {"target_id": str(target_id), "parent_id": str(parent_id)}
-
-        try:
-            cursor = await self.db.aql.execute(
-                query,
-                bind_vars=bind_vars,
-                batch_size=1,
-            )
-
-            doc = await cursor.next() if cursor else None
-            if not doc:
-                return None
-            return CallNode(**doc)
-
-        except Exception as e:
-            logger.error("Error finding call by target/parent: %s", e)
-            return None
 
     async def find_calls_by_target_parent_batch(
         self,
@@ -245,43 +195,8 @@ class CallRepo(NodeRepository[CallNode]):
         Count how many times the same target (function/class) appears
         in the call chain **upwards** from a given parent node.
         """
-        query = """
-            LET matches = (
-                FOR v IN 0..@max_depth INBOUND @start_parent_id @@contains
-                    PRUNE v.node_type != "call"
-                    FILTER v.node_type == "call"
-                    LET target = FIRST(
-                        FOR t IN 1..1 OUTBOUND v @@targets
-                            RETURN t
-                    )
-                    FILTER target != null && target._id == @target_id
-                    RETURN 1
-            )
-            RETURN LENGTH(matches)
-        """
-
-        bind_vars = {
-            "start_parent_id": str(parent_id),
-            "target_id": str(target_id),
-            "@contains": "contains_edges",
-            "@targets": "targets_edges",
-            "max_depth": max_depth,
-        }
-
-        try:
-            cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-            # Query returns a single scalar row: LENGTH(matches)
-            async for row in cursor:
-                return int(row or 0)
-            return 0
-        except Exception as e:
-            logger.error(
-                "Error counting recursive calls upward for %s -> %s: %s",
-                parent_id,
-                target_id,
-                e,
-            )
-            return 0
+        results = await self.count_recursive_calls_upward_batch([(parent_id, target_id)], max_depth=max_depth)
+        return results.get((parent_id, target_id), 0)
 
     async def count_recursive_calls_upward_batch(
         self,

@@ -296,6 +296,48 @@ class NodeRepository(BaseRepository[T]):
     async def find_by_qname(self, qname: str) -> Optional[T]:
         return await self.find_one({"qname": qname})
 
+    async def get_by_ids(self, ids: List[str]) -> Dict[str, T]:
+        """Fetch multiple nodes by their keys."""
+        if not ids:
+            return {}
+
+        clean_ids = [i.split("/")[-1] if "/" in i else i for i in ids]
+
+        query = """
+            FOR n IN @@collection
+                FILTER n._key IN @ids
+                RETURN n
+        """
+        cursor = await self.db.aql.execute(
+            query,
+            bind_vars={"@collection": self.collection_name, "ids": clean_ids}
+        )
+        results = {}
+        async for doc in cursor:
+            node = self._validate(doc)
+            results[node.key] = node
+        return results
+
+    async def get_by_qnames(self, qnames: List[str]) -> Dict[str, T]:
+        """Fetch multiple nodes by their qualified names."""
+        if not qnames:
+            return {}
+
+        query = """
+            FOR n IN @@collection
+                FILTER n.qname IN @qnames
+                RETURN n
+        """
+        cursor = await self.db.aql.execute(
+            query,
+            bind_vars={"@collection": self.collection_name, "qnames": qnames}
+        )
+        results = {}
+        async for doc in cursor:
+            node = self._validate(doc)
+            results[node.qname] = node
+        return results
+
     async def find_by_type(self, node_type: str) -> List[T]:
         return await self.find({"node_type": node_type})
 
