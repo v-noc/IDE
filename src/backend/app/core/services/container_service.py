@@ -56,6 +56,18 @@ class ContainerService:
     async def get_parent_container(self, container_id: str):
         return await self.repos.nodes.get_parent(container_id)
 
+    async def delete_recursive(self, node_key: str) -> bool:
+        """Generic cascading delete for any container node."""
+        node_id = f"nodes/{node_key}"
+        descendants = await self.repos.nodes.get_containment_tree(node_id, depth="*")
+        descendant_keys = [item["vertex"]["_key"] for item in descendants]
+
+        # Use batch delete for descendants
+        if descendant_keys:
+            await self.repos.nodes.delete_batch(descendant_keys)
+
+        return await self.repos.nodes.delete(node_key)
+
     async def update_theme_config(
         self,
         container_id: str,
@@ -104,52 +116,145 @@ class ContainerService:
 
     # Internal helpers for code resolution
     async def _resolve_file_and_project(self, start_node_id: str):
-        """Walk parents via contains edges to find enclosing file and project.
+        """Find enclosing file and project for any node.
 
         Returns a tuple (file_doc, project_doc) where each is a dict document.
-        Any missing ancestor returns (None, None) accordingly.
         """
-        current_id = start_node_id
-        file_doc = None
-        project_doc = None
+        # Fetch start node to see if it's already a file or project
+        start_node = await self.repos.nodes.get_by_id(start_node_id)
+        if not start_node:
+            return None, None
 
-        # Limit the ascent to avoid infinite loops
-        for _ in range(50):
-            parent_info = await self.repos.nodes.get_parent(current_id)
+        raw_node = start_node.model_dump()
+        node_type = raw_node.get("node_type")
 
-            if not parent_info:
-                break
+        if node_type == "file":
+            file_doc = raw_node
+            # Fast traversal for project
+            project_node = await self.repos.nodes.get_parent_project(start_node_id)
+            project_doc = project_node.model_dump() if project_node else None
+            return file_doc, project_doc
 
-            parent_vertex = parent_info.get("vertex") or {}
-            parent_id = parent_vertex.get("_id")
-            node_type = parent_vertex.get("node_type")
+        # If it's a project (unlikely to call get_code on it, but for safety)
+        if node_type == "project":
+            return None, raw_node
 
-            if node_type == "file" and file_doc is None:
-                file_doc = parent_vertex
-            if node_type == "project":
-                project_doc = parent_vertex
-                # We can stop once we reach project
-                break
+        # Otherwise, use the optimized traversal for ancestors
+        result = await self.repos.nodes.get_nearest_file_and_project(start_node_id)
+        return result.get("file"), result.get("project")
 
-            if not parent_id:
-                break
-            current_id = parent_id
-
-        if project_doc is None:
-            project_doc = await self.repos.nodes.get_parent_project(
-                file_doc.get("_id"))
-
-            if project_doc is None:
-                return None, None
-        return file_doc, project_doc
-
-    async def _build_abs_file_path(self, project_path: str, file_path: str) -> str:
+    def _build_abs_file_path(self, project_path: str, file_path: str) -> str:
         import os
 
         # If file_path is absolute, prefer it; else join with project root
         if os.path.isabs(file_path):
             return file_path
         return os.path.normpath(os.path.join(project_path, file_path))
+
+    async def get_code(self, node_id: str) -> Optional[dict]:
+        """Generic get_code for both FileNode and positioned nodes (Class/Function)."""
+        node = await self.repos.nodes.get_by_id(node_id)
+        if not node:
+            return None
+
+        file_doc, project_doc = await self._resolve_file_and_project(node.id)
+        if not project_doc:
+            return None
+
+        # For files, file_doc IS the node.
+        # If node is a file, we might not have a separate file_doc from _resolve_file_and_project
+        # depending on how it's implemented. But our improved version handles it.
+        effective_file_doc = file_doc or (
+            node.model_dump() if node.node_type == "file" else None)
+
+        if not effective_file_doc:
+            return None
+
+        abs_path = self._build_abs_file_path(
+            project_doc.get("path"),
+            effective_file_doc.get("path"),
+        )
+
+        # Files fetch everything, positioned nodes slice content
+        position = getattr(node, "position", None) if node.node_type != "file" else None
+
+        code = await self._extract_code_from_file(abs_path, position)
+
+        result = {
+            "id": node.id,
+            "name": node.name,
+            "node_type": node.node_type,
+            "qname": node.qname,
+            "file_path": effective_file_doc.get("path"),
+            "file_name": effective_file_doc.get("name"),
+            "code": code,
+        }
+        if position:
+            result["position"] = position.model_dump()
+
+        return result
+
+    async def write_code(self, node_id: str, code_block: str) -> dict:
+        """Generic write_code for both FileNode and positioned nodes."""
+        node = await self.repos.nodes.get_by_id(node_id)
+        if not node:
+            return {"success": False, "error": "Element not found"}
+
+        file_doc, project_doc = await self._resolve_file_and_project(node.id)
+        if not file_doc or not project_doc:
+            return {"success": False, "error": "Enclosing file or project not found"}
+
+        abs_path = self._build_abs_file_path(
+            project_doc.get("path"), file_doc.get("path"))
+
+        if node.node_type == "file":
+            try:
+                with open(abs_path, "w", encoding="utf-8") as f:
+                    f.write(code_block)
+                return {"success": True}
+            except IOError as e:
+                return {"success": False, "error": str(e)}
+
+        position = getattr(node, "position", None)
+        if not position:
+            return {"success": False, "error": "Positioned node missing position data"}
+
+        try:
+            with open(abs_path, "r+", encoding="utf-8") as f:
+                lines = f.readlines()
+
+                start_line = max(1, position.line_no) - 1
+                end_line = position.end_line_no
+                start_col = max(0, position.col_offset)
+                end_col = position.end_col_offset
+
+                # Build replacement lines with indentation preserved from start column
+                prefix = lines[start_line][:start_col] if 0 <= start_line < len(
+                    lines) else ""
+                new_lines = [
+                    (prefix + l if i > 0 else (prefix + l))
+                    for i, l in enumerate(code_block.splitlines(True))
+                ]
+
+                if end_line is None:
+                    # Replace from start_line to end of file
+                    lines[start_line:] = new_lines
+                else:
+                    # If selection ends mid-line, keep tail after end_col
+                    tail = ""
+                    if 0 <= (end_line - 1) < len(lines) and end_col is not None:
+                        original = lines[end_line - 1]
+                        tail = original[end_col:]
+                    lines[start_line:end_line] = new_lines
+                    if tail:
+                        lines.insert(start_line + len(new_lines), tail)
+
+                f.seek(0)
+                f.writelines(lines)
+                f.truncate()
+            return {"success": True}
+        except IOError as e:
+            return {"success": False, "error": str(e)}
 
     async def _extract_code_from_file(
         self,
