@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from threading import Timer
 from typing import Callable, Optional
 
 from watchdog.events import (
@@ -19,26 +20,40 @@ logger = logging.getLogger(__name__)
 class ChangeHandler(FileSystemEventHandler):
     """Handles file system events."""
 
-    def __init__(self, callback: Callable[[], None]):
+    def __init__(self, callback: Callable[[], None], debounce_seconds: float = 0.5):
         self.callback = callback
+        self.debounce_seconds = debounce_seconds
+        self.timer: Optional[Timer] = None
+
+    def _trigger(self):
+        self.callback()
 
     def on_modified(self, event: FileModifiedEvent):
         if event.is_directory or not event.src_path.endswith(".py"):
             return
         logger.info(f"File modified: {event.src_path}")
-        self.callback()
+        if self.timer:
+            self.timer.cancel()
+        self.timer = Timer(self.debounce_seconds, self._trigger)
+        self.timer.start()
 
     def on_created(self, event: FileCreatedEvent):
         if event.is_directory or not event.src_path.endswith(".py"):
             return
         logger.info(f"File created: {event.src_path}")
-        self.callback()
+        if self.timer:
+            self.timer.cancel()
+        self.timer = Timer(self.debounce_seconds, self._trigger)
+        self.timer.start()
 
     def on_deleted(self, event: FileDeletedEvent):
         if event.is_directory or not event.src_path.endswith(".py"):
             return
         logger.info(f"File deleted: {event.src_path}")
-        self.callback()
+        if self.timer:
+            self.timer.cancel()
+        self.timer = Timer(self.debounce_seconds, self._trigger)
+        self.timer.start()
 
 
 class ProjectWatcher:

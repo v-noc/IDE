@@ -16,6 +16,7 @@ from app.api.dependencies import (
 )
 from app.core.watcher.service import WatcherService, get_watcher_service
 from app.core.repository import Repositories
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
 
 router = APIRouter()
@@ -56,7 +57,8 @@ async def write_code(
     """
     project_service, file_service, _, _, _ = _get_services(db)
 
-    # Ensure the project's watcher is running for this element
+    # Get project node and stop watcher before writing
+    project_node = None
     try:
         node_repo = Repositories(db).nodes
         raw_node = await node_repo.get_raw_by_key(element_id)
@@ -66,15 +68,37 @@ async def write_code(
             parent = await node_repo.get_parent_project(current_id)
             if parent:
                 project_node = await project_service.get(parent.id)
-                # TODO: do a syncer
                 if project_node:
-                    watcher_service.start_watching(project_node)
+                    # Stop watcher (not pause) to prevent event bubbling
+                    watcher_service.stop_watching(project_node.id)
     except Exception:
-        # Non-fatal: failure to start watcher should not block write
+        # Non-fatal: failure to stop watcher should not block write
         pass
+
+    # Write the code
     result = await file_service.write_code_by_id(element_id, code_block)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result.get("error"))
+
+    # Run orchestrator manually to sync changes
+    if project_node:
+        try:
+            orchestrator = GraphBuilderOrchestrator(
+                project_node=project_node,
+                db=db,
+            )
+            await orchestrator.resync()
+        except Exception:
+            # Non-fatal: failure to sync should not block write response
+            pass
+
+        # Start watcher again after sync
+        try:
+            watcher_service.start_watching(project_node)
+        except Exception:
+            # Non-fatal: failure to start watcher should not block write
+            pass
+
     return result
 
 
