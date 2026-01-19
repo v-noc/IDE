@@ -14,7 +14,7 @@ from app.core.services.file_service import FileService
 from app.core.services.folder_service import FolderService
 from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
-from app.core.parser.scope_manager.manager import ScopeManager
+
 
 
 PROJECT_PATH = Path(__file__).resolve().parent / "sample_project"
@@ -106,15 +106,12 @@ async def create_sample_project(arangodb_client, create_repos, tmp_path):
         project_node
     )
 
-    scope_manager = ScopeManager(project_node.name, db_path=str(db_path))
-
     orchestrator = GraphBuilderOrchestrator(
         project_node=project_node,
         db=arangodb_client,
         ignore_file_name=None,
-        scope_manager=scope_manager,
     )
-    orchestrator.resync()
+    await orchestrator.resync()
 
 
 @pytest_asyncio.fixture
