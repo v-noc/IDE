@@ -1,5 +1,6 @@
 
 
+import aiofiles
 from app.core.model.edges import ContainsEdge, TargetsEdge
 
 from app.core.repository import Repositories
@@ -176,7 +177,8 @@ class ContainerService:
         )
 
         # Files fetch everything, positioned nodes slice content
-        position = getattr(node, "position", None) if node.node_type != "file" else None
+        position = getattr(
+            node, "position", None) if node.node_type != "file" else None
 
         code = await self._extract_code_from_file(abs_path, position)
 
@@ -209,8 +211,8 @@ class ContainerService:
 
         if node.node_type == "file":
             try:
-                with open(abs_path, "w", encoding="utf-8") as f:
-                    f.write(code_block)
+                async with aiofiles.open(abs_path, "w", encoding="utf-8") as f:
+                    await f.write(code_block)
                 return {"success": True}
             except IOError as e:
                 return {"success": False, "error": str(e)}
@@ -220,38 +222,41 @@ class ContainerService:
             return {"success": False, "error": "Positioned node missing position data"}
 
         try:
-            with open(abs_path, "r+", encoding="utf-8") as f:
-                lines = f.readlines()
+            # Read file content first
+            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
+                content = await f.read()
 
-                start_line = max(1, position.line_no) - 1
-                end_line = position.end_line_no
-                start_col = max(0, position.col_offset)
-                end_col = position.end_col_offset
+            lines = content.splitlines(True)
 
-                # Build replacement lines with indentation preserved from start column
-                prefix = lines[start_line][:start_col] if 0 <= start_line < len(
-                    lines) else ""
-                new_lines = [
-                    (prefix + l if i > 0 else (prefix + l))
-                    for i, l in enumerate(code_block.splitlines(True))
-                ]
+            start_line = max(1, position.line_no) - 1
+            end_line = position.end_line_no
+            start_col = max(0, position.col_offset)
+            end_col = position.end_col_offset
 
-                if end_line is None:
-                    # Replace from start_line to end of file
-                    lines[start_line:] = new_lines
-                else:
-                    # If selection ends mid-line, keep tail after end_col
-                    tail = ""
-                    if 0 <= (end_line - 1) < len(lines) and end_col is not None:
-                        original = lines[end_line - 1]
-                        tail = original[end_col:]
-                    lines[start_line:end_line] = new_lines
-                    if tail:
-                        lines.insert(start_line + len(new_lines), tail)
+            # Build replacement lines with indentation preserved from start column
+            prefix = lines[start_line][:start_col] if 0 <= start_line < len(
+                lines) else ""
+            new_lines = [
+                (prefix + l if i > 0 else (prefix + l))
+                for i, l in enumerate(code_block.splitlines(True))
+            ]
 
-                f.seek(0)
-                f.writelines(lines)
-                f.truncate()
+            if end_line is None:
+                # Replace from start_line to end of file
+                lines[start_line:] = new_lines
+            else:
+                # If selection ends mid-line, keep tail after end_col
+                tail = ""
+                if 0 <= (end_line - 1) < len(lines) and end_col is not None:
+                    original = lines[end_line - 1]
+                    tail = original[end_col:]
+                lines[start_line:end_line] = new_lines
+                if tail:
+                    lines.insert(start_line + len(new_lines), tail)
+
+            # Write modified content back
+            async with aiofiles.open(abs_path, "w", encoding="utf-8") as f:
+                await f.writelines(lines)
             return {"success": True}
         except IOError as e:
             return {"success": False, "error": str(e)}
@@ -270,8 +275,8 @@ class ContainerService:
         """
         # Fast path: full file
         if position is None:
-            with open(abs_path, "r", encoding="utf-8") as f:
-                return f.read()
+            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
+                return await f.read()
 
         start_line = max(1, position.line_no)
         start_col = max(0, position.col_offset)
@@ -282,9 +287,11 @@ class ContainerService:
 
         # Stream through file and collect raw lines
         collected: list[str] = []
-        with open(abs_path, "r", encoding="utf-8") as f:
-            for idx, raw_line in enumerate(f, start=1):
+        async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
+            idx = 1
+            async for raw_line in f:
                 if idx < start_line:
+                    idx += 1
                     continue
 
                 line = raw_line[:-1] if raw_line.endswith("\n") else raw_line
@@ -298,6 +305,7 @@ class ContainerService:
                     break
                 else:
                     break
+                idx += 1
 
         if not collected:
             return ""
