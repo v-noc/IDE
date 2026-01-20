@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Dict, Set
 
-from app.core.repository.folder_repo import FolderRepo
+from app.core.repository.structure.folder_repo import FolderRepo
 from app.core.model.nodes import ProjectNode, FolderNode
 from app.core.parser.graph_builder.discovery.change_detector import (
     ChangeSet,

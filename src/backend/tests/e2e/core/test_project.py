@@ -167,8 +167,7 @@ async def test_delete_project(client, sample_project_path, create_repos):
 
     # 3. Delete the project
     response = await client.delete(f"/api/v1/projects/{project_key}")
-    assert response.status_code == 200
-    assert response.json() is True
+    assert response.status_code == 204
 
     # 4. Verify the project is gone
     response = await client.get(f"/api/v1/projects/{project_key}")

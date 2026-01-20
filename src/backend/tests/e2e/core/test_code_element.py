@@ -74,7 +74,7 @@ async def test_get_code_for_function(client, sample_project_path):
 
     # Call get_code for function
     func_key = create_child_func["_key"]
-    r_func = await client.get(f"/api/v1/code-elements/{func_key}/code")
+    r_func = await client.get(f"/api/v1/code-elements/{func_key}/read-code")
     assert r_func.status_code == 200
     payload = r_func.json()
     assert payload["node_type"] == "function"
@@ -124,7 +124,7 @@ async def test_get_code_for_class(client, sample_project_path):
     assert child_class is not None
 
     class_key = child_class["_key"]
-    r_class = await client.get(f"/api/v1/code-elements/{class_key}/code")
+    r_class = await client.get(f"/api/v1/code-elements/{class_key}/read-code")
     assert r_class.status_code == 200
     payload = r_class.json()
     assert payload["node_type"] == "class"
@@ -175,7 +175,7 @@ async def test_get_code_for_nested_function(client):
     assert add_func is not None
 
     nested_key = add_func["_key"]
-    r_nested = await client.get(f"/api/v1/code-elements/{nested_key}/code")
+    r_nested = await client.get(f"/api/v1/code-elements/{nested_key}/read-code")
     assert r_nested.status_code == 200
     payload = r_nested.json()
     assert payload["node_type"] == "function"

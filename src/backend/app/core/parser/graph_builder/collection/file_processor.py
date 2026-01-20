@@ -3,8 +3,8 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from app.core.repository.file_repo import FileRepo
-from app.core.repository.folder_repo import FolderRepo
+from app.core.repository.structure.file_repo import FileRepo
+from app.core.repository.structure.folder_repo import FolderRepo
 from app.core.model.nodes import ProjectNode, FileNode, FolderNode
 from app.core.parser.graph_builder.discovery.change_detector import (
     ChangeSet,

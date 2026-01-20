@@ -143,8 +143,7 @@ async def test_remove_call(client, arangodb_client, create_repos, tmp_path):
         f"/api/v1/calls/{call_key}/remove-call",
     )
 
-    assert delete_resp.status_code == 200
-    assert delete_resp.json() == {"message": "Call removed successfully"}
+    assert delete_resp.status_code == 204
 
     projects = await project_service.get_all()
     project = projects[0]
