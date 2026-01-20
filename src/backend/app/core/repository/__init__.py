@@ -1,12 +1,12 @@
 from arangoasync.database import AsyncDatabase
 
 from app.core.model import AllNodes, edges
-from app.core.repository.base.node_repo import NodeRepository
+from app.core.repository.base.base_node_repo import NodeRepository
 from app.core.repository.base.edge_repo import EdgeRepository
 
 from .project_repo import ProjectRepo
-from .folder_repo import FolderRepo
-from .file_repo import FileRepo
+from .structure.folder_repo import FolderRepo
+from .structure.file_repo import FileRepo
 from .code_elements.function_repo import FunctionRepo
 from .code_elements.class_repo import ClassRepo
 from .code_elements.call_repo import CallRepo

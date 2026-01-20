@@ -3,7 +3,7 @@
 import asyncio
 
 from app.core.model.nodes import ProjectNode
-from app.core.repository.base.node_repo import NodeRepository
+from .base.base_node_repo import NodeRepository
 from arangoasync.database import AsyncDatabase
 
 

@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from arangoasync.database import AsyncDatabase
 
 from app.core.model.nodes import CallNode, ClassNode, FunctionNode
-from app.core.repository.base.node_repo import NodeRepository
+from ..base.base_node_repo import NodeRepository
 
 logger = logging.getLogger(__name__)
 
