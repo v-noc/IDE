@@ -143,26 +143,19 @@ async def get_project(
     return project_tree
 
 
-@router.get("/", response_model=list[ProjectTreeNode])
-async def get_all_projects(
-    project_service: ProjectService = Depends(get_project_service),
-) -> list[AnyTreeNode]:
-    projects = await project_service.get_all()
-    return projects
-
-
-@router.delete("/{project_id}", response_model=bool)
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
     project_id: str,
     project_service: ProjectService = Depends(get_project_service),
-) -> bool:
+):
     project = await project_service.get(project_id=project_id)
     if project:
         result = await project_service.delete(project)
         if result is False:
-            return False
-
-        return True
+             raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete project {project_id}"
+            )
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

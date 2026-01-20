@@ -1,22 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, status
-from arangoasync.database import AsyncDatabase
 from typing import Dict, Any
 from pydantic import BaseModel
 import os
 
 from app.core.sandbox.code_run import CodeResponse, CodeRunner
 from app.db.client import get_db
-from app.core.services.project_service import ProjectService
+from arangoasync.database import AsyncDatabase
 from app.api.dependencies import (
     get_project_service,
-    get_file_service,
-    get_class_service,
-    get_function_service,
-    get_call_service,
+    get_container_service,
 )
 from app.core.watcher.service import WatcherService, get_watcher_service
-from app.core.repository import Repositories
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.services.project_service import ProjectService
+from app.core.services.container_service import ContainerService
 
 
 router = APIRouter()
@@ -30,53 +27,36 @@ class RunCode(BaseModel):
     filename: str | None = None
 
 
-def _get_services(db: AsyncDatabase):
-    project_service = get_project_service(db)
-    file_service = get_file_service(db)
-    class_service = get_class_service(db)
-    function_service = get_function_service(db)
-    call_service = get_call_service(db)
-    return (
-        project_service,
-        file_service,
-        class_service,
-        function_service,
-        call_service,
-    )
-
-
 @router.post("/{element_id}/write-code")
 async def write_code(
     element_id: str,
     code_block: str = Body(..., embed=True, alias="code"),
-    db: AsyncDatabase = Depends(get_db),
+    container_service: ContainerService = Depends(get_container_service),
+    project_service: ProjectService = Depends(get_project_service),
     watcher_service: WatcherService = Depends(get_watcher_service),
+    db: AsyncDatabase = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     Writes a block of code to the location of a given code element.
     """
-    project_service, file_service, _, _, _ = _get_services(db)
+    node_id = f"nodes/{element_id}"
 
     # Get project node and stop watcher before writing
     project_node = None
     try:
-        node_repo = Repositories(db).nodes
-        raw_node = await node_repo.get_raw_by_key(element_id)
-        if raw_node:
-            current_id = raw_node.get("_id")
-            # Walk up to find the project ancestor
-            parent = await node_repo.get_parent_project(current_id)
-            if parent:
-                project_node = await project_service.get(parent.id)
-                if project_node:
-                    # Stop watcher (not pause) to prevent event bubbling
-                    watcher_service.stop_watching(project_node.id)
+        _, project_doc = await container_service._resolve_file_and_project(node_id)
+        if project_doc:
+            project_id = project_doc.get("_id")
+            project_node = await project_service.get(project_id)
+            if project_node:
+                # Stop watcher (not pause) to prevent event bubbling
+                watcher_service.stop_watching(project_node.id)
     except Exception:
         # Non-fatal: failure to stop watcher should not block write
         pass
 
     # Write the code
-    result = await file_service.write_code_by_id(element_id, code_block)
+    result = await container_service.write_code(node_id, code_block)
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result.get("error"))
 
@@ -102,50 +82,21 @@ async def write_code(
     return result
 
 
-@router.get("/{element_id}/code")
+@router.get("/{element_id}/read-code")
 async def get_code(
     element_id: str,
-    db: AsyncDatabase = Depends(get_db),
+    container_service: ContainerService = Depends(get_container_service),
 ) -> Dict[str, Any]:
     """
-    Retrieves the code for a given element by first determining its type.
+    Retrieves the code for a given element.
     Accepts document key (not full _id).
     """
-    node_repo = Repositories(db).nodes
-    raw_node = await node_repo.get_raw_by_key(element_id)
-
-    if not raw_node:
-        raise HTTPException(status_code=404, detail="Element not found")
-
-    node_type = raw_node.get("node_type")
-    node_id = raw_node.get("_id")  # full id like nodes/123
-
-    if not node_type or not node_id:
-        raise HTTPException(status_code=500, detail="Node data is corrupted")
-
-    (
-        _,
-        file_service,
-        class_service,
-        function_service,
-        call_service,
-    ) = _get_services(db)
-
-    if node_type == "file":
-        code_details = await file_service.get_code(node_id)
-    elif node_type == "function":
-        code_details = await function_service.get_code(node_id)
-    elif node_type == "class":
-        code_details = await class_service.get_code(node_id)
-    elif node_type == "call":
-        code_details = await call_service.get_code(node_id)
-    else:
-        raise HTTPException(
-            status_code=400, detail=f"Unsupported node type: {node_type}")
+    node_id = f"nodes/{element_id}"
+    code_details = await container_service.get_code(node_id)
 
     if code_details is None:
         raise HTTPException(
-            status_code=404, detail="Code not found for element")
+            status_code=404, detail="Element or code not found")
 
     return code_details
 

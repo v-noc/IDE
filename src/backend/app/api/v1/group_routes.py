@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 from typing import List
 from fastapi import Depends
@@ -36,12 +36,12 @@ async def create_group(
     )
 
 
-@router.delete("/{group_id}/delete-group")
+@router.delete("/{group_id}/delete-group", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_group(
     group_id: str,
     group_service: GroupService = Depends(get_group_service),
 ):
-    return await group_service.delete(group_id, remove_children=True)
+    await group_service.delete(group_id, remove_children=True)
 
 
 @router.post("/{group_id}/add-child")
@@ -53,10 +53,10 @@ async def add_child(
     return await group_service.add_child_to_group(group_id, add_child.child_id)
 
 
-@router.delete("/{group_id}/remove-child")
+@router.delete("/{group_id}/remove-child", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_child(
     group_id: str,
     remove_child: RemoveChildRequest,
     group_service: GroupService = Depends(get_group_service),
 ):
-    return await group_service.remove_child_from_group(group_id, remove_child.child_id)
+    await group_service.remove_child_from_group(group_id, remove_child.child_id)

@@ -12,11 +12,7 @@ from typing import List
 router = APIRouter()
 
 
-def get_document_service(
-    db: AsyncDatabase = Depends(get_db),
-) -> DocumentService:
-    repos = Repositories(db)
-    return DocumentService(repos)
+from app.api.dependencies import get_document_service
 
 
 class CreateDocumentRequest(BaseModel):

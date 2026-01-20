@@ -9,7 +9,7 @@ from app.api.dependencies import (
 )
 from app.core.services.function_service import FunctionService
 from app.core.services.container_service import ContainerService
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from app.core.model.properties import CodePosition
 
 router = APIRouter()
@@ -86,7 +86,7 @@ async def add_call(
     return call
 
 
-@router.delete("/{call_key}/remove-call")
+@router.delete("/{call_key}/remove-call", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_call(
     call_key: str,
     call_service: CallService = Depends(get_call_service),
@@ -95,4 +95,3 @@ async def remove_call(
     if not call:
         raise HTTPException(status_code=404, detail="Call not found")
     await call_service.delete(call_key)
-    return {"message": "Call removed successfully"}

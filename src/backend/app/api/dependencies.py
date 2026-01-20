@@ -10,6 +10,7 @@ from app.core.services.function_service import FunctionService
 from app.core.services.call_service import CallService
 from app.core.services.log_service import LogService
 from app.core.services.group_service import GroupService
+from app.core.services.document_service import DocumentService
 
 
 def get_group_service(
@@ -66,3 +67,10 @@ def get_log_service(
 ) -> LogService:
     repos = Repositories(db)
     return LogService(repos)
+
+
+def get_document_service(
+    db: AsyncDatabase = Depends(get_db),
+) -> DocumentService:
+    repos = Repositories(db)
+    return DocumentService(repos)

@@ -1,13 +1,13 @@
 from fastapi import APIRouter
 from . import health
-from .core.projects import crud as project_crud
-from .core import container
-from .core import code_element
-from .core import logger as logger_api
-from .core import documents as documents_api
-from .core import calls as calls_api
-from .core import group as group_api
-# from .core import base as core_base
+from .v1 import project_routes
+from .v1 import container_routes
+from .v1 import code_routes
+from .v1 import logger_routes
+from .v1 import document_routes
+from .v1 import call_routes
+from .v1 import group_routes
+
 router = APIRouter()
 
 
@@ -19,21 +19,21 @@ def get_root():
 router.include_router(health.router, prefix="/health", tags=["health"])
 
 
-router.include_router(project_crud.router,
+router.include_router(project_routes.router,
                       prefix="/projects", tags=["projects"])
 
 router.include_router(
-    container.router, prefix="/containers", tags=["containers"])
+    container_routes.router, prefix="/containers", tags=["containers"])
 
 router.include_router(
-    code_element.router, prefix="/code-elements", tags=["code-elements"]
+    code_routes.router, prefix="/code-elements", tags=["code-elements"]
 )
 
-router.include_router(logger_api.router, prefix="/logs", tags=["logs"])
+router.include_router(logger_routes.router, prefix="/logs", tags=["logs"])
 
-router.include_router(documents_api.router,
+router.include_router(document_routes.router,
                       prefix="/documents", tags=["documents"])
 
-router.include_router(calls_api.router, prefix="/calls", tags=["calls"])
+router.include_router(call_routes.router, prefix="/calls", tags=["calls"])
 
-router.include_router(group_api.router, prefix="/groups", tags=["groups"])
+router.include_router(group_routes.router, prefix="/groups", tags=["groups"])
