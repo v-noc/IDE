@@ -11,7 +11,7 @@ export interface CodeData {
 }
 
 export const codeApi = {
-  getCode: (elementId: string): Promise<CodeData> => api(`${API_ROUTES.CODE_ELEMENTS}${elementId}/code`),
+  getCode: (elementId: string): Promise<CodeData> => api(`${API_ROUTES.CODE_ELEMENTS}${elementId}/read-code`),
   writeCode: (elementId: string, code: string): Promise<void> => api(`${API_ROUTES.CODE_ELEMENTS}${elementId}/write-code`, {
     method: 'POST',
     body: { code },
