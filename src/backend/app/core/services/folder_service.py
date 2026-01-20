@@ -26,10 +26,10 @@ class FolderService(ContainerService):
         return await self.delete_recursive(folder_key)
 
     async def add_folder(self, parent_folder_id: str, folder_id: str):
-        return await self.add_child_to_container(parent_folder_id, folder_id)
+        return await self.add_child(parent_folder_id, folder_id)
 
     async def add_file(self, parent_folder_id: str, file_id: str):
-        return await self.add_child_to_container(parent_folder_id, file_id)
+        return await self.add_child(parent_folder_id, file_id)
 
 
     async def get_children(self, folder_id: str):

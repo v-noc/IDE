@@ -32,13 +32,13 @@ class FileService(ContainerService):
         return await self.delete_recursive(file_key)
 
     async def add_function(self, file_id: str, function_id: str):
-        return await self.add_child_to_container(file_id, function_id)
+        return await self.add_child(file_id, function_id)
 
     async def add_call(self, file_id: str, call_id: str):
-        return await self.add_child_to_container(file_id, call_id)
+        return await self.add_child(file_id, call_id)
 
     async def add_class(self, file_id: str, class_id: str):
-        return await self.add_child_to_container(file_id, class_id)
+        return await self.add_child(file_id, class_id)
 
     async def get_children(self, file_id: str):
         return await self.repos.file_repo.get_containment_tree(file_id)

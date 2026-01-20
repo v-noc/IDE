@@ -24,7 +24,7 @@ class GroupService(ContainerService):
 
         await self._remove_child_from_group(group.id, child.id)
 
-        await self.add_child_to_container(
+        await self.add_child(
             parent.get("vertex").get("_id"),
             child.id,
             f"{parent.get('vertex').get('node_type').lower()}_to_{child.node_type}",
@@ -68,7 +68,7 @@ class GroupService(ContainerService):
 
         await self._remove_child_from_group(
             parent.get("vertex").get("_id"), child.id)
-        return await self.add_child_to_container(group.id, child.id)
+        return await self.add_child(group.id, child.id)
 
     async def delete(self, group_id: str, remove_children: bool = False):
         group = await self.repos.group_repo.get_by_id(group_id)
@@ -83,7 +83,7 @@ class GroupService(ContainerService):
                 group.id, child.get("vertex").get("_id"))
             parent = await self.repos.nodes.get_parent(group.id)
             if parent:
-                await self.add_child_to_container(
+                await self.add_child(
                     parent.get("vertex").get("_id"),
                     child.get("vertex").get("_id"),
                     f"{parent.get('vertex').get('node_type').lower()}_to_{child.get('vertex').get('node_type')}",
@@ -141,11 +141,11 @@ class GroupService(ContainerService):
             # Removes the child from the previous parent
             await self._remove_child_from_group(parent.id, child.id)
             # Adds the child to the new group
-            await self.add_child_to_container(
+            await self.add_child(
                 created_group.id, child.id, f"group_to_{child.node_type.lower()}"
             )
 
-        await self.add_child_to_container(
+        await self.add_child(
             parent.id, created_group.id, f"{parent.node_type.lower()}_to_group"
         )
 

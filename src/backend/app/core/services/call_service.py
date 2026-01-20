@@ -57,7 +57,7 @@ class CallService(ContainerService):
         return await self.repos.call_repo.delete(call_key)
 
     async def add_call(self, parent_call_id: str, call_id: str):
-        return await self.add_child_to_container(
+        return await self.add_child(
             parent_call_id,
             call_id,
             "call_to_call",

@@ -1,7 +1,7 @@
 from arangoasync.database import AsyncDatabase
 
 from app.core.model import AllNodes, edges
-from app.core.repository.base.base_node_repo import NodeRepository
+from app.core.repository.base.base_node_repo import BaseNodeRepository
 from app.core.repository.base.edge_repo import EdgeRepository
 
 from .project_repo import ProjectRepo
@@ -21,7 +21,7 @@ class Repositories:
     def __init__(self, db: AsyncDatabase):
         # Generic Node Repo for mixed-type queries
         self.db = db
-        self.nodes = NodeRepository(db, "nodes", AllNodes)
+        self.nodes = BaseNodeRepository(db, "nodes", AllNodes)
 
         # Specific Node Repos for type-specific operations
         self.project_repo = ProjectRepo(db)

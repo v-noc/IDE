@@ -12,7 +12,7 @@ from .base_collection import BaseRepository
 T = TypeVar("T", bound=BaseModel)
 
 
-class NodeRepository(BaseRepository[T]):
+class BaseNodeRepository(BaseRepository[T]):
     """Repository for node collections."""
 
     async def _delete_edges_for_node(self, ec_name: str, node_id: str) -> int:

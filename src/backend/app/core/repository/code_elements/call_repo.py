@@ -5,12 +5,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from arangoasync.database import AsyncDatabase
 
 from app.core.model.nodes import CallNode, ClassNode, FunctionNode
-from ..base.base_node_repo import NodeRepository
+from ..base.base_node_repo import BaseNodeRepository
 
 logger = logging.getLogger(__name__)
 
 
-class CallRepo(NodeRepository[CallNode]):
+class CallRepo(BaseNodeRepository[CallNode]):
     def __init__(self, db: AsyncDatabase):
         super().__init__(db, "nodes", CallNode)
 

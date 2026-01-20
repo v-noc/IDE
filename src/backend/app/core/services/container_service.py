@@ -20,7 +20,7 @@ class ContainerService:
     async def get_by_qname(self, qname: str):
         return await self.repos.class_repo.find_by_qname(qname)
 
-    async def add_child_to_container(
+    async def add_child(
         self,
         container_id: str,
         child_id: str,
@@ -461,7 +461,7 @@ class ContainerService:
                     parent_container_id = attach_under_id
 
                 # Edge: parent -> group (contain type auto-detected)
-                await self.add_child_to_container(
+                await self.add_child(
                     parent_container_id,
                     created_group.id,
                     None,
@@ -506,7 +506,7 @@ class ContainerService:
                     parent_container_id = attach_under_id
 
                 # Edge: parent -> call
-                await self.add_child_to_container(
+                await self.add_child(
                     parent_container_id,
                     created.id,
                     None,

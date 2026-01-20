@@ -38,13 +38,13 @@ class ClassService(ContainerService):
         return await self.delete_recursive(class_key)
 
     async def add_function(self, parent_class_id: str, function_id: str):
-        return await self.add_child_to_container(parent_class_id, function_id)
+        return await self.add_child(parent_class_id, function_id)
 
     async def add_call(self, parent_class_id: str, call_id: str):
-        return await self.add_child_to_container(parent_class_id, call_id)
+        return await self.add_child(parent_class_id, call_id)
 
     async def add_class(self, parent_class_id: str, class_id: str):
-        return await self.add_child_to_container(parent_class_id, class_id)
+        return await self.add_child(parent_class_id, class_id)
 
     async def get_children(self, class_id: str):
         return await self.repos.class_repo.get_containment_tree(class_id)

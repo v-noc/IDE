@@ -1,10 +1,10 @@
-from .base.node_repo import NodeRepository
+from .base.base_node_repo import BaseNodeRepository
 from app.core.model.documents import DocumentNode
 from arangoasync.database import AsyncDatabase
 from typing import List
 
 
-class DocumentRepo(NodeRepository[DocumentNode]):
+class DocumentRepo(BaseNodeRepository[DocumentNode]):
     def __init__(self, db: AsyncDatabase):
         super().__init__(db, "documents", DocumentNode)
 

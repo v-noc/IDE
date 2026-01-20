@@ -27,10 +27,10 @@ class ProjectService(ContainerService):
         return await self.repos.project_repo.create(project)
 
     async def add_folder(self, project_id: str, folder_id: str):
-        return await self.add_child_to_container(project_id, folder_id)
+        return await self.add_child(project_id, folder_id)
 
     async def add_file(self, project_id: str, file_id: str):
-        return await self.add_child_to_container(project_id, file_id)
+        return await self.add_child(project_id, file_id)
 
     async def get(self, project_id: str):
         return await self.repos.project_repo.get_by_id(project_id)

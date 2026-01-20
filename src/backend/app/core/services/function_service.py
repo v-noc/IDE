@@ -37,13 +37,13 @@ class FunctionService(ContainerService):
         return await self.delete_recursive(function_key)
 
     async def add_function(self, parent_function_id: str, function_id: str):
-        return await self.add_child_to_container(parent_function_id, function_id)
+        return await self.add_child(parent_function_id, function_id)
 
     async def add_call(self, parent_function_id: str, call_id: str):
-        return await self.add_child_to_container(parent_function_id, call_id)
+        return await self.add_child(parent_function_id, call_id)
 
     async def add_class(self, parent_function_id: str, class_id: str):
-        return await self.add_child_to_container(parent_function_id, class_id)
+        return await self.add_child(parent_function_id, class_id)
 
 
     async def get_children(self, function_id: str):

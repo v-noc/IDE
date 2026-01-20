@@ -3,11 +3,11 @@
 import asyncio
 
 from app.core.model.nodes import ProjectNode
-from .base.base_node_repo import NodeRepository
+from .base.base_node_repo import BaseNodeRepository
 from arangoasync.database import AsyncDatabase
 
 
-class ProjectRepo(NodeRepository[ProjectNode]):
+class ProjectRepo(BaseNodeRepository[ProjectNode]):
     """Repository for project collections."""
 
     def __init__(self, db: AsyncDatabase):

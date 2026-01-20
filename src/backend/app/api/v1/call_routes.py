@@ -70,7 +70,7 @@ async def add_call(
         current_version=parent_version,
     )
 
-    await container_service.add_child_to_container(
+    await container_service.add_child(
         parent_node.id,
         call.id,
         f"{parent_node.node_type}_to_call",
