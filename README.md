@@ -1,6 +1,6 @@
 # V-NOC: Graph Based IDE
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: FSL-1.1-Apache-2.0](https://img.shields.io/badge/License-FSL--1.1--Apache--2.0-blue.svg)](https://fsl.software/)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-purple.svg)](https://discord.gg/J5nfPHqyBr)
 
 **Software development is a computational problem that we have mistakenly turned into a memory problem.**
@@ -157,10 +157,13 @@ make dev          # Start both Backend and Frontend
 
 ## 🤝 Community & License
 
-V-NOC is built for the community. We are moving away from the "chaos of disorganization" toward automated development.
+V-NOC is source-available under the Functional Source License (FSL-1.1-Apache-2.0).
+
+- Free for development, testing, non-production, and personal use.
+- Commercial or production hosting requires a separate license — contact me for details.
+- Automatically becomes Apache 2.0 after 2 years.
 
 - **Join the Discord:** [discord.gg/J5nfPHqyBr](https://discord.gg/J5nfPHqyBr)
-- **License:** [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0)
 
 > [!NOTE]
 > Commercial/proprietary use requires a separate license. Contact the maintainers for details.
