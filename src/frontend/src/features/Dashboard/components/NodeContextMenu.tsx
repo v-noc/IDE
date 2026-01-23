@@ -5,28 +5,30 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Separator } from "@/components/ui/separator";
-import type { AnyNodeTree } from "@/types/project";
 import { Crosshair, Expand, Group, Link, Trash, FileCode } from "lucide-react";
 
 interface NodeContextMenuProps {
   children: React.ReactNode;
-  node: AnyNodeTree;
+  nodeId: string;
+  nodeType: string;
+  manuallyCreated?: boolean;
   onAction: (action: string) => void;
 }
 
 export const NodeContextMenu = ({
   children,
-  node,
+  nodeId,
+  nodeType,
+  manuallyCreated,
   onAction,
 }: NodeContextMenuProps) => {
-  const nodeType = node.node_type;
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div>{children}</div>
       </ContextMenuTrigger>
-      <ContextMenuContent>
+      <ContextMenuContent data-node-id={nodeId}>
         <ContextMenuItem onClick={() => onAction("focus")}>
           <Crosshair className="mr-2 h-4 w-4" />
           Focus
@@ -46,7 +48,7 @@ export const NodeContextMenu = ({
             Add Call
           </ContextMenuItem>
         )}
-        {nodeType === "call" && (node as any)?.manually_created && (
+        {nodeType === "call" && manuallyCreated && (
           <ContextMenuItem onClick={() => onAction("remove-call")}>
             <Trash className="mr-2 h-4 w-4" />
             Remove Call

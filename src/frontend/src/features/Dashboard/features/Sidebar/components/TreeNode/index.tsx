@@ -1,9 +1,7 @@
 import { type ContainerNodeTree } from "@/types/project";
 import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu";
 import { NodeContent } from "./NodeContent";
-import type { AnyNodeTree, CallNodeTree } from "@/types/project";
 import { useTreeNodeState } from "../../hooks/useTreeNodeState";
-import { useTreeNodeActions } from "../../hooks/useTreeNodeAction";
 import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
 
 interface TreeNodeProps {
@@ -30,12 +28,10 @@ export const TreeNode = ({
   const {
     handleToggle,
     handleSelectNode,
-    handleFocus,
-    handleExpand,
-    handleContextAction,
-  } = useNodeHandlers(node, tabId);
+    onAction
+  } = useNodeHandlers(node._key, tabId);
 
-  const { handleRemoveCall, handleDeleteGroup } = useTreeNodeActions(node);
+
 
   if (!node) return null;
 
@@ -43,30 +39,15 @@ export const TreeNode = ({
     ? () => onSelect(node)
     : handleSelectNode;
 
-  const onAction = (action: string) => {
-    if (action === "remove-call") {
-      handleRemoveCall(node as unknown as CallNodeTree);
-      return;
-    }
-    if (action === "delete-group") {
-      handleDeleteGroup();
-      return;
-    }
-    if (action === "focus") {
-      handleFocus();
-      return;
-    }
-    if (action === "expand") {
-      handleExpand();
-      return;
-    }
-    // All other actions (add-call, create-group, manage-group, prompt-builder)
-    // are handled by the handlers hook which opens the global modal store
-    handleContextAction(action);
-  };
+
 
   return (
-    <NodeContextMenu node={node as AnyNodeTree} onAction={onAction}>
+    <NodeContextMenu
+      nodeId={node._key}
+      nodeType={node.node_type}
+      manuallyCreated={(node as any).manually_created}
+      onAction={onAction}
+    >
       <NodeContent
         node={node}
         tabId={tabId}

@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { SidebarHeader } from "./SidebarHeader";
-import { SidebarDialogs } from "@/features/Dashboard/components/SidebarDialogs";
+
 import { TabContextStack } from "./TabContextStack";
 
 import { useSidebarData } from "../hooks/useSidebarData";
@@ -41,8 +41,7 @@ export const SideBar = memo(function SideBar() {
         />
       </div>
 
-      {/* 3. Global Modals/Dialogs */}
-      <SidebarDialogs />
+  
     </div>
   );
 });

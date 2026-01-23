@@ -5,6 +5,9 @@ import { NodeDescription } from "./NodeDescription";
 import { NodeCodeView } from "./NodeCodeView";
 import { NodeFooter } from "./NodeFooter";
 import { useNodeCode } from "./useNodeCode";
+import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu";
+import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 
 export interface NodeMetadata {
   createdAt?: string;
@@ -34,6 +37,7 @@ export interface EnhancedNodeData {
   target?: { _key: string };
   focused?: boolean;
   selected?: boolean;
+  manuallyCreated?: boolean;
   [key: string]: unknown;
 }
 
@@ -44,6 +48,7 @@ const EnhancedNode = memo(
       targetKey: data.target?._key,
       nodeType: data.nodeType,
     });
+    const activeTabId = useTabStore((s) => s.activeTabId);
 
     const statusStyles = useMemo(() => {
       const status = data.metadata?.status;
@@ -59,6 +64,10 @@ const EnhancedNode = memo(
       };
     }, [data.metadata?.status]);
 
+    const {
+      onAction
+    } = useNodeHandlers(data.nodeId ?? "", activeTabId);
+
     const handleCodeToggle = () => {
       nodeCode.toggleCode();
       data.onCodeToggle?.();
@@ -67,10 +76,10 @@ const EnhancedNode = memo(
     return (
       <div
         className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${data.focused
-            ? "ring-4 ring-blue-400 ring-offset-2 scale-[1.02]"
-            : data.selected
-              ? "ring-4 ring-amber-400 ring-offset-1"
-              : ""
+          ? "ring-4 ring-blue-400 ring-offset-2 scale-[1.02]"
+          : data.selected
+            ? "ring-4 ring-amber-400 ring-offset-1"
+            : ""
           }`}
         style={{
           backgroundColor: data.bgColor,
@@ -83,20 +92,27 @@ const EnhancedNode = memo(
           ...statusStyles,
         }}
       >
-        <NodeHeader
-          name={data.name}
-          icon={data.mainIcon}
-          iconColor={data.iconColor}
-          borderColor={data.borderColor}
-          bgColor={data.bgColor}
-          expandable={data.expandable}
-          expanded={data.expanded}
-          onToggle={data.onToggle}
-          hasCode={Boolean(nodeCode.hasCode)}
-          showCode={nodeCode.showCode}
-          onCodeToggle={handleCodeToggle}
-          status={data.metadata?.status}
-        />
+        <NodeContextMenu
+          nodeId={data.nodeId ?? ""}
+          nodeType={data.nodeType ?? ""}
+          manuallyCreated={data.manuallyCreated}
+          onAction={onAction}
+        >
+          <NodeHeader
+            name={data.name}
+            icon={data.mainIcon}
+            iconColor={data.iconColor}
+            borderColor={data.borderColor}
+            bgColor={data.bgColor}
+            expandable={data.expandable}
+            expanded={data.expanded}
+            onToggle={data.onToggle}
+            hasCode={Boolean(nodeCode.hasCode)}
+            showCode={nodeCode.showCode}
+            onCodeToggle={handleCodeToggle}
+            status={data.metadata?.status}
+          />
+        </NodeContextMenu>
 
         {nodeCode.showCode && nodeCode.hasCode ? (
           <NodeCodeView

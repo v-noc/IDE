@@ -2,60 +2,79 @@ import { useCallback } from 'react';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
 import useTabStore from '@/features/Dashboard/store/useTabStore';
 import { useSidebarModalStore } from '@/features/Dashboard/store/useSidebarModalStore';
-import type { AnyNodeTree, ContainerNodeTree } from '@/types/project';
+import type { AnyNodeTree, CallNodeTree, ContainerNodeTree } from '@/types/project';
 import { useShallow } from 'zustand/react/shallow';
+import { useTreeNodeActions } from './useNodeAction';
+import { findNodeByKey } from '@/features/Dashboard/utils/findNode';
+import type { ProjectStore } from '@/features/Dashboard/store/useProjectStore';
 
 /**
  * Event handlers for tree node interactions.
  * All mutations dispatch to modal store or API.
  */
-export function useNodeHandlers(node: ContainerNodeTree, tabId: string) {
+export function useNodeHandlers(nodeId: string, tabId: string) {
   // Store actions
-  const handleNodeSelection = useTabStore((s) => s.handleNodeSelection);
-  const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
-  const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[tabId]);
-  const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
-  const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
-  const pushFocus = useProjectStore((s) => s.pushFocus);
-  const focusStack = useProjectStore(useShallow((s) => s.focusStack[tabId] ?? []));
+  const handleNodeSelection = useTabStore((s: any) => s.handleNodeSelection);
+  const setSecondarySelectedNode = useProjectStore((s: any) => s.setSecondarySelectedNode);
+  const secondarySelectedNode = useProjectStore((s: any) => s.secondarySelectedNode[tabId]);
+  const selectedNode = useProjectStore((s: any) => s.selectedNode[tabId]);
+  const toggleNodeExpansion = useProjectStore((s: any) => s.toggleNodeExpansion);
+  const pushFocus = useProjectStore((s: any) => s.pushFocus);
+  const focusStack = useProjectStore(useShallow((s: ProjectStore) => s.focusStack[tabId] ?? []));
+
+  // Helper to get fresh node from store for actions that need full object
+  const getNode = useCallback(() => {
+    const projectData = useProjectStore.getState().projectData;
+    if (!projectData) return null;
+    return findNodeByKey(projectData, nodeId);
+  }, [nodeId]);
+
+  const node = getNode();
+  const { handleRemoveCall, handleDeleteGroup } = useTreeNodeActions(node as ContainerNodeTree);
 
   // Modal store
-  const openModal = useSidebarModalStore((s) => s.openModal);
+  const openModal = useSidebarModalStore((s: any) => s.openModal);
 
   // Toggle expansion
   const handleToggle = useCallback((e: React.MouseEvent) => {
-    if (!node) return;
+    if (!nodeId) return;
     e.stopPropagation();
-    toggleNodeExpansion(tabId, node._key);
-  }, [node, tabId, toggleNodeExpansion]);
+    toggleNodeExpansion(tabId, nodeId);
+  }, [nodeId, tabId, toggleNodeExpansion]);
 
   // Select node
   const handleSelectNode = useCallback(() => {
-    if (!node) return;
+    if (!nodeId) return;
     if (secondarySelectedNode) {
       setSecondarySelectedNode(tabId, null);
     }
-    if (selectedNode?._key === node._key) return;
-    handleNodeSelection(tabId, node as AnyNodeTree, "primary");
+    if (selectedNode?._key === nodeId) return;
 
-  }, [node, tabId, selectedNode, secondarySelectedNode, handleNodeSelection, setSecondarySelectedNode]);
+    const node = getNode();
+    if (!node) return;
+    handleNodeSelection(tabId, node as AnyNodeTree, "primary");
+  }, [nodeId, tabId, selectedNode, secondarySelectedNode, handleNodeSelection, setSecondarySelectedNode, getNode]);
 
   // Focus (zoom into node)
   const handleFocus = useCallback(() => {
-    if (!node) return;
+    if (!nodeId) return;
     const lastFocused = focusStack[focusStack.length - 1];
-    if (lastFocused?._key === node._key) return;
+    if (lastFocused?._key === nodeId) return;
+
+    const node = getNode();
+    if (!node) return;
     pushFocus(tabId, node as AnyNodeTree);
-  }, [node, tabId, focusStack, pushFocus]);
+  }, [nodeId, tabId, focusStack, pushFocus, getNode]);
 
   // Expand/collapse
   const handleExpand = useCallback(() => {
-    if (!node) return;
-    toggleNodeExpansion(tabId, node._key);
-  }, [node, tabId, toggleNodeExpansion]);
+    if (!nodeId) return;
+    toggleNodeExpansion(tabId, nodeId);
+  }, [nodeId, tabId, toggleNodeExpansion]);
 
   // Context menu actions - dispatch to modal store
   const handleContextAction = useCallback((action: string) => {
+    const node = getNode();
     if (!node) return;
     switch (action) {
       case 'create-group':
@@ -69,13 +88,39 @@ export function useNodeHandlers(node: ContainerNodeTree, tabId: string) {
         navigator.clipboard.writeText((node as any).path ?? node.name);
         break;
     }
-  }, [node, openModal]);
+  }, [getNode, openModal]);
+
+
+  const onAction = (action: string) => {
+    if (action === "remove-call") {
+      handleRemoveCall(node as unknown as CallNodeTree);
+      return;
+    }
+    if (action === "delete-group") {
+      handleDeleteGroup();
+      return;
+    }
+    if (action === "focus") {
+      handleFocus();
+      return;
+    }
+    if (action === "expand") {
+      handleExpand();
+      return;
+    }
+    // All other actions (add-call, create-group, manage-group, prompt-builder)
+    // are handled by the handlers hook which opens the global modal store
+    handleContextAction(action);
+  };
 
   return {
-    handleToggle,
-    handleSelectNode,
-    handleFocus,
-    handleExpand,
     handleContextAction,
+    handleDeleteGroup,
+    handleRemoveCall,
+    handleSelectNode,
+    handleToggle,
+    handleExpand,
+    handleFocus,
+    onAction,
   };
 }

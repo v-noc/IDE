@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import Layout from "@/features/Dashboard/components/Layout";
 import SideBar from "@/features/Dashboard/features/Sidebar/components/SideBar";
-import Navbar from "@/features/Dashboard/features/Navbar/componets/Navbar";
+import Navbar from "@/features/Dashboard/features/Navbar/components/Navbar";
 import Workspace from "@/features/Dashboard/features/Main";
 import { ResizablePanelGroup } from "@/components/ui/resizable";
 import { RightSidebar } from "@/features/Dashboard/features/Main/components/RightSidebar";
@@ -15,6 +15,7 @@ import { selectTabStack } from "@/features/Dashboard/store/selectors/tabSelector
 import { cn } from "@/lib/utils";
 
 import { useShallow } from "zustand/react/shallow";
+import { SidebarDialogs } from "@/features/Dashboard/components/SidebarDialogs";
 
 /**
  * Dashboard Page - Entry point for the IDE dashboard.
@@ -64,6 +65,7 @@ const Dashboard = () => {
         navbar={<Navbar />}
         leftSidebar={<SideBar />}
       />
+           <SidebarDialogs />
     </ResizablePanelGroup>
   );
 };
