@@ -30,9 +30,6 @@ class EdgeRepository(BaseRepository[T]):
             results.append(self._validate(doc))
         return results
 
-    async def find_one(self, filters: Dict[str, Any]) -> Optional[T]:
-        result = await self.find_one(filters, limit=1)
-        return result or None
 
     async def create_edges_batch(
         self,
