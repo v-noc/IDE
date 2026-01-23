@@ -9,7 +9,7 @@ import { useShallow } from 'zustand/react/shallow';
  * Event handlers for tree node interactions.
  * All mutations dispatch to modal store or API.
  */
-export function useTreeNodeHandlers(node: ContainerNodeTree, tabId: string) {
+export function useNodeHandlers(node: ContainerNodeTree, tabId: string) {
   // Store actions
   const handleNodeSelection = useTabStore((s) => s.handleNodeSelection);
   const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);

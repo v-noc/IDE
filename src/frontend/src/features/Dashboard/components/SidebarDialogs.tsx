@@ -1,11 +1,11 @@
 import { useSidebarModalStore } from "@/features/Dashboard/store/useSidebarModalStore";
-import CreateGroupsDialog from "../../../components/CreateGroupsDialog";
+import CreateGroupsDialog from "./CreateGroupsDialog";
 import SelectNodeDialog from "./SelectNodeDialog";
 import PromptBuilder from "@/components/PromptBuilder/PromptBuilder";
 import ManageGroupsDialog from "@/features/Dashboard/components/ManageGroupsDialog";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { getParentNode, getSiblings } from "@/features/Dashboard/utils/treeUtils";
-import { useTreeNodeActions } from "../hooks/useTreeNodeAction";
+import { useTreeNodeActions } from "../hooks/useNodeAction";
 import type { AnyNodeTree, ContainerNodeTree, GroupNodeTree } from "@/types/project";
 import { useMemo } from "react";
 

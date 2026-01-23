@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { SidebarHeader } from "./SidebarHeader";
-import { SidebarDialogs } from "./SidebarDialogs";
+import { SidebarDialogs } from "@/features/Dashboard/components/SidebarDialogs";
 import { TabContextStack } from "./TabContextStack";
 
 import { useSidebarData } from "../hooks/useSidebarData";

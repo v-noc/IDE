@@ -1,10 +1,10 @@
 import { type ContainerNodeTree } from "@/types/project";
-import { NodeContextMenu } from "./NodeContextMenu";
+import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu";
 import { NodeContent } from "./NodeContent";
 import type { AnyNodeTree, CallNodeTree } from "@/types/project";
 import { useTreeNodeState } from "../../hooks/useTreeNodeState";
-import { useTreeNodeHandlers } from "../../hooks/useTreeNodeHandlers";
 import { useTreeNodeActions } from "../../hooks/useTreeNodeAction";
+import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
 
 interface TreeNodeProps {
   node: ContainerNodeTree;
@@ -33,7 +33,7 @@ export const TreeNode = ({
     handleFocus,
     handleExpand,
     handleContextAction,
-  } = useTreeNodeHandlers(node, tabId);
+  } = useNodeHandlers(node, tabId);
 
   const { handleRemoveCall, handleDeleteGroup } = useTreeNodeActions(node);
 
