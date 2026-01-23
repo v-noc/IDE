@@ -1,8 +1,7 @@
 import { useSidebarModalStore } from "@/features/Dashboard/store/useSidebarModalStore";
-import CreateGroupsDialog from "./CreateGroupsDialog";
+import GroupDialog from "./GroupDialog";
 import SelectNodeDialog from "./SelectNodeDialog";
 import PromptBuilder from "@/components/PromptBuilder/PromptBuilder";
-import ManageGroupsDialog from "@/features/Dashboard/components/ManageGroupsDialog";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { getParentNode, getSiblings } from "@/features/Dashboard/utils/treeUtils";
 import { useTreeNodeActions } from "../hooks/useNodeAction";
@@ -39,17 +38,20 @@ export function SidebarDialogs() {
         }}
       />
 
-      <CreateGroupsDialog
+      <GroupDialog
         isOpen={activeModal === "create-group"}
         onClose={closeModal}
+        mode="create"
         initialChildren={[targetNode as AnyNodeTree]}
         project_key={projectData?._key ?? ""}
         parent_node_id={parentNode?._key ?? ""}
+        siblings={siblings}
       />
 
-      <ManageGroupsDialog
+      <GroupDialog
         isOpen={activeModal === "manage-group"}
         onClose={closeModal}
+        mode="manage"
         group={targetNode as unknown as GroupNodeTree}
         siblings={siblings}
         project_key={projectData?._key ?? ""}

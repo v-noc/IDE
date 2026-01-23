@@ -12,7 +12,7 @@ const createGroup = async (
   parent_node_id: string,
   create_group: CreateGroupRequest
 ) => {
-  return api(`${API_ROUTES.GROUPS}${parent_node_id}/create-group`, {
+  return api(`${API_ROUTES.GROUPS}${parent_node_id}`, {
     method: "POST",
     body: create_group,
   });
@@ -29,17 +29,37 @@ export const useCreateGroup = (parent_node_id: string, project_key: string) => {
   });
 };
 
+const updateGroup = async (
+  group_id: string,
+  update_data: { name?: string; description?: string }
+) => {
+  return api(`${API_ROUTES.GROUPS}${group_id}`, {
+    method: "PATCH",
+    body: update_data,
+  });
+};
+
+export const useUpdateGroup = (group_id: string, project_key: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (update_data: { name?: string; description?: string }) =>
+      updateGroup(group_id, update_data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+    },
+  });
+};
+
 const addChildToGroup = async (group_id: string, child_id: string) => {
-  return api(`${API_ROUTES.GROUPS}${group_id}/add-child`, {
+  return api(`${API_ROUTES.GROUPS}${group_id}/children`, {
     method: "POST",
     body: { child_id },
   });
 };
 
 const removeChildFromGroup = async (group_id: string, child_id: string) => {
-  return api(`${API_ROUTES.GROUPS}${group_id}/remove-child`, {
+  return api(`${API_ROUTES.GROUPS}${group_id}/children/${child_id}`, {
     method: "DELETE",
-    body: { child_id },
   });
 };
 
@@ -66,7 +86,7 @@ export const useGroupUpdate = (group_id: string, project_key: string) => {
 };
 
 const deleteGroup = async (group_id: string) => {
-  return api(`${API_ROUTES.GROUPS}${group_id}/delete-group`, {
+  return api(`${API_ROUTES.GROUPS}${group_id}`, {
     method: "DELETE",
   });
 };
