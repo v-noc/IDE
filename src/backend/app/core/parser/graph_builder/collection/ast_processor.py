@@ -38,7 +38,7 @@ class ASTProcessor:
         existing_tree = await self.repos.nodes.get_containment_tree(
             file_node.id,
             depth=50,
-            exclude_types=["call"]
+            exclude_types=["call", "group"],
         )
 
         existing_map = {}

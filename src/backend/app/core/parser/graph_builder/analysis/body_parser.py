@@ -51,8 +51,9 @@ class BodyParser:
 
         # 1. Prefetch DB nodes (Optimization)
         existing_tree = await self.repos.nodes.get_containment_tree(
-            # We ignore existing calls here
-            file_node.id, depth=50, exclude_types=["call"]
+            file_node.id,
+            depth=50,
+            exclude_types=["call", "group"]
         )
 
         node_map: Dict[str, ContainerNode] = {file_node.qname: file_node}

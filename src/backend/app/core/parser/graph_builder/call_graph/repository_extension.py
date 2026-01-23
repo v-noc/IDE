@@ -19,13 +19,28 @@ class CallGraphRepository:
         from the given parent.
         """
         query = """
-            FOR c IN 1..1 OUTBOUND @parent_id contains_edges
-                FILTER c.node_type == "call"
+            FOR v, e, p IN 1..10 OUTBOUND @parent_id contains_edges
+                OPTIONS { order: "bfs", uniqueVertices: "global" }
+                
+                // 1. Only look at CallNodes
+                FILTER v.node_type == "call"
+
+                // 2. PATH VALIDATION (The Fix)
+                // We verify that every node *between* the Parent and the Call is a "group".
+                // If there are no intermediate nodes (direct child), it passes automatically.
+                LET intermediates = SLICE(p.vertices, 1, LENGTH(p.vertices) - 2)
+                
+                FILTER LENGTH(intermediates) == 0 
+                    OR (intermediates[*].node_type ALL == "group")
+
+                // 3. Resolve the Target
                 LET target = FIRST(
-                    FOR t IN 1..1 OUTBOUND c targets_edges RETURN t
+                    FOR t IN 1..1 OUTBOUND v targets_edges 
+                    RETURN t
                 )
                 FILTER target != null
-                RETURN { target_id: target._id, call_id: c._id }
+                
+                RETURN { target_id: target._id, call_id: v._id }
         """
         cursor = await self.db.aql.execute(query, bind_vars={"parent_id": parent_id})
         result = {}
