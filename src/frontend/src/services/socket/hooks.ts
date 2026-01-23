@@ -13,6 +13,9 @@ export const useSocket = () => {
 export const useProjectRoom = (projectId: string | undefined) => {
   const { socket, isConnected } = useSocketContext();
   useEffect(() => {
+    console.log("Socket connected:", socket);
+    console.log("Is connected:", isConnected);
+    console.log("Project ID:", projectId);
     if (!socket || !isConnected || !projectId) return;
 
     socket.emit("join_project", projectId);

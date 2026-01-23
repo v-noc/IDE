@@ -20,6 +20,7 @@ from app.core.parser.graph_builder.utils import (
 )
 from app.core.parser.graph_builder.performance import tracker
 from app.core.repository import Repositories
+from app.core.socket.manager import get_socket_manager
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,8 @@ class GraphBuilderOrchestrator:
 
         # Initialize Phase Processor
         # PhaseProcessor also needs refactoring to remove ScopeManager
-        # For now, we update initialization to match what we have or remove incompatible args
+        # For now, we update initialization to match what we have or
+        # remove incompatible args
         self.phase_processor = PhaseProcessor(
             self.project_node,
             self.project_path,
@@ -123,7 +125,9 @@ class GraphBuilderOrchestrator:
         )
 
         # 2. Detect Changes
-        change_set = await self.change_detector.detect_changes(scan_result, project_id)
+        change_set = await self.change_detector.detect_changes(
+            scan_result, project_id
+        )
         logger.info(f"Detected changes: {change_set}")
 
         if (
@@ -135,6 +139,19 @@ class GraphBuilderOrchestrator:
 
         # 3. Process Changes (Phase 1 & 2)
         await self._process_changes(change_set, scan_result)
+
+        # 4. Emit project:updated socket event after successful sync
+        try:
+            socket_manager = get_socket_manager()
+            # project_id is normalized in emit_to_project
+            await socket_manager.emit_to_project(
+                project_id,
+                "project:updated",
+                {"project_id": project_id}
+            )
+        except Exception as e:
+            # Non-fatal: failure to emit socket event should not block sync
+            logger.warning(f"Failed to emit project:updated socket event: {e}")
 
         return change_set
 

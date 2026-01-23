@@ -14,6 +14,7 @@ from app.core.watcher.service import WatcherService, get_watcher_service
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.services.project_service import ProjectService
 from app.core.services.container_service import ContainerService
+from app.core.socket.manager import get_socket_manager
 
 
 router = APIRouter()
@@ -70,6 +71,18 @@ async def write_code(
             await orchestrator.resync()
         except Exception:
             # Non-fatal: failure to sync should not block write response
+            pass
+
+        # Emit code:updated socket event
+        try:
+            socket_manager = get_socket_manager()
+            await socket_manager.emit_to_project(
+                project_node.id,
+                "code:updated",
+                {"element_id": element_id}
+            )
+        except Exception:
+            # Non-fatal: failure to emit socket event should not block write
             pass
 
         # Start watcher again after sync

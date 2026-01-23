@@ -29,8 +29,7 @@ class ChangeHandler(FileSystemEventHandler):
         self.callback()
 
     def on_modified(self, event: FileModifiedEvent):
-        if event.is_directory or not event.src_path.endswith(".py"):
-            return
+
         logger.info(f"File modified: {event.src_path}")
         if self.timer:
             self.timer.cancel()
@@ -38,8 +37,7 @@ class ChangeHandler(FileSystemEventHandler):
         self.timer.start()
 
     def on_created(self, event: FileCreatedEvent):
-        if event.is_directory or not event.src_path.endswith(".py"):
-            return
+
         logger.info(f"File created: {event.src_path}")
         if self.timer:
             self.timer.cancel()
@@ -47,8 +45,7 @@ class ChangeHandler(FileSystemEventHandler):
         self.timer.start()
 
     def on_deleted(self, event: FileDeletedEvent):
-        if event.is_directory or not event.src_path.endswith(".py"):
-            return
+
         logger.info(f"File deleted: {event.src_path}")
         if self.timer:
             self.timer.cancel()
