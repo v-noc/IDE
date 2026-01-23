@@ -79,15 +79,21 @@ class GroupService(ContainerService):
             group.id, depth=1)
 
         for child in children:
-            await self._remove_child_from_group(
-                group.id, child.get("vertex").get("_id"))
-            parent = await self.repos.nodes.get_parent(group.id)
-            if parent:
-                await self.add_child(
-                    parent.get("vertex").get("_id"),
-                    child.get("vertex").get("_id"),
-                    f"{parent.get('vertex').get('node_type').lower()}_to_{child.get('vertex').get('node_type')}",
-                )
+            child_id = child.get("vertex").get("_id")
+            child_key = child.get("vertex").get("_key")
+            
+            await self._remove_child_from_group(group.id, child_id)
+            
+            if remove_children:
+                await self.repos.nodes.delete(child_key)
+            else:
+                parent = await self.repos.nodes.get_parent(group.id)
+                if parent:
+                    await self.add_child(
+                        parent.get("vertex").get("_id"),
+                        child_id,
+                        f"{parent.get('vertex').get('node_type').lower()}_to_{child.get('vertex').get('node_type')}",
+                    )
 
         return await self.repos.group_repo.delete(group.key)
 

@@ -40,6 +40,7 @@ class DocumentService:
             raise ValueError(f"Node {node_id} not found")
 
         else:
+            print("created===--->", created.id)
             node.documents.append(created.id)
             await self.repos.nodes.update(node.key, node)
 

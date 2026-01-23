@@ -8,7 +8,7 @@ class ProjectService(ContainerService):
         super().__init__(repos)
 
     async def delete(self, project: ProjectNode):
-        return await self.delete_recursive(project.key)
+        return await self.repos.project_repo.delete(project.key)
 
     async def update(self, project: ProjectNode):
         return await self.repos.project_repo.update(project.key, project)
@@ -37,7 +37,6 @@ class ProjectService(ContainerService):
 
     async def get_all(self):
         return await self.repos.project_repo.get_all_projects()
-
 
     async def get_children(self, project_id: str, exclude_groups: bool = False, depth: int | str = 50):
         exclude_types = ["group"] if exclude_groups else None
