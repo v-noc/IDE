@@ -35,7 +35,7 @@ class WatcherService:
             self.initialized = True
 
     def set_event_loop(self, loop: asyncio.AbstractEventLoop):
-        """Set the main event loop to use for async operations from sync threads."""
+        """Set the main event loop for async operations from sync threads."""
         self.main_event_loop = loop
 
     def set_db(self, db: AsyncDatabase):
@@ -46,7 +46,7 @@ class WatcherService:
         project_id = project_node.id
 
         # Helper to run async socket events from the sync thread
-        def emit_sync_event(event_type: str, message: str):
+        def emit_sync_event(event_type: str, data: dict):
             try:
                 # Try to use the main event loop if available
                 if self.main_event_loop and self.main_event_loop.is_running():
@@ -55,25 +55,26 @@ class WatcherService:
                         self.socket_manager.emit_to_project(
                             project_id,
                             event_type,
-                            {"message": message, "projectId": project_id}
+                            data
                         ),
                         self.main_event_loop
                     )
-                    # Wait for the result (with timeout to avoid blocking forever)
+                    # Wait for result (with timeout to avoid blocking forever)
                     future.result(timeout=5.0)
                 else:
                     # Fallback: create a new event loop in this thread
-                    # This works when called from a thread without an event loop
+                    # This works when called from a thread without an
+                    # event loop
                     try:
                         loop = asyncio.get_event_loop()
                         if loop.is_running():
-                            # If loop is running, we can't use run_until_complete
+                            # If loop is running, can't use run_until_complete
                             # Create a task instead
                             asyncio.create_task(
                                 self.socket_manager.emit_to_project(
                                     project_id,
                                     event_type,
-                                    {"message": message, "projectId": project_id}
+                                    data
                                 )
                             )
                         else:
@@ -81,7 +82,7 @@ class WatcherService:
                                 self.socket_manager.emit_to_project(
                                     project_id,
                                     event_type,
-                                    {"message": message, "projectId": project_id}
+                                    data
                                 )
                             )
                     except RuntimeError:
@@ -93,7 +94,7 @@ class WatcherService:
                                 self.socket_manager.emit_to_project(
                                     project_id,
                                     event_type,
-                                    {"message": message, "projectId": project_id}
+                                    data
                                 )
                             )
                         finally:
@@ -113,7 +114,10 @@ class WatcherService:
             logger.info(f"Triggering resync for {project_node.name}")
 
             # 1. Notify Frontend: Sync Started
-            emit_sync_event("sync_started", "Detecting changes...")
+            emit_sync_event(
+                "sync_started",
+                {"message": "Detecting changes...", "project_id": project_id}
+            )
 
             try:
                 if self.db is None:
@@ -123,7 +127,9 @@ class WatcherService:
                 # Use pause() which unschedules without joining threads
                 self.pause_watching(project_id)
 
-                from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+                from app.core.parser.graph_builder.orchestrator import (
+                    GraphBuilderOrchestrator
+                )
 
                 # Re-initialize orchestrator for the specific job
                 # Note: We create a fresh one to ensure clean state
@@ -132,7 +138,7 @@ class WatcherService:
                     db=self.db
                 )
 
-                # Perform the sync (orchestrator is async; we run it in the main loop)
+                # Perform the sync (orchestrator is async; run in main loop)
                 if self.main_event_loop and self.main_event_loop.is_running():
                     future = asyncio.run_coroutine_threadsafe(
                         orchestrator.resync(),
@@ -143,17 +149,32 @@ class WatcherService:
                     # Fallback: run in a dedicated loop in this thread
                     changes = asyncio.run(orchestrator.resync())
 
-                # 3. Notify Frontend: Sync Complete
+                # 3. Notify Frontend: Sync Complete and Project Updated
                 msg = "Sync complete."
-                if changes and (changes.has_changes() or changes.has_folder_changes()):
+                if changes and (
+                    changes.has_changes() or changes.has_folder_changes()
+                ):
                     msg = f"Synced {len(changes.modified_files)} changes."
 
-                emit_sync_event("sync_complete", msg)
+                emit_sync_event(
+                    "sync_complete",
+                    {"message": msg, "project_id": project_id}
+                )
+
+                # Emit project:updated event after successful sync
+                emit_sync_event(
+                    "project:updated",
+                    {"project_id": project_id}
+                )
+
                 logger.info(f"Project {project_node.name} resynced.")
 
             except Exception as e:
                 logger.error(f"Error resyncing {project_node.name}: {e}")
-                emit_sync_event("sync_error", str(e))
+                emit_sync_event(
+                    "sync_error",
+                    {"message": str(e), "project_id": project_id}
+                )
             finally:
                 # 4. Resume watching (only catch NEW events from now on)
                 self.resume_watching(project_id)
@@ -178,7 +199,8 @@ class WatcherService:
         """Pause watching by unscheduling the watch (non-blocking)."""
         watcher = self.watchers.get(project_id)
         if watcher:
-            # Use pause() instead of stop() to avoid joining the thread from within callback
+            # Use pause() instead of stop() to avoid joining thread
+            # from callback
             watcher.pause()
 
     def resume_watching(self, project_id: str):
@@ -189,7 +211,9 @@ class WatcherService:
 # Dependency remains the same...
 
 
-def get_watcher_service(request: Request, db: AsyncDatabase = Depends(get_db)) -> WatcherService:
+def get_watcher_service(
+    request: Request, db: AsyncDatabase = Depends(get_db)
+) -> WatcherService:
     service = getattr(request.app.state, "watcher_service", None)
     if service is None:
         service = WatcherService()

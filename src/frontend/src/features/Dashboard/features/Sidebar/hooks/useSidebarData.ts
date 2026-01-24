@@ -11,7 +11,6 @@ import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
  * Hook to manage sidebar data:
  * - Fetches project tree data based on route params.
  * - Synchronizes server data with the project store.
- * - Handles cache invalidation on "code-saved" events.
  * - Integrates tree filtering logic.
  */
 export function useSidebarData() {
@@ -50,15 +49,7 @@ export function useSidebarData() {
     }
   }, [data, isSuccess]); // Only run when server data actually changes/arrives
 
-  // Listen for code saves to invalidate query
-  useEffect(() => {
-    const handler = () => {
-      if (!projectId) return;
-      queryClient.invalidateQueries({ queryKey: ["projectTree", projectId] });
-    };
-    window.addEventListener("code-saved", handler);
-    return () => window.removeEventListener("code-saved", handler);
-  }, [projectId, queryClient]);
+
 
   // Tree Filtering
   const { filteredNodes, searchQuery, setSearchQuery } = useTreeFilter(

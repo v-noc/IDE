@@ -9,11 +9,13 @@ if TYPE_CHECKING:
     from app.api.json_rpc.schemas import RegisterLogsParams
 
 from app.core.builder.log_tree_builder import LogTreeBuilder
+from app.core.socket.manager import get_socket_manager
 
 
 class LogService:
     def __init__(self, repos: Repositories):
         self.repos = repos
+        self.socket_manager = get_socket_manager()
 
     async def create(
         self,
@@ -48,6 +50,22 @@ class LogService:
         await self._link_to_parent_log(
             created, function_id, parent_function_id, params.chain_id
         )
+
+        # Emit logs:new socket event
+        try:
+            # Get project_id from function_id
+            project_id = await self._get_project_id_from_node(function_id)
+            if project_id:
+                await self.socket_manager.emit_to_project(
+                    project_id,
+                    "logs:new",
+                    {"node_id": function_id}
+                )
+        except Exception as e:
+            # Non-fatal: failure to emit socket event should not block log creation
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Failed to emit logs:new socket event: {e}")
 
         return created
 
@@ -199,4 +217,35 @@ class LogService:
         await self.repos.log_repo.create_batch_edges(func_edges, "log_to_function")
         await self.repos.log_repo.create_batch_edges(log_edges, "log_to_log")
 
+        # Emit logs:new socket events for unique function_ids
+        try:
+            unique_function_ids = set(
+                p.function_id for p in batch_params if p.function_id)
+            for function_id in unique_function_ids:
+                project_id = await self._get_project_id_from_node(function_id)
+                if project_id:
+                    await self.socket_manager.emit_to_project(
+                        project_id,
+                        "logs:new",
+                        {"node_id": function_id}
+                    )
+        except Exception as e:
+            # Non-fatal: failure to emit socket event should not block log creation
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Failed to emit logs:new socket events: {e}")
+
         return True
+
+    async def _get_project_id_from_node(self, node_id: str) -> Optional[str]:
+        """Get project_id from a node_id by traversing up the containment tree."""
+        try:
+            # Use ContainerService's method to resolve project
+            from app.core.services.container_service import ContainerService
+            container_service = ContainerService(self.repos)
+            _, project_doc = await container_service._resolve_file_and_project(node_id)
+            if project_doc:
+                return project_doc.get("_id")
+        except Exception:
+            pass
+        return None

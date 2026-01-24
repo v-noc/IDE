@@ -1,8 +1,8 @@
 from app.core.services.container_service import ContainerService
 from app.core.repository import Repositories
 from app.core.model.nodes import GroupNode
-from typing import Optional
-from typing import List
+from typing import List, Optional, Set
+from app.core.model.nodes import GroupNode
 
 
 class GroupService(ContainerService):
@@ -68,6 +68,13 @@ class GroupService(ContainerService):
 
         await self._remove_child_from_group(
             parent.get("vertex").get("_id"), child.id)
+
+        # Validate type compatibility
+        if not self._validate_group_type(group.group_type, child.node_type):
+            raise ValueError(
+                f"Cannot add {child.node_type} to {group.group_type} group"
+            )
+            
         return await self.add_child(group.id, child.id)
 
     async def delete(self, group_id: str, remove_children: bool = False):
@@ -75,19 +82,43 @@ class GroupService(ContainerService):
         if not group:
             raise ValueError(f"Group {group_id} not found")
 
-        children = await self.repos.group_repo.get_containment_tree(
+        # Get the group's parent to re-attach children if preserving them
+        parent = await self.repos.nodes.get_parent(group.id)
+        if not remove_children and not parent:
+             # If we want to preserve children, we MUST have a parent to move them to.
+             # However, if the group is orphaned (no parent), we can't move them "up".
+             # In that edge case, we should probably fail or force delete.
+             # For now, let's raise error.
+            raise ValueError("Cannot preserve children: group has no parent to move them to")
+
+        parent_vertex = parent.get("vertex") if parent else None
+        parent_id = parent_vertex.get("_id") if parent_vertex else None
+        parent_type = parent_vertex.get("node_type") if parent_vertex else None
+
+        children = await self.repos.nodes.get_containment_tree(
             group.id, depth=1)
 
         for child in children:
-            await self._remove_child_from_group(
-                group.id, child.get("vertex").get("_id"))
-            parent = await self.repos.nodes.get_parent(group.id)
-            if parent:
-                await self.add_child(
-                    parent.get("vertex").get("_id"),
-                    child.get("vertex").get("_id"),
-                    f"{parent.get('vertex').get('node_type').lower()}_to_{child.get('vertex').get('node_type')}",
-                )
+            child_vertex = child.get("vertex")
+            child_id = child_vertex.get("_id")
+            child_key = child_vertex.get("_key")
+            child_type = child_vertex.get("node_type")
+            
+            # Use internal method to remove the edge
+            await self._remove_child_from_group(group.id, child_id)
+            
+            if remove_children:
+                await self.repos.nodes.delete(child_key)
+            else:
+                # Move child to group's parent
+                if parent_id:
+                     # Construct new edge type
+                    contain_type = f"{parent_type.lower()}_to_{child_type}"
+                    await self.add_child(
+                        parent_id, 
+                        child_id, 
+                        contain_type
+                    )
 
         return await self.repos.group_repo.delete(group.key)
 
@@ -153,3 +184,46 @@ class GroupService(ContainerService):
 
     async def get_children(self, group_id: str):
         return await self.repos.group_repo.get_containment_tree(group_id)
+
+    def _validate_group_type(
+        self,
+        existing_type: str,
+        new_child_type: str
+    ) -> bool:
+        """Check if adding this child type is valid for the group."""
+        type_rules = {
+            "call": {"call"},
+            "code": {"function", "class", "group"},
+            "folder_file": {"folder", "file", "group"},
+            "empty": set(),  # "empty" needs special handling or just allow first item to set type
+        }
+        
+        # If group is strictly empty, we might allow the first child to define it.
+        # But here we just check compatibility against predefined rules.
+        if existing_type == "empty":
+             # If it's empty, we allow anything that CAN be grouped.
+             # But technically, we should check against what valid groups ARE.
+             # For now, let's assume empty accepts common types.
+             return new_child_type in {"folder", "file", "function", "class", "call", "group"}
+             
+        allowed = type_rules.get(existing_type, set())
+        return new_child_type in allowed
+
+    def _infer_group_type(self, child_types: List[str]) -> str:
+        """Infer the appropriate group type from child node types."""
+        type_set = set(child_types)
+        
+        if not type_set:
+            return "empty"
+        
+        if type_set == {"call"}:
+            return "call"
+        
+        if type_set.issubset({"function", "class", "group"}):
+            return "code"
+        
+        if type_set.issubset({"folder", "file", "group"}):
+            return "folder_file"
+        
+        # Fallback for mixed or invalid
+        return "empty"

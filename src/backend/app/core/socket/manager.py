@@ -130,16 +130,60 @@ class SocketManager:
         @self.server.event
         async def join_project(sid, project_id: str):
             """Frontend joins a room specific to a project to get updates."""
+            # Normalize project_id to ensure consistent room matching
+            normalized_id = self._normalize_project_id(project_id)
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             logger.info(
-                f"📦 [{timestamp}] Client {sid[:8]}... joined project room: {project_id}"
+                f"📦 [{timestamp}] Client {sid[:8]}... "
+                f"joined project room: {normalized_id}"
             )
-            await self.server.enter_room(sid, project_id)
+            await self.server.enter_room(sid, normalized_id)
 
-    async def emit_to_project(self, project_id: str, event: str, data: Any):
+        @self.server.event
+        async def leave_project(sid, project_id: str):
+            """Frontend leaves a project room."""
+            # Normalize project_id to ensure consistent room matching
+            normalized_id = self._normalize_project_id(project_id)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            logger.info(
+                f"📦 [{timestamp}] Client {sid[:8]}... "
+                f"left project room: {normalized_id}"
+            )
+            await self.server.leave_room(sid, normalized_id)
+
+    def _normalize_project_id(self, project_id: str) -> str:
+        """Normalize project_id to key format (remove nodes/ prefix)."""
+        # Extract key part if project_id has nodes/ prefix
+        # Frontend expects just the key in query keys and room names
+        if "/" in project_id:
+            return project_id.split("/")[-1]
+        return project_id
+
+    async def emit_to_project(
+        self, project_id: str, event: str, data: Any
+    ):
         """Emit an event to all users viewing a specific project."""
         try:
-            await self.server.emit(event, data, room=project_id)
+            # Normalize project_id for room matching
+            # (frontend joins with key only)
+            normalized_room = self._normalize_project_id(project_id)
+
+            # Normalize all ID fields in data payload for frontend consistency
+            # Frontend expects keys without nodes/ prefix
+            normalized_data = data.copy() if isinstance(data, dict) else data
+            if isinstance(normalized_data, dict):
+                # Normalize common ID fields
+                id_fields = [
+                    "project_id", "element_id", "node_id", "function_id"
+                ]
+                for field in id_fields:
+                    if field in normalized_data and normalized_data[field]:
+                        normalized_data[field] = self._normalize_project_id(
+                            normalized_data[field]
+                        )
+            await self.server.emit(
+                event, normalized_data, room=normalized_room
+            )
         except Exception as e:
             logger.error(f"Failed to emit socket event: {e}")
 

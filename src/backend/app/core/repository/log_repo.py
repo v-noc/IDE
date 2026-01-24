@@ -33,8 +33,12 @@ class LogRepository(BaseRepository[LogNode]):
             "chain_id": chain_id,
         }
         cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-        result = await cursor.next() if cursor else None
-        return result or None
+        result = None
+        async for doc in cursor:
+            result = doc
+            break  # Get first result and exit
+
+        return LogNode.model_validate(result) if result else None
 
     async def find_parent_log(self, log_id: str) -> Optional[LogNode]:
         query = """
@@ -51,8 +55,12 @@ class LogRepository(BaseRepository[LogNode]):
             "from_id": log_id,
         }
         cursor = await self.db.aql.execute(query, bind_vars=bind_vars)
-        result = await cursor.next() if cursor else None
-        return result or None
+        result = None
+        async for doc in cursor:
+            result = doc
+            break  # Get first result and exit
+
+        return LogNode.model_validate(result) if result else None
 
     async def find_logs_for_function_chain(
         self, function_ids: List[str], start_function_id: str

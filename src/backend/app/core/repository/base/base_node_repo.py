@@ -40,6 +40,177 @@ class BaseNodeRepository(BaseRepository[T]):
             return result  # the length
         return 0
 
+    async def cascade_delete(
+        self,
+        start_node_id: str,
+        max_depth: int = 50,
+    ) -> Dict[str, Any]:
+        """
+        Cascade delete a node and all its descendants in a single AQL query.
+
+        This method:
+        - Collects all descendant vertex IDs via graph traversal (deduplicated)
+        - Deletes edges from all fixed edge collections (contains_edges,
+          targets_edges, log_to_function_edges, log_to_log_edges)
+        - Deletes all vertices
+        - Returns counts of what was deleted
+
+        Args:
+            start_node_id: The _id of the starting node (e.g., "nodes/123")
+            max_depth: Maximum traversal depth (default: 50)
+
+        Returns:
+            Dict with keys:
+                - removed_vertices: Number of vertices deleted
+                - removed_contains_edges: Number of contains_edges deleted
+                - removed_targets_edges: Number of targets_edges deleted
+                - removed_log_to_function_edges: Number deleted
+                - removed_log_to_log_edges: Number deleted
+                - removed_documents: Number of documents deleted
+                - total_vertex_ids_collected: Total vertex IDs collected
+        """
+        query = """
+            LET startId = @start_node_id
+            LET maxDepth = @max_depth
+
+            // 1) Get Start Node Data explicitly first
+            LET startNode = DOCUMENT(startId)
+            
+            // If start doesn't exist, stop here
+            FILTER startNode != null
+
+            // 2) Traverse: Collect _id AND documents list immediately
+            LET descendantsData = (
+                FOR v IN 1..maxDepth OUTBOUND startId contains_edges
+                OPTIONS { uniqueVertices: "global", order: "bfs" }
+                FILTER v != null
+                RETURN { id: v._id, docs: v.documents }
+            )
+
+            // 3) Combine Start Node data + Descendant data
+            // We now have a list of objects: [{ id: "nodes/1", docs: [...] }, ...]
+            LET allNodeData = APPEND(
+                [{ id: startNode._id, docs: startNode.documents }], 
+                descendantsData
+            )
+
+            // Extract just the IDs list for edge operations (Deduplicated)
+            LET allIds = UNIQUE(allNodeData[*].id)
+
+            // --- EDGE DELETIONS (Uses allIds) ---
+
+            LET removedContains = (
+                FOR e IN contains_edges
+                    FILTER e._from IN allIds OR e._to IN allIds
+                    REMOVE e IN contains_edges OPTIONS { ignoreErrors: true }
+                    RETURN 1
+            )
+
+            LET removedTargets = (
+                FOR e IN targets_edges
+                    FILTER e._from IN allIds OR e._to IN allIds
+                    REMOVE e IN targets_edges OPTIONS { ignoreErrors: true }
+                    RETURN 1
+            )
+
+            LET removedLogToFunction = (
+                FOR e IN log_to_function_edges
+                    FILTER e._from IN allIds OR e._to IN allIds
+                    REMOVE e IN log_to_function_edges OPTIONS { ignoreErrors: true }
+                    RETURN 1
+            )
+
+            LET removedLogToLog = (
+                FOR e IN log_to_log_edges
+                    FILTER e._from IN allIds OR e._to IN allIds
+                    REMOVE e IN log_to_log_edges OPTIONS { ignoreErrors: true }
+                    RETURN 1
+            )
+
+            // --- DOCUMENT DELETION (Uses allNodeData) ---
+            
+            // 4) Extract Document Keys directly from the data we already fetched.
+            // No need to call DOCUMENT() again.
+            LET docKeysToDelete = UNIQUE(
+                FOR item IN allNodeData
+                    FILTER IS_ARRAY(item.docs) // Ensure the node actually had a list
+                    FOR docId IN item.docs
+                        FILTER docId != null
+                        // Parse to ensure we only delete things in 'documents' collection
+                        LET parsed = PARSE_IDENTIFIER(docId)
+                        FILTER parsed.collection == "documents"
+                        RETURN parsed.key
+            )
+
+            LET removedDocuments = (
+                FOR key IN docKeysToDelete
+                    REMOVE { _key: key } IN documents OPTIONS { ignoreErrors: true }
+                    RETURN 1
+            )
+
+            // --- VERTEX DELETION ---
+
+            LET removedVertices = (
+                FOR vid IN allIds
+                    // Ensure we only delete from 'nodes' collection to be safe
+                    LET parsed = PARSE_IDENTIFIER(vid)
+                    FILTER parsed.collection == "nodes"
+                    REMOVE { _key: parsed.key } IN nodes OPTIONS { ignoreErrors: true }
+                    RETURN 1
+            )
+
+            RETURN {
+                docKeysToDelete: docKeysToDelete,
+                removed_vertices: LENGTH(removedVertices),
+                removed_contains_edges: LENGTH(removedContains),
+                removed_targets_edges: LENGTH(removedTargets),
+                removed_log_to_function_edges: LENGTH(removedLogToFunction),
+                removed_log_to_log_edges: LENGTH(removedLogToLog),
+                removed_documents: LENGTH(removedDocuments),
+                total_vertex_ids_collected: LENGTH(allIds)
+            }
+        """
+
+        try:
+            cursor = await self.db.aql.execute(
+                query,
+                bind_vars={
+                    "start_node_id": start_node_id,
+                    "max_depth": max_depth,
+                }
+            )
+            result = None
+
+            async for row in cursor:
+                result = row
+
+                break
+
+            # If start node doesn't exist, return empty counts
+            if result is None:
+                return {
+                    "removed_vertices": 0,
+                    "removed_contains_edges": 0,
+                    "removed_targets_edges": 0,
+                    "removed_log_to_function_edges": 0,
+                    "removed_log_to_log_edges": 0,
+                    "removed_documents": 0,
+                    "total_vertex_ids_collected": 0,
+                }
+
+            return result
+        except Exception as e:
+            print(f"Cascade delete failed: {e}")
+            return {
+                "removed_vertices": 0,
+                "removed_contains_edges": 0,
+                "removed_targets_edges": 0,
+                "removed_log_to_function_edges": 0,
+                "removed_log_to_log_edges": 0,
+                "removed_documents": 0,
+                "total_vertex_ids_collected": 0,
+            }
+
     async def delete(self, key: str) -> bool:
         node_id = f"{self.collection_name}/{key}"
 
