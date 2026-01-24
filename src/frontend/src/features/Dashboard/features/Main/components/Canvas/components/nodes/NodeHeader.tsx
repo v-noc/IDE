@@ -38,26 +38,26 @@ export const NodeHeader = memo(function NodeHeader({
 }: NodeHeaderProps) {
   return (
     <div
-      className="flex items-center gap-3 border-b px-4 py-3.5 bg-slate-50"
+      className="flex items-center gap-3 border-b px-4 py-3.5 bg-slate-50/50"
       style={{ borderColor }}
     >
       {expandable && (
         <button
           onClick={() => {
-          
             onToggle?.();
           }}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110"
+          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
+            expanded ? "bg-slate-200/40" : "bg-slate-100/80"
+          }`}
           style={{
             borderColor,
-            color: iconColor,
-            backgroundColor: expanded ? iconColor : bgColor,
+          
           }}
         >
           {expanded ? (
-            <ChevronDown size={18} style={{ color: bgColor }} />
+            <ChevronDown size={18} style={{ color: iconColor }} />
           ) : (
-            <ChevronRight size={18} />
+            <ChevronRight size={18} style={{ color: iconColor }} />
           )}
         </button>
       )}
@@ -83,17 +83,17 @@ export const NodeHeader = memo(function NodeHeader({
       {hasCode && (
         <button
           onClick={() => {
-
             onCodeToggle?.()
           }}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110"
+          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
+            showCode ? "bg-slate-200/40" : "bg-slate-100/70"
+          }`}
           style={{
             borderColor,
-            backgroundColor: showCode ? iconColor : bgColor,
-            color: showCode ? bgColor : iconColor,
+            color: iconColor,
           }}
         >
-          <Code2 size={16} />
+          <Code2 size={16} style={{ color: iconColor }} />
         </button>
       )}
     </div>

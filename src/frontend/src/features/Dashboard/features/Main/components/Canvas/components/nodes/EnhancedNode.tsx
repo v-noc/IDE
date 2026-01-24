@@ -126,7 +126,7 @@ const EnhancedNode = memo(
             iconColor={data.iconColor}
           />
         ) : (
-          <NodeDescription description={data.metadata?.description} />
+          <NodeDescription description={data.metadata?.description} textColor={data.textColor} />
         )}
 
         <NodeFooter
