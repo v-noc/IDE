@@ -113,7 +113,7 @@ export const useEnhancedTreeLayout = ({
           target: node.target,
    
        
-          manuallyCreated: (node as any).manually_created ?? false,
+          manuallyCreated: (node as unknown as { manually_created?: boolean }).manually_created ?? false,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,
