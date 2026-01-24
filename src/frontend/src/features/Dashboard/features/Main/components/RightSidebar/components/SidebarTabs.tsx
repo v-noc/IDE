@@ -39,7 +39,7 @@ const ConfigSidebarContent: React.FC<ConfigSidebarContentProps> = ({
   return (
     <div className="flex flex-col h-full  ">
       <Tabs defaultValue={defaultTab} className="flex flex-col flex-1 min-h-0">
-        <TabsList className="p-0 bg-[var(--right-sidebar-color)]">
+        <TabsList className="p-0 bg-(--right-sidebar-color)">
           <TabsTrigger
             className="rounded-none bg-white shadow-sm data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
             value="documents"
