@@ -23,21 +23,20 @@ const NODE_HEIGHT = 150;
 interface UseEnhancedTreeLayoutProps {
   centerNode: SimpleTreeNode | null;
   expandedNodeIds: string[];
-  selectedNode: SimpleTreeNode | null;
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
-  focusTargetId?: string | null;
+ 
 }
 
 export const useEnhancedTreeLayout = ({
   centerNode,
-  selectedNode,
+  
   expandedNodeIds,
   toggleNodeExpansion,
   nodeMetadataMap,
   layoutConfig: _layoutConfig,
-  focusTargetId,
+
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
 
@@ -74,7 +73,7 @@ export const useEnhancedTreeLayout = ({
         ...(node.metadata ?? {}),
         createdAt: node.created_at,
         updatedAt: node.updated_at,
-        description: node.description,
+        description: node.target ? node.target?.description : node.description,
       };
     };
 
@@ -112,13 +111,8 @@ export const useEnhancedTreeLayout = ({
           nodeType: node.node_type,
           nodeId: nodeId,
           target: node.target,
-          focused: focusTargetId
-            ? nodeId ===
-            (focusTargetId.includes("/")
-              ? focusTargetId.split("/").pop()
-              : focusTargetId)
-            : false,
-          selected: nodeId === selectedNode?._key,
+   
+       
           manuallyCreated: (node as any).manually_created ?? false,
         } as EnhancedNodeData,
         type: "enhanced",
@@ -188,6 +182,6 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap, focusTargetId, selectedNode]);
+  }, [centerNode, expandedNodeIds, metadataMap]);
   return { initialNodes, initialEdges };
 };

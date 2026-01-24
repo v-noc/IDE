@@ -75,9 +75,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     []
   );
 
-  const focusTargetId = useProjectStore(
-    useShallow((s) => s.focusTargetId[tabId])
-  );
+
   const effectiveSelectedNode = secondarySelectedNode
     ? secondarySelectedNode
     : centerNode;
@@ -87,21 +85,45 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
-    focusTargetId,
+
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   useEffect(() => {
-    setNodes(initialNodes);
+    setNodes((currentNodes) => {
+      // 1. Create a map of existing nodes for quick lookup
+      const currentNodeMap = new Map(currentNodes.map((n) => [n.id, n]));
+  
+      // 2. Map the new layout onto the current state
+      return initialNodes.map((newNode) => {
+        const existingNode = currentNodeMap.get(newNode.id);
+  
+        if (existingNode) {
+          // Only update the properties that the layout changed (position, data)
+          // This preserves the internal object reference if nothing changed
+          return {
+            ...existingNode,
+            position: newNode.position,
+            data: {
+              ...existingNode.data,
+              ...newNode.data, // Sync expanded/expandable state
+            },
+          };
+        }
+  
+        // 3. If it doesn't exist, it's a brand new node being added (expanded)
+        return newNode;
+      });
+    });
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 
   const centerOnTarget = useEffectEvent(() => {
-   
+
     const nodeId = centerNode?._key
     if (!nodeId || nodes.length === 0 || !reactFlowInstanceRef.current) {
       return;
@@ -165,10 +187,11 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const nodeKey = node.id;
+
       if (projectData && nodeKey) {
         const foundNode = findNodeByKey(projectData, nodeKey);
         if (foundNode?._key && foundNode?._key !== centerNode?._key) {
-          handleNodeSelection(tabId, foundNode, "secondary");
+          handleNodeSelection(tabId, foundNode, "secondary")
         } else {
           handleNodeSelection(tabId, foundNode, "primary");
         }

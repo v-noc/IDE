@@ -43,8 +43,8 @@ export const NodeHeader = memo(function NodeHeader({
     >
       {expandable && (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
+          
             onToggle?.();
           }}
           className="flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110"
@@ -82,9 +82,9 @@ export const NodeHeader = memo(function NodeHeader({
 
       {hasCode && (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onCodeToggle?.();
+          onClick={() => {
+
+            onCodeToggle?.()
           }}
           className="flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110"
           style={{
