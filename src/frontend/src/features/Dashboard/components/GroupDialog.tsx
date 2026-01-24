@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import type { AnyNodeTree, GroupNodeTree, NodeType } from "@/types/project";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useEffectEvent } from "react";
 import { useCreateGroup, useUpdateGroup, useGroupUpdate } from "../service/useGroup";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -116,21 +116,33 @@ const GroupDialog = ({
     const [leftFilter, setLeftFilter] = useState("");
     const [rightFilter, setRightFilter] = useState("");
 
+    // 1. THE "WHAT": The Effect Event (Non-Reactive)
+    // This function always sees the latest props/state but DOES NOT trigger re-runs.
+    const onDialogInit = useEffectEvent((isCreate: boolean, group: any) => {
+        if (isCreate) {
+            setCurrentChildren(initialChildren);
+            form.reset({ name: "", description: "" });
+        } else if (group) {
+            setCurrentChildren((group.children || []) as ChildCandidate[]);
+            form.reset({ name: group.name, description: group.description || "" });
+        }
+        
+        // Clear filters and selections
+        setChildrenSelected({});
+        setSiblingsSelected({});
+        setLeftFilter("");
+        setRightFilter("");
+    });
+    
+    // 2. THE "WHEN": The Effect (Reactive)
+    // This only triggers when the fundamental "source of truth" changes.
     useEffect(() => {
         if (isOpen) {
-            if (isCreate) {
-                setCurrentChildren(initialChildren);
-                form.reset({ name: "", description: "" });
-            } else if (group) {
-                setCurrentChildren((group.children || []) as ChildCandidate[]);
-                form.reset({ name: group.name, description: group.description || "" });
-            }
-            setChildrenSelected({});
-            setSiblingsSelected({});
-            setLeftFilter("");
-            setRightFilter("");
+            // We call the event here. 
+            // We don't need 'form' or 'initialChildren' in the dependency array anymore!
+            onDialogInit(isCreate, group);
         }
-    }, [isOpen, isCreate, group, initialChildren, form]);
+    }, [isOpen, isCreate, group?._key]); // Only react to the ID, not the whole object
 
     const availableSiblings = useMemo(() => {
         const childKeys = new Set(currentChildren.map((c) => c._key));
@@ -207,6 +219,7 @@ const GroupDialog = ({
 
     // Update current children if group children changes (for manage mode immediate feel)
     useEffect(() => {
+     
         if (!isCreate && group?.children) {
             setCurrentChildren(group.children as ChildCandidate[]);
         }

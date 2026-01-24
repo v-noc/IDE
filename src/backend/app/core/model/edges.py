@@ -1,14 +1,15 @@
-from typing import Literal
+from typing import Literal, Optional
 from .base import BaseEdge
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 
 class ContainsEdge(BaseEdge):
     edge_type: str = "contains_edges"
     version: int = Field(default=0, description="The version of the edge.")
     # NEW: Differentiates the type of containment relationship.
-    contain_type: Literal[
+    # Optional to support legacy documents that don't have this field
+    contain_type: Optional[Literal[
         "project_to_folder",
         "project_to_file",
         "project_to_group",
@@ -43,7 +44,7 @@ class ContainsEdge(BaseEdge):
         "group_to_class",
         "group_to_function",
         "group_to_call",
-    ] = Field(..., description="The specific type of containment.")
+    ]] = Field(default=None, description="The specific type of containment.")
 
 
 class TargetsEdge(BaseEdge):
