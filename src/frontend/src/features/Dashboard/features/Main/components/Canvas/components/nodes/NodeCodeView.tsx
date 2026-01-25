@@ -1,5 +1,6 @@
 import React, { memo, lazy, Suspense, useState } from "react";
-import { Save, Copy, Check } from "lucide-react";
+import { Save, Copy, Check, Maximize2 } from "lucide-react";
+import { CodeViewDialog } from "./CodeViewDialog";
 
 // Lazy load Monaco Editor
 const CodeEditor = lazy(() => import("@/components/CodeEditor"));
@@ -38,6 +39,7 @@ export const NodeCodeView = memo(function NodeCodeView({
   iconColor,
 }: NodeCodeViewProps) {
   const [copied, setCopied] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -87,8 +89,29 @@ export const NodeCodeView = memo(function NodeCodeView({
               </>
             )}
           </button>
+          <div className="w-px h-4 bg-slate-200 mx-1" />
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="flex items-center justify-center p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+          >
+            <Maximize2 size={14} />
+          </button>
         </div>
       </div>
+      <CodeViewDialog
+        isOpen={isExpanded}
+        onClose={() => setIsExpanded(false)}
+        code={code}
+        fileName={fileName}
+        language={language}
+        onChange={onChange}
+        onSave={onSave}
+        hasChanges={hasChanges}
+        isSaving={isSaving}
+        isLoading={isLoading}
+        borderColor={borderColor}
+        iconColor={iconColor}
+      />
       <div
         className="h-[300px] mt-1 overflow-hidden border-b nodrag"
         style={{ borderColor }}
@@ -109,6 +132,6 @@ export const NodeCodeView = memo(function NodeCodeView({
           />
         </Suspense>
       </div>
-    </div>
+    </div >
   );
 });
