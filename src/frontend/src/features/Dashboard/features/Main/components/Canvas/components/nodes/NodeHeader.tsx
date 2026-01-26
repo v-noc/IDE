@@ -6,7 +6,7 @@ interface NodeHeaderProps {
   icon: ReactNode;
   iconColor: string;
   borderColor: string;
-  bgColor: string;
+  textColor: string;
   expandable?: boolean;
   expanded?: boolean;
   onToggle?: () => void;
@@ -27,7 +27,7 @@ export const NodeHeader = memo(function NodeHeader({
   icon,
   iconColor,
   borderColor,
-  bgColor,
+  textColor,
   expandable,
   expanded,
   onToggle,
@@ -38,7 +38,7 @@ export const NodeHeader = memo(function NodeHeader({
 }: NodeHeaderProps) {
   return (
     <div
-      className="flex items-center gap-3 border-b px-4 py-3.5 bg-slate-50/50"
+      className="flex items-center gap-3 border-b px-4 py-3.5 bg-slate-50/30"
       style={{ borderColor }}
     >
       {expandable && (
@@ -47,7 +47,7 @@ export const NodeHeader = memo(function NodeHeader({
             onToggle?.();
           }}
           className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
-            expanded ? "bg-slate-200/40" : "bg-slate-100/80"
+            expanded ? "bg-slate-200/5" : "bg-slate-100/15"
           }`}
           style={{
             borderColor,
@@ -66,7 +66,7 @@ export const NodeHeader = memo(function NodeHeader({
         <span className="text-xl" style={{ color: iconColor }}>
           {icon}
         </span>
-        <span className="text-base font-bold tracking-wide text-slate-800">
+        <span className="text-base font-bold tracking-wide text-slate-800" style={{ color: textColor }}>
           {name}
         </span>
       </div>
@@ -86,7 +86,7 @@ export const NodeHeader = memo(function NodeHeader({
             onCodeToggle?.()
           }}
           className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
-            showCode ? "bg-slate-200/40" : "bg-slate-100/70"
+            showCode ? "bg-slate-200/5" : "bg-slate-100/15"
           }`}
           style={{
             borderColor,

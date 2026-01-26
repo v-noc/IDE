@@ -101,7 +101,7 @@ const EnhancedNode = memo(
             icon={data.mainIcon}
             iconColor={data.iconColor}
             borderColor={data.borderColor}
-            bgColor={data.bgColor}
+            textColor={data.textColor}
             expandable={data.expandable}
             expanded={data.expanded}
             onToggle={data.onToggle}
@@ -132,6 +132,7 @@ const EnhancedNode = memo(
         <NodeFooter
           createdAt={data.metadata?.createdAt}
           updatedAt={data.metadata?.updatedAt}
+          textColor={data.textColor}
           borderColor={data.borderColor}
           iconColor={data.iconColor}
         />
