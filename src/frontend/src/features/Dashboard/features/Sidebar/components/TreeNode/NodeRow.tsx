@@ -33,8 +33,8 @@ export const NodeRow = memo(function NodeRow({
     node.icon ||
     getIcons(
       node.node_type === "call"
-        ? (node as CallNodeTree).target?.node_type ?? "call"
-        : node.node_type
+        ? ((node as CallNodeTree).target?.node_type ?? "call")
+        : node.node_type,
     );
 
   const row = (
@@ -42,7 +42,7 @@ export const NodeRow = memo(function NodeRow({
       onClick={onClick}
       className={cn(
         "flex items-center space-x-1 rounded-md p-1 cursor-pointer",
-        "transition-all duration-200 hover:bg-black/5"
+        "transition-all duration-200 hover:bg-black/5",
       )}
     >
       {/* Toggle */}
@@ -55,7 +55,7 @@ export const NodeRow = memo(function NodeRow({
           <ChevronRight
             className={cn(
               "h-4 w-4 transition-transform duration-200",
-              isOpen && "rotate-90"
+              isOpen && "rotate-90",
             )}
           />
         </button>
@@ -75,7 +75,7 @@ export const NodeRow = memo(function NodeRow({
         <span
           className={cn(
             "text-sm truncate block",
-            isSelected ? "font-semibold" : "font-medium"
+            isSelected ? "font-semibold" : "font-medium",
           )}
         >
           {node.name}
@@ -85,12 +85,16 @@ export const NodeRow = memo(function NodeRow({
   );
 
   // Wrap with tooltip only if has description
-  if (node.description) {
+  const description =
+    node.node_type === "call"
+      ? (node as CallNodeTree).target?.description
+      : node.description;
+  if (description) {
     return (
       <Tooltip>
         <TooltipTrigger asChild>{row}</TooltipTrigger>
         <TooltipContent side="right">
-          <p className="max-w-xs">{node.description}</p>
+          <p className="max-w-xs">{description}</p>
         </TooltipContent>
       </Tooltip>
     );
