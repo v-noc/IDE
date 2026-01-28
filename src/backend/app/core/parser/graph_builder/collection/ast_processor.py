@@ -34,7 +34,32 @@ class ASTProcessor:
         Synchronize AST nodes as descendants of the given file node.
         Handles Creation, Updates, and Deletions of child nodes.
         """
-        # 1. Fetch Full Scope Tree (Graph-based)
+        # 1. Fetch existing nodes from database
+        existing_map = await self._build_existing_map(file_node)
+
+        # 2. Flatten AST & Prepare desired nodes
+        desired_nodes_data = []
+        self._flatten_nodes(
+            nodes, file_node, file_node.path, content, desired_nodes_data
+        )
+
+        # 3. Determine what operations need to be performed
+        sync_ops = self._determine_sync_operations(
+            desired_nodes_data, existing_map
+        )
+
+        # 4. Execute batch operations
+        await self._execute_batch_operations(sync_ops, file_node.path)
+
+        return sync_ops["current_nodes"]
+
+    async def _build_existing_map(
+        self, file_node: FileNode
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Build a map of existing nodes from the containment tree.
+        Returns a dict mapping node_id to {"node": Node, "parent_id": str}
+        """
         existing_tree = await self.repos.nodes.get_containment_tree(
             file_node.id,
             depth=50,
@@ -66,20 +91,79 @@ class ASTProcessor:
                 "parent_id": item["parent_id"]
             }
 
-        # 2. Flatten AST & Prepare Nodes
-        desired_nodes_data = []
-        self._flatten_nodes(
-            nodes, file_node, file_node.path, content, desired_nodes_data
+        return existing_map
+
+    def _prepare_new_node(
+        self,
+        ast_node: BaseNode,
+        node_data: Dict[str, Any],
+        node_id: str
+    ) -> Union[FunctionNode, ClassNode]:
+        """
+        Create a new node model from AST data.
+        """
+        position = CodePosition(
+            line_no=ast_node.position.line,
+            col_offset=ast_node.position.column,
+            end_line_no=ast_node.position.end_line,
+            end_col_offset=ast_node.position.end_column
         )
 
+        if node_data["type"] == "class":
+            mro = node_data.get("mro", [])
+            return ClassNode(
+                key=node_id,
+                name=ast_node.name,
+                qname=node_data["qname"],
+                position=position,
+                implements=mro,
+                description=f"Class {ast_node.name}",
+                node_type="class"
+            )
+        else:
+            return FunctionNode(
+                key=node_id,
+                name=ast_node.name,
+                qname=node_data["qname"],
+                position=position,
+                description=f"Function {ast_node.name}",
+                node_type="function"
+            )
+
+    def _update_existing_node(
+        self,
+        existing_node: Union[FunctionNode, ClassNode],
+        new_node: Union[FunctionNode, ClassNode]
+    ) -> None:
+        """
+        Update existing node fields with new values, preserving other fields
+        like created_at, theme_config, documents, etc.
+        """
+        # Update fields that come from AST parsing
+        existing_node.name = new_node.name
+        existing_node.qname = new_node.qname
+        existing_node.position = new_node.position
+
+        # Update ClassNode-specific fields
+        if isinstance(existing_node, ClassNode) and isinstance(new_node, ClassNode):
+            existing_node.implements = new_node.implements
+
+    def _determine_sync_operations(
+        self,
+        desired_nodes_data: List[Dict[str, Any]],
+        existing_map: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Determine what nodes need to be created, updated, moved, or deleted.
+        Returns a dict with keys: funcs_to_create, classes_to_create,
+        funcs_to_update, classes_to_update, moves_to_execute, ids_to_delete,
+        current_nodes
+        """
         funcs_to_create: List[FunctionNode] = []
         classes_to_create: List[ClassNode] = []
-
         funcs_to_update: List[FunctionNode] = []
         classes_to_update: List[ClassNode] = []
-
         moves_to_execute: List[tuple[str, str]] = []  # (child_id, parent_id)
-
         processed_ids = set()
         current_nodes = []
 
@@ -92,46 +176,21 @@ class ASTProcessor:
                 continue
 
             node_id = ast_node.id
-            processed_ids.add(f"nodes/" + node_id)
+            full_node_id = f"nodes/{node_id}"
+            processed_ids.add(full_node_id)
 
-            existing_entry = existing_map.get("nodes/" + node_id)
-
+            existing_entry = existing_map.get(full_node_id)
             existing_node = existing_entry["node"] if existing_entry else None
-            existing_parent_id = existing_entry["parent_id"] \
-                if existing_entry else None
-
-            # Prepare Node Model
-            position = CodePosition(
-                line_no=ast_node.position.line,
-                col_offset=ast_node.position.column,
-                end_line_no=ast_node.position.end_line,
-                end_col_offset=ast_node.position.end_column
+            existing_parent_id = (
+                existing_entry["parent_id"] if existing_entry else None
             )
 
-            if node_data["type"] == "class":
-                mro = node_data.get("mro", [])
-                new_node = ClassNode(
-                    key=node_id,
-                    name=ast_node.name,
-                    qname=node_data["qname"],
-                    position=position,
-                    implements=mro,
-                    description=f"Class {ast_node.name}",
-                    node_type="class"
-                )
-            else:
-                new_node = FunctionNode(
-                    key=node_id,
-                    name=ast_node.name,
-                    qname=node_data["qname"],
-                    position=position,
-                    description=f"Function {ast_node.name}",
-                    node_type="function"
-                )
-
+            # Prepare new node model
+            new_node = self._prepare_new_node(ast_node, node_data, node_id)
             current_nodes.append(new_node)
 
             if not existing_node:
+                # Node doesn't exist, create it
                 if isinstance(new_node, ClassNode):
                     classes_to_create.append(new_node)
                 else:
@@ -140,7 +199,7 @@ class ASTProcessor:
                 moves_to_execute.append((node_id, parent_id))
                 logger.debug(f"Will create new node: {new_node.qname}")
             else:
-                # Update if changed
+                # Node exists, check if update is needed
                 needs_update = (
                     existing_node.name != new_node.name or
                     existing_node.qname != new_node.qname or
@@ -151,12 +210,16 @@ class ASTProcessor:
                 )
 
                 if needs_update:
-                    if isinstance(new_node, ClassNode):
-                        classes_to_update.append(new_node)
-                    else:
-                        funcs_to_update.append(new_node)
-                    logger.debug(f"Node updated: {new_node.qname}")
+                    # Update existing node fields instead of replacing
+                    self._update_existing_node(existing_node, new_node)
 
+                    if isinstance(existing_node, ClassNode):
+                        classes_to_update.append(existing_node)
+                    else:
+                        funcs_to_update.append(existing_node)
+                    logger.debug(f"Node updated: {existing_node.qname}")
+
+                # Check if parent changed
                 if existing_parent_id != parent_id:
                     logger.debug(
                         f"Node moved: {existing_node.qname} -> "
@@ -164,12 +227,34 @@ class ASTProcessor:
                     )
                     moves_to_execute.append((node_id, parent_id))
 
-        # 3. Calculate Deletes
+        # Calculate nodes to delete
         ids_to_delete = [
             sid for sid in existing_map if sid not in processed_ids
         ]
 
-        # 4. Batch Execution
+        return {
+            "funcs_to_create": funcs_to_create,
+            "classes_to_create": classes_to_create,
+            "funcs_to_update": funcs_to_update,
+            "classes_to_update": classes_to_update,
+            "moves_to_execute": moves_to_execute,
+            "ids_to_delete": ids_to_delete,
+            "current_nodes": current_nodes
+        }
+
+    async def _execute_batch_operations(
+        self, sync_ops: Dict[str, Any], file_path: str
+    ) -> None:
+        """
+        Execute all batch operations (create, update, move, delete).
+        """
+        funcs_to_create = sync_ops["funcs_to_create"]
+        classes_to_create = sync_ops["classes_to_create"]
+        funcs_to_update = sync_ops["funcs_to_update"]
+        classes_to_update = sync_ops["classes_to_update"]
+        moves_to_execute = sync_ops["moves_to_execute"]
+        ids_to_delete = sync_ops["ids_to_delete"]
+
         if funcs_to_create:
             await self.repos.function_repo.create_batch(funcs_to_create)
         if classes_to_create:
@@ -185,11 +270,9 @@ class ASTProcessor:
 
         if ids_to_delete:
             await self.repos.nodes.delete_batch(ids_to_delete)
-            print(
-                f"Deleted {len(ids_to_delete)} stale nodes {ids_to_delete} in {file_node.path}"
+            logger.info(
+                f"Deleted {len(ids_to_delete)} stale nodes {ids_to_delete} in {file_path}"
             )
-
-        return current_nodes
 
     def _flatten_nodes(
         self,

@@ -29,24 +29,27 @@ class DocumentRepo(BaseNodeRepository[DocumentNode]):
 
     async def get_documents_for_node(self, node_ref: str) -> List[DocumentNode]:
         """Fetch documents for a node via one AQL; accepts key or full ID."""
-        query = """
-            LET isFullId = CONTAINS(@node_ref, "/")
-            LET node = isFullId
-                ? DOCUMENT(@node_ref)
-                : DOCUMENT(@@nodes_collection, @node_ref)
-            FOR doc IN (node ? DOCUMENT(node.documents) : [])
-                FILTER doc != null
-                RETURN doc
-        """
-        cursor = await self.db.aql.execute(
-            query,
-            bind_vars={
-                "@nodes_collection": "nodes",
-                "node_ref": node_ref,
-            },
-        )
-        # Validate each document row into DocumentNode
-        results = []
-        async for doc in cursor:
-            results.append(self._validate(doc))
-        return results
+        try:
+            query = """
+                LET isFullId = CONTAINS(@node_ref, "/")
+                LET node = isFullId
+                    ? DOCUMENT(@node_ref)
+                    : DOCUMENT(@@nodes_collection, @node_ref)
+                FOR doc IN (node ? DOCUMENT(node.documents) : [])
+                    FILTER doc != null
+                    RETURN doc
+            """
+            cursor = await self.db.aql.execute(
+                query,
+                bind_vars={
+                    "@nodes_collection": "nodes",
+                    "node_ref": node_ref,
+                },
+            )
+            # Validate each document row into DocumentNode
+            results = []
+            async for doc in cursor:
+                results.append(self._validate(doc))
+            return results
+        except:
+            return []
