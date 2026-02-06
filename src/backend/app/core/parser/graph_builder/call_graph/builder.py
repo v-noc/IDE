@@ -16,6 +16,7 @@ from app.core.parser.ast.models import CallNode as ASTCallNode
 from app.core.repository import Repositories
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.graph_builder.call_graph.models import ResolvedCall
+from app.core.parser.graph_builder.performance import tracker
 
 
 from .resolver import CallResolverService
@@ -209,12 +210,13 @@ class CallChainBuilder:
             file_path_str = node.path
 
         else:
-            file_info = await self.repos.nodes.get_nearest_file_and_project(node.id)
+            with tracker.timer("call_graph.load_node_context.get_nearest_file_and_project"):
+                file_info = await self.repos.nodes.get_nearest_file_and_project(node.id)
 
-            if not file_info or not file_info.get("file"):
-                return None, None
+                if not file_info or not file_info.get("file"):
+                    return None, None
 
-            file_path_str = file_info["file"]["path"]
+                file_path_str = file_info["file"]["path"]
 
         abs_path = self.project_path / \
             file_path_str if not Path(
@@ -260,7 +262,8 @@ class CallChainBuilder:
         # 1. Load Context (File & Source)
         # If not provided (recursive step), we must load it.
         if not file_path or not source_code:
-            file_path, source_code = await self._load_node_context(node)
+            with tracker.timer("call_graph.load_node_context"):
+                file_path, source_code = await self._load_node_context(node)
 
             if not file_path:
                 return
@@ -276,9 +279,10 @@ class CallChainBuilder:
             parent_contexts = [None]
 
         for ctx in parent_contexts:
-            resolved_list, c_map = await self.resolver.resolve_scope_calls(
-                file_path, source_code, ast_calls, parent_context=ctx
-            )
+            with tracker.timer("call_graph.resolve_scope_calls"):
+                resolved_list, c_map = await self.resolver.resolve_scope_calls(
+                    file_path, source_code, ast_calls, parent_context=ctx
+                )
 
             # Merge Resolved Calls (Deduplicate by target_id)
             for r in resolved_list:
@@ -293,11 +297,12 @@ class CallChainBuilder:
 
         # 3. Sync to DB (Batch Create/Delete)
         # We pass the collected unique values
-        sync_result = await self.processor.sync_scope(
-            node,
-            list(all_resolved_map.values()),
-            parent_call_node_id=parent_call_node_id
-        )
+        with tracker.timer("call_graph.sync_scope"):
+            sync_result = await self.processor.sync_scope(
+                node,
+                list(all_resolved_map.values()),
+                parent_call_node_id=parent_call_node_id
+            )
 
         # =========================================================
         # THE SPIDER LOGIC (Replicating your old logic)
@@ -305,22 +310,31 @@ class CallChainBuilder:
         # We found targets (B, C). Now we must process THEM immediately.
 
         if sync_result.created_map:
-            target_nodes = await self._fetch_nodes_batch(list(sync_result.created_map.keys()))
+            with tracker.timer("call_graph.fetch_nodes_batch"):
+                target_nodes = await self._fetch_nodes_batch(list(sync_result.created_map.keys()))
 
+            # Batch process all target nodes concurrently
+            tasks = []
             for target_node in target_nodes:
                 # RECURSION: Process B immediately
                 # Get the list of contexts for this target from our merged map
                 next_step_contexts = merged_context_map.get(
                     target_node.id, [None])
 
-                await self.process_node_scope(
-                    node=target_node,
-                    parent_call_node_id=sync_result.created_map[target_node.id],
-                    file_path=None,
-                    source_code=None,
-                    visited_ids=visited_ids.copy(),
-                    current_depth=current_depth + 1,
-                    parent_contexts=next_step_contexts
+                tasks.append(
+                    self.process_node_scope(
+                        node=target_node,
+                        parent_call_node_id=sync_result.created_map[target_node.id],
+                        file_path=None,
+                        source_code=None,
+                        visited_ids=visited_ids.copy(),
+                        current_depth=current_depth + 1,
+                        parent_contexts=next_step_contexts
+                    )
                 )
+
+            # Execute all tasks concurrently
+            if tasks:
+                await asyncio.gather(*tasks)
 
             merged_context_map.clear()
