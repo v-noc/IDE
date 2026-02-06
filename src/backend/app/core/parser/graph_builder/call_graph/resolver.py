@@ -8,6 +8,7 @@ from app.core.parser.ast.models import CallNode as ASTCallNode
 from app.core.parser.jedi_adapter.call_resolver import CallResolver as JediAdapter
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.repository import Repositories
+from app.core.parser.graph_builder.performance import tracker
 
 from .models import ResolvedCall
 
@@ -52,47 +53,49 @@ class CallResolverService:
             )
 
         # 1. Resolve to Jedi Definitions
-        jedi_results = await asyncio.gather(*tasks, return_exceptions=True)
+        with tracker.timer("call_graph.resolve_jedi_calls"):
+            jedi_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         resolved_calls_map: Dict[str, ResolvedCall] = {}
         context_map: Dict[str, List[Any]] = {}
 
-        for i, resolutions in enumerate(jedi_results):
-            if isinstance(resolutions, Exception) or not resolutions:
-                continue
-
-            # We iterate all resolutions to capture all contexts
-            for resolution in resolutions:
-                target_id = getattr(resolution, "callee_id", None)
-                target_qname = getattr(resolution, "callee_qname", "unknown")
-
-                if not target_id:
+        with tracker.timer("call_graph.process_resolved_calls"):
+            for i, resolutions in enumerate(jedi_results):
+                if isinstance(resolutions, Exception) or not resolutions:
                     continue
 
-                db_target_id = f"nodes/{target_id}"
+                # We iterate all resolutions to capture all contexts
+                for resolution in resolutions:
+                    target_id = getattr(resolution, "callee_id", None)
+                    target_qname = getattr(resolution, "callee_qname", "unknown")
 
-                # 1. Collect Contexts (Do not skip if target_id exists!)
-                if db_target_id not in context_map:
-                    context_map[db_target_id] = []
+                    if not target_id:
+                        continue
 
-                next_context = getattr(resolution, "execution_context", None)
-                if next_context:
-                    context_map[db_target_id].append(next_context)
+                    db_target_id = f"nodes/{target_id}"
 
-                # 2. Keep only one ResolvedCall object per target for the Processor
-                # We use the first occurrence to define the edge properties (like position)
-                if db_target_id not in resolved_calls_map:
-                    ast_node = ast_calls[i]
-                    resolved_calls_map[db_target_id] = ResolvedCall(
-                        target_id=db_target_id,
-                        target_qname=target_qname,
-                        call_node_name=ast_node.name or "call",
-                        position=CodePosition(
-                            line_no=ast_node.position.line,
-                            col_offset=ast_node.position.column,
-                            end_line_no=ast_node.position.end_line,
-                            end_col_offset=ast_node.position.end_column,
-                        ),
-                    )
+                    # 1. Collect Contexts (Do not skip if target_id exists!)
+                    if db_target_id not in context_map:
+                        context_map[db_target_id] = []
+
+                    next_context = getattr(resolution, "execution_context", None)
+                    if next_context:
+                        context_map[db_target_id].append(next_context)
+
+                    # 2. Keep only one ResolvedCall object per target for the Processor
+                    # We use the first occurrence to define the edge properties (like position)
+                    if db_target_id not in resolved_calls_map:
+                        ast_node = ast_calls[i]
+                        resolved_calls_map[db_target_id] = ResolvedCall(
+                            target_id=db_target_id,
+                            target_qname=target_qname,
+                            call_node_name=ast_node.name or "call",
+                            position=CodePosition(
+                                line_no=ast_node.position.line,
+                                col_offset=ast_node.position.column,
+                                end_line_no=ast_node.position.end_line,
+                                end_col_offset=ast_node.position.end_column,
+                            ),
+                        )
 
         return list(resolved_calls_map.values()), context_map

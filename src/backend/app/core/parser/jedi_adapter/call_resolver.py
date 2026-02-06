@@ -92,10 +92,6 @@ class CallResolver:
 
             # Use provided parent context or fall back to module context
 
-            position_context = script.get_context(line, column)
-            if position_context.in_builtin_module() or position_context.is_stub():
-                return []
-
             context = parent_context or script._get_module_context()
 
             # Find the leaf at this position
