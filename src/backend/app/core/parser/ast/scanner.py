@@ -1,7 +1,21 @@
+
 from typing import List, Optional
+from functools import lru_cache
 from .models import BaseNode
 from .parser import JediParser
 from .id_injector import inject_ids
+
+
+@lru_cache(maxsize=50)
+def _inner_scan(content: str):
+    # Phase 1: ID Injection
+    processed_content, modified = inject_ids(content)
+
+    # Phase 2: Parsing
+    parser = JediParser(processed_content)
+    nodes = parser.parse()
+
+    return nodes, processed_content, modified
 
 
 def scan(content: str, file_path: Optional[str] = None) -> tuple[List[BaseNode], str]:
@@ -10,7 +24,7 @@ def scan(content: str, file_path: Optional[str] = None) -> tuple[List[BaseNode],
     """
     # Step 1: Inject IDs
     # We only write to file if file_path is provided AND content was modified.
-    processed_content, modified = inject_ids(content)
+    nodes, processed_content, modified = _inner_scan(content)
 
     if modified and file_path:
         try:
@@ -21,6 +35,4 @@ def scan(content: str, file_path: Optional[str] = None) -> tuple[List[BaseNode],
             # We continue with processed_content even if write failed,
             # so the parser sees the IDs.
 
-    # Step 2: Parse with Jedi/Parso
-    parser = JediParser(processed_content)
-    return parser.parse(), processed_content
+    return nodes, processed_content
