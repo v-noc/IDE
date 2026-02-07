@@ -29,9 +29,11 @@ class BodyParser:
         repos: Repositories,
         jedi_manager: JediProjectManager,
         batch_size: int = 1000,
+        progress_tracker=None,
     ):
         self.project_path = project_path
         self.repos = repos
+        self.progress_tracker = progress_tracker
 
         # Initialize the NEW Builder here
         self.call_chain_builder = CallChainBuilder(
@@ -111,6 +113,11 @@ class BodyParser:
 
 
         """
+        
+        # Set current function qname for non-file scopes (functions/classes)
+        if current_scope.node_type in ("function", "class") and self.progress_tracker:
+            self.progress_tracker.set_current_function(current_scope.qname)
+            await self.progress_tracker.emit()
 
         await self.call_chain_builder.process_node_scope(
             node=current_scope,
@@ -118,6 +125,14 @@ class BodyParser:
             source_code=source,
             visited_ids=None,
         )
+        
+        # Track entity processing for non-file scopes (functions/classes)
+        if current_scope.node_type in ("function", "class") and self.progress_tracker:
+            self.progress_tracker.increment_entity_processed()
+            # Clear current function after processing
+            self.progress_tracker.clear_current_function()
+            await self.progress_tracker.emit()
+        
         for node in nodes:
             if isinstance(node, (ASTClassNode, ASTFunctionNode)):
                 # 1. Identify the DB Node

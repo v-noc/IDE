@@ -57,6 +57,7 @@ class PhaseProcessor:
         self,
         change_set: ChangeSet,
         scan_result: ScanResult,
+        progress_tracker=None,
     ) -> List:
         """
         Phase 1: Structure Collection.
@@ -79,17 +80,29 @@ class PhaseProcessor:
                 if not checksum:
                     return None
                 logger.info(f"Collecting structure for: {file_path}")
+                # Set current file at start of processing
+                if progress_tracker:
+                    progress_tracker.set_current_file(file_path)
+                    await progress_tracker.emit()
                 try:
-                    return await asyncio.wait_for(
-                        self.collector.process_file(file_path, checksum),
+                    result = await asyncio.wait_for(
+                        self.collector.process_file(file_path, checksum, progress_tracker),
                         timeout=self._file_timeout,
                     )
+                    # Update file progress
+                    if progress_tracker:
+                        progress_tracker.increment_file_processed(file_path)
+                        await progress_tracker.emit()
+                    return result
                 except Exception as exc:
                     logger.error(
                         "Error in collector.process_file for %s: %s",
                         file_path, exc
                     )
-
+                    # Still update progress even on error
+                    if progress_tracker:
+                        progress_tracker.increment_file_processed(file_path)
+                        await progress_tracker.emit()
                     return None
 
         async with asyncio.TaskGroup() as tg:
@@ -111,6 +124,7 @@ class PhaseProcessor:
     async def process_analysis_phase(
         self,
         collection_results: List,
+        progress_tracker=None,
     ) -> None:
         """
         Phase 2: Body Analysis (Calls).
@@ -125,6 +139,7 @@ class PhaseProcessor:
                 self.repos,
                 self.jedi_manager,
                 batch_size=self._batch_size,
+                progress_tracker=progress_tracker,
             )
 
             with tracker.timer("phase2.analyze_file"):
@@ -134,6 +149,11 @@ class PhaseProcessor:
                             "Analyzing call graph for: %s",
                             result.file_node.qname,
                         )
+                        
+                        # Set current file at start of processing
+                        if progress_tracker:
+                            progress_tracker.set_current_file(result.file_node.path)
+                            await progress_tracker.emit()
 
                         # NOTE: Do NOT delete descendant calls here.
                         # The BodyParser -> CallChainBuilder -> ScopeProcessor
@@ -145,12 +165,25 @@ class PhaseProcessor:
                                 body_parser.process_ast(result.file_node),
                                 timeout=self._file_timeout,
                             )
+                        
+                        # Clear current function when file is done
+                        if progress_tracker:
+                            progress_tracker.clear_current_function()
+                        
+                        # Update file progress
+                        if progress_tracker:
+                            progress_tracker.increment_file_processed(result.file_node.path)
+                            await progress_tracker.emit()
 
                     except Exception as exc:
                         logger.error(
                             f"Error analyzing file {result.file_node.path}: {exc}",
                             exc_info=True
                         )
+                        # Still update progress even on error
+                        if progress_tracker:
+                            progress_tracker.increment_file_processed(result.file_node.path)
+                            await progress_tracker.emit()
 
         # Execute in parallel
         async with asyncio.TaskGroup() as tg:

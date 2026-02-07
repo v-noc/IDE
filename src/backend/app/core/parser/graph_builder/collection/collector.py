@@ -111,7 +111,7 @@ class Collector:
             return folder_changes
 
     async def process_file(
-        self, file_path: str, checksum: str
+        self, file_path: str, checksum: str, progress_tracker=None
     ) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 2 collection (Content/AST).
@@ -176,7 +176,7 @@ class Collector:
             # line numbers in ast_nodes match it (IDs injected)
             with tracker.timer("collector.process_file.sync_content"):
                 await self.ast_processor.sync_content(
-                    file_node, ast_nodes, processed_content
+                    file_node, ast_nodes, processed_content, progress_tracker
                 )
 
             return CollectionResult(

@@ -19,6 +19,7 @@ from app.core.parser.graph_builder.utils import (
     PhaseProcessor,
 )
 from app.core.parser.graph_builder.performance import tracker
+from app.core.parser.graph_builder.progress import ProgressTracker
 from app.core.repository import Repositories
 from app.core.socket.manager import get_socket_manager
 
@@ -116,29 +117,51 @@ class GraphBuilderOrchestrator:
         project_id = self.project_node.id
         print(f"project_id {project_id}")
 
-        # 1. Scan Disk
-        scan_result = self.file_scanner.scan()
-        logger.info(
-            "Scanned %d files across %d folders on disk",
-            len(scan_result.files),
-            len(scan_result.folders),
-        )
+        # Initialize progress tracker
+        socket_manager = get_socket_manager()
+        progress_tracker = ProgressTracker(project_id, socket_manager)
 
-        # 2. Detect Changes
-        change_set = await self.change_detector.detect_changes(
-            scan_result, project_id
-        )
-        logger.info(f"Detected changes: {change_set}")
+        try:
+            # 1. Scan Disk
+            progress_tracker.start_phase("scanning")
+            await progress_tracker.emit(force=True)
+            
+            scan_result = self.file_scanner.scan()
+            logger.info(
+                "Scanned %d files across %d folders on disk",
+                len(scan_result.files),
+                len(scan_result.folders),
+            )
+            
+            # Set total files after scanning
+            progress_tracker.set_total_files(len(scan_result.files))
+            await progress_tracker.emit(force=True)
 
-        if (
-            not change_set.has_changes()
-            and not change_set.has_folder_changes()
-        ):
-            logger.info("No changes detected. Graph is up to date.")
-            return change_set
+            # 2. Detect Changes
+            change_set = await self.change_detector.detect_changes(
+                scan_result, project_id
+            )
+            logger.info(f"Detected changes: {change_set}")
 
-        # 3. Process Changes (Phase 1 & 2)
-        await self._process_changes(change_set, scan_result)
+            if (
+                not change_set.has_changes()
+                and not change_set.has_folder_changes()
+            ):
+                logger.info("No changes detected. Graph is up to date.")
+                await progress_tracker.complete()
+                return change_set
+
+            # 3. Process Changes (Phase 1 & 2)
+            await self._process_changes(change_set, scan_result, progress_tracker)
+            
+            # Mark as complete
+            await progress_tracker.complete()
+            
+        except Exception as e:
+            logger.error(f"Error during resync: {e}", exc_info=True)
+            progress_tracker.set_error(str(e))
+            await progress_tracker.emit(force=True)
+            raise
 
         # 4. Emit project:updated socket event after successful sync
         try:
@@ -156,7 +179,7 @@ class GraphBuilderOrchestrator:
         return change_set
 
     async def _process_changes(
-        self, change_set: ChangeSet, scan_result: ScanResult
+        self, change_set: ChangeSet, scan_result: ScanResult, progress_tracker: ProgressTracker
     ):
         """
         Process the detected changes in multiple phases.
@@ -177,20 +200,43 @@ class GraphBuilderOrchestrator:
 
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")
+        progress_tracker.start_phase("collecting")
+        
+        # Calculate files to process for collection phase
+        files_to_process = [
+            tp.path
+            for tp in (change_set.new_files + change_set.modified_files)
+            if tp.path
+        ]
+        files_to_process.extend(
+            [mv.new for mv in change_set.moved_files if mv.new]
+        )
+        progress_tracker.set_total_files(len(files_to_process))
+        await progress_tracker.emit(force=True)
+        
         collection_results = (
             await self.phase_processor.process_collection_phase(
-                change_set, scan_result
+                change_set, scan_result, progress_tracker
             )
         )
+        
+        # Emit final collection phase progress with discovered entities
+        await progress_tracker.emit(force=True)
 
         # Phase 2: Analysis (Body parsing and call chain building)
         logger.info("Starting Phase 2: Analysis")
         print("Starting Phase 2: Analysis", flush=True)
+        progress_tracker.start_phase("analyzing")
+        # Total entities is set from discovery phase (functions_found + classes_found)
+        # Total files for analysis is the number of collection results
+        progress_tracker.set_total_files(len(collection_results))
+        await progress_tracker.emit(force=True)
+        
         try:
             # Phase 2 refactoring is deferred.
             # We pass None for call_sync_service as we removed SyncService.
             await self.phase_processor.process_analysis_phase(
-                collection_results
+                collection_results, progress_tracker
             )
             logger.info("Phase 2: Analysis completed")
             print("Phase 2: Analysis completed", flush=True)

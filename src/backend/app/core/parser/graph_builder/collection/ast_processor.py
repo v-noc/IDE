@@ -28,7 +28,8 @@ class ASTProcessor:
         self,
         file_node: FileNode,
         nodes: List[BaseNode],
-        content: Optional[str] = None
+        content: Optional[str] = None,
+        progress_tracker=None
     ) -> List[ContainerNode]:
         """
         Synchronize AST nodes as descendants of the given file node.
@@ -40,7 +41,7 @@ class ASTProcessor:
         # 2. Flatten AST & Prepare desired nodes
         desired_nodes_data = []
         self._flatten_nodes(
-            nodes, file_node, file_node.path, content, desired_nodes_data
+            nodes, file_node, file_node.path, content, desired_nodes_data, progress_tracker
         )
 
         # 3. Determine what operations need to be performed
@@ -280,7 +281,8 @@ class ASTProcessor:
         parent_node: Union[FileNode, FunctionNode, ClassNode],
         file_path: str,
         content: Optional[str],
-        result_list: List[dict]
+        result_list: List[dict],
+        progress_tracker=None
     ) -> None:
         """Recursively flatten nodes and prepare their metadata."""
         for node in nodes:
@@ -289,6 +291,10 @@ class ASTProcessor:
                 node_type = (
                     "class" if isinstance(node, ASTClassNode) else "function"
                 )
+
+                # Track entity discovery for progress reporting
+                if progress_tracker:
+                    progress_tracker.increment_discovery(node_type)
 
                 mro = []
                 if (isinstance(node, ASTClassNode) and
@@ -341,7 +347,7 @@ class ASTProcessor:
                 if hasattr(node, "children"):
                     self._flatten_nodes(
                         node.children, pseudo_parent, file_path,
-                        content, result_list
+                        content, result_list, progress_tracker
                     )
 
     def _resolve_mro(
