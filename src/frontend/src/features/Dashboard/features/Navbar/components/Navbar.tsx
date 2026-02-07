@@ -7,7 +7,13 @@ import {
   MenubarSeparator,
   MenubarShortcut,
 } from "@/components/ui/menubar";
-const Navbar = () => {
+import { ProgressIndicator } from "./ProgressIndicator";
+
+interface NavbarProps {
+  projectId?: string;
+}
+
+const Navbar = ({ projectId }: NavbarProps) => {
   return (
     <div className="w-full flex items-center justify-between">
       <Menubar className="bg-transparent rounded-none shadow-none border-none mx-2 py-1 h-auto">
@@ -35,6 +41,9 @@ const Navbar = () => {
           </MenubarContent>
         </MenubarMenu>
       </Menubar>
+      <div className="flex items-center gap-2 mr-4">
+        <ProgressIndicator projectId={projectId} />
+      </div>
     </div>
   );
 };

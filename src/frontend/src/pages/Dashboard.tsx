@@ -62,7 +62,7 @@ const Dashboard = () => {
             ))}
           </RightSidebar>
         }
-        navbar={<Navbar />}
+        navbar={<Navbar projectId={projectId} />}
         leftSidebar={<SideBar />}
       />
            <SidebarDialogs />

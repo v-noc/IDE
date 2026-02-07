@@ -8,9 +8,10 @@ import {
 } from "react";
 import { Socket } from "socket.io-client";
 import { createSocket, disconnectSocket } from "./socket";
+import type { ServerToClientEvents, ClientToServerEvents } from "./types";
 
 interface SocketContextValue {
-  socket: Socket | null;
+  socket: Socket<ServerToClientEvents, ClientToServerEvents> | null;
   isConnected: boolean;
 }
 
