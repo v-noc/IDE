@@ -28,6 +28,8 @@ dependencies = [
   "aiofiles>=25.1.0",
   "asgi-lifespan>=2.1.0",
   "terminusdb-client>=10.2.6",
+  "respx>=0.22.0",
+  "trio>=0.32.0",
 ]
 
 [project.optional-dependencies]

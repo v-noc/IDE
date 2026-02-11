@@ -16,13 +16,13 @@ from typing import Any, Dict, List, Optional, Union
 import httpx
 
 from terminusdb_client.__version__ import __version__
-from terminusdb_client.errors import DatabaseError, InterfaceError
+from terminusdb_client.errors import InterfaceError
+from .errors import DatabaseError
 from .woql_utils import (
     _clean_dict,
     _dt_dict,
     _dt_list,
     _finish_response,
-    _finish_streaming_response,
     _result2stream,
     _args_as_payload,
 )
@@ -37,31 +37,40 @@ class WoqlResult:
     """Iterator for streaming WOQL results."""
 
     def __init__(self, lines):
-        preface = json.loads(next(lines))
+
+        self.preface = None
+        self.postscript = {}
+        self._lines = lines
+
+    async def _init(self):
+        preface_line = await self._lines.__anext__()
+        preface = json.loads(preface_line)
+
         if not ("@type" in preface and preface["@type"] == "PrefaceRecord"):
             raise DatabaseError(response=preface)
         self.preface = preface
-        self.postscript = {}
-        self.lines = lines
+        return self
 
     def _check_error(self, document):
+
         if "@type" in document:
             if document["@type"] == "Binding":
                 return document
             if document["@type"] == "PostscriptRecord":
                 self.postscript = document
-                raise StopIteration()
+                raise StopAsyncIteration()
 
         raise DatabaseError(response=document)
 
     def variable_names(self):
         return self.preface["names"]
 
-    def __iter__(self):
+    def __aiter__(self):
         return self
 
-    def __next__(self):
-        return self._check_error(json.loads(next(self.lines)))
+    async def __anext__(self):
+        line = await self._lines.__anext__()
+        return self._check_error(json.loads(line))
 
 
 class JWTAuth(httpx.Auth):

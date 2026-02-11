@@ -2,28 +2,30 @@ import pytest
 import pytest_asyncio
 import shutil
 from httpx import AsyncClient, ASGITransport
-from arango.database import StandardDatabase
 
 from app.main import app
 from pathlib import Path
 from app.db.client import get_db
 from app.core.services.project_service import ProjectService
+from app.db.async_terminus_client import AsyncClient as TerminusClient
 
 
 @pytest_asyncio.fixture()
-async def client(arangodb_client: StandardDatabase) -> AsyncClient:
+async def client(terminusdb_client: TerminusClient) -> AsyncClient:
     """
     Provides an AsyncClient instance for making API requests, with the database
     dependency overridden to use the test database.
     """
 
     def override_get_db():
-        return arangodb_client
+        return terminusdb_client
 
     app.dependency_overrides[get_db] = override_get_db
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport, base_url="http://test"
+    ) as c:
         yield c
 
     app.dependency_overrides.clear()
