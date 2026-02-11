@@ -13,15 +13,16 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
-import requests
+import httpx
 
 from terminusdb_client.__version__ import __version__
 from terminusdb_client.errors import DatabaseError, InterfaceError
-from terminusdb_client.woql_utils import (
+from .woql_utils import (
     _clean_dict,
     _dt_dict,
     _dt_list,
     _finish_response,
+    _finish_streaming_response,
     _result2stream,
     _args_as_payload,
 )
@@ -63,7 +64,7 @@ class WoqlResult:
         return self._check_error(json.loads(next(self.lines)))
 
 
-class JWTAuth(requests.auth.AuthBase):
+class JWTAuth(httpx.Auth):
     """Class for JWT Authentication in requests"""
 
     def __init__(self, token):
@@ -71,10 +72,10 @@ class JWTAuth(requests.auth.AuthBase):
 
     def __call__(self, r):
         r.headers["Authorization"] = f"Bearer {self._token}"
-        return r
+        yield r
 
 
-class APITokenAuth(requests.auth.AuthBase):
+class APITokenAuth(httpx.Auth):
     """Class for API Token Authentication in requests"""
 
     def __init__(self, token):
@@ -82,7 +83,7 @@ class APITokenAuth(requests.auth.AuthBase):
 
     def __call__(self, r):
         r.headers["Authorization"] = f"Token {self._token}"
-        return r
+        yield r
 
 
 class Patch:
@@ -161,7 +162,7 @@ class GraphType(str, Enum):
     SCHEMA = "schema"
 
 
-class Client:
+class AsyncClient:
     """Client for TerminusDB server.
 
     Attributes
@@ -308,7 +309,7 @@ class Client:
             value = value.lower()
         self._ref = value
 
-    def connect(
+    async def connect(
         self,
         team: str = "admin",
         db: Optional[str] = None,
@@ -374,11 +375,14 @@ class Client:
         self.branch = branch
         self.ref = ref
         self.repo = repo
-        self._session = requests.Session()
+        self._session = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            follow_redirects=True,
+        )
         self._connected = True
 
         try:
-            self._db_info = self.info()
+            self._db_info = await self.info()
         except Exception as error:
             raise InterfaceError(
                 f"Cannot connect to server, please make sure TerminusDB is running at {self.server_url} and the authentication details are correct. Details: {str(error)}"
@@ -386,7 +390,7 @@ class Client:
         if self.db is not None:
             try:
                 _finish_response(
-                    self._session.head(
+                    await self._session.head(
                         self._db_url(),
                         headers=self._default_headers,
                         params={"exists": "true"},
@@ -398,12 +402,20 @@ class Client:
                     f"Connection fail, {self.db} does not exist.")
         self._author = self.user
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Undo connect and close the connection.
 
         The connection will be unusable from this point forward; an Error (or subclass) exception will be raised if any operation is attempted with the connection, unless connect is call again.
         """
+        if self._session is not None:
+            await self._session.aclose()
         self._connected = False
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     def _check_connection(self, check_db=True) -> None:
         """Raise connection InterfaceError if not connected
@@ -416,7 +428,7 @@ class Client:
                 "No database is connected. Please either connect to a database or create a new database."
             )
 
-    def info(self) -> dict:
+    async def info(self) -> dict:
         """Get info of a TerminusDB database server
 
         Returns
@@ -446,7 +458,7 @@ class Client:
         """
         return json.loads(
             _finish_response(
-                self._session.get(
+                await self._session.get(
                     self.api + "/info",
                     headers=self._default_headers,
                     auth=self._auth(),
@@ -454,7 +466,7 @@ class Client:
             )
         )
 
-    def ok(self) -> bool:
+    async def ok(self) -> bool:
         """Check whether the TerminusDB server is still OK.
            Status is not OK when this function returns false
            or throws an exception (mostly ConnectTimeout)
@@ -470,12 +482,12 @@ class Client:
         """
         if not self._connected:
             return self._connected
-        req = self._session.get(
+        req = await self._session.get(
             self.api + "/ok", headers=self._default_headers, timeout=6
         )
         return req.status_code == 200
 
-    def log(
+    async def log(
         self,
         team: Optional[str] = None,
         db: Optional[str] = None,
@@ -514,7 +526,7 @@ class Client:
         self._check_connection(check_db=(not team or not db))
         team = team if team else self.team
         db = db if db else self.db
-        result = self._session.get(
+        result = await self._session.get(
             f"{self.api}/log/{team}/{db}",
             params={"start": start, "count": count},
             headers=self._default_headers,
@@ -526,7 +538,7 @@ class Client:
             commit["commit"] = commit["identifier"]  # For backwards compat.
         return commits
 
-    def get_commit_history(self, max_history: int = 500) -> list:
+    async def get_commit_history(self, max_history: int = 500) -> list:
         """Get the whole commit history.
         Commit history - Commit id, author of the commit, commit message and the commit time, in the current branch from the current commit, ordered backwards in time, will be returned in a dictionary in the follow format:
         ```
@@ -567,9 +579,9 @@ class Client:
         """
         if max_history < 0:
             raise ValueError("max_history needs to be non-negative.")
-        return self.log(count=max_history)
+        return await self.log(count=max_history)
 
-    def get_document_history(
+    async def get_document_history(
         self,
         doc_id: str,
         team: Optional[str] = None,
@@ -654,7 +666,7 @@ class Client:
         if updated:
             params["updated"] = updated
 
-        result = self._session.get(
+        result = await self._session.get(
             f"{self.api}/history/{team}/{db}",
             params=params,
             headers=self._default_headers,
@@ -674,28 +686,28 @@ class Client:
 
         return history
 
-    def _get_current_commit(self):
+    async def _get_current_commit(self):
         descriptor = self.db
         if self.branch:
             descriptor = f"{descriptor}/local/branch/{self.branch}"
-        commit = self.log(team=self.team, db=descriptor, count=1)[0]
+        commit = await self.log(team=self.team, db=descriptor, count=1)[0]
         return commit["identifier"]
 
-    def _get_target_commit(self, step):
+    async def _get_target_commit(self, step):
         descriptor = self.db
         if self.branch:
             descriptor = f"{descriptor}/local/branch/{self.branch}"
-        commit = self.log(team=self.team, db=descriptor,
-                          count=1, start=step)[0]
+        commit = await self.log(team=self.team, db=descriptor,
+                                count=1, start=step)[0]
         return commit["identifier"]
 
-    def get_all_branches(self, get_data_version=False):
+    async def get_all_branches(self, get_data_version=False):
         """Get all the branches available in the database."""
         self._check_connection()
         api_url = self._documents_url().split("/")
         api_url = api_url[:-2]
         api_url = "/".join(api_url) + "/_commits"
-        result = self._session.get(
+        result = await self._session.get(
             api_url,
             headers=self._default_headers,
             params={"type": "Branch"},
@@ -737,7 +749,7 @@ class Client:
         """
         return copy.deepcopy(self)
 
-    def set_db(self, dbid: str, team: Optional[str] = None) -> str:
+    async def set_db(self, dbid: str, team: Optional[str] = None) -> str:
         """Set the connection to another database. This will reset the connection.
 
         Parameters
@@ -763,7 +775,7 @@ class Client:
         if team is None:
             team = self.team
 
-        return self.connect(
+        return await self.connect(
             team=team,
             db=dbid,
             remote_auth=self._remote_auth_dict,
@@ -774,10 +786,10 @@ class Client:
             repo=self.repo,
         )
 
-    def _get_prefixes(self):
+    async def _get_prefixes(self):
         """Get the prefixes for a given database"""
         self._check_connection()
-        result = self._session.get(
+        result = await self._session.get(
             self._db_base("prefixes"),
             headers=self._default_headers,
             auth=self._auth(),
@@ -785,7 +797,7 @@ class Client:
         result.raise_for_status()
         return result.json()
 
-    def get_prefix(self, prefix_name: str) -> str:
+    async def get_prefix(self, prefix_name: str) -> str:
         """Get a single prefix IRI by name.
 
         Parameters
@@ -809,7 +821,7 @@ class Client:
         'http://schema.org/'
         """
         self._check_connection()
-        result = self._session.get(
+        result = await self._session.get(
             self._prefix_url(prefix_name),
             headers=self._default_headers,
             auth=self._auth(),
@@ -817,7 +829,7 @@ class Client:
         result.raise_for_status()
         return result.json()["api:prefix_uri"]
 
-    def add_prefix(self, prefix_name: str, uri: str) -> dict:
+    async def add_prefix(self, prefix_name: str, uri: str) -> dict:
         """Add a new prefix mapping.
 
         Parameters
@@ -843,7 +855,7 @@ class Client:
         {'@type': 'api:PrefixAddResponse', 'api:status': 'api:success', ...}
         """
         self._check_connection()
-        result = self._session.post(
+        result = await self._session.post(
             self._prefix_url(prefix_name),
             json={"uri": uri},
             headers=self._default_headers,
@@ -852,7 +864,7 @@ class Client:
         result.raise_for_status()
         return result.json()
 
-    def update_prefix(self, prefix_name: str, uri: str) -> dict:
+    async def update_prefix(self, prefix_name: str, uri: str) -> dict:
         """Update an existing prefix mapping.
 
         Parameters
@@ -878,7 +890,7 @@ class Client:
         {'@type': 'api:PrefixUpdateResponse', 'api:status': 'api:success', ...}
         """
         self._check_connection()
-        result = self._session.put(
+        result = await self._session.put(
             self._prefix_url(prefix_name),
             json={"uri": uri},
             headers=self._default_headers,
@@ -887,7 +899,7 @@ class Client:
         result.raise_for_status()
         return result.json()
 
-    def upsert_prefix(self, prefix_name: str, uri: str) -> dict:
+    async def upsert_prefix(self, prefix_name: str, uri: str) -> dict:
         """Create or update a prefix mapping (upsert).
 
         Parameters
@@ -913,7 +925,7 @@ class Client:
         {'@type': 'api:PrefixUpdateResponse', 'api:status': 'api:success', ...}
         """
         self._check_connection()
-        result = self._session.put(
+        result = await self._session.put(
             self._prefix_url(prefix_name) + "?create=true",
             json={"uri": uri},
             headers=self._default_headers,
@@ -922,7 +934,7 @@ class Client:
         result.raise_for_status()
         return result.json()
 
-    def delete_prefix(self, prefix_name: str) -> dict:
+    async def delete_prefix(self, prefix_name: str) -> dict:
         """Delete a prefix mapping.
 
         Parameters
@@ -946,7 +958,7 @@ class Client:
         {'@type': 'api:PrefixDeleteResponse', 'api:status': 'api:success', ...}
         """
         self._check_connection()
-        result = self._session.delete(
+        result = await self._session.delete(
             self._prefix_url(prefix_name),
             headers=self._default_headers,
             auth=self._auth(),
@@ -954,7 +966,7 @@ class Client:
         result.raise_for_status()
         return result.json()
 
-    def create_database(
+    async def create_database(
         self,
         dbid: str,
         team: Optional[str] = None,
@@ -1022,7 +1034,7 @@ class Client:
         self.db = dbid
 
         _finish_response(
-            self._session.post(
+            await self._session.post(
                 self._db_url(),
                 headers=self._default_headers,
                 json=details,
@@ -1030,7 +1042,7 @@ class Client:
             )
         )
 
-    def delete_database(
+    async def delete_database(
         self,
         dbid: Optional[str] = None,
         team: Optional[str] = None,
@@ -1081,7 +1093,7 @@ class Client:
         if force:
             payload["force"] = "true"
         _finish_response(
-            self._session.delete(
+            await self._session.delete(
                 self._db_url(),
                 headers=self._default_headers,
                 auth=self._auth(),
@@ -1090,7 +1102,7 @@ class Client:
         )
         self.db = None
 
-    def get_triples(self, graph_type: GraphType) -> str:
+    async def get_triples(self, graph_type: GraphType) -> str:
         """Retrieves the contents of the specified graph as triples encoded in turtle format
 
         Parameters
@@ -1108,14 +1120,14 @@ class Client:
         str
         """
         self._check_connection()
-        result = self._session.get(
+        result = await self._session.get(
             self._triples_url(graph_type),
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def update_triples(
+    async def update_triples(
         self, graph_type: GraphType, content: str, commit_msg: str
     ) -> None:
         """Updates the contents of the specified graph with the triples encoded in turtle format.
@@ -1140,7 +1152,7 @@ class Client:
             "commit_info": self._generate_commit(commit_msg),
             "turtle": content,
         }
-        result = self._session.post(
+        result = await self._session.post(
             self._triples_url(graph_type),
             headers=self._default_headers,
             json=params,
@@ -1148,7 +1160,7 @@ class Client:
         )
         return json.loads(_finish_response(result))
 
-    def insert_triples(
+    async def insert_triples(
         self, graph_type: GraphType, content: str, commit_msg: Optional[str] = None
     ) -> None:
         """Inserts into the specified graph with the triples encoded in turtle format.
@@ -1170,7 +1182,7 @@ class Client:
         self._check_connection()
         params = {"commit_info": self._generate_commit(
             commit_msg), "turtle": content}
-        result = self._session.put(
+        result = await self._session.put(
             self._triples_url(graph_type),
             headers=self._default_headers,
             json=params,
@@ -1178,7 +1190,7 @@ class Client:
         )
         return json.loads(_finish_response(result))
 
-    def query_document(
+    async def query_document(
         self,
         document_template: dict,
         graph_type: GraphType = GraphType.INSTANCE,
@@ -1222,7 +1234,7 @@ class Client:
                 payload[the_arg] = kwargs[the_arg]
         headers = self._default_headers.copy()
         headers["X-HTTP-Method-Override"] = "GET"
-        result = self._session.post(
+        result = await self._session.post(
             self._documents_url(),
             headers=headers,
             json=payload,
@@ -1242,7 +1254,7 @@ class Client:
         else:
             return return_obj
 
-    def get_document(
+    async def get_document(
         self,
         iri_id: str,
         graph_type: GraphType = GraphType.INSTANCE,
@@ -1278,7 +1290,7 @@ class Client:
             if the_arg in kwargs:
                 payload[the_arg] = kwargs[the_arg]
 
-        result = self._session.get(
+        result = await self._session.get(
             self._documents_url(),
             headers=self._default_headers,
             params=payload,
@@ -1291,7 +1303,7 @@ class Client:
 
         return json.loads(_finish_response(result))
 
-    def get_documents_by_type(
+    async def get_documents_by_type(
         self,
         doc_type: str,
         graph_type: GraphType = GraphType.INSTANCE,
@@ -1330,7 +1342,7 @@ class Client:
         iterable
             Stream of dictionaries
         """
-        return self.get_all_documents(
+        return await self.get_all_documents(
             graph_type,
             skip,
             count,
@@ -1340,7 +1352,7 @@ class Client:
             **kwargs,
         )
 
-    def get_all_documents(
+    async def get_all_documents(
         self,
         graph_type: GraphType = GraphType.INSTANCE,
         skip: int = 0,
@@ -1390,7 +1402,7 @@ class Client:
         for the_arg in add_args:
             if the_arg in kwargs:
                 payload[the_arg] = kwargs[the_arg]
-        result = self._session.get(
+        result = await self._session.get(
             self._documents_url(),
             headers=self._default_headers,
             params=payload,
@@ -1411,9 +1423,9 @@ class Client:
         else:
             return return_obj
 
-    def get_existing_classes(self):
+    async def get_existing_classes(self):
         """Get all the existing classes (only ids) in a database."""
-        all_existing_obj = self.get_all_documents(graph_type="schema")
+        all_existing_obj = await self.get_all_documents(graph_type="schema")
         all_existing_class = {}
         for item in all_existing_obj:
             if item.get("@id"):
@@ -1470,7 +1482,7 @@ class Client:
 
         return list(seen.values()) + objects
 
-    def insert_document(
+    async def insert_document(
         self,
         document: Union[
             dict,
@@ -1555,15 +1567,15 @@ class Client:
             headers.update(
                 {"Content-Encoding": "gzip", "Content-Type": "application/json"}
             )
-            result = self._session.post(
+            result = await self._session.post(
                 self._documents_url(),
                 headers=headers,
                 params=params,
-                data=gzip.compress(json_string),
+                content=gzip.compress(json_string),
                 auth=self._auth(),
             )
         else:
-            result = self._session.post(
+            result = await self._session.post(
                 self._documents_url(),
                 headers=headers,
                 params=params,
@@ -1577,7 +1589,7 @@ class Client:
                     item._backend_id = result[idx]
         return result
 
-    def replace_document(
+    async def replace_document(
         self,
         document: Union[
             dict,
@@ -1637,15 +1649,15 @@ class Client:
             headers.update(
                 {"Content-Encoding": "gzip", "Content-Type": "application/json"}
             )
-            result = self._session.put(
+            result = await self._session.put(
                 self._documents_url(),
                 headers=headers,
                 params=params,
-                data=gzip.compress(json_string),
+                content=gzip.compress(json_string),
                 auth=self._auth(),
             )
         else:
-            result = self._session.put(
+            result = await self._session.put(
                 self._documents_url(),
                 headers=headers,
                 params=params,
@@ -1659,7 +1671,7 @@ class Client:
                     item._backend_id = result[idx][len("terminusdb:///data/"):]
         return result
 
-    def update_document(
+    async def update_document(
         self,
         document: Union[
             dict,
@@ -1693,11 +1705,11 @@ class Client:
         InterfaceError
             if the client does not connect to a database
         """
-        self.replace_document(
+        await self.replace_document(
             document, graph_type, commit_msg, last_data_version, compress, True
         )
 
-    def delete_document(
+    async def delete_document(
         self,
         document: Union[str, list, dict, Iterable],
         graph_type: GraphType = GraphType.INSTANCE,
@@ -1745,7 +1757,7 @@ class Client:
             headers["TerminusDB-Data-Version"] = last_data_version
 
         _finish_response(
-            self._session.delete(
+            await self._session.delete(
                 self._documents_url(),
                 headers=headers,
                 params=params,
@@ -1754,7 +1766,7 @@ class Client:
             )
         )
 
-    def has_doc(self, doc_id: str, graph_type: GraphType = GraphType.INSTANCE) -> bool:
+    async def has_doc(self, doc_id: str, graph_type: GraphType = GraphType.INSTANCE) -> bool:
         """Check if a certain document exist in a database
 
         Parameters
@@ -1776,7 +1788,7 @@ class Client:
         """
         self._check_connection()
 
-        response = self._session.get(
+        response = await self._session.get(
             self._documents_url(),
             headers=self._default_headers,
             json={"id": doc_id, "graph_type": graph_type},
@@ -1795,7 +1807,7 @@ class Client:
                 return False
             raise exception
 
-    def get_class_frame(self, class_name):
+    async def get_class_frame(self, class_name):
         """Get the frame of the class of class_name. Provide information about all the avaliable properties of that class.
 
         Parameters
@@ -1810,7 +1822,7 @@ class Client:
         """
         self._check_connection()
         opts = {"type": class_name}
-        result = self._session.get(
+        result = await self._session.get(
             self._class_frame_url(),
             headers=self._default_headers,
             params=opts,
@@ -1821,7 +1833,7 @@ class Client:
     def commit(self):
         """Not implementated: open transactions currently not suportted. Please check back later."""
 
-    def query(
+    async def query(
         self,
         woql_query: Union[dict, WOQLQuery],
         commit_msg: Optional[str] = None,
@@ -1871,16 +1883,18 @@ class Client:
         if last_data_version is not None:
             headers["TerminusDB-Data-Version"] = last_data_version
 
-        result = self._session.post(
+        if streaming:
+            # httpx streaming uses an async context manager
+            async with self._session.stream("POST", self._query_url(), headers=headers, json=query_obj, auth=self._auth()) as response:
+                lines = response.aiter_lines()
+                return await WoqlResult(lines)._init()
+
+        result = await self._session.post(
             self._query_url(),
             headers=headers,
             json=query_obj,
             auth=self._auth(),
-            stream=streaming,
         )
-
-        if streaming:
-            return WoqlResult(lines=_finish_response(result, streaming=True))
 
         if get_data_version:
             result, version = _finish_response(result, get_data_version)
@@ -1895,7 +1909,7 @@ class Client:
         else:
             return result
 
-    def create_branch(self, new_branch_id: str, empty: bool = False) -> None:
+    async def create_branch(self, new_branch_id: str, empty: bool = False) -> None:
         """Create a branch starting from the current branch.
 
         Parameters
@@ -1922,7 +1936,7 @@ class Client:
             }
 
         _finish_response(
-            self._session.post(
+            await self._session.post(
                 self._branch_url(new_branch_id),
                 headers=self._default_headers,
                 json=source,
@@ -1930,7 +1944,7 @@ class Client:
             )
         )
 
-    def delete_branch(self, branch_id: str) -> None:
+    async def delete_branch(self, branch_id: str) -> None:
         """Delete a branch
 
         Parameters
@@ -1946,14 +1960,14 @@ class Client:
         self._check_connection()
 
         _finish_response(
-            self._session.delete(
+            await self._session.delete(
                 self._branch_url(branch_id),
                 headers=self._default_headers,
                 auth=self._auth(),
             )
         )
 
-    def pull(
+    async def pull(
         self,
         remote: str = "origin",
         remote_branch: Optional[str] = None,
@@ -2003,7 +2017,7 @@ class Client:
             "message": message,
         }
 
-        result = self._session.post(
+        result = await self._session.post(
             self._pull_url(),
             headers=self._default_headers,
             json=rc_args,
@@ -2012,7 +2026,7 @@ class Client:
 
         return json.loads(_finish_response(result))
 
-    def fetch(
+    async def fetch(
         self,
         remote_id: str,
         remote_auth: Optional[dict] = None,
@@ -2030,7 +2044,7 @@ class Client:
             if the client does not connect to a database"""
         self._check_connection()
 
-        result = self._session.post(
+        result = await self._session.post(
             self._fetch_url(remote_id),
             headers=self._default_headers,
             auth=self._auth(),
@@ -2038,7 +2052,7 @@ class Client:
 
         return json.loads(_finish_response(result))
 
-    def push(
+    async def push(
         self,
         remote: str = "origin",
         remote_branch: Optional[str] = None,
@@ -2099,7 +2113,7 @@ class Client:
             }
         headers.update(self._default_headers)
 
-        result = self._session.post(
+        result = await self._session.post(
             self._push_url(),
             headers=headers,
             json=rc_args,
@@ -2108,7 +2122,7 @@ class Client:
 
         return json.loads(_finish_response(result))
 
-    def rebase(
+    async def rebase(
         self,
         branch: Optional[str] = None,
         commit: Optional[str] = None,
@@ -2169,7 +2183,7 @@ class Client:
         rc_args = {"rebase_from": rebase_source,
                    "author": author, "message": message}
 
-        result = self._session.post(
+        result = await self._session.post(
             self._rebase_url(),
             headers=self._default_headers,
             json=rc_args,
@@ -2178,7 +2192,7 @@ class Client:
 
         return json.loads(_finish_response(result))
 
-    def reset(
+    async def reset(
         self, commit: Optional[str] = None, soft: bool = False, use_path: bool = False
     ) -> None:
         """Reset the current branch HEAD to the specified commit path. If `soft` is not True, it will be a hard reset, meaning reset to that commit in the backend and newer commit will be wipped out. If `soft` is True, the client will only reference to that commit and can be reset to the newest commit when done.
@@ -2227,7 +2241,7 @@ class Client:
             commit_path = f"{self.team}/{self.db}/{self.repo}/commit/{commit}"
 
         _finish_response(
-            self._session.post(
+            await self._session.post(
                 self._reset_url(),
                 headers=self._default_headers,
                 json={"commit_descriptor": commit_path},
@@ -2235,7 +2249,7 @@ class Client:
             )
         )
 
-    def optimize(self, path: str) -> None:
+    async def optimize(self, path: str) -> None:
         """Optimize the specified path.
 
         Raises
@@ -2262,14 +2276,14 @@ class Client:
         self._check_connection()
 
         _finish_response(
-            self._session.post(
+            await self._session.post(
                 self._optimize_url(path),
                 headers=self._default_headers,
                 auth=self._auth(),
             )
         )
 
-    def squash(
+    async def squash(
         self,
         message: Optional[str] = None,
         author: Optional[str] = None,
@@ -2308,7 +2322,7 @@ class Client:
         """
         self._check_connection()
 
-        result = self._session.post(
+        result = await self._session.post(
             self._squash_url(),
             headers=self._default_headers,
             json={"commit_info": self._generate_commit(message, author)},
@@ -2323,7 +2337,7 @@ class Client:
 
         commit_id = json.loads(_finish_response(result)).get("api:commit")
         if reset:
-            self.reset(commit_id)
+            await self.reset(commit_id)
         return commit_id
 
     def _convert_diff_document(self, document):
@@ -2336,7 +2350,7 @@ class Client:
             new_doc = self._conv_to_dict(document)
         return new_doc
 
-    def apply(
+    async def apply(
         self, before_version, after_version, branch=None, message=None, author=None
     ):
         """Diff two different commits and apply changes on branch
@@ -2354,7 +2368,7 @@ class Client:
         branch = branch if branch else self.branch
         return json.loads(
             _finish_response(
-                self._session.post(
+                await self._session.post(
                     self._apply_url(branch=branch),
                     headers=self._default_headers,
                     json={
@@ -2367,7 +2381,7 @@ class Client:
             )
         )
 
-    def diff_object(self, before_object, after_object):
+    async def diff_object(self, before_object, after_object):
         """Diff two different objects.
 
         Parameters
@@ -2380,7 +2394,7 @@ class Client:
         self._check_connection(check_db=False)
         return json.loads(
             _finish_response(
-                self._session.post(
+                await self._session.post(
                     self._diff_url(),
                     headers=self._default_headers,
                     json={"before": before_object, "after": after_object},
@@ -2389,7 +2403,7 @@ class Client:
             )
         )
 
-    def diff_version(self, before_version, after_version):
+    async def diff_version(self, before_version, after_version):
         """Diff two different versions. Can either be a branch or a commit
 
         Parameters
@@ -2402,7 +2416,7 @@ class Client:
         self._check_connection(check_db=False)
         return json.loads(
             _finish_response(
-                self._session.post(
+                await self._session.post(
                     self._diff_url(),
                     headers=self._default_headers,
                     json={
@@ -2414,7 +2428,7 @@ class Client:
             )
         )
 
-    def diff(
+    async def diff(
         self,
         before: Union[
             str,
@@ -2473,7 +2487,7 @@ class Client:
                 )
         if self._connected:
             result = _finish_response(
-                self._session.post(
+                await self._session.post(
                     self._diff_url(),
                     headers=self._default_headers,
                     json=request_dict,
@@ -2481,16 +2495,17 @@ class Client:
                 )
             )
         else:
-            result = _finish_response(
-                requests.post(
-                    self.server_url,
-                    headers=self._default_headers,
-                    json=request_dict,
+            async with httpx.AsyncClient() as tmp_client:
+                result = _finish_response(
+                    await tmp_client.post(
+                        self.server_url,
+                        headers=self._default_headers,
+                        json=request_dict,
+                    )
                 )
-            )
         return Patch(json=result)
 
-    def patch(
+    async def patch(
         self,
         before: Union[
             dict,
@@ -2533,7 +2548,7 @@ class Client:
 
         if self._connected:
             result = _finish_response(
-                self._session.post(
+                await self._session.post(
                     self._patch_url(),
                     headers=self._default_headers,
                     json=request_dict,
@@ -2541,16 +2556,18 @@ class Client:
                 )
             )
         else:
-            result = _finish_response(
-                requests.post(
-                    self.server_url,
-                    headers=self._default_headers,
-                    json=request_dict,
+
+            async with httpx.AsyncClient() as tmp_client:
+                result = _finish_response(
+                    await tmp_client.post(
+                        self.server_url,
+                        headers=self._default_headers,
+                        json=request_dict,
+                    )
                 )
-            )
         return json.loads(result)
 
-    def patch_resource(
+    async def patch_resource(
         self,
         patch: Patch,
         branch=None,
@@ -2585,7 +2602,7 @@ class Client:
         patch_url = self._branch_base("patch", branch)
 
         result = _finish_response(
-            self._session.post(
+            await self._session.post(
                 patch_url,
                 headers=self._default_headers,
                 json=request_dict,
@@ -2594,7 +2611,7 @@ class Client:
         )
         return json.loads(result)
 
-    def clonedb(
+    async def clonedb(
         self,
         clone_source: str,
         newid: str,
@@ -2641,7 +2658,7 @@ class Client:
                    "label": newid, "comment": description}
 
         _finish_response(
-            self._session.post(
+            await self._session.post(
                 self._clone_url(newid),
                 headers=headers,
                 json=rc_args,
@@ -2680,10 +2697,10 @@ class Client:
             msg = f"Commit via python client {__version__}"
         return {"author": mes_author, "message": msg}
 
-    def _auth(self):
+    def _auth(self) -> httpx.Auth:
         # if https basic
         if not self._use_token and self._connected and self._key and self.user:
-            return (self.user, self._key)
+            return httpx.BasicAuth(self.user, self._key)
         elif self._connected and self._jwt_token is not None:
             return JWTAuth(self._jwt_token)
         elif self._connected and self._api_token is not None:
@@ -2713,7 +2730,7 @@ class Client:
         # JWT is the only key type remaining
         return f"Bearer {key}"
 
-    def create_organization(self, org: str) -> Optional[dict]:
+    async def create_organization(self, org: str) -> Optional[dict]:
         """
         Add a new organization
 
@@ -2732,14 +2749,14 @@ class Client:
         dict or None if failed
         """
         self._check_connection(check_db=False)
-        result = self._session.post(
+        result = await self._session.post(
             f"{self._organization_url()}/{org}",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def get_organization_users(self, org: str) -> Optional[dict]:
+    async def get_organization_users(self, org: str) -> Optional[dict]:
         """
         Returns a list of users in an organization.
 
@@ -2758,14 +2775,14 @@ class Client:
 
         """
         self._check_connection(check_db=False)
-        result = self._session.get(
+        result = await self._session.get(
             f"{self._organization_url()}/{org}/users",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def get_organization_user(self, org: str, username: str) -> Optional[dict]:
+    async def get_organization_user(self, org: str, username: str) -> Optional[dict]:
         """
         Returns user info related to an organization.
 
@@ -2785,14 +2802,14 @@ class Client:
 
         """
         self._check_connection(check_db=False)
-        result = self._session.get(
+        result = await self._session.get(
             f"{self._organization_url()}/{org}/users/{username}",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def get_organization_user_databases(
+    async def get_organization_user_databases(
         self, org: str, username: str
     ) -> Optional[dict]:
         """
@@ -2814,14 +2831,14 @@ class Client:
 
         """
         self._check_connection(check_db=False)
-        result = self._session.get(
+        result = await self._session.get(
             f"{self._organization_url()}/{org}/users/{username}/databases",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def get_organizations(self) -> Optional[dict]:
+    async def get_organizations(self) -> Optional[dict]:
         """
         Returns a list of organizations in the database.
 
@@ -2836,14 +2853,14 @@ class Client:
 
         """
         self._check_connection(check_db=False)
-        result = self._session.get(
+        result = await self._session.get(
             self._organization_url(),
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def get_organization(self, org: str) -> Optional[dict]:
+    async def get_organization(self, org: str) -> Optional[dict]:
         """
         Returns a specific organization
 
@@ -2862,14 +2879,14 @@ class Client:
         dict or None if not found
         """
         self._check_connection(check_db=False)
-        result = self._session.get(
+        result = await self._session.get(
             f"{self._organization_url()}/{org}",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def delete_organization(self, org: str) -> Optional[dict]:
+    async def delete_organization(self, org: str) -> Optional[dict]:
         """
         Deletes a specific organization
 
@@ -2888,14 +2905,14 @@ class Client:
         dict or None if request failed
         """
         self._check_connection(check_db=False)
-        result = self._session.delete(
+        result = await self._session.delete(
             f"{self._organization_url()}/{org}",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def change_capabilities(self, capability_change: dict) -> Optional[dict]:
+    async def change_capabilities(self, capability_change: dict) -> Optional[dict]:
         """
         Change the capabilities of a certain user
 
@@ -2926,7 +2943,7 @@ class Client:
 
         """
         self._check_connection(check_db=False)
-        result = self._session.post(
+        result = await self._session.post(
             f"{self._capabilities_url()}",
             headers=self._default_headers,
             json=capability_change,
@@ -2934,7 +2951,7 @@ class Client:
         )
         return json.loads(_finish_response(result))
 
-    def add_role(self, role: dict) -> Optional[dict]:
+    async def add_role(self, role: dict) -> Optional[dict]:
         """
         Add a new role
 
@@ -2981,7 +2998,7 @@ class Client:
         >>> client.add_role(role)
         """
         self._check_connection(check_db=False)
-        result = self._session.post(
+        result = await self._session.post(
             f"{self._roles_url()}",
             headers=self._default_headers,
             json=role,
@@ -2989,7 +3006,7 @@ class Client:
         )
         return json.loads(_finish_response(result))
 
-    def change_role(self, role: dict) -> Optional[dict]:
+    async def change_role(self, role: dict) -> Optional[dict]:
         """
         Change role actions for a particular role
 
@@ -3037,7 +3054,7 @@ class Client:
         >>> client.change_role(role)
         """
         self._check_connection(check_db=False)
-        result = self._session.put(
+        result = await self._session.put(
             f"{self._roles_url()}",
             headers=self._default_headers,
             json=role,
@@ -3045,7 +3062,7 @@ class Client:
         )
         return json.loads(_finish_response(result))
 
-    def get_available_roles(self) -> Optional[dict]:
+    async def get_available_roles(self) -> Optional[dict]:
         """
         Get the available roles for the current authenticated user
 
@@ -3059,14 +3076,14 @@ class Client:
         dict or None if failed
         """
         self._check_connection(check_db=False)
-        result = self._session.get(
+        result = await self._session.get(
             f"{self._roles_url()}",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def add_user(self, username: str, password: str) -> Optional[dict]:
+    async def add_user(self, username: str, password: str) -> Optional[dict]:
         """
         Add a new user
 
@@ -3087,7 +3104,7 @@ class Client:
         dict or None if failed
         """
         self._check_connection(check_db=False)
-        result = self._session.post(
+        result = await self._session.post(
             f"{self._users_url()}",
             headers=self._default_headers,
             json={"name": username, "password": password},
@@ -3095,7 +3112,7 @@ class Client:
         )
         return json.loads(_finish_response(result))
 
-    def get_user(self, username: str) -> Optional[dict]:
+    async def get_user(self, username: str) -> Optional[dict]:
         """
         Get a user
 
@@ -3114,14 +3131,14 @@ class Client:
         dict or None if failed
         """
         self._check_connection(check_db=False)
-        result = self._session.get(
+        result = await self._session.get(
             f"{self._users_url()}/{username}",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def get_users(self) -> Optional[dict]:
+    async def get_users(self) -> Optional[dict]:
         """
         Get all users
 
@@ -3135,14 +3152,14 @@ class Client:
         dict or None if failed
         """
         self._check_connection(check_db=False)
-        result = self._session.get(
+        result = await self._session.get(
             f"{self._users_url()}",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def delete_user(self, username: str) -> Optional[dict]:
+    async def delete_user(self, username: str) -> Optional[dict]:
         """
         Delete a user
 
@@ -3161,14 +3178,14 @@ class Client:
         dict or None if failed
         """
         self._check_connection(check_db=False)
-        result = self._session.delete(
+        result = await self._session.delete(
             f"{self._users_url()}/{username}",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def change_user_password(self, username: str, password: str) -> Optional[dict]:
+    async def change_user_password(self, username: str, password: str) -> Optional[dict]:
         """
         Change user's password
 
@@ -3189,7 +3206,7 @@ class Client:
         dict or None if failed
         """
         self._check_connection(check_db=False)
-        result = self._session.put(
+        result = await self._session.put(
             f"{self._users_url()}",
             headers=self._default_headers,
             json={"name": username, "password": password},
@@ -3197,7 +3214,7 @@ class Client:
         )
         return json.loads(_finish_response(result))
 
-    def get_database(self, dbid: str, team: Optional[str] = None) -> Optional[dict]:
+    async def get_database(self, dbid: str, team: Optional[str] = None) -> Optional[dict]:
         """
         Returns metadata (id, organization, label, comment) about the requested database
         Parameters
@@ -3220,14 +3237,14 @@ class Client:
         """
         self._check_connection(check_db=False)
         team = team if team else self.team
-        result = self._session.get(
+        result = await self._session.get(
             f"{self.api}/db/{team}/{dbid}?verbose=true",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def has_database(self, dbid: str, team: Optional[str] = None) -> bool:
+    async def has_database(self, dbid: str, team: Optional[str] = None) -> bool:
         """
         Check whether a database exists
 
@@ -3249,15 +3266,14 @@ class Client:
         """
         self._check_connection(check_db=False)
         team = team if team else self.team
-        r = self._session.head(
+        r = await self._session.head(
             f"{self.api}/db/{team}/{dbid}",
             headers=self._default_headers,
             auth=self._auth(),
-            allow_redirects=True,
         )
         return r.status_code == 200
 
-    def get_databases(self) -> List[dict]:
+    async def get_databases(self) -> List[dict]:
         """
         Returns a list of database metadata records for all databases the user has access to
 
@@ -3272,14 +3288,14 @@ class Client:
         """
         self._check_connection(check_db=False)
 
-        result = self._session.get(
+        result = await self._session.get(
             self.api + "/",
             headers=self._default_headers,
             auth=self._auth(),
         )
         return json.loads(_finish_response(result))
 
-    def list_databases(self) -> List[Dict]:
+    async def list_databases(self) -> List[Dict]:
         """
         Returns a list of database ids for all databases the user has access to
 
@@ -3294,7 +3310,7 @@ class Client:
         """
         self._check_connection(check_db=False)
         all_dbs = []
-        for data in self.get_databases():
+        for data in await self.get_databases():
             all_dbs.append(data["name"])
         return all_dbs
 
