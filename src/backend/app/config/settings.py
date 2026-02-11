@@ -3,16 +3,16 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
+
 class Settings(BaseSettings):
     APP_ENV: str
-    ARANGO_HOST: str
-    ARANGO_USER: str
-    ARANGO_PASSWORD: str
-    ARANGO_DB: str
-    ARANGO_ROOT_PASSWORD: str
-    PORT: int
-    LOG_LEVEL: str = "INFO"
 
+    TERMINUS_HOST: str
+    TERMINUS_USER: str
+    TERMINUS_KEY: str
+    TERMINUS_TEAM: str
+    TERMINUS_DB: str
+    LOG_LEVEL: str = "INFO"
 
     model_config = SettingsConfigDict(
         # Pydantic-Settings will automatically use the ENV_FILE env var if it exists.
@@ -22,7 +22,6 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-
     def is_development(self) -> bool:
         return self.APP_ENV == "development"
 
@@ -31,6 +30,7 @@ class Settings(BaseSettings):
 
     def is_test(self) -> bool:
         return self.APP_ENV == "test"
+
 
 @lru_cache()
 def get_settings() -> Settings:

@@ -1,49 +1,77 @@
+"""
+TerminusDB client module.
 
-from arangoasync import ArangoClient
-from arangoasync.auth import Auth
-from arangoasync.database import AsyncDatabase
+Provides a singleton Client instance that is shared across the application.
+The TerminusDB Python client is synchronous, so we wrap calls for
+compatibility with our async FastAPI stack.
+"""
 
+from terminusdb_client import Client
 from ..config.settings import get_settings
 
-# NOTE: python-arango-async uses an async context manager to initialize
-# underlying resources. Returning a database handle from inside an `async with`
-# block would immediately close the client and invalidate the handle.
-_client: ArangoClient | None = None
-_db: AsyncDatabase | None = None
+# ---------- Singleton state ----------
+_client: Client | None = None
 
 
-async def get_db_async_client() -> AsyncDatabase:
-    """Return a cached AsyncDatabase connection (python-arango-async)."""
-    global _client, _db
-    if _db is not None:
-        return _db
+def _build_client() -> Client:
+    """
+    Create and connect a TerminusDB client using app settings.
 
+    Returns:
+        A connected Client bound to the configured database.
+    """
     settings = get_settings()
-    _client = ArangoClient(hosts=settings.ARANGO_HOST)
-    # Manually enter the async context once and keep it alive for the process.
-    await _client.__aenter__()
+    client = Client(settings.TERMINUS_HOST)
+    # Connect to the target database.
+    # If the DB doesn't exist yet, create it first.
+    try:
+        client.connect(db=settings.TERMINUS_DB,
+                       user=settings.TERMINUS_USER,
+                       key=settings.TERMINUS_KEY,
+                       team=settings.TERMINUS_TEAM,)
+    except Exception:
+        client.create_database(
+            settings.TERMINUS_DB,
+            label=settings.TERMINUS_DB,
+            description="V-NOC code analysis graph",
+        )
+        client.connect(db=settings.TERMINUS_DB,
+                       user=settings.TERMINUS_USER,
+                       key=settings.TERMINUS_KEY,
+                       team=settings.TERMINUS_TEAM,)
 
-    auth = Auth(username=settings.ARANGO_USER,
-                password=settings.ARANGO_PASSWORD)
-    _db = await _client.db(settings.ARANGO_DB, auth=auth)
-    return _db
+    return client
 
 
-async def get_db() -> AsyncDatabase:
+def get_terminus_client() -> Client:
     """
-    FastAPI dependency: returns the process-wide cached AsyncDatabase.
+    Return a cached, singleton TerminusDB Client.
 
-    Kept as `get_db` for compatibility with existing imports.
+    This replaces `get_db_async_client()` from the ArangoDB version.
     """
-    return await get_db_async_client()
+    global _client
+    if _client is None:
+        _client = _build_client()
+    return _client
+
+
+# FastAPI dependency (mirrors the old `get_db` function signature)
+async def get_db() -> Client:
+    """
+    FastAPI dependency: returns the TerminusDB client.
+
+    Kept as `get_db` for compatibility — repos that previously did:
+        db = Depends(get_db)
+    will still work, but `db` is now a Client, not AsyncDatabase.
+    """
+    return get_terminus_client()
 
 
 def close_db_client() -> None:
-    """Close the global Arango client (best-effort)."""
-    global _client, _db
+    """Close the global TerminusDB client (best-effort)."""
+    global _client
     try:
         if _client is not None:
             _client.close()
     finally:
         _client = None
-        _db = None

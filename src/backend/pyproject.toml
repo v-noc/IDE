@@ -27,6 +27,7 @@ dependencies = [
   "pytest-asyncio>=1.1.0",
   "aiofiles>=25.1.0",
   "asgi-lifespan>=2.1.0",
+  "terminusdb-client>=10.2.6",
 ]
 
 [project.optional-dependencies]
