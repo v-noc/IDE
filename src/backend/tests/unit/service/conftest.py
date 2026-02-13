@@ -11,7 +11,7 @@ from app.core.model.properties import CodePosition
 # from app.core.services.call_service import CallService
 # from app.core.services.class_service import ClassService
 # from app.core.services.file_service import FileService
-# from app.core.services.folder_service import FolderService
+from app.core.services.folder_service import FolderService
 # from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
 
@@ -124,15 +124,19 @@ async def create_project(create_repos):
     yield project
     await project_service.delete(project.id)
 
-# @pytest_asyncio.fixture
-# async def create_folder(create_repos):
-#     folder_service = FolderService(create_repos)
-#     return await folder_service.create(
-#         "Test Folder",
-#         "test_project.test_folder",
-#         "This is a test folder",
-#         "test_folder"
-#     )
+
+@pytest_asyncio.fixture
+async def create_folder(create_repos, create_project):
+    folder_service = FolderService(create_repos, create_project)
+    folder = await folder_service.create(
+        "folder",
+        "Test Folder",
+        "test_project.test_folder",
+        "This is a test folder",
+        "test_folder"
+    )
+    yield folder
+    await folder_service.delete(folder.id)
 
 
 # @pytest_asyncio.fixture

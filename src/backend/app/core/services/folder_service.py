@@ -24,13 +24,13 @@ class FolderService():
         return await self.repos.folder_repo.create(folder, self.project.db_name)
 
     async def get(self, folder_id: str):
-        return await self.repos.folder_repo.get_by_id(folder_id)
+        return await self.repos.folder_repo.get_by_id(folder_id, self.project.db_name)
 
     async def update(self, folder: FolderNode):
-        return await self.repos.folder_repo.update(folder.key, folder)
+        return await self.repos.folder_repo.update(folder, self.project.db_name)
 
     async def delete(self, folder_key: str):
-        return await self.delete_recursive(folder_key)
+        return await self.repos.folder_repo.delete(folder_key, self.project.db_name)
 
     async def add_folder(self, parent_folder_id: str, folder_id: str):
         return await self.add_child(parent_folder_id, folder_id)

@@ -19,8 +19,8 @@ async def test_create_folder(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_get_folder(create_repos, create_folder):
-    folder_service = FolderService(create_repos)
+async def test_get_folder(create_repos, create_folder, create_project):
+    folder_service = FolderService(create_repos, create_project)
     folder = await folder_service.get(create_folder.id)
     assert folder is not None
     assert folder.name == "Test Folder"
@@ -29,8 +29,8 @@ async def test_get_folder(create_repos, create_folder):
 
 
 @pytest.mark.asyncio
-async def test_update_folder(create_repos, create_folder):
-    folder_service = FolderService(create_repos)
+async def test_update_folder(create_repos, create_folder, create_project):
+    folder_service = FolderService(create_repos, create_project)
     create_folder.name = "Updated Folder"
     create_folder.description = "This is an updated folder"
 
