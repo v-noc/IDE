@@ -341,7 +341,7 @@
 from app.db.async_terminus_client import AsyncClient
 
 
-class LogRepo():
+class LogRepository():
     def __init__(self, client: AsyncClient):
         self.client = client
 

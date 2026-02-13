@@ -1,5 +1,5 @@
 
-from backend.app.db.async_terminus_client import AsyncClient
+from app.db.async_terminus_client import AsyncClient
 
 
 from .project_repo import ProjectRepo
@@ -30,7 +30,3 @@ class Repositories:
         self.group_repo = GroupRepo(client)
         self.log_repo = LogRepository(client)
         self.document_repo = DocumentRepo(client)
-
-   async def ensure_schema(self):
-        # self.client.insert_document(all_schema_classes, graph_type="schema")
-        pass
