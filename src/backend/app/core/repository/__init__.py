@@ -1,8 +1,6 @@
-from arangoasync.database import AsyncDatabase
 
-from app.core.model import AllNodes, edges
-from app.core.repository.base.base_node_repo import BaseNodeRepository
-from app.core.repository.base.edge_repo import EdgeRepository
+from backend.app.db.async_terminus_client import AsyncClient
+
 
 from .project_repo import ProjectRepo
 from .structure.folder_repo import FolderRepo
@@ -18,49 +16,21 @@ from .group_repo import GroupRepo
 class Repositories:
     """A container for all repository instances."""
 
-    def __init__(self, db: AsyncDatabase):
+    def __init__(self, client: AsyncClient):
         # Generic Node Repo for mixed-type queries
-        self.db = db
-        self.nodes = BaseNodeRepository(db, "nodes", AllNodes)
+        self.client = client
 
         # Specific Node Repos for type-specific operations
-        self.project_repo = ProjectRepo(db)
-        self.folder_repo = FolderRepo(db)
-        self.file_repo = FileRepo(db)
-        self.function_repo = FunctionRepo(db)
-        self.class_repo = ClassRepo(db)
-        self.call_repo = CallRepo(db)
-        self.group_repo = GroupRepo(db)
-        self.log_repo = LogRepository(db)
-        self.document_repo = DocumentRepo(db)
+        self.project_repo = ProjectRepo(client)
+        self.folder_repo = FolderRepo(client)
+        self.file_repo = FileRepo(client)
+        self.function_repo = FunctionRepo(client)
+        self.class_repo = ClassRepo(client)
+        self.call_repo = CallRepo(client)
+        self.group_repo = GroupRepo(client)
+        self.log_repo = LogRepository(client)
+        self.document_repo = DocumentRepo(client)
 
-        # Edge Repositories
-        self.contains_edges = EdgeRepository[edges.ContainsEdge](
-            db, "contains_edges", edges.ContainsEdge)
-        self.targets_edges = EdgeRepository[edges.TargetsEdge](
-            db,
-            "targets_edges",
-            edges.TargetsEdge
-        )
-
-        # Log edges
-        self.log_to_function_edges = EdgeRepository[edges.LogToFunctionEdge](
-            db, "log_to_function_edges",
-            edges.LogToFunctionEdge
-        )
-        self.log_to_log_edges = EdgeRepository[edges.LogToLogEdge](
-            db, "log_to_log_edges",
-            edges.LogToLogEdge
-        )
-        # self.imports_edges = BaseRepository(
-        #     db, "imports_edges", edges.ImportsEdge, is_edge=True
-        # )
-
-    async def ensure_collections(self):
-        await self.nodes.get_collection()
-        await self.contains_edges.get_collection()
-        await self.targets_edges.get_collection()
-        await self.log_to_function_edges.get_collection()
-        await self.log_to_log_edges.get_collection()
-        await self.document_repo.get_collection()
-        await self.log_repo.get_collection()
+   async def ensure_schema(self):
+        # self.client.insert_document(all_schema_classes, graph_type="schema")
+        pass

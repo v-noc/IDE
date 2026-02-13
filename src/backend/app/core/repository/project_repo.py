@@ -1,30 +1,26 @@
 
 
-from app.core.model.nodes import ProjectNode
-from .base.base_node_repo import BaseNodeRepository
-from arangoasync.database import AsyncDatabase
+from app.db.async_terminus_client import AsyncClient
 
 
-class ProjectRepo(BaseNodeRepository[ProjectNode]):
-    """Repository for project collections."""
+class ProjectRepo():
+    def __init__(self, client: AsyncClient):
+        self.client = client
 
-    def __init__(self, db: AsyncDatabase):
-        super().__init__(db, "nodes", ProjectNode)
+    def get_project_by_id(self, project_id: str):
+        pass
 
-    async def get_all_projects(self):
-        return await self.find({"node_type": "project"})
+    def get_all_projects(self):
+        pass
 
-    async def delete(self, key: str) -> bool:
-        """Deletes a project and all its children (cascade)."""
-        try:
-            # Build the start vertex id, e.g. "nodes/<key>"
-            start_node_id = f"{self.collection_name}/{key}"
+    def create_project(self, project):
+        pass
 
-            # Use the shared cascade delete method
-            result = await self.cascade_delete(start_node_id, max_depth=50)
+    def update_project(self, project_id: str, project):
+        pass
 
-            # Return True if any vertices were deleted (including the start node)
-            return result.get("removed_vertices", 0) > 0
-        except Exception as e:
-            print(f"Cascade project delete failed: {e}")
-            return False
+    def delete_project(self, project_id: str):
+        pass
+
+    def get_children(self, project_id: str):
+        pass
