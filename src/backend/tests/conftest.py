@@ -1,7 +1,7 @@
 
 import pytest_asyncio
 
-
+from app.db.client import migrate_base
 from app.db.async_terminus_client import AsyncClient
 from app.config.settings import get_settings
 
@@ -21,8 +21,9 @@ async def terminusdb_client() -> AsyncClient:
 
     # Connect to server (without a specific db) to create the test database
     await client.connect(
+        user=settings.TERMINUS_USER,
+        key=settings.TERMINUS_KEY,
         team=settings.TERMINUS_TEAM,
-
     )
 
     try:
@@ -32,17 +33,14 @@ async def terminusdb_client() -> AsyncClient:
             label=TEST_DB_NAME,
             description="Test database for V-NOC",
         )
-        print("creaintg")
+
     except Exception as e:
         # Database may already exist from a previous run
         print(f"database already exists: {e}")
 
     # Connect to the test database
-    await client.connect(
-        team=settings.TERMINUS_TEAM,
-
-        db=TEST_DB_NAME,
-    )
+    await client.set_db(TEST_DB_NAME)
+    await migrate_base(client)
 
     yield client
 

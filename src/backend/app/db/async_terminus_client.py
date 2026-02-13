@@ -387,6 +387,7 @@ class AsyncClient:
         self._session = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
             follow_redirects=True,
+
         )
         self._connected = True
 
@@ -676,6 +677,7 @@ class AsyncClient:
             params["updated"] = updated
 
         result = await self._session.get(
+
             f"{self.api}/history/{team}/{db}",
             params=params,
             headers=self._default_headers,
@@ -1266,7 +1268,7 @@ class AsyncClient:
     async def get_document(
         self,
         iri_id: str,
-        graph_type: GraphType = GraphType.INSTANCE,
+        graph_type: GraphType = GraphType.INSTANCE.value,
         get_data_version: bool = False,
         **kwargs,
     ) -> dict:
@@ -1300,8 +1302,9 @@ class AsyncClient:
                 payload[the_arg] = kwargs[the_arg]
 
         result = await self._session.get(
-            self._documents_url(),
+            self._documents_url()+"/",
             headers=self._default_headers,
+
             params=payload,
             auth=self._auth(),
         )
@@ -1500,7 +1503,7 @@ class AsyncClient:
             "DocumentTemplate",  # noqa:F821
             List["DocumentTemplate"],  # noqa:F821
         ],
-        graph_type: GraphType = GraphType.INSTANCE,
+        graph_type: GraphType = GraphType.INSTANCE.value,
         full_replace: bool = False,
         commit_msg: Optional[str] = None,
         last_data_version: Optional[str] = None,
@@ -1607,7 +1610,7 @@ class AsyncClient:
             "DocumentTemplate",  # noqa:F821
             List["DocumentTemplate"],  # noqa:F821
         ],
-        graph_type: GraphType = GraphType.INSTANCE,
+        graph_type: GraphType = GraphType.INSTANCE.value,
         commit_msg: Optional[str] = None,
         last_data_version: Optional[str] = None,
         compress: Union[str, int] = 1024,
@@ -1689,7 +1692,7 @@ class AsyncClient:
             "DocumentTemplate",  # noqa:F821
             List["DocumentTemplate"],  # noqa:F821
         ],
-        graph_type: GraphType = GraphType.INSTANCE,
+        graph_type: GraphType = GraphType.INSTANCE.value,
         commit_msg: Optional[str] = None,
         last_data_version: Optional[str] = None,
         compress: Union[str, int] = 1024,
@@ -1721,7 +1724,7 @@ class AsyncClient:
     async def delete_document(
         self,
         document: Union[str, list, dict, Iterable],
-        graph_type: GraphType = GraphType.INSTANCE,
+        graph_type: GraphType = GraphType.INSTANCE.value,
         commit_msg: Optional[str] = None,
         last_data_version: Optional[str] = None,
     ) -> None:
@@ -1766,8 +1769,9 @@ class AsyncClient:
             headers["TerminusDB-Data-Version"] = last_data_version
 
         _finish_response(
-            await self._session.delete(
-                self._documents_url(),
+            await self._session.request(
+                method="DELETE",
+                url=self._documents_url(),
                 headers=headers,
                 params=params,
                 json=doc_id,

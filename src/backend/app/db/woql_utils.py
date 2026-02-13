@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from terminusdb_client.errors import DatabaseError
+from .errors import DatabaseError
 
 
 def _result2stream(result):
@@ -47,12 +47,14 @@ def _finish_response(request_response, get_version=False):
     DatabaseError
         For status codes 400 to 598.
     """
+
     if request_response.status_code == 200:
         if get_version:
             return request_response.text, request_response.headers.get(
                 "Terminusdb-Data-Version"
             )
         return request_response.text
+
     elif 400 <= request_response.status_code < 599:
         raise DatabaseError(request_response)
 

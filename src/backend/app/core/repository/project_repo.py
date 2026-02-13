@@ -1,6 +1,6 @@
 from datetime import datetime
 from datetime import timezone
-from terminusdb_client.errors import DatabaseError
+from app.db.errors import DatabaseError
 
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.schemas import ProjectSchema, ensure_schema
@@ -13,10 +13,12 @@ class ProjectRepo():
         self.client = client
 
     async def delete(self, project_id: str):
-        project = await self.get_project_by_id(project_id)
-        current_db = self.client.db
-        if not project:
+        project = await self.get_by_id(project_id)
+        if project is None:
+
             return True
+
+        current_db = self.client.db
 
         try:
             await self.client.delete_database(project["db_name"])
@@ -69,10 +71,21 @@ class ProjectRepo():
         )
         return project_node
 
-    async def get_project_by_id(self, project_id: str):
-        return await self.client.get_document(project_id)
+    async def get_by_id(self, project_id: str):
+        try:
+            return await self.client.get_document(project_id)
+        except DatabaseError as e:
+            print(e, " ", project_id)
+            if e.error_obj.get("api:error", {}).get("@type", "") == "api:DocumentNotFound":
+                return None
+            else:
+                raise e
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            return None
 
-    async def get_all_projects(self):
+    async def get_all(self):
         projects_raw = await self.client.get_all_documents(
             doc_type=ProjectSchema.__name__)
 
@@ -90,11 +103,27 @@ class ProjectRepo():
 
         return projects
 
-    def create_project(self, project):
-        pass
+    async def update(self, project_id: str, project: ProjectNode):
+        old_project = await self.get_by_id(project_id)
+        if not old_project:
+            return None
 
-    def update_project(self, project_id: str, project):
-        pass
+        old_project["name"] = project.name
+        old_project["description"] = project.description
+        old_project["local_path"] = project.local_path
+
+        old_project["updated_at"] = datetime.now(timezone.utc)
+
+        await self.client.update_document(old_project, commit_msg=f"Updating project {project_id}")
+        return ProjectNode(
+            id=old_project["@id"],
+            name=old_project["name"],
+            description=old_project["description"],
+            local_path=old_project["local_path"],
+            db_name=old_project["db_name"],
+            created_at=old_project["created_at"],
+            updated_at=old_project["updated_at"],
+        )
 
     def get_children(self, project_id: str):
         pass
