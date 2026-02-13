@@ -7,8 +7,22 @@ management for use with FastAPI.
 
 from .async_terminus_client import AsyncClient
 from ..config.settings import get_settings
+from app.core.model.schemas import ProjectSchema, BaseSchema, TerminusBase
+from app.db.woqlschema import *
 
 _client: AsyncClient | None = None
+
+
+async def migrate_base(client):
+    schema_obj = WOQLSchema(
+        title="V-NOC Schema",
+        description="V-NOC code analysis graph schema",
+        authors=["V-NOC Team"],
+    )
+    schema_obj.add_obj(TerminusBase.__name__, TerminusBase)
+    schema_obj.add_obj(BaseSchema.__name__, BaseSchema)
+    schema_obj.add_obj(ProjectSchema.__name__, ProjectSchema)
+    await schema_obj.commit(client, "Add ProjectSchema to schema", full_replace=True)
 
 
 async def _build_client() -> AsyncClient:
@@ -23,7 +37,8 @@ async def _build_client() -> AsyncClient:
         )
     except Exception:
         await client.create_database(
-            settings.TERMINUS_DB,
+            dbid=settings.TERMINUS_DB,
+            team=settings.TERMINUS_TEAM,
             label=settings.TERMINUS_DB,
             description="V-NOC code analysis graph",
         )
@@ -33,6 +48,7 @@ async def _build_client() -> AsyncClient:
             key=settings.TERMINUS_KEY,
             team=settings.TERMINUS_TEAM,
         )
+    await migrate_base(client)
     return client
 
 

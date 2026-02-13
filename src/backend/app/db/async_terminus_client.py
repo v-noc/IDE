@@ -1363,7 +1363,7 @@ class AsyncClient:
 
     async def get_all_documents(
         self,
-        graph_type: GraphType = GraphType.INSTANCE,
+        graph_type: GraphType = GraphType.INSTANCE.value,
         skip: int = 0,
         count: Optional[int] = None,
         as_list: bool = False,

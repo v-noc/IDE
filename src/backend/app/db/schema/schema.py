@@ -748,14 +748,14 @@ class Schema:
             await client.insert_document(
                 self,
                 commit_msg=commit_msg,
-                graph_type=GraphType.SCHEMA,
+                graph_type=GraphType.SCHEMA.value,
                 full_replace=True,
             )
         else:
             await client.update_document(
                 self,
                 commit_msg=commit_msg,
-                graph_type=GraphType.SCHEMA,
+                graph_type=GraphType.SCHEMA.value,
             )
 
     async def from_db(self, client: AsyncClient, select: Optional[List[str]] = None):
@@ -769,7 +769,7 @@ class Schema:
             The classes (and depended classes) that will be imported, default to None which will import all classes
         """
         all_existing_class_raw = await client.get_all_documents(
-            graph_type=GraphType.SCHEMA)
+            graph_type=GraphType.SCHEMA.value)
         # clean up and update all_existing_classes
         for item in all_existing_class_raw:
             item_id = item.get("@id")
