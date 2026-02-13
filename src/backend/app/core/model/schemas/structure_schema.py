@@ -2,7 +2,7 @@
 from typing import Optional, Set
 
 from app.db.schema.schema import LexicalKey
-from app.core.model.nodes import FolderNode
+from app.core.model.nodes import FileNode, FolderNode
 
 from .base import BaseSchema
 from .code_element_schema import (
@@ -33,6 +33,42 @@ class FileSchema(BaseSchema):
     code_element_group: Set["CodeElementGroupSchema"]
     call_group: Set["CallGroupSchema"]
     call_children: Set["CallSchema"]
+    hash: str
+
+    @staticmethod
+    def from_pydantic(file: FileNode):
+        return FileSchema(
+            _id=file.id,
+            name=file.name,
+            description=file.description,
+            qname=file.qname,
+            path=file.path,
+            hash=file.hash,
+            class_children=file.class_children,
+            function_children=file.function_children,
+            code_element_group=file.code_element_group,
+            call_group=file.call_group,
+            call_children=file.call_children,
+            created_at=file.created_at,
+            updated_at=file.updated_at,
+        )
+
+    def to_pydantic(self):
+        return FileNode(
+            id=self._id,
+            name=self.name,
+            description=self.description,
+            qname=self.qname,
+            path=self.path,
+            hash=self.hash,
+            class_children=self.class_children,
+            function_children=self.function_children,
+            code_element_group=self.code_element_group,
+            call_group=self.call_group,
+            call_children=self.call_children,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class FolderSchema(BaseSchema):

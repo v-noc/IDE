@@ -81,6 +81,24 @@ class FolderNode(BaseNode):
     documents: Set[Union[str, "DocumentNode"]] = Field(
         default=set(), description="The documents of the folder.")
 
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        return FolderNode(
+            id=raw_dict["@id"],
+            name=raw_dict["name"],
+            description=raw_dict["description"],
+            qname=raw_dict["qname"],
+            path=raw_dict["path"],
+            folder_children=raw_dict.get(
+                "folder_children", set()),
+            file_children=raw_dict.get("file_children", set()),
+            structure_group=raw_dict.get(
+                "structure_group", set()),
+            created_at=raw_dict["created_at"],
+            updated_at=raw_dict["updated_at"],
+
+        )
+
 
 class CallContainerNode(BaseNode):
     call_children: Set[Union[str, "CallNode"]] = Field(
@@ -107,6 +125,7 @@ class FileNode(CodeElementContainerNode, CallContainerNode):
         default=None, description="The theme config of the file.")
     documents: Set[Union[str, "DocumentNode"]] = Field(
         default=set(), description="The documents of the file.")
+    hash: str = Field(..., description="The hash of the file.")
 
 
 class ClassNode(CodeElementContainerNode, CallContainerNode):

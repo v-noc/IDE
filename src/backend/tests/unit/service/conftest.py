@@ -10,7 +10,7 @@ from app.core.model.properties import CodePosition
 # from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 # from app.core.services.call_service import CallService
 # from app.core.services.class_service import ClassService
-# from app.core.services.file_service import FileService
+from app.core.services.file_service import FileService
 from app.core.services.folder_service import FolderService
 # from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
@@ -139,17 +139,19 @@ async def create_folder(create_repos, create_project):
     await folder_service.delete(folder.id)
 
 
-# @pytest_asyncio.fixture
-# async def create_file(create_repos):
-#     file_service = FileService(create_repos)
-#     return await file_service.create(
-#         "Test File",
-#         "test_project.test_file",
-#         "This is a test file",
-#         "test_file",
-#         "hash"
-#     )
-
+@pytest_asyncio.fixture
+async def create_file(create_repos, create_project):
+    file_service = FileService(create_repos, create_project)
+    file = await file_service.create(
+        id="file",
+        name="Test File",
+        qname="test_project.test_file",
+        description="This is a test file",
+        path="test_file",
+        hash="hash"
+    )
+    yield file
+    await file_service.delete(file.id)
 
 # @pytest.fixture
 # def function_service(create_repos):

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Literal
 from app.core.repository import Repositories
 
 from app.core.model.nodes import FolderNode
@@ -32,11 +33,8 @@ class FolderService():
     async def delete(self, folder_key: str):
         return await self.repos.folder_repo.delete(folder_key, self.project.db_name)
 
-    async def add_folder(self, parent_folder_id: str, folder_id: str):
-        return await self.add_child(parent_folder_id, folder_id)
-
-    async def add_file(self, parent_folder_id: str, file_id: str):
-        return await self.add_child(parent_folder_id, file_id)
+    async def add_child(self, parent_folder_id: str, child_id: str, child_type: Literal["folder", "file"]):
+        return await self.repos.folder_repo.move_item(parent_folder_id, child_id, child_type, self.project.db_name)
 
     async def get_children(self, folder_id: str):
-        return await self.repos.folder_repo.get_containment_tree(folder_id)
+        return await self.repos.folder_repo.get_children(folder_id, [], self.project.db_name)

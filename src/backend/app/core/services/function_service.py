@@ -1,11 +1,11 @@
-from app.core.services.container_service import ContainerService
+
 from app.core.repository import Repositories
 from app.core.model.nodes import FunctionNode
 from app.core.model.properties import CodePosition
 from typing import Optional
 
 
-class FunctionService(ContainerService):
+class FunctionService():
     def __init__(self, repos: Repositories):
         super().__init__(repos)
 
@@ -45,7 +45,5 @@ class FunctionService(ContainerService):
     async def add_class(self, parent_function_id: str, class_id: str):
         return await self.add_child(parent_function_id, class_id)
 
-
     async def get_children(self, function_id: str):
         return await self.repos.function_repo.get_containment_tree(function_id)
-

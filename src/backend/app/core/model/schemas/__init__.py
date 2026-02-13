@@ -1,5 +1,8 @@
+import enum
 from app.db.async_terminus_client import AsyncClient
 from app.db.woqlschema import *
+from app.db.schema import schema
+from app.db import woqlschema
 from .base import BaseSchema, TerminusBase
 from .code_element_schema import (
     CallGroupSchema,

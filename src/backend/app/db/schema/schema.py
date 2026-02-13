@@ -1,3 +1,4 @@
+from ..async_terminus_client import AsyncClient, GraphType
 import json
 import urllib.parse as urlparse
 import weakref
@@ -9,9 +10,9 @@ from typing import List, Optional, Set, Union
 from numpydoc.docscrape import ClassDoc
 from typeguard import check_type
 
-from terminusdb_client import woql_type as wt
-from ..async_terminus_client import AsyncClient, GraphType
-from terminusdb_client.woql_type import (  # noqa: F401
+import app.db.woql_type as wt
+# wt = woql_type
+from app.db.woql_type import (
     to_woql_type,
     anySimpleType,
     decimal,
@@ -538,13 +539,17 @@ class Schema:
             else:
                 raise RuntimeError(
                     f"{class_obj_dict} not exist in database schema")
+
         for key, value in class_obj_dict.items():
             if key[0] != "@":
                 attributedict[key] = None
                 if isinstance(value, str):
                     if value[:4] == "xsd:":
                         annotations[key] = wt.from_woql_type(value)
+                    elif value[:4] == "sys:":
+                        annotations[key] = dict
                     else:
+
                         if value not in self._all_existing_classes:
                             raise RuntimeError(
                                 f"{value} not exist in database schema")
@@ -621,6 +626,7 @@ class Schema:
 
     def _construct_object(self, obj_dict):
         obj_type = obj_dict.get("@type")
+        print(f"obj_type {self.object}")
         if obj_type and obj_type not in self.object:
             raise ValueError(
                 f"{obj_type} is not in current schema. (Received {obj_dict})"

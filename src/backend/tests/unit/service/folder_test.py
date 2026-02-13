@@ -43,15 +43,16 @@ async def test_update_folder(create_repos, create_folder, create_project):
 
 
 @pytest.mark.asyncio
-async def test_add_folder_to_folder(create_repos, create_folder):
-    folder_service = FolderService(create_repos)
+async def test_add_folder_to_folder(create_repos, create_folder, create_project):
+    folder_service = FolderService(create_repos, create_project)
     second_folder = await folder_service.create(
-        "second Folder",
+        "second_folder",
+        "Second Folder",
         "test_project.test_folder.second_folder",
         "This is a new folder",
         "test_folder/second_folder"
     )
-    await folder_service.add_folder(create_folder.id, second_folder.id)
+    await folder_service.add_child(create_folder.id, second_folder.id, "folder")
 
     children_tree = await folder_service.get_children(create_folder.id)
 

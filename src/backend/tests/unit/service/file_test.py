@@ -4,9 +4,10 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_create_file(create_repos):
-    file_service = FileService(create_repos)
+async def test_create_file(create_repos, create_project):
+    file_service = FileService(create_repos, create_project)
     file = await file_service.create(
+        "file",
         "Test File",
         "test_project.test_file",
         "This is a test file",
@@ -20,8 +21,8 @@ async def test_create_file(create_repos):
 
 
 @pytest.mark.asyncio
-async def test_get_file(create_repos, create_file):
-    file_service = FileService(create_repos)
+async def test_get_file(create_repos, create_file, create_project):
+    file_service = FileService(create_repos, create_project)
     file = await file_service.get(create_file.id)
     assert file is not None
     assert file.name == "Test File"
@@ -30,8 +31,8 @@ async def test_get_file(create_repos, create_file):
 
 
 @pytest.mark.asyncio
-async def test_update_file(create_repos, create_file):
-    file_service = FileService(create_repos)
+async def test_update_file(create_repos, create_file, create_project):
+    file_service = FileService(create_repos, create_project)
     create_file.name = "Updated File"
     create_file.description = "This is an updated file"
 

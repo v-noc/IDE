@@ -1,45 +1,92 @@
-# from typing import Dict, Any, List
-# from ..base.base_node_repo import BaseNodeRepository
-# from app.core.model.nodes import FileNode
-# from arangoasync.database import AsyncDatabase
+from datetime import datetime, timezone
+from app.core.model.nodes import FileNode
+from app.core.model.schemas import FileSchema
 from app.db.async_terminus_client import AsyncClient
 
-
-# class FileRepo(BaseNodeRepository[FileNode]):
-#     def __init__(self, db: AsyncDatabase):
-#         super().__init__(db, "nodes", FileNode)
-
-#     async def get_project_files(self, project_id: str) -> List[Dict[str, Any]]:
-#         """
-#         Returns a list of file details (path, id, checksum) belonging to the specific project.
-#         Uses graph traversal to ensure we only get nodes connected to this project.
-#         """
-#         query = """
-#             FOR v, e, p IN 1..100 OUTBOUND @project_id @@contains_collection
-#                 OPTIONS { order: "bfs", uniqueVertices: "global" }
-#                 FILTER v.node_type == "file"
-#                 // Optional: Double check path just in case, but graph logic is primary
-#                 RETURN {
-#                     path: v.path,
-#                     id: v._key,
-#                     checksum: v.hash
-#                 }
-#         """
-#         cursor = await self.db.aql.execute(
-#             query,
-#             bind_vars={
-#                 "project_id": project_id,
-#                 "@contains_collection": "contains_edges"
-#             }
-#         )
-#         return [doc async for doc in cursor]
 
 class FileRepo():
     def __init__(self, client: AsyncClient):
         self.client = client
 
-    def get_file_by_id(self, file_id: str):
-        pass
+    async def create(self, file: FileNode, project_db_name: str):
+        current_db = None
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
+        file_schema = FileSchema.from_pydantic(file)
+        await self.client.insert_document(file_schema, commit_msg=f"Creating file {file.name}")
+        if current_db:
+            await self.client.set_db(current_db)
+        return file_schema.to_pydantic()
+
+    async def get_by_id(self, file_id: str, project_db_name: str):
+        current_db = None
+
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
+        try:
+            file_raw = await self.client.get_document(file_id)
+        except Exception as e:
+            print(e)
+            return None
+        finally:
+            if current_db:
+                await self.client.set_db(current_db)
+
+        file = FileNode(
+            id=file_raw["@id"],
+            name=file_raw["name"],
+            description=file_raw["description"],
+            qname=file_raw["qname"],
+            path=file_raw["path"],
+            hash=file_raw["hash"],
+            class_children=file_raw.get("class_children", set()),
+            function_children=file_raw.get("function_children", set()),
+            code_element_group=file_raw.get("code_element_group", set()),
+            call_group=file_raw.get("call_group", set()),
+            call_children=file_raw.get("call_children", set()),
+            created_at=file_raw["created_at"],
+            updated_at=file_raw["updated_at"],
+        )
+
+        return file
+
+    async def delete(self, file_id: str, project_db_name: str):
+        current_db = None
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
+        try:
+            await self.client.delete_document(file_id, commit_msg=f"Deleting file {file_id}")
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            if current_db:
+                await self.client.set_db(current_db)
+        return True
+
+    async def update(self, file: FileNode, project_db_name: str):
+        current_db = None
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
+
+        existing_file = await self.get_by_id(file.id, project_db_name)
+        if not existing_file:
+            return None
+        file_schema = FileSchema.from_pydantic(file)
+        file_schema.updated_at = datetime.now(timezone.utc)
+        try:
+            await self.client.update_document(file_schema, commit_msg=f"Updating file {file.id}")
+        except Exception as e:
+            print(e)
+            return None
+        finally:
+            if current_db:
+                await self.client.set_db(current_db)
+        return file_schema.to_pydantic()
 
     def get_file_by_path(self, path: str):
         pass
@@ -60,13 +107,4 @@ class FileRepo():
         pass
 
     def remove_child(self, parent_id: str, child_id: str, child_type: str):
-        pass
-
-    def create_file(self, parent_id: str, name: str, description: str):
-        pass
-
-    def update_file(self, file_id: str, name: str, description: str):
-        pass
-
-    def delete_file(self, file_id: str):
         pass
