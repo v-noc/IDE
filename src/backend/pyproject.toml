@@ -30,6 +30,7 @@ dependencies = [
   "terminusdb-client>=10.2.6",
   "respx>=0.22.0",
   "trio>=0.32.0",
+  "python-slugify>=8.0.4",
 ]
 
 [project.optional-dependencies]

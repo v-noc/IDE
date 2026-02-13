@@ -1,3 +1,4 @@
+from terminusdb_client.errors import DatabaseError
 from app.core.model.schemas import ProjectSchema, BaseSchema, TerminusBase
 from app.db.woqlschema import *
 from app.db.client import get_db, get_settings
@@ -28,5 +29,14 @@ async def get_all_documents():
         print(document)
     return documents
 
+
+async def get_database(db_name: str):
+    try:
+        client = await get_db()
+        return await client.create_database("test_db")
+    except DatabaseError as e:
+        print(f"Error getting database: {e.error_obj.get("api:error", "")}")
+        return None
+
 if __name__ == "__main__":
-    asyncio.run(get_all_documents())
+    asyncio.run(get_database("tada"))

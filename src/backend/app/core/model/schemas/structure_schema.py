@@ -18,6 +18,7 @@ class StructureGroupSchema(BaseSchema):
     """
     folder_children: Set["FolderSchema"]
     file_children: Set["FileSchema"]
+    structure_group: Set["StructureGroupSchema"]
 
 
 class FileSchema(BaseSchema):

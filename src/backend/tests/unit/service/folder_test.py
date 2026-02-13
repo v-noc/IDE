@@ -3,9 +3,10 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_create_folder(create_repos):
-    folder_service = FolderService(create_repos)
+async def test_create_folder(create_repos, create_project):
+    folder_service = FolderService(create_repos, create_project)
     folder = await folder_service.create(
+        "folder",
         "Test Folder",
         "test_project.test_folder",
         "This is a test folder",
