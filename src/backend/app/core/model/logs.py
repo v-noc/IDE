@@ -1,12 +1,10 @@
 from datetime import datetime
 from typing import Any, Dict, Optional, Literal
 
-from pydantic import Field
-
-from .base import ArangoBase
+from pydantic import Field, BaseModel
 
 
-class LogNode(ArangoBase):
+class LogNode(BaseModel):
     timestamp: datetime = Field(
         ..., description="Event timestamp (UTC ISO 8601)"
     )

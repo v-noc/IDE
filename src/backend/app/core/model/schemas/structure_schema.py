@@ -1,6 +1,8 @@
 
 from typing import Optional, Set
 
+from app.db.schema.schema import LexicalKey
+
 from .base import BaseSchema
 from .code_element_schema import (
     CallGroupSchema,
@@ -46,6 +48,7 @@ class ProjectSchema(BaseSchema):
     """
     The schema for the project document.
     """
+
     db_name: str
     local_path: str
-    remote_path: str
+    remote_path: Optional[str]

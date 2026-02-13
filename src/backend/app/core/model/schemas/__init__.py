@@ -1,3 +1,5 @@
+from app.db.async_terminus_client import AsyncClient
+from app.db.woqlschema import *
 from .base import BaseSchema, TerminusBase
 from .code_element_schema import (
     CallGroupSchema,
@@ -6,7 +8,7 @@ from .code_element_schema import (
     FunctionSchema,
     CallSchema
 )
-from .log_schema import LogSchema
+from .log_schema import LogSchema, LogLevelName, LogEventType
 from .metadata import CodePosition, ThemeConfig, DocumentSchema
 from .structure_schema import StructureGroupSchema, FileSchema, FolderSchema, ProjectSchema
 
@@ -19,6 +21,8 @@ __all__ = [
     "FunctionSchema",
     "CallSchema",
     "LogSchema",
+    "LogLevelName",
+    "LogEventType",
     "CodePosition",
     "ThemeConfig",
     "DocumentSchema",
@@ -27,3 +31,35 @@ __all__ = [
     "FolderSchema",
     "ProjectSchema"
 ]
+
+
+async def ensure_schema(client: AsyncClient, title: str, description: str, authors: list[str]):
+    schema_obj = WOQLSchema(
+        title=title,
+        description=description,
+        authors=authors,
+    )
+    schema_obj.add_obj(TerminusBase.__name__, TerminusBase)
+    schema_obj.add_obj(BaseSchema.__name__, BaseSchema)
+
+    # log schema
+    schema_obj.add_obj(LogSchema.__name__, LogSchema)
+    schema_obj.add_obj(LogLevelName.__name__, LogLevelName)
+    schema_obj.add_obj(LogEventType.__name__, LogEventType)
+    schema_obj.add_obj(DocumentSchema.__name__, DocumentSchema)
+    schema_obj.add_obj(ThemeConfig.__name__, ThemeConfig)
+    schema_obj.add_obj(CodePosition.__name__, CodePosition)
+
+    # structure schema
+    schema_obj.add_obj(FolderSchema.__name__, FolderSchema)
+    schema_obj.add_obj(FileSchema.__name__, FileSchema)
+    schema_obj.add_obj(StructureGroupSchema.__name__, StructureGroupSchema)
+
+    # code element schema
+    schema_obj.add_obj(CodeElementGroupSchema.__name__, CodeElementGroupSchema)
+    schema_obj.add_obj(ClassSchema.__name__, ClassSchema)
+    schema_obj.add_obj(FunctionSchema.__name__, FunctionSchema)
+    schema_obj.add_obj(CallGroupSchema.__name__, CallGroupSchema)
+    schema_obj.add_obj(CallSchema.__name__, CallSchema)
+
+    await schema_obj.commit(client, f"Initialize schema for {title}", full_replace=True)
