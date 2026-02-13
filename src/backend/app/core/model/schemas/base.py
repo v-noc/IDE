@@ -17,5 +17,6 @@ class TerminusBase(DocumentTemplate):
 
 
 class BaseSchema(TerminusBase):
+    _abstract = []
     name: str
     description: str

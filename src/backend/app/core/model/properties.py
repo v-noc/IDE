@@ -10,19 +10,6 @@ class CodePosition(BaseModel):
     end_col_offset: int
 
 
-class TypeKeyValuesProperties(BaseModel):
-
-    varname: str = Field(
-        ...,
-        description="The key of the type key-value pair."
-    )
-    varType: str = Field(..., description="The type of the variable.")
-    position: CodePosition = Field(
-        ...,
-        description="The position of the variable."
-    )
-
-
 class ThemeConfig(BaseModel):
     navbarColor: Optional[str] = Field(
         default=None,

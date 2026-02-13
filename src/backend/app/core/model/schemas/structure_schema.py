@@ -14,7 +14,6 @@ class StructureGroupSchema(BaseSchema):
     """
     The schema for the structure group document.
     """
-    name: str
     folder_children: Set["FolderSchema"]
     file_children: Set["FileSchema"]
 
@@ -23,7 +22,8 @@ class FileSchema(BaseSchema):
     """
     The schema for the file document.
     """
-    name: str
+    qname: str
+    path: str
     class_children: Set["ClassSchema"]
     function_children: Set["FunctionSchema"]
     code_element_group: Set["CodeElementGroupSchema"]
@@ -35,7 +35,8 @@ class FolderSchema(BaseSchema):
     """
     The schema for the folder document.
     """
-
+    qname: str
+    path: str
     folder_children: Set["FolderSchema"]
     file_children: Set["FileSchema"]
     structure_group: Set["StructureGroupSchema"]
@@ -46,4 +47,5 @@ class ProjectSchema(BaseSchema):
     The schema for the project document.
     """
     db_name: str
-    root_folder: FolderSchema
+    local_path: str
+    remote_path: str

@@ -30,6 +30,7 @@ class ClassSchema(BaseSchema):
     """
     The schema for the class document.
     """
+    qname: str
     class_children: Set["ClassSchema"]
     function_children: Set["FunctionSchema"]
     call_children: Set["CallSchema"]
@@ -43,6 +44,7 @@ class FunctionSchema(BaseSchema):
     """
     The schema for the function document.
     """
+    qname: str
     function_children: Set["FunctionSchema"]
     class_children: Set["ClassSchema"]
     call_children: Set["CallSchema"]
