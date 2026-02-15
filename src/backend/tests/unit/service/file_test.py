@@ -45,19 +45,19 @@ async def test_update_file(create_repos, create_file, create_project):
 
 
 @pytest.mark.asyncio
-async def test_add_function_to_file(create_repos, create_file, create_function):
-    file_service = FileService(create_repos)
+async def test_add_function_to_file(create_repos, create_file, create_function, create_project):
+    file_service = FileService(create_repos, create_project)
     await file_service.add_function(create_file.id, create_function.id)
     functions = await file_service.get_children(create_file.id)
     assert len(functions) == 1
 
-    assert functions[0]['vertex']['_id'] == create_function.id
+    assert functions[0].id == create_function.id
 
 
 @pytest.mark.asyncio
-async def test_nested_functions(create_repos, create_file, create_function, create_function2):
-    file_service = FileService(create_repos)
-    function_service = FunctionService(create_repos)
+async def test_nested_functions(create_repos, create_project, create_file, create_function, create_function2):
+    file_service = FileService(create_repos, create_project)
+    function_service = FunctionService(create_repos, create_project)
 
     await file_service.add_function(create_file.id, create_function.id)
     await function_service.add_function(
