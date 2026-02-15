@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from app.core.model.nodes import FileNode
 from app.core.model.schemas import FileSchema
 from app.db.async_terminus_client import AsyncClient
+from app.db.async_terminus_client import WOQLQuery as WQ
 
 
 class FileRepo():
@@ -61,6 +62,13 @@ class FileRepo():
         if not existing_file:
             return None
         file_schema = FileSchema.from_pydantic(file)
+
+        file_schema.call_children = existing_file.call_children
+        file_schema.call_group = existing_file.call_group
+        file_schema.class_children = existing_file.class_children
+        file_schema.function_children = existing_file.function_children
+        file_schema.code_element_group = existing_file.code_element_group
+
         file_schema.updated_at = datetime.now(timezone.utc)
         try:
             await self.client.update_document(file_schema, commit_msg=f"Updating file {file.id}")
@@ -72,20 +80,47 @@ class FileRepo():
                 await self.client.set_db(current_db)
         return file_schema.to_pydantic()
 
-    def get_file_by_path(self, path: str):
-        pass
+    async def move_item(self, new_parent_id: str, item_id: str,  child_type: str, project_db_name: str):
+        current_db = None
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
 
-    def get_file_by_qname(self, qname: str):
-        pass
+        filed_name = None
 
-    def get_children(self, folder_id: str):
-        pass
+        match child_type:
+            case "folder":
+                filed_name = "folder_children"
+            case "file":
+                filed_name = "file_children"
+            case "structure_group":
+                filed_name = "structure_group"
+            case _:
+                return None
 
-    def get_direct_children(self, file_id: str):
-        pass
+        if not filed_name:
+            raise ValueError(f"Invalid child type: {child_type}")
 
-    def move_item(self, item_id: str, new_parent_id: str, child_type: str):
-        pass
+        try:
+            current_time = datetime.now(timezone.utc)
+            query = WQ().woql_and(
+                WQ().opt(
+                    WQ().triple("v:parent", filed_name, item_id)
+                    .delete_triple("v:parent", filed_name, item_id)
+                    .update_triple("v:parent", "updated_at", current_time)
+                ),
+                WQ().add_triple(new_parent_id, filed_name, item_id)
+                .update_triple(new_parent_id, "updated_at", current_time)
+            )
+            await self.client.query(query, commit_msg=f"Moving item {item_id} to {new_parent_id}")
+
+            return True
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            if current_db:
+                await self.client.set_db(current_db)
 
     def add_child(self, parent_id: str, child_id: str, child_type: str):
         pass

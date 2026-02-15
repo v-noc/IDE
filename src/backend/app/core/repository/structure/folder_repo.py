@@ -89,6 +89,11 @@ class FolderRepo():
             return None
 
         folder_schema = FolderSchema.from_pydantic(folder)
+
+        folder_schema.folder_children = existing_folder.folder_children
+        folder_schema.file_children = existing_folder.file_children
+        folder_schema.structure_group = existing_folder.structure_group
+
         folder_schema.updated_at = datetime.now(timezone.utc)
 
         try:
@@ -199,14 +204,17 @@ class FolderRepo():
             raise ValueError(f"Invalid child type: {child_type}")
 
         try:
+            current_time = datetime.now(timezone.utc)
             query = WQ().woql_and(
                 WQ().opt(
                     WQ().triple("v:parent", filed_name, item_id)
                     .delete_triple("v:parent", filed_name, item_id)
+                    .update_triple("v:parent", "updated_at", current_time)
                 ),
                 WQ().add_triple(new_parent_id, filed_name, item_id)
+                .update_triple(new_parent_id, "updated_at", current_time)
             )
-            result = await self.client.query(query, commit_msg=f"Moving item {item_id} to {new_parent_id}")
+            await self.client.query(query, commit_msg=f"Moving item {item_id} to {new_parent_id}")
 
             return True
         except Exception as e:
