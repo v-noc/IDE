@@ -34,23 +34,7 @@ class FileRepo():
             if current_db:
                 await self.client.set_db(current_db)
 
-        file = FileNode(
-            id=file_raw["@id"],
-            name=file_raw["name"],
-            description=file_raw["description"],
-            qname=file_raw["qname"],
-            path=file_raw["path"],
-            hash=file_raw["hash"],
-            class_children=file_raw.get("class_children", set()),
-            function_children=file_raw.get("function_children", set()),
-            code_element_group=file_raw.get("code_element_group", set()),
-            call_group=file_raw.get("call_group", set()),
-            call_children=file_raw.get("call_children", set()),
-            created_at=file_raw["created_at"],
-            updated_at=file_raw["updated_at"],
-        )
-
-        return file
+        return FileNode.from_raw_dict(file_raw)
 
     async def delete(self, file_id: str, project_db_name: str):
         current_db = None

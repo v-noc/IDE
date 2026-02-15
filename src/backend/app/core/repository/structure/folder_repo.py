@@ -18,15 +18,16 @@ class FolderRepo():
             current_db = self.client.db
             await self.client.set_db(project_db_name)
 
+        by_type = new_folder.get_children_by_type()
         folder_schema = FolderSchema(
             _id=new_folder.id,
             name=new_folder.name,
             description=new_folder.description,
             qname=new_folder.qname,
             path=new_folder.path,
-            folder_children=new_folder.folder_children,
-            file_children=new_folder.file_children,
-            structure_group=new_folder.structure_group,
+            folder_children=by_type.get("folder_children", set()),
+            file_children=by_type.get("file_children", set()),
+            structure_group=by_type.get("structure_group", set()),
             created_at=new_folder.created_at,
             updated_at=new_folder.updated_at,
         )
@@ -50,19 +51,7 @@ class FolderRepo():
             if current_db:
                 await self.client.set_db(current_db)
 
-        folder = FolderNode(
-            id=folder_raw["@id"],
-            name=folder_raw["name"],
-            description=folder_raw["description"],
-            qname=folder_raw["qname"],
-            path=folder_raw["path"],
-            folder_children=folder_raw.get("folder_children", set()),
-            file_children=folder_raw.get("file_children", set()),
-            structure_group=folder_raw.get("structure_group", set()),
-            created_at=folder_raw["created_at"],
-            updated_at=folder_raw["updated_at"],
-        )
-        return folder
+        return FolderNode.from_raw_dict(folder_raw)
 
     async def delete(self, folder_id: str, project_db_name: str):
         current_db = None

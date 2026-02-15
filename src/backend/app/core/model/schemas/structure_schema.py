@@ -37,6 +37,7 @@ class FileSchema(BaseSchema):
 
     @staticmethod
     def from_pydantic(file: FileNode):
+        by_type = file.get_children_by_type()
         return FileSchema(
             _id=file.id,
             name=file.name,
@@ -44,11 +45,11 @@ class FileSchema(BaseSchema):
             qname=file.qname,
             path=file.path,
             hash=file.hash,
-            class_children=file.class_children,
-            function_children=file.function_children,
-            code_element_group=file.code_element_group,
-            call_group=file.call_group,
-            call_children=file.call_children,
+            class_children=by_type.get("class_children", set()),
+            function_children=by_type.get("function_children", set()),
+            code_element_group=by_type.get("code_element_group", set()),
+            call_group=by_type.get("call_group", set()),
+            call_children=by_type.get("call_children", set()),
             created_at=file.created_at,
             updated_at=file.updated_at,
         )
@@ -61,11 +62,15 @@ class FileSchema(BaseSchema):
             qname=self.qname,
             path=self.path,
             hash=self.hash,
-            class_children=self.class_children,
-            function_children=self.function_children,
-            code_element_group=self.code_element_group,
-            call_group=self.call_group,
-            call_children=self.call_children,
+            children=self.class_children | self.function_children | self.code_element_group
+            | self.call_group | self.call_children,
+            children_by_type={
+                "class_children": self.class_children,
+                "function_children": self.function_children,
+                "code_element_group": self.code_element_group,
+                "call_group": self.call_group,
+                "call_children": self.call_children,
+            },
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
@@ -83,15 +88,16 @@ class FolderSchema(BaseSchema):
 
     @staticmethod
     def from_pydantic(folder: FolderNode):
+        by_type = folder.get_children_by_type()
         return FolderSchema(
             _id=folder.id,
             name=folder.name,
             description=folder.description,
             qname=folder.qname,
             path=folder.path,
-            folder_children=folder.folder_children,
-            file_children=folder.file_children,
-            structure_group=folder.structure_group,
+            folder_children=by_type.get("folder_children", set()),
+            file_children=by_type.get("file_children", set()),
+            structure_group=by_type.get("structure_group", set()),
             created_at=folder.created_at,
             updated_at=folder.updated_at,
         )
@@ -103,9 +109,12 @@ class FolderSchema(BaseSchema):
             description=self.description,
             qname=self.qname,
             path=self.path,
-            folder_children=self.folder_children,
-            file_children=self.file_children,
-            structure_group=self.structure_group,
+            children=self.folder_children | self.file_children | self.structure_group,
+            children_by_type={
+                "folder_children": self.folder_children,
+                "file_children": self.file_children,
+                "structure_group": self.structure_group,
+            },
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
