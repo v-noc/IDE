@@ -75,3 +75,14 @@ async def test_add_class_to_file(create_repos, create_file, create_class):
     assert len(classes) == 1
 
     assert classes[0]['vertex']['_id'] == create_class.id
+
+
+@pytest.mark.asyncio
+async def test_get_all_files(create_repos, create_file, create_folder, create_project):
+    file_service = FileService(create_repos, create_project)
+    files = await file_service.get_all_files()
+
+    assert len(files) == 1
+    assert files[0].name == "Test File"
+    assert files[0].qname == "test_project.test_file"
+    assert files[0].description == "This is a test file"

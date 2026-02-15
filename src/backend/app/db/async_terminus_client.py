@@ -1265,6 +1265,35 @@ class AsyncClient:
         else:
             return return_obj
 
+    async def get_documents(
+        self,
+        iri_ids: List[str],
+        graph_type: GraphType = GraphType.INSTANCE.value,
+        get_data_version: bool = False,
+        **kwargs,
+    ) -> List[dict]:
+        """Retrieves the documents of the iri_ids
+        """
+        add_args = ["prefixed", "minimized", "unfold"]
+        self._check_connection()
+        payload = {"graph_type": graph_type}
+        for the_arg in add_args:
+            if the_arg in kwargs:
+                payload[the_arg] = kwargs[the_arg]
+
+        result = await self._session.post(
+            self._documents_url()+"/",
+            headers={**self._default_headers, "X-HTTP-Method-Override": "GET"},
+            json={"ids": iri_ids},
+            auth=self._auth(),
+        )
+
+        if get_data_version:
+            result, version = _finish_response(result, get_data_version)
+            return json.loads(result), version
+
+        return _result2stream(_finish_response(result))
+
     async def get_document(
         self,
         iri_id: str,

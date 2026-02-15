@@ -38,3 +38,6 @@ class FolderService():
 
     async def get_children(self, folder_id: str):
         return await self.repos.folder_repo.get_children(folder_id, [], self.project.db_name)
+
+    async def get_all_folders(self):
+        return await self.repos.folder_repo.get_all_folders(self.project.db_name)

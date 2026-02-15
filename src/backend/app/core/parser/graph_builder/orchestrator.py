@@ -125,21 +125,21 @@ class GraphBuilderOrchestrator:
             # 1. Scan Disk
             progress_tracker.start_phase("scanning")
             await progress_tracker.emit(force=True)
-            
+
             scan_result = self.file_scanner.scan()
             logger.info(
                 "Scanned %d files across %d folders on disk",
                 len(scan_result.files),
                 len(scan_result.folders),
             )
-            
+
             # Set total files after scanning
             progress_tracker.set_total_files(len(scan_result.files))
             await progress_tracker.emit(force=True)
 
             # 2. Detect Changes
             change_set = await self.change_detector.detect_changes(
-                scan_result, project_id
+                scan_result, self.project_node.db_name
             )
             logger.info(f"Detected changes: {change_set}")
 
@@ -153,10 +153,10 @@ class GraphBuilderOrchestrator:
 
             # 3. Process Changes (Phase 1 & 2)
             await self._process_changes(change_set, scan_result, progress_tracker)
-            
+
             # Mark as complete
             await progress_tracker.complete()
-            
+
         except Exception as e:
             logger.error(f"Error during resync: {e}", exc_info=True)
             progress_tracker.set_error(str(e))
@@ -201,7 +201,7 @@ class GraphBuilderOrchestrator:
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")
         progress_tracker.start_phase("collecting")
-        
+
         # Calculate files to process for collection phase
         files_to_process = [
             tp.path
@@ -213,13 +213,13 @@ class GraphBuilderOrchestrator:
         )
         progress_tracker.set_total_files(len(files_to_process))
         await progress_tracker.emit(force=True)
-        
+
         collection_results = (
             await self.phase_processor.process_collection_phase(
                 change_set, scan_result, progress_tracker
             )
         )
-        
+
         # Emit final collection phase progress with discovered entities
         await progress_tracker.emit(force=True)
 
@@ -231,7 +231,7 @@ class GraphBuilderOrchestrator:
         # Total files for analysis is the number of collection results
         progress_tracker.set_total_files(len(collection_results))
         await progress_tracker.emit(force=True)
-        
+
         try:
             # Phase 2 refactoring is deferred.
             # We pass None for call_sync_service as we removed SyncService.

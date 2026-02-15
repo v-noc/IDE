@@ -2,7 +2,7 @@ import uuid
 import logging
 from pathlib import Path
 from app.core.parser.ast.id_injector import inject_module_metadata
-
+from app.core.model.schemas import FolderSchema
 logger = logging.getLogger(__name__)
 
 
@@ -65,7 +65,7 @@ class FolderTracker:
             if modified:
                 init_file.write_text(new_content, encoding="utf-8")
 
-            return folder_id
+            return f"{FolderSchema.__name__}/{folder_id}"
 
         except Exception as e:
             logger.error(f"Error processing {init_file}: {e}")

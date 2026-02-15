@@ -11,6 +11,7 @@ from app.core.parser.graph_builder.collection.folder_tracker import (
 )
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
+from app.core.model.nodes import FileNode, FolderNode
 
 
 @dataclass
@@ -90,13 +91,13 @@ class ChangeDetector:
     def _compute_file_changes(
         self,
         current_files: Dict[str, str],
-        db_file_snapshots: List[Dict[str, Any]],
+        db_file_snapshots: List[FileNode],
     ) -> Tuple[List[str], List[str], List[str], Dict[str, str]]:
         """
         Returns (new_files, modified_files, deleted_files, db_id_by_path).
         """
-        db_state = {f["path"]: f["checksum"] for f in db_file_snapshots}
-        db_id_by_path = {f["path"]: f["id"] for f in db_file_snapshots}
+        db_state = {f.path: f.hash for f in db_file_snapshots}
+        db_id_by_path = {f.path: f.id for f in db_file_snapshots}
 
         current_paths = set(current_files.keys())
         db_paths = set(db_state.keys())
@@ -118,16 +119,16 @@ class ChangeDetector:
     def _compute_folder_changes(
         self,
         current_folders: Set[str],
-        db_folder_snapshots: List[Dict[str, Any]],
+        db_folder_snapshots: List[FolderNode],
     ) -> Tuple[List[str], List[str], Dict[str, str]]:
         """
         Returns (new_folders, deleted_folders, db_id_by_path).
         """
         db_folder_paths: Set[str] = {
-            f["path"] for f in db_folder_snapshots
+            f.path for f in db_folder_snapshots
         }
         db_id_by_path = {
-            f["path"]: f["id"] for f in db_folder_snapshots
+            f.path: f.id for f in db_folder_snapshots
         }
 
         new_folders = sorted(current_folders - db_folder_paths)
@@ -205,7 +206,7 @@ class ChangeDetector:
             moved,
         )
 
-    async def detect_changes(self, scan_result: ScanResult, project_id: str) -> ChangeSet:
+    async def detect_changes(self, scan_result: ScanResult, project_db_name: str) -> ChangeSet:
         """
         Compare current files from disk with those in the DB.
         """
@@ -214,8 +215,8 @@ class ChangeDetector:
 
         # 1) Fetch DB state in parallel
         db_file_snapshots, db_folder_snapshots = await asyncio.gather(
-            self.repos.file_repo.get_project_files(project_id),
-            self.repos.folder_repo.get_project_folders(project_id),
+            self.repos.file_repo.get_all_files(project_db_name),
+            self.repos.folder_repo.get_all_folders(project_db_name),
         )
 
         (

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import List, Union
 from app.core.model.nodes import FileNode
 from app.core.model.schemas import FileSchema
 from app.db.async_terminus_client import AsyncClient
@@ -9,16 +10,20 @@ class FileRepo():
     def __init__(self, client: AsyncClient):
         self.client = client
 
-    async def create(self, file: FileNode, project_db_name: str):
+    async def create(self, file: List[Union[FileNode, List[FileNode]]], project_db_name: str):
         current_db = None
         if self.client.db != project_db_name:
             current_db = self.client.db
             await self.client.set_db(project_db_name)
-        file_schema = FileSchema.from_pydantic(file)
-        await self.client.insert_document(file_schema, commit_msg=f"Creating file {file.name}")
+        file_schemas = []
+        if isinstance(file, FileNode):
+            file_schemas.append(FileSchema.from_pydantic(file))
+        else:
+            file_schemas = [FileSchema.from_pydantic(file) for file in file]
+        await self.client.insert_document(file_schemas, commit_msg=f"Creating files {', '.join([file.name for file in file])}")
         if current_db:
             await self.client.set_db(current_db)
-        return file_schema.to_pydantic()
+        return [file_schema.to_pydantic() for file_schema in file_schemas]
 
     async def get_by_id(self, file_id: str, project_db_name: str, raw: bool = False):
         current_db = None
@@ -39,6 +44,25 @@ class FileRepo():
             return file_raw
         return FileNode.from_raw_dict(file_raw)
 
+    async def get_by_ids(self, file_ids: List[str], project_db_name: str, raw: bool = False):
+        current_db = None
+
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
+        try:
+            files_raw = await self.client.get_documents(file_ids)
+        except Exception as e:
+            print(e)
+            return None
+        finally:
+            if current_db:
+                await self.client.set_db(current_db)
+
+        if raw:
+            return files_raw
+        return [FileNode.from_raw_dict(file_raw) for file_raw in files_raw]
+
     async def delete(self, file_id: str, project_db_name: str):
         current_db = None
         if self.client.db != project_db_name:
@@ -53,6 +77,28 @@ class FileRepo():
                 WQ().delete_document(file_id)
             )
             await self.client.query(query, commit_msg=f"Deleting file {file_id}")
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            if current_db:
+                await self.client.set_db(current_db)
+        return True
+
+    async def delete_batch(self, file_ids: List[str], project_db_name: str):
+        current_db = None
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
+        try:
+            query = WQ().member("v:file_id", file_ids).woql_and(
+                WQ().opt(
+                    WQ().triple("v:parent", "file_children", "v:file_id")
+                    .delete_triple("v:parent", "file_children", "v:file_id")
+                ),
+                WQ().delete_document("v:file_id")
+            )
+            await self.client.query(query, commit_msg=f"Deleting files {', '.join(file_ids[:5])}")
         except Exception as e:
             print(e)
             return False
@@ -90,6 +136,17 @@ class FileRepo():
             if current_db:
                 await self.client.set_db(current_db)
         return file_schema.to_pydantic()
+
+    async def update_batch(self, files: List[FileNode], project_db_name: str):
+        current_db = None
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
+
+        existing_files = await self.get_by_ids([file.id for file in files], project_db_name, raw=True)
+        if not existing_files or len(existing_files) != len(files):
+            return None
+        file_schemas = []
 
     async def move_item(self, new_parent_id: str, item_id: str,  child_type: str, project_db_name: str):
         current_db = None
@@ -133,8 +190,22 @@ class FileRepo():
             if current_db:
                 await self.client.set_db(current_db)
 
-    def add_child(self, parent_id: str, child_id: str, child_type: str):
-        pass
-
-    def remove_child(self, parent_id: str, child_id: str, child_type: str):
-        pass
+    async def get_all_files(self, project_db_name: str):
+        current_db = None
+        if self.client.db != project_db_name:
+            current_db = self.client.db
+            await self.client.set_db(project_db_name)
+        try:
+            result = await self.client.get_all_documents(doc_type=FileSchema.__name__)
+            files = []
+            for file_raw in result:
+                node = FileNode.from_raw_dict(file_raw)
+                if node is not None:
+                    files.append(node)
+            return files
+        except Exception as e:
+            print(e)
+            return []
+        finally:
+            if current_db:
+                await self.client.set_db(current_db)

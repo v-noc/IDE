@@ -69,7 +69,7 @@ class FileSchema(BaseSchema):
             qname=self.qname,
             path=self.path,
             hash=self.hash,
-            documents=self.documents,
+            documents=self.documents or set(),
             theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
             children=self.class_children | self.function_children | self.code_element_group
             | self.call_group | self.call_children,
@@ -128,7 +128,7 @@ class FolderSchema(BaseSchema):
                 "file_children": self.file_children,
                 "structure_group": self.structure_group,
             },
-            documents=self.documents,
+            documents=self.documents or set(),
             theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
             created_at=self.created_at,
             updated_at=self.updated_at,

@@ -58,3 +58,13 @@ async def test_add_folder_to_folder(create_repos, create_folder, create_project)
     children_tree = await folder_service.get_children(create_folder.id)
 
     assert len(children_tree) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_all_folders(create_repos, create_folder, create_file, create_project):
+    folder_service = FolderService(create_repos, create_project)
+    folders = await folder_service.get_all_folders()
+    assert len(folders) == 1
+    assert folders[0].name == "Test Folder"
+    assert folders[0].qname == "test_project.test_folder"
+    assert folders[0].description == "This is a test folder"

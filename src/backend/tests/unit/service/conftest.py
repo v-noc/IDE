@@ -5,16 +5,16 @@ import pytest
 import pytest_asyncio
 import shutil
 from app.core.model.properties import CodePosition
-# from app.core.model.nodes import ProjectNode
-# from app.core.repository import Repositories
+
 # from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-# from app.core.services.call_service import CallService
+
 from app.core.services.class_service import ClassService
 from app.core.services.file_service import FileService
 from app.core.services.folder_service import FolderService
 from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
 from app.core.services.call_service import CallService
+from app.core.model.nodes import ProjectNode
 
 
 PROJECT_PATH = Path(__file__).resolve().parent / "sample_project"
@@ -24,38 +24,6 @@ DEFAULT_POSITION = CodePosition(
     end_line_no=1,
     end_col_offset=0,
 )
-
-
-# @pytest_asyncio.fixture(autouse=True)
-# async def _isolate_test_db(arangodb_client):
-#     """
-#     Ensure unit tests are isolated from each other.
-
-#     The ArangoDB database is session-scoped (see tests/conftest.py), so documents
-#     would otherwise leak between tests. Also, some repository methods run AQL
-#     directly against edge collections without ensuring they exist first.
-#     """
-#     repos = Repositories(arangodb_client)
-
-#     # Ensure required collections exist (correct types) before any AQL uses them.
-#     await repos.nodes.get_collection()
-#     await repos.contains_edges.get_collection()
-#     await repos.targets_edges.get_collection()
-#     await repos.log_to_function_edges.get_collection()
-#     await repos.log_to_log_edges.get_collection()
-
-#     # Truncate in edge->vertex order for cleanliness.
-#     for name in [
-#         "contains_edges",
-#         "targets_edges",
-#         "log_to_function_edges",
-#         "log_to_log_edges",
-#         "nodes",
-#     ]:
-#         col = arangodb_client.collection(name)
-#         await col.truncate()
-
-#     yield
 
 
 async def _create_function(function_service: FunctionService, id: str, name: str, qname: str):
@@ -128,8 +96,12 @@ async def create_project(create_repos):
 
 
 @pytest_asyncio.fixture
-async def create_folder(create_repos, create_project):
-    folder_service = FolderService(create_repos, create_project)
+async def folder_service(create_repos, create_project):
+    return FolderService(create_repos, create_project)
+
+
+@pytest_asyncio.fixture
+async def create_folder(folder_service):
     folder = await folder_service.create(
         "folder",
         "Test Folder",

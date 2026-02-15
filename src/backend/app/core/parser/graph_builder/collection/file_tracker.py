@@ -4,6 +4,8 @@ from pathlib import Path
 from app.core.parser.ast.id_injector import inject_module_metadata, IDInjector
 import libcst as cst
 
+from app.core.model.schemas import FileSchema
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,14 +36,14 @@ class FileTracker:
             else:
                 file_id = str(uuid.uuid4())
 
-            # Inject if missing
-            new_content, modified = inject_module_metadata(
-                content, {"FileID": file_id})
+                # Inject if missing
+                new_content, modified = inject_module_metadata(
+                    content, {"FileID": file_id})
 
-            if modified:
-                file_path.write_text(new_content, encoding="utf-8")
+                if modified:
+                    file_path.write_text(new_content, encoding="utf-8")
 
-            return file_id
+            return f"{FileSchema.__name__}/{file_id}"
 
         except Exception as e:
             logger.error(f"Error processing {file_path}: {e}")

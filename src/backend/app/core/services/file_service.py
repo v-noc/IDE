@@ -46,3 +46,6 @@ class FileService():
 
     async def get_children(self, file_id: str):
         return await self.repos.file_repo.get_containment_tree(file_id)
+
+    async def get_all_files(self):
+        return await self.repos.file_repo.get_all_files(self.project.db_name)

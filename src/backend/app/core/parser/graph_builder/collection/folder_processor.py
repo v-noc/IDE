@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import uuid
 from dataclasses import dataclass
@@ -208,7 +209,8 @@ class FolderProcessor:
         if not ids:
             return
 
-        existing_by_id = await self.folder_repo.get_by_ids(ids)
+        existing_by_id = await self.folder_repo.get_by_ids([id for id in ids], self.project_node.db_name)
+        existing_by_id = {folder.id: folder for folder in existing_by_id}
 
         # Pre-fetch any parent scopes not present in the current change mapping.
         parent_qnames_needed: Set[str] = set()
@@ -232,7 +234,7 @@ class FolderProcessor:
 
         nodes_to_create: List[FolderNode] = []
         nodes_to_update: List[FolderNode] = []
-        moves_to_execute: List[tuple[str, str]] = []
+        moves_to_execute: List[tuple[str, str, str]] = []
 
         for tp in batch:
             if not tp.id:
@@ -256,12 +258,14 @@ class FolderProcessor:
             node = existing_by_id.get(tp.id)
             if not node:
                 node = FolderNode(
-                    key=tp.id,
+                    id=tp.id,
                     name=desired_name,
                     qname=desired_qname,
                     path=desired_path,
                     description=f"Folder {desired_name}",
-                    node_type="folder"
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+
                 )
                 nodes_to_create.append(node)
                 if node.id not in self._touched_folder_ids:
@@ -295,14 +299,14 @@ class FolderProcessor:
                 parent_nodes_by_qname=parent_nodes_by_qname,
             )
             if parent_id:
-                moves_to_execute.append((tp.id, parent_id))
+                moves_to_execute.append((tp.id, parent_id, "folder"))
 
         if nodes_to_create:
-            await self.folder_repo.create_batch(nodes_to_create)
+            await self.folder_repo.create(nodes_to_create, self.project_node.db_name)
         if nodes_to_update:
-            await self.folder_repo.update_batch(nodes_to_update)
+            await self.folder_repo.update_batch(nodes_to_update, self.project_node.db_name)
         if moves_to_execute:
-            await self.folder_repo.move_batch(moves_to_execute)
+            await self.folder_repo.move_batch(moves_to_execute, self.project_node.db_name)
 
     def qname_for_rel_path(self, rel_path: Path) -> str:
         parts = [p for p in rel_path.parts if p]

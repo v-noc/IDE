@@ -60,7 +60,7 @@ class Collector:
         # Normalize key/id if we have exactly one of them.
         if self.project_node.id and not self.project_node.key:
             self.project_node.key = (
-                self.project_node.id.split("/")[-1]
+                self.project_node.id.split
                 if "/" in self.project_node.id
                 else self.project_node.id
             )
@@ -93,9 +93,6 @@ class Collector:
         Returns folder changes for notification/logging.
         """
         with tracker.timer("collector.sync_structure"):
-            # Ensure project_root is persisted before processing
-            await self.ensure_project_root()
-
             # 1. Sync Folders
             with tracker.timer("collector.sync_folders"):
                 folder_changes = await self.folder_processor.process_batch(
