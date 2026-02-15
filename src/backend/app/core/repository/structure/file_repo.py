@@ -45,7 +45,14 @@ class FileRepo():
             current_db = self.client.db
             await self.client.set_db(project_db_name)
         try:
-            await self.client.delete_document(file_id, commit_msg=f"Deleting file {file_id}")
+            query = WQ().woql_and(
+                WQ().opt(
+                    WQ().triple("v:parent", "file_children", file_id)
+                    .delete_triple("v:parent", "file_children", file_id)
+                ),
+                WQ().delete_document(file_id)
+            )
+            await self.client.query(query, commit_msg=f"Deleting file {file_id}")
         except Exception as e:
             print(e)
             return False

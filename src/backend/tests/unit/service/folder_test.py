@@ -12,6 +12,7 @@ async def test_create_folder(create_repos, create_project):
         "This is a test folder",
         "test_folder"
     )
+
     assert folder is not None
     assert folder.name == "Test Folder"
     assert folder.qname == "test_project.test_folder"
@@ -55,5 +56,5 @@ async def test_add_folder_to_folder(create_repos, create_folder, create_project)
     await folder_service.add_child(create_folder.id, second_folder.id, "folder")
 
     children_tree = await folder_service.get_children(create_folder.id)
-    print(children_tree)
+
     assert len(children_tree) == 1

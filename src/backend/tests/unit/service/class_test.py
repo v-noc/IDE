@@ -4,8 +4,8 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_create_class(create_repos):
-    class_service = ClassService(create_repos)
+async def test_create_class(create_repos, create_project):
+    class_service = ClassService(create_repos, create_project)
     position = CodePosition(
         line_no=1,
         col_offset=0,
@@ -13,10 +13,10 @@ async def test_create_class(create_repos):
         end_col_offset=0
     )
     new_class = await class_service.create(
+        "class",
         "Test Class",
         "test_project.test_class",
         "This is a test class",
-
         position
     )
     assert new_class is not None

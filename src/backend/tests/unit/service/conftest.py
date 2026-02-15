@@ -12,7 +12,7 @@ from app.core.model.properties import CodePosition
 # from app.core.services.class_service import ClassService
 from app.core.services.file_service import FileService
 from app.core.services.folder_service import FolderService
-# from app.core.services.function_service import FunctionService
+from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
 
 
@@ -57,13 +57,14 @@ DEFAULT_POSITION = CodePosition(
 #     yield
 
 
-# async def _create_function(function_service: FunctionService, name: str, qname: str):
-#     return await function_service.create(
-#         name,
-#         qname,
-#         f"This is {name.lower()}",
-#         DEFAULT_POSITION,
-#     )
+async def _create_function(function_service: FunctionService, id: str, name: str, qname: str):
+    return await function_service.create(
+        id,
+        name,
+        qname,
+        f"This is {name.lower()}",
+        DEFAULT_POSITION,
+    )
 
 
 # async def _create_class(class_service: ClassService, name: str, qname: str):
@@ -168,22 +169,30 @@ async def create_file(create_repos, create_project):
 #     return CallService(create_repos)
 
 
-# @pytest_asyncio.fixture
-# async def create_function(function_service):
-#     return await _create_function(
-#         function_service,
-#         "Test Function",
-#         "test_project.test_function",
-#     )
+@pytest_asyncio.fixture
+async def create_function(create_repos, create_project):
+    function_service = FunctionService(create_repos, create_project)
+    function = await _create_function(
+        function_service,
+        "function",
+        "Test Function",
+        "test_project.test_function",
+    )
+    yield function
+    await function_service.delete(function.id)
 
 
-# @pytest_asyncio.fixture
-# async def create_function2(function_service):
-#     return await _create_function(
-#         function_service,
-#         "Test Function 2",
-#         "test_project.test_function2",
-#     )
+@pytest_asyncio.fixture
+async def create_function2(create_repos, create_project):
+    function_service = FunctionService(create_repos, create_project)
+    function = await _create_function(
+        function_service,
+        "function2",
+        "Test Function 2",
+        "test_project.test_function2",
+    )
+    yield function
+    await function_service.delete(function.id)
 
 
 # @pytest_asyncio.fixture

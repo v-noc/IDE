@@ -130,14 +130,19 @@ _FOLDER_CHILDREN_KEYS = (
     ("file_children", "file_children"),
     ("structure_group", "structure_group"),
 )
-
-_FILE_CHILDREN_KEYS = (
+_CODE_ELEMENT_CHILDREN_KEYS = (
     ("class_children", "class_children"),
     ("function_children", "function_children"),
     ("code_element_group", "code_element_group"),
+
+)
+_CALL_CHILDREN_KEYS = (
     ("call_children", "call_children"),
     ("call_group", "call_group"),
 )
+
+
+_FILE_CHILDREN_KEYS = (_CODE_ELEMENT_CHILDREN_KEYS + _CALL_CHILDREN_KEYS)
 
 
 class FolderNode(BaseNode):
@@ -235,6 +240,15 @@ class ClassNode(BaseNode):
     documents: Set[str] = Field(
         default_factory=set, description="The documents of the class."
     )
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence.",
+    )
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the class."
+    )
+    base_classes: Set[str] = Field(
+        default_factory=set, description="The base classes of the class.")
     theme_config: Optional[ThemeConfig] = Field(
         default=None, description="The theme config of the class.")
 
@@ -251,11 +265,14 @@ class ClassNode(BaseNode):
                 "call_group",
             ),
         )
+        by_type = _children_by_type(raw_dict, _CODE_ELEMENT_CHILDREN_KEYS)
         return ClassNode(
             **base.model_dump(),
             qname=raw_dict["qname"],
             code_position=raw_dict["code_position"],
             children=children,
+            base_classes=raw_dict.get("base_classes", set()) or set(),
+            children_by_type=by_type,
             documents=raw_dict.get("documents", set()) or set(),
             theme_config=raw_dict.get("theme_config"),
         )
@@ -265,6 +282,14 @@ class FunctionNode(BaseNode):
     qname: str = Field(..., description="The qname of the function.")
     code_position: CodePosition = Field(...,
                                         description="The code position of the function.")
+
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence.",
+    )
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the function."
+    )
     documents: Set[str] = Field(
         default_factory=set, description="The documents of the function."
     )
@@ -284,13 +309,25 @@ class FunctionNode(BaseNode):
                 "call_group",
             ),
         )
+        by_type = _children_by_type(raw_dict, _CODE_ELEMENT_CHILDREN_KEYS)
         return FunctionNode(
             **base.model_dump(),
             qname=raw_dict["qname"],
             code_position=raw_dict["code_position"],
             children=children,
+            children_by_type=by_type,
             documents=raw_dict.get("documents", set()) or set(),
             theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        """Return children split by type for schema persistence."""
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("class_children", "function_children",
+             "code_element_group", "call_children", "call_group"),
+            set(),
         )
 
 
@@ -298,6 +335,13 @@ class CallNode(BaseNode):
     qname: str = Field(..., description="The qname of the call.")
     target_function: "FunctionNode" = Field(
         ..., description="The target function of the call.")
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence.",
+    )
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the call."
+    )
     documents: Set[str] = Field(
         default_factory=set, description="The documents of the call."
     )
@@ -311,11 +355,13 @@ class CallNode(BaseNode):
             raw_dict,
             ("call_children", "call_group"),
         )
+        by_type = _children_by_type(raw_dict, _CALL_CHILDREN_KEYS)
         return CallNode(
             **base.model_dump(),
             qname=raw_dict["qname"],
             target_function=raw_dict["target_function"],
             children=children,
+            children_by_type=by_type,
             documents=raw_dict.get("documents", set()) or set(),
             theme_config=raw_dict.get("theme_config"),
         )

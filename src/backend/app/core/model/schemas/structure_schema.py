@@ -11,6 +11,7 @@ from .code_element_schema import (
     ClassSchema,
     FunctionSchema,
     CallSchema)
+from .metadata import DocumentSchema, ThemeConfigSchema
 
 
 class StructureGroupSchema(BaseSchema):
@@ -20,6 +21,8 @@ class StructureGroupSchema(BaseSchema):
     folder_children: Set["FolderSchema"]
     file_children: Set["FileSchema"]
     structure_group: Set["StructureGroupSchema"]
+    documents: Set[DocumentSchema]
+    theme_config: Optional[ThemeConfigSchema]
 
 
 class FileSchema(BaseSchema):
@@ -33,6 +36,8 @@ class FileSchema(BaseSchema):
     code_element_group: Set["CodeElementGroupSchema"]
     call_group: Set["CallGroupSchema"]
     call_children: Set["CallSchema"]
+    documents: Set[DocumentSchema]
+    theme_config: Optional[ThemeConfigSchema]
     hash: str
 
     @staticmethod
@@ -51,6 +56,8 @@ class FileSchema(BaseSchema):
             call_group=by_type.get("call_group", set()),
             call_children=by_type.get("call_children", set()),
             created_at=file.created_at,
+            documents=file.documents,
+            theme_config=ThemeConfigSchema.from_pydantic(file.theme_config),
             updated_at=file.updated_at,
         )
 
@@ -62,6 +69,8 @@ class FileSchema(BaseSchema):
             qname=self.qname,
             path=self.path,
             hash=self.hash,
+            documents=self.documents,
+            theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
             children=self.class_children | self.function_children | self.code_element_group
             | self.call_group | self.call_children,
             children_by_type={
@@ -85,6 +94,8 @@ class FolderSchema(BaseSchema):
     folder_children: Set["FolderSchema"]
     file_children: Set["FileSchema"]
     structure_group: Set["StructureGroupSchema"]
+    documents: Set[DocumentSchema]
+    theme_config: Optional[ThemeConfigSchema]
 
     @staticmethod
     def from_pydantic(folder: FolderNode):
@@ -99,6 +110,8 @@ class FolderSchema(BaseSchema):
             file_children=by_type.get("file_children", set()),
             structure_group=by_type.get("structure_group", set()),
             created_at=folder.created_at,
+            documents=folder.documents,
+            theme_config=ThemeConfigSchema.from_pydantic(folder.theme_config),
             updated_at=folder.updated_at,
         )
 
@@ -115,6 +128,8 @@ class FolderSchema(BaseSchema):
                 "file_children": self.file_children,
                 "structure_group": self.structure_group,
             },
+            documents=self.documents,
+            theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

@@ -4,8 +4,8 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_create_function(create_repos):
-    function_service = FunctionService(create_repos)
+async def test_create_function(create_repos, create_project):
+    function_service = FunctionService(create_repos, create_project)
     position = CodePosition(
         line_no=1,
         col_offset=0,
@@ -13,6 +13,7 @@ async def test_create_function(create_repos):
         end_col_offset=0
     )
     function = await function_service.create(
+        "function",
         "Test Function",
         "test_project.test_function",
         "This is a test function",
@@ -25,8 +26,8 @@ async def test_create_function(create_repos):
 
 
 @pytest.mark.asyncio
-async def test_get_function(create_repos, create_function):
-    function_service = FunctionService(create_repos)
+async def test_get_function(create_repos, create_function, create_project):
+    function_service = FunctionService(create_repos, create_project)
     function = await function_service.get(create_function.id)
     assert function is not None
     assert function.name == "Test Function"
@@ -35,8 +36,8 @@ async def test_get_function(create_repos, create_function):
 
 
 @pytest.mark.asyncio
-async def test_update_function(create_repos, create_function):
-    function_service = FunctionService(create_repos)
+async def test_update_function(create_repos, create_function, create_project):
+    function_service = FunctionService(create_repos, create_project)
     create_function.name = "Updated Function"
     create_function.description = "This is an updated function"
     function = await function_service.update(create_function)
@@ -46,23 +47,23 @@ async def test_update_function(create_repos, create_function):
 
 
 @pytest.mark.asyncio
-async def test_delete_function(create_repos, create_function):
-    function_service = FunctionService(create_repos)
+async def test_delete_function(create_repos, create_function, create_project):
+    function_service = FunctionService(create_repos, create_project)
     # delete() expects a key, not a full id ("nodes/<key>")
-    await function_service.delete(create_function.key)
+    await function_service.delete(create_function.id)
     function = await function_service.get(create_function.id)
     assert function is None
 
 
 @pytest.mark.asyncio
-async def test_add_function_to_function(create_repos, create_function, create_function2):
-    function_service = FunctionService(create_repos)
+async def test_add_function_to_function(create_repos, create_function, create_function2, create_project):
+    function_service = FunctionService(create_repos, create_project)
     await function_service.add_function(
         create_function.id, create_function2.id)
     functions = await function_service.get_children(create_function.id)
     assert len(functions) == 1
 
-    assert functions[0]['vertex']['_id'] == create_function2.id
+    assert functions[0].id == create_function2.id
 
 
 @pytest.mark.asyncio

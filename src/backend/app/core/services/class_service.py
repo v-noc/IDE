@@ -1,32 +1,37 @@
-from typing import Optional
-from app.core.services.container_service import ContainerService
+from datetime import datetime, timezone
+
 from app.core.repository import Repositories
 from app.core.model.nodes import ClassNode
 from app.core.model.properties import CodePosition
+from app.core.model.nodes import ProjectNode
 
 
-class ClassService(ContainerService):
-    def __init__(self, repos: Repositories):
-        super().__init__(repos)
+class ClassService():
+    def __init__(self, repos: Repositories, project: ProjectNode):
+        self.repos = repos
+        self.project = project
 
     async def create(
         self,
+        id: str,
         name: str,
         qname: str,
         description: str,
         position: CodePosition,
-        _key: Optional[str] = None,
+
     ):
         class_node = ClassNode(
+            id=id,
             name=name,
             qname=qname,
             description=description,
             implements=[qname],
-            position=position,
+            code_position=position,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
-        if _key:
-            class_node.key = _key
-        return await self.repos.class_repo.create(class_node)
+
+        return await self.repos.class_repo.create(class_node, self.project.db_name)
 
     async def get(self, class_id: str):
         return await self.repos.class_repo.get_by_id(class_id)
@@ -48,4 +53,3 @@ class ClassService(ContainerService):
 
     async def get_children(self, class_id: str):
         return await self.repos.class_repo.get_containment_tree(class_id)
-

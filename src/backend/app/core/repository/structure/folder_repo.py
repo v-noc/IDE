@@ -1,10 +1,14 @@
-
 from datetime import datetime, timezone
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import FolderNode
 from app.core.model.schemas import FolderSchema
 from app.db.async_terminus_client import WOQLQuery as WQ
 from app.db.schema.schema import WOQLSchema
+from app.core.repository.utils import (
+    parse_structure_child,
+    build_path_field_name,
+    STRUCTURE_FIELDS,
+)
 
 
 class FolderRepo():
@@ -99,6 +103,9 @@ class FolderRepo():
         folder_schema.structure_group = existing_folder.get(
             "structure_group", set())
 
+        folder_schema.documents = existing_folder.get("documents", set())
+        folder_schema.theme_config = existing_folder.get("theme_config")
+
         folder_schema.updated_at = datetime.now(timezone.utc)
 
         try:
@@ -117,11 +124,7 @@ class FolderRepo():
             current_db = self.client.db
             await self.client.set_db(project_db_name)
 
-        filed_name = None
-        if len(child_type) == 0:
-            filed_name = "(folder_children|file_children|structure_group)"
-        else:
-            filed_name = "|".join(child_type)
+        filed_name = build_path_field_name(child_type, STRUCTURE_FIELDS)
 
         try:
             query = (
@@ -135,12 +138,10 @@ class FolderRepo():
             )
             result = await self.client.query(query)
             children = []
-
             for child_raw in [row["child_doc"] for row in result["bindings"]]:
-                if child_raw["@type"] == "FolderSchema":
-                    folder = FolderNode.from_raw_dict(child_raw)
-                    children.append(folder)
-            # print(f"children {children}")
+                node = parse_structure_child(child_raw)
+                if node is not None:
+                    children.append(node)
             return children
         except Exception as e:
             print(e)
