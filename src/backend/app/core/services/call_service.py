@@ -1,70 +1,58 @@
-from app.core.services.container_service import ContainerService
+
+from datetime import datetime, timezone
+import uuid
+from typing import Literal
 from app.core.repository import Repositories
 from app.core.model.nodes import CallNode
-from app.core.model.properties import CodePosition
-from app.core.model.edges import TargetsEdge
-from typing import Optional
+from app.core.model.nodes import ProjectNode
 
 
-class CallService(ContainerService):
-    def __init__(self, repos: Repositories):
+class CallService():
+    def __init__(self, repos: Repositories, project: ProjectNode):
         self.repos = repos
+        self.project = project
 
     async def create(
         self,
         name: str,
         qname: str,
         description: str,
-        position: CodePosition,
         target_id: str,
-        manually_created: bool = False,
-        current_version: Optional[int] = None,
+
     ):
         call = CallNode(
+            id=f"CallSchema/{str(uuid.uuid4())}",
             name=name,
             qname=qname,
             description=description,
-            position=position,
-            manually_created=manually_created,
-            current_version=current_version if current_version is not None else 0,
+            target_function=target_id,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
-        new_call = await self.repos.call_repo.create(call)
-        target = TargetsEdge(
-            from_id=new_call.id,
-            to_id=target_id,
-        )
-        await self.repos.targets_edges.create(target)
+        new_call = await self.repos.call_repo.create(call, self.project.db_name)
+
         return new_call
 
     async def get(self, call_id: str):
-        return await self.repos.call_repo.get_by_id(call_id)
+        return await self.repos.call_repo.get_by_id(call_id, self.project.db_name)
 
     async def update(self, call: CallNode):
-        return await self.repos.call_repo.update(call.key, call)
+        return await self.repos.call_repo.update(call, self.project.db_name)
 
-    async def delete(self, call_key: str):
-        call_id = f"nodes/{call_key}"
-
-        descendants = await self.repos.call_repo.get_containment_tree(
-            call_id, depth="*")
-
-        descendant_keys = [item["vertex"]["_key"] for item in descendants]
-
-        for key in reversed(descendant_keys):
-            await self.repos.nodes.delete(key)
-
-        return await self.repos.call_repo.delete(call_key)
+    async def delete(self, call_id: str):
+        return await self.repos.call_repo.delete(call_id, self.project.db_name)
 
     async def add_call(self, parent_call_id: str, call_id: str):
-        return await self.add_child(
+        return await self.repos.call_repo.move_item(
             parent_call_id,
             call_id,
-            "call_to_call",
+            "call",
+            self.project.db_name
         )
 
-    async def get_children(self, call_id: str):
-        return await self.repos.call_repo.get_containment_tree(call_id)
+    async def get_children(self, call_id: str, child_type: list[Literal["call", "call_group"]] = []):
+        return await self.repos.call_repo.get_children(call_id, child_type, self.project.db_name)
 
     async def get_direct_call_children(self, parent_id: str):
         """

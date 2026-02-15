@@ -343,7 +343,7 @@ class FunctionNode(BaseNode):
 
 class CallNode(BaseNode):
     qname: str = Field(..., description="The qname of the call.")
-    target_function: "FunctionNode" = Field(
+    target_function: str = Field(
         ..., description="The target function of the call.")
     children_by_type: Optional[dict[str, set]] = Field(
         default=None,
@@ -374,4 +374,13 @@ class CallNode(BaseNode):
             children_by_type=by_type,
             documents=raw_dict.get("documents", set()) or set(),
             theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        """Return children split by type for schema persistence."""
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("call_children", "call_group"),
+            set(),
         )

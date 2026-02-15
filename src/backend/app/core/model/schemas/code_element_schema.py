@@ -1,7 +1,7 @@
 
 from typing import Optional, Set
 
-from app.core.model.nodes import ClassNode, FunctionNode
+from app.core.model.nodes import CallNode, ClassNode, FunctionNode
 
 from .base import BaseSchema
 from .metadata import CodePositionSchema, DocumentSchema, ThemeConfigSchema
@@ -158,8 +158,48 @@ class CallSchema(BaseSchema):
     """
     The schema for the call document.
     """
-
+    qname: str
     call_children: Set["CallSchema"]
     target_function: "FunctionSchema"
     call_group: Set["CallGroupSchema"]
     theme_config: Optional[ThemeConfigSchema]
+    documents: Set[DocumentSchema]
+
+    @staticmethod
+    def from_pydantic(call: CallNode):
+        by_type = call.get_children_by_type()
+        return CallSchema(
+            _id=call.id,
+            name=call.name,
+            qname=call.qname,
+            description=call.description,
+            target_function=call.target_function,
+            call_children=by_type.get("call_children", set()),
+            call_group=by_type.get("call_group", set()),
+            theme_config=ThemeConfigSchema.from_pydantic(
+                call.theme_config),
+            documents=call.documents,
+
+            created_at=call.created_at,
+            updated_at=call.updated_at,
+        )
+
+    def to_pydantic(self):
+        children = self.call_children | self.call_group
+        children_by_type = {
+            "call_children": self.call_children,
+            "call_group": self.call_group,
+        }
+        return CallNode(
+            id=self._id,
+            name=self.name,
+            qname=self.qname,
+            description=self.description,
+            target_function=self.target_function,
+            children=children,
+            children_by_type=children_by_type,
+            documents=self.documents,
+            theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )

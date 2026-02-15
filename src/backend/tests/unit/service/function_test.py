@@ -67,13 +67,15 @@ async def test_add_function_to_function(create_repos, create_function, create_fu
 
 
 @pytest.mark.asyncio
-async def test_add_class_to_function(create_repos, create_function, create_class):
-    function_service = FunctionService(create_repos)
+async def test_add_class_to_function(create_repos, create_function, create_class,  create_project):
+    function_service = FunctionService(create_repos, create_project)
     await function_service.add_class(create_function.id, create_class.id)
     classes = await function_service.get_children(create_function.id)
+
+    print(classes)
     assert len(classes) == 1
 
-    assert classes[0]['vertex']['_id'] == create_class.id
+    assert classes[0].id == create_class.id
 
 
 @pytest.mark.asyncio

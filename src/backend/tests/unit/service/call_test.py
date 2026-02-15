@@ -1,20 +1,18 @@
-from app.core.model.properties import CodePosition
+
 from app.core.services.call_service import CallService
-from app.core.services.container_service import ContainerService
+
 from app.core.services.function_service import FunctionService
 import pytest
 
 
 @pytest.mark.asyncio
-async def test_create_call(create_repos, create_function):
-    call_service = CallService(create_repos)
-    position = CodePosition(line_no=1, col_offset=0,
-                            end_line_no=1, end_col_offset=0)
+async def test_create_call(create_repos, create_function, create_project):
+    call_service = CallService(create_repos, create_project)
+
     new_call = await call_service.create(
         "Test Call",
         "test_project.test_call",
         "This is a test call",
-        position,
         create_function.id,
     )
     assert new_call is not None
@@ -22,10 +20,11 @@ async def test_create_call(create_repos, create_function):
     assert new_call.qname == "test_project.test_call"
     assert new_call.description == "This is a test call"
 
+    await call_service.delete(new_call.id)
+
 
 @pytest.mark.asyncio
-async def test_get_call(create_repos, create_call):
-    call_service = CallService(create_repos)
+async def test_get_call(call_service, create_call):
     new_call = await call_service.get(create_call.id)
     assert new_call is not None
     assert new_call.name == "Test Call"
@@ -34,8 +33,8 @@ async def test_get_call(create_repos, create_call):
 
 
 @pytest.mark.asyncio
-async def test_update_call(create_repos, create_call):
-    call_service = CallService(create_repos)
+async def test_update_call(create_call, call_service):
+
     create_call.name = "Updated Call"
     create_call.description = "This is an updated call"
     new_call = await call_service.update(create_call)
@@ -45,34 +44,21 @@ async def test_update_call(create_repos, create_call):
 
 
 @pytest.mark.asyncio
-async def test_delete_call(create_repos, create_call):
-    call_service = CallService(create_repos)
-    # delete() expects a key, not a full id ("nodes/<key>")
-    await call_service.delete(create_call.key)
+async def test_delete_call(create_call, call_service):
+    await call_service.delete(create_call.id)
     new_call = await call_service.get(create_call.id)
     assert new_call is None
 
 
 @pytest.mark.asyncio
 async def test_add_call_to_function(
-    create_repos, create_function, create_function3, create_call, create_call2
+    create_call, create_call2, create_function, create_function3, call_service, function_service
 ):
-    call_service = CallService(create_repos)
-    function_service = FunctionService(create_repos)
-    container_service = ContainerService(create_repos)
-
-    # 1) Construct chain: create_function -> create_call -> create_call3
-    # Ensure the first call is attached under the function
     await function_service.add_call(create_function.id, create_call.id)
-
-    # Create call3 that targets function3 and attach under create_call
-    position = CodePosition(line_no=1, col_offset=0,
-                            end_line_no=1, end_col_offset=0)
     call3 = await call_service.create(
         "Test Call 3",
         "test_project.test_call3",
         "This is a test call 3",
-        position,
         create_function3.id,
     )
     await call_service.add_call(create_call.id, call3.id)
@@ -82,10 +68,11 @@ async def test_add_call_to_function(
         "Fn as Call",
         "test_project.fn_as_call",
         "Function as call",
-        position,
+
         create_function.id,
     )
     await function_service.add_call(create_function3.id, clone_entry.id)
+
     await container_service.clone_callee_call_graph(
         create_function.id, clone_entry.id)
 
@@ -117,13 +104,13 @@ async def test_add_call_to_function(
 
 
 @pytest.mark.asyncio
-async def test_add_call_to_call(create_repos, create_call, create_call2):
-    call_service = CallService(create_repos)
+async def test_add_call_to_call(create_call, create_call2, call_service):
+
     await call_service.add_call(create_call.id, create_call2.id)
     calls = await call_service.get_children(create_call.id)
     assert len(calls) == 1
-    assert calls[0]["vertex"]["_id"] == create_call2.id
-    assert calls[0]["target"] is not None
+    assert calls[0].id == create_call2.id
+    assert calls[0].target_function is not None
 
 
 @pytest.mark.asyncio

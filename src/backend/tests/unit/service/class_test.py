@@ -56,23 +56,23 @@ async def test_delete_class(create_repos, create_class, create_project):
 
 
 @pytest.mark.asyncio
-async def test_add_function_to_class(create_repos, create_class, create_function):
-    class_service = ClassService(create_repos)
+async def test_add_function_to_class(create_repos, create_class, create_function, create_project):
+    class_service = ClassService(create_repos, create_project)
     await class_service.add_function(create_class.id, create_function.id)
     functions = await class_service.get_children(create_class.id)
     assert len(functions) == 1
 
-    assert functions[0]['vertex']['_id'] == create_function.id
+    assert functions[0].id == create_function.id
 
 
 @pytest.mark.asyncio
-async def test_add_class_to_class(create_repos, create_class, create_class2):
-    class_service = ClassService(create_repos)
+async def test_add_class_to_class(create_repos, create_class, create_class2, create_project):
+    class_service = ClassService(create_repos, create_project)
     await class_service.add_class(create_class.id, create_class2.id)
     classes = await class_service.get_children(create_class.id)
     assert len(classes) == 1
 
-    assert classes[0]['vertex']['_id'] == create_class2.id
+    assert classes[0].id == create_class2.id
 
 
 @pytest.mark.asyncio
