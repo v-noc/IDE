@@ -209,7 +209,7 @@ class FileProcessor:
                 logger.warning(f"Could not resolve parent for file {tp.path}")
 
         if nodes_to_create:
-            await self.file_repo.create_batch(nodes_to_create)
+            await self.file_repo.create(nodes_to_create)
         if nodes_to_update:
             await self.file_repo.update_batch(nodes_to_update)
         if moves_to_execute:

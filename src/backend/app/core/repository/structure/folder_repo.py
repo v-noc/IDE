@@ -22,13 +22,15 @@ class FolderRepo():
             current_db = self.client.db
             await self.client.set_db(project_db_name)
         folder_schemas = []
+        commit_msg = "Creating folders"
         if isinstance(new_folder, FolderNode):
             folder_schemas.append(FolderSchema.from_pydantic(new_folder))
+            commit_msg = f"Creating folder {new_folder.name}"
         else:
             folder_schemas = [FolderSchema.from_pydantic(
                 folder) for folder in new_folder]
-
-        await self.client.insert_document(folder_schemas, commit_msg=f"Creating folders {', '.join([folder.name for folder in new_folder])}")
+            commit_msg = f"Creating folders {', '.join([folder.name for folder in new_folder])}"
+        await self.client.insert_document(folder_schemas, commit_msg=commit_msg)
         if current_db:
             await self.client.set_db(current_db)
         if raw:
@@ -163,7 +165,7 @@ class FolderRepo():
             await self.client.set_db(project_db_name)
 
         existing_folders = await self.get_by_ids([folder.id for folder in folders], project_db_name, raw=True)
-        if not existing_folders or len(existing_folders) != len(folders):
+        if not existing_folders:
             return None
         folder_schemas = []
         for existing_folder, folder in zip(existing_folders, folders):
@@ -183,6 +185,8 @@ class FolderRepo():
             folder_schema.updated_at = datetime.now(timezone.utc)
             folder_schemas.append(folder_schema)
 
+        if len(folder_schemas) != len(folders):
+            return None
         try:
             await self.client.update_document(folder_schemas, commit_msg=f"Updating folder {folder.id}")
         except Exception as e:
@@ -331,6 +335,7 @@ class FolderRepo():
                 raise ValueError(f"Invalid child type: {child_type}")
         try:
             #
+
             current_time = datetime.now(timezone.utc)
             queries = []
             for data in parsed_data:
@@ -346,7 +351,7 @@ class FolderRepo():
                             .update_triple(data, "updated_at", current_time)
                         )
                         queries.append(query)
-            query = WQ().woql_and(*queries)
+            query = WQ().woql_or(*queries)
             await self.client.query(query, commit_msg=f"Moving items to {', '.join([parent_id for parent_id in parsed_data.keys()])}")
             return True
         except Exception as e:

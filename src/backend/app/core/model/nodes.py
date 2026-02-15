@@ -1,6 +1,6 @@
 from .properties import CodePosition, ThemeConfig
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Set
 from pydantic import BaseModel, Field
 
@@ -25,9 +25,9 @@ class BaseNode(BaseModel):
     id: Optional[str] = Field(..., description="The ID of the node.")
     name: str = Field(..., description="The name of the node.")
     description: str = Field(..., description="The description of the node.")
-    created_at: datetime = Field(...,
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),
                                  description="The creation time of the node.")
-    updated_at: datetime = Field(...,
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),
                                  description="The update time of the node.")
 
     @staticmethod
