@@ -20,7 +20,7 @@ class FileRepo():
             await self.client.set_db(current_db)
         return file_schema.to_pydantic()
 
-    async def get_by_id(self, file_id: str, project_db_name: str):
+    async def get_by_id(self, file_id: str, project_db_name: str, raw: bool = False):
         current_db = None
 
         if self.client.db != project_db_name:
@@ -35,6 +35,8 @@ class FileRepo():
             if current_db:
                 await self.client.set_db(current_db)
 
+        if raw:
+            return file_raw
         return FileNode.from_raw_dict(file_raw)
 
     async def delete(self, file_id: str, project_db_name: str):
@@ -58,16 +60,18 @@ class FileRepo():
             current_db = self.client.db
             await self.client.set_db(project_db_name)
 
-        existing_file = await self.get_by_id(file.id, project_db_name)
+        existing_file = await self.get_by_id(file.id, project_db_name, raw=True)
         if not existing_file:
             return None
         file_schema = FileSchema.from_pydantic(file)
 
-        file_schema.call_children = existing_file.call_children
-        file_schema.call_group = existing_file.call_group
-        file_schema.class_children = existing_file.class_children
-        file_schema.function_children = existing_file.function_children
-        file_schema.code_element_group = existing_file.code_element_group
+        file_schema.call_children = existing_file.get("call_children", set())
+        file_schema.call_group = existing_file.get("call_group", set())
+        file_schema.class_children = existing_file.get("class_children", set())
+        file_schema.function_children = existing_file.get(
+            "function_children", set())
+        file_schema.code_element_group = existing_file.get(
+            "code_element_group", set())
 
         file_schema.updated_at = datetime.now(timezone.utc)
         try:

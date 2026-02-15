@@ -37,7 +37,7 @@ class FolderRepo():
             await self.client.set_db(current_db)
         return folder_schema.to_pydantic()
 
-    async def get_by_id(self, folder_id: str, project_db_name: str):
+    async def get_by_id(self, folder_id: str, project_db_name: str, raw: bool = False):
         current_db = None
         if self.client.db != project_db_name:
             current_db = self.client.db
@@ -51,6 +51,8 @@ class FolderRepo():
             if current_db:
                 await self.client.set_db(current_db)
 
+        if raw:
+            return folder_raw
         return FolderNode.from_raw_dict(folder_raw)
 
     async def delete(self, folder_id: str, project_db_name: str):
@@ -84,15 +86,18 @@ class FolderRepo():
             current_db = self.client.db
             await self.client.set_db(project_db_name)
 
-        existing_folder = await self.get_by_id(folder.id, project_db_name)
+        existing_folder = await self.get_by_id(folder.id, project_db_name, raw=True)
         if not existing_folder:
             return None
 
         folder_schema = FolderSchema.from_pydantic(folder)
 
-        folder_schema.folder_children = existing_folder.folder_children
-        folder_schema.file_children = existing_folder.file_children
-        folder_schema.structure_group = existing_folder.structure_group
+        folder_schema.folder_children = existing_folder.get(
+            "folder_children", set())
+        folder_schema.file_children = existing_folder.get(
+            "file_children", set())
+        folder_schema.structure_group = existing_folder.get(
+            "structure_group", set())
 
         folder_schema.updated_at = datetime.now(timezone.utc)
 
