@@ -277,6 +277,16 @@ class ClassNode(BaseNode):
             theme_config=raw_dict.get("theme_config"),
         )
 
+    def get_children_by_type(self) -> dict[str, set]:
+        """Return children split by type for schema persistence."""
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("class_children", "function_children",
+             "code_element_group", "call_children", "call_group"),
+            set(),
+        )
+
 
 class FunctionNode(BaseNode):
     qname: str = Field(..., description="The qname of the function.")
