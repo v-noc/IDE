@@ -139,7 +139,7 @@ async def test_batch_update_folders(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_batch_move_folders(create_repos, create_project, create_folder):
+async def test_batch_move_folders(create_repos, create_project, create_folder, create_file):
     folder_service = FolderService(create_repos, create_project)
 
     await folder_service.create_batch([
@@ -160,7 +160,11 @@ async def test_batch_move_folders(create_repos, create_project, create_folder):
         ),
     ])
 
-    await folder_service.move_batch([(FolderSchema.__name__+"/folder_1", create_folder.id, "folder"), (f"{FolderSchema.__name__}/folder_2", FolderSchema.__name__+"/folder_1", "folder")])
+    await folder_service.move_batch([(FolderSchema.__name__+"/folder_1", create_folder.id, "folder"), (f"{FolderSchema.__name__}/folder_2", FolderSchema.__name__+"/folder_1", "folder"), (create_file.id, FolderSchema.__name__+"/folder_1", "file")])
 
     children_tree = await folder_service.get_children(create_folder.id)
-    print(children_tree)
+    assert len(children_tree) == 3
+
+    for item in children_tree:
+        if item.id == f"{FolderSchema.__name__}/folder_1":
+            assert len(item.children) == 2

@@ -11,6 +11,7 @@ from app.core.model.nodes import (
     CodeElementGroupNode,
     CallGroupNode,
     FolderNode,
+    FileNode,
 )
 
 # Field names for path queries
@@ -56,7 +57,9 @@ def parse_structure_child(raw: dict[str, Any]) -> Optional[FolderNode]:
     schema_type = raw.get("@type")
     if schema_type == "FolderSchema":
         return FolderNode.from_raw_dict(raw)
-    return None
+    elif schema_type == "FileSchema":
+        return FileNode.from_raw_dict(raw)
+    return parse_code_element_child(raw)
 
 
 def build_path_field_name(

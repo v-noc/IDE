@@ -200,23 +200,27 @@ class FileNode(BaseNode):
         default=None,
         description="Split by type for schema persistence.",
     )
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the file."
+    )
 
     @staticmethod
     def from_raw_dict(raw_dict):
         base = BaseNode.from_raw_dict(raw_dict)
-        code_children = _merge_children(
+        children = _merge_children(
             raw_dict,
-            ("class_children", "function_children", "code_element_group"),
+            ("class_children", "function_children",
+             "code_element_group", "call_children", "call_group"),
         )
-        call_children = _merge_children(
-            raw_dict, ("call_children", "call_group"))
+
         by_type = _children_by_type(raw_dict, _FILE_CHILDREN_KEYS)
         return FileNode(
             **base.model_dump(),
             qname=raw_dict["qname"],
             path=raw_dict["path"],
+
             hash=raw_dict["hash"],
-            children=code_children | call_children,
+            children=children,
             documents=raw_dict.get("documents", set()) or set(),
             children_by_type=by_type,
             theme_config=raw_dict.get("theme_config"),

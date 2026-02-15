@@ -217,6 +217,7 @@ class FolderRepo():
             )
             result = await self.client.query(query)
             children = []
+
             for child_raw in [row["child_doc"] for row in result["bindings"]]:
                 node = parse_structure_child(child_raw)
                 if node is not None:
