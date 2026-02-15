@@ -9,7 +9,7 @@ from app.core.model.properties import CodePosition
 # from app.core.repository import Repositories
 # from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 # from app.core.services.call_service import CallService
-# from app.core.services.class_service import ClassService
+from app.core.services.class_service import ClassService
 from app.core.services.file_service import FileService
 from app.core.services.folder_service import FolderService
 from app.core.services.function_service import FunctionService
@@ -67,13 +67,14 @@ async def _create_function(function_service: FunctionService, id: str, name: str
     )
 
 
-# async def _create_class(class_service: ClassService, name: str, qname: str):
-#     return await class_service.create(
-#         name,
-#         qname,
-#         f"This is {name.lower()}",
-#         DEFAULT_POSITION,
-#     )
+async def _create_class(class_service: ClassService, id: str, name: str, qname: str):
+    return await class_service.create(
+        id,
+        name,
+        qname,
+        f"This is {name.lower()}",
+        DEFAULT_POSITION,
+    )
 
 
 # async def _create_call(call_service: CallService, name: str, qname: str, target_id: str):
@@ -159,9 +160,9 @@ async def create_file(create_repos, create_project):
 #     return FunctionService(create_repos)
 
 
-# @pytest.fixture
-# def class_service(create_repos):
-#     return ClassService(create_repos)
+@pytest.fixture
+def class_service(create_repos, create_project):
+    return ClassService(create_repos, create_project)
 
 
 # @pytest.fixture
@@ -204,22 +205,29 @@ async def create_function2(create_repos, create_project):
 #     )
 
 
-# @pytest_asyncio.fixture
-# async def create_class(class_service):
-#     return await _create_class(
-#         class_service,
-#         "Test Class",
-#         "test_project.test_class",
-#     )
+@pytest_asyncio.fixture
+async def create_class(class_service, create_project):
+
+    class1 = await _create_class(
+        class_service,
+        "class",
+        "Test Class",
+        "test_project.test_class",
+    )
+    yield class1
+    await class_service.delete(class1.id)
 
 
-# @pytest_asyncio.fixture
-# async def create_class2(class_service):
-#     return await _create_class(
-#         class_service,
-#         "Test Class 2",
-#         "test_project.test_class2",
-#     )
+@pytest_asyncio.fixture
+async def create_class2(class_service):
+    class2 = await _create_class(
+        class_service,
+        "class2",
+        "Test Class 2",
+        "test_project.test_class2",
+    )
+    yield class2
+    await class_service.delete(class2.id)
 
 
 # @pytest_asyncio.fixture

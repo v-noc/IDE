@@ -26,8 +26,8 @@ async def test_create_class(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_get_class(create_repos, create_class):
-    class_service = ClassService(create_repos)
+async def test_get_class(create_repos, create_class, create_project):
+    class_service = ClassService(create_repos, create_project)
     new_class = await class_service.get(create_class.id)
     assert new_class is not None
     assert new_class.name == "Test Class"
@@ -36,8 +36,8 @@ async def test_get_class(create_repos, create_class):
 
 
 @pytest.mark.asyncio
-async def test_update_class(create_repos, create_class):
-    class_service = ClassService(create_repos)
+async def test_update_class(create_repos, create_class, create_project):
+    class_service = ClassService(create_repos, create_project)
     create_class.name = "Updated Class"
     create_class.description = "This is an updated class"
     new_class = await class_service.update(create_class)
@@ -47,10 +47,10 @@ async def test_update_class(create_repos, create_class):
 
 
 @pytest.mark.asyncio
-async def test_delete_class(create_repos, create_class):
-    class_service = ClassService(create_repos)
+async def test_delete_class(create_repos, create_class, create_project):
+    class_service = ClassService(create_repos, create_project)
     # delete() expects a key, not a full id ("nodes/<key>")
-    await class_service.delete(create_class.key)
+    await class_service.delete(create_class.id)
     new_class = await class_service.get(create_class.id)
     assert new_class is None
 
