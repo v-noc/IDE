@@ -352,9 +352,10 @@ class BaseRepo(Generic[TNode, TSchema]):
             WQ()
             .select("v:item_doc")
             .woql_and(
-                WQ().triple("v:item", "rdf:type", f"@schema:{self.schema_class.__name__}"),
+                WQ().member("v:qname", [WQ().string(x) for x in qnames]),
                 WQ().triple("v:item", "qname", "v:qname"),
-                WQ().member("v:qname", qnames),
+                WQ().triple("v:item", "rdf:type",
+                            f"@schema:{self.schema_class.__name__}"),
                 WQ().read_document("v:item", "v:item_doc"),
             )
         )
@@ -362,6 +363,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         async with self.session(project_db_name):
             try:
                 result = await self.client.query(query)
+
             except Exception as exc:
                 print(exc)
                 return []

@@ -151,30 +151,3 @@ class Collector:
                 removed_scope_ids=[],  # Deletions handled internally
                 folder_changes=[],
             )
-
-    async def process_folder(
-        self, folder_path: str
-    ) -> Optional[List[FolderChange]]:
-        """Ensure folder hierarchy exists for a folder change event."""
-
-        abs_path = Path(folder_path)
-        try:
-            rel_path = abs_path.relative_to(self.project_path)
-        except ValueError:
-            logger.error(
-                "Folder %s is not inside project path %s",
-                folder_path,
-                self.project_path,
-            )
-            return []
-        build_result = await self.folder_processor.ensure_folder(rel_path)
-        if not build_result:
-            return []
-        return build_result.folder_changes
-
-    async def process_folder_changes_batch(
-        self, change_set: ChangeSet, batch_size: int = 100
-    ) -> List[FolderChange]:
-        return await self.folder_processor.process_batch(
-            change_set, batch_size
-        )

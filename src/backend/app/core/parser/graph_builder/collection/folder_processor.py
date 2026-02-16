@@ -1,14 +1,13 @@
-from datetime import datetime
 import logging
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Dict, Set
+from typing import Dict, List, Optional, Set
 
 from app.core.repository.structure.folder_repo import FolderRepo
 from app.core.model.nodes import ProjectNode, FolderNode
 from app.core.parser.graph_builder.discovery.change_detector import (
     ChangeSet,
+    MoveEvent,
     TrackedPath,
 )
 
@@ -43,83 +42,6 @@ class FolderProcessor:
         """Reset cached folder touches for a new orchestration run."""
         self._touched_folder_ids.clear()
 
-    async def ensure_folder(
-        self, rel_path: Path
-    ) -> Optional[FolderBuildResult]:
-        """
-        Ensure that a folder hierarchy exists for the given relative path.
-        """
-        rel_parts = [part for part in rel_path.parts if part]
-        folder_changes: List[FolderChange] = []
-
-        root = self.project_node
-
-        if not rel_parts:
-            return FolderBuildResult(node=root, folder_changes=folder_changes)
-
-        current_qname = self.project_node.name
-        qnames_to_check = []
-        qname_paths = {}
-
-        for idx, part in enumerate(rel_parts):
-            current_qname = f"{current_qname}.{part}"
-            path_so_far = self.project_path / Path(*rel_parts[: idx + 1])
-            qnames_to_check.append(current_qname)
-            qname_paths[current_qname] = (part, str(path_so_far))
-
-        existing_nodes = await self.folder_repo.get_by_qnames(
-            qnames_to_check, self.project_node.db_name
-        )
-
-        nodes_to_create = []
-        moves_to_execute = []  # List of (child_id, parent_id)
-        current_parent = root
-        # Prefer the persisted project root reference; fall back to key.
-        root_ref = (
-            self.project_node.id
-            or self.project_node.key
-            or root.id
-            or root.key
-        )
-
-        for qname in qnames_to_check:
-            node = existing_nodes.get(qname)
-            display_name, path_so_far = qname_paths[qname]
-
-            if not node:
-                node = FolderNode(
-                    key=str(uuid.uuid4()),
-                    name=display_name,
-                    qname=qname,
-                    path=path_so_far,
-                    description=f"Folder {display_name}",
-                    node_type="folder"
-                )
-                nodes_to_create.append(node)
-                # Always move using key/id references (node.id can be None pre-insert).
-                parent_ref = (
-                    root_ref
-                    if current_parent == root
-                    else (current_parent.id or current_parent.key)
-                )
-                if parent_ref:
-                    moves_to_execute.append((node.key, parent_ref))
-
-                folder_changes.append(FolderChange(
-                    node=node, action="created"))
-                self._touched_folder_ids.add(node.id)
-
-            current_parent = node
-
-        if nodes_to_create:
-            await self.folder_repo.create(nodes_to_create, self.project_node.db_name)
-        if moves_to_execute:
-            await self.folder_repo.move_batch(moves_to_execute, self.project_node.db_name)
-
-        return FolderBuildResult(
-            node=current_parent, folder_changes=folder_changes
-        )
-
     async def process_batch(
         self, change_set: ChangeSet, batch_size: int = 100
     ) -> List[FolderChange]:
@@ -128,35 +50,37 @@ class FolderProcessor:
         """
         folder_changes: List[FolderChange] = []
 
-        # Ensure project root scope exists
-        root = self.project_node
-
-        # Map absolute folder path -> stable folder id for any changed folders
+        # Map absolute folder path -> stable folder id for all changed folders.
+        # This allows parent resolution to avoid unnecessary DB lookups.
         path_to_id: Dict[str, str] = {
-            tp.path: tp.id for tp in change_set.new_folders}
+            tp.path: tp.id for tp in change_set.new_folders
+        }
+        path_to_id.update(
+            {tp.path: tp.id for tp in change_set.modified_folders}
+        )
         path_to_id.update({mv.new: mv.id for mv in change_set.moved_folders})
 
-        # 1) Upsert moved folders (treated as updates) and newly-created folders
-        moved_tracked = [
-            TrackedPath(path=mv.new, id=mv.id)
-            for mv in change_set.moved_folders
-        ]
-        new_tracked = list(change_set.new_folders)
-
-        await self._upsert_folders_in_batches(
-            folders=moved_tracked,
-            root_node=root,
+        # 1) Create only folders detector classified as new.
+        await self._sync_tracked_folders_in_batches(
+            folders=change_set.new_folders,
+            mode="create",
             path_to_id=path_to_id,
             folder_changes=folder_changes,
-            default_action="updated",
             batch_size=batch_size,
         )
-        await self._upsert_folders_in_batches(
-            folders=new_tracked,
-            root_node=root,
+        # 2) Update only folders detector classified as modified.
+        await self._sync_tracked_folders_in_batches(
+            folders=change_set.modified_folders,
+            mode="update",
             path_to_id=path_to_id,
             folder_changes=folder_changes,
-            default_action="created",
+            batch_size=batch_size,
+        )
+        # 3) Move only folders detector classified as moved.
+        await self._move_folders_in_batches(
+            moves=change_set.moved_folders,
+            path_to_id=path_to_id,
+            folder_changes=folder_changes,
             batch_size=batch_size,
         )
 
@@ -176,14 +100,13 @@ class FolderProcessor:
 
         return folder_changes
 
-    async def _upsert_folders_in_batches(
+    async def _sync_tracked_folders_in_batches(
         self,
         *,
         folders: List[TrackedPath],
-        root_node: FolderNode,
+        mode: str,
         path_to_id: Dict[str, str],
         folder_changes: List[FolderChange],
-        default_action: str,
         batch_size: int,
     ) -> None:
         if not folders:
@@ -191,22 +114,42 @@ class FolderProcessor:
 
         for i in range(0, len(folders), batch_size):
             batch = folders[i: i + batch_size]
-            await self._upsert_folders_batch(
+            await self._sync_tracked_folders_batch(
                 batch=batch,
-                root_node=root_node,
+                mode=mode,
                 path_to_id=path_to_id,
                 folder_changes=folder_changes,
-                default_action=default_action,
             )
 
-    async def _upsert_folders_batch(
+    async def _move_folders_in_batches(
+        self,
+        *,
+        moves: List[MoveEvent],
+        path_to_id: Dict[str, str],
+        folder_changes: List[FolderChange],
+        batch_size: int,
+    ) -> None:
+        if not moves:
+            return
+
+        moved_folders = [TrackedPath(path=move.new, id=move.id)
+                         for move in moves]
+        for i in range(0, len(moved_folders), batch_size):
+            batch = moved_folders[i: i + batch_size]
+            await self._sync_tracked_folders_batch(
+                batch=batch,
+                mode="move",
+                path_to_id=path_to_id,
+                folder_changes=folder_changes,
+            )
+
+    async def _sync_tracked_folders_batch(
         self,
         *,
         batch: List[TrackedPath],
-        root_node: FolderNode,
+        mode: str,
         path_to_id: Dict[str, str],
         folder_changes: List[FolderChange],
-        default_action: str,
     ) -> None:
         ids = [tp.id for tp in batch if tp.id]
         if not ids:
@@ -259,6 +202,9 @@ class FolderProcessor:
             desired_path = str(abs_path)
 
             node = existing_by_id.get(tp.id)
+            is_create = mode == "create"
+            is_move = mode == "move"
+
             if not node:
                 node = FolderNode(
                     id=tp.id,
@@ -266,14 +212,14 @@ class FolderProcessor:
                     qname=desired_qname,
                     path=desired_path,
                     description=f"Folder {desired_name}",
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
-
                 )
                 nodes_to_create.append(node)
                 if node.id not in self._touched_folder_ids:
                     folder_changes.append(
-                        FolderChange(node=node, action=default_action)
+                        FolderChange(
+                            node=node,
+                            action="created" if not is_move else "updated",
+                        )
                     )
                     self._touched_folder_ids.add(node.id)
             else:
@@ -290,30 +236,31 @@ class FolderProcessor:
                     nodes_to_update.append(node)
                     if node.id not in self._touched_folder_ids:
                         folder_changes.append(
-                            FolderChange(node=node, action="updated")
+                            FolderChange(
+                                node=node,
+                                action="created" if is_create else "updated",
+                            )
                         )
                         self._touched_folder_ids.add(node.id)
 
-            # Relink parent-child relationship
-            parent_id = self.resolve_parent_id_for_abs_path(
-                abs_path=abs_path,
-                root_node=root_node,
-                path_to_id=path_to_id,
-                parent_nodes_by_qname=parent_nodes_by_qname,
-            )
+            # Parent relationships only need to be set for newly created or moved folders.
+            if is_create or is_move:
 
-            if parent_id:
-                moves_to_execute.append((tp.id, parent_id, "folder"))
+                parent_id = self.resolve_parent_id_for_abs_path(
+                    abs_path=abs_path,
+                    path_to_id=path_to_id,
+                    parent_nodes_by_qname=parent_nodes_by_qname,
+                )
+
+                if parent_id:
+                    moves_to_execute.append((tp.id, parent_id, "folder"))
 
         if nodes_to_create:
             await self.folder_repo.create(nodes_to_create, self.project_node.db_name)
-            print("nodes_to_create --- \n\n")
         if nodes_to_update:
             await self.folder_repo.update_batch(nodes_to_update, self.project_node.db_name)
-            print("nodes_to_update --- \n\n", )
         if moves_to_execute:
             await self.folder_repo.move_batch(moves_to_execute, self.project_node.db_name)
-            print("moves_to_execute --- \n\n", moves_to_execute)
 
     def qname_for_rel_path(self, rel_path: Path) -> str:
         parts = [p for p in rel_path.parts if p]
@@ -325,7 +272,6 @@ class FolderProcessor:
         self,
         *,
         abs_path: Path,
-        root_node: FolderNode,
         path_to_id: Dict[str, str],
         parent_nodes_by_qname: Dict[str, FolderNode],
     ) -> Optional[str]:
@@ -335,6 +281,7 @@ class FolderProcessor:
             return None
 
         parent_id = path_to_id.get(str(parent_abs))
+
         if parent_id:
             return parent_id
 
@@ -345,4 +292,5 @@ class FolderProcessor:
 
         parent_qname = self.qname_for_rel_path(rel_parent)
         parent_node = parent_nodes_by_qname.get(parent_qname)
+
         return parent_node.id if parent_node else None

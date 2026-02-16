@@ -22,7 +22,7 @@ class FileTracker:
             content = file_path.read_text(encoding="utf-8")
         except Exception as e:
             logger.error(f"Failed to read {file_path}: {e}")
-            return str(uuid.uuid4())
+            return None
 
         try:
             # Extract existing ID to return it

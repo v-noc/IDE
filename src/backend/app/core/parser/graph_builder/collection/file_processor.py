@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import uuid
 from pathlib import Path
@@ -42,6 +43,9 @@ class FileProcessor:
             tp.path: tp.id for tp in change_set.new_folders
         }
         folder_path_to_id.update(
+            {tp.path: tp.id for tp in change_set.modified_folders}
+        )
+        folder_path_to_id.update(
             {mv.new: mv.id for mv in change_set.moved_folders})
 
         # 2. Process Moves (Update Location & Parent)
@@ -64,10 +68,6 @@ class FileProcessor:
         )
 
         # 4. Process Modified Files
-        # Modified files usually just need content analysis, but we ensure they exist/checksum update
-        # We can optionally update their checksum here if we want to be safe,
-        # but content analysis will do it too.
-        # For optimization, we can batch update checksums here if provided in scan_result.
         await self._upsert_files_in_batches(
             files=change_set.modified_files,
             folder_path_to_id=folder_path_to_id,
@@ -142,13 +142,6 @@ class FileProcessor:
         nodes_to_update: List[FileNode] = []
         moves_to_execute: List[tuple[str, str]] = []
 
-        # Get root node for fallback
-        root_node = self.project_node
-        if not root_node:
-            # Should exist due to FolderProcessor running first
-            logger.warning("Root scope not found during file processing")
-            return
-
         for tp in batch:
             if not tp.id:
                 continue
@@ -176,7 +169,7 @@ class FileProcessor:
                     name=desired_name,
                     qname=desired_qname,
                     path=desired_path,
-                    hash=checksum,
+                    hash=self._calculate_checksum(abs_path),
                     description=f"File {desired_name}",
 
                 )
@@ -199,7 +192,7 @@ class FileProcessor:
             # Link/Relink Parent
             parent_id = self.resolve_parent_id(
                 abs_path=abs_path,
-                root_node=root_node,
+
                 folder_path_to_id=folder_path_to_id,
                 parent_nodes_by_qname=parent_nodes_by_qname,
             )
@@ -232,11 +225,18 @@ class FileProcessor:
 
         return ".".join([self.project_node.name] + parts)
 
+    def _calculate_checksum(self, file_path: Path) -> str:
+        """Calculate SHA256 checksum of a file."""
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+
     def resolve_parent_id(
         self,
         *,
         abs_path: Path,
-        root_node: FolderNode,
         folder_path_to_id: Dict[str, str],
         parent_nodes_by_qname: Dict[str, FolderNode],
     ) -> Optional[str]:
