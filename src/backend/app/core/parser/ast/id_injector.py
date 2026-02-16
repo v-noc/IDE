@@ -18,22 +18,13 @@ class IDInjector(cst.CSTTransformer):
     def _build_docstring(self, original_doc: Optional[str], new_metadata: Dict[str, str]) -> str:
         content = (original_doc or "").rstrip()
 
-        # Strip legacy metadata block if present (keeping this logic from legacy for safety)
-        if content:
-            content = re.sub(
-                r"\s*---\s*metadata:\s*.*?\s*---\s*$",
-                "",
-                content,
-                flags=re.DOTALL | re.IGNORECASE,
-            ).rstrip()
-
         # Remove existing keys we are about to update
         for key in new_metadata.keys():
             pattern = re.compile(
                 rf"(^|(?<=\s)){re.escape(key)}\s*:\s*\S+(?=\s|$)",
                 re.MULTILINE,
             )
-            content = pattern.sub("", content).strip()
+            content = pattern.sub("", content)
 
         # Format metadata lines cleanly
         kv_lines = [f"{k}: {v}" for k, v in new_metadata.items()]
@@ -42,14 +33,14 @@ class IDInjector(cst.CSTTransformer):
         # Combine content and metadata with proper formatting
         if content:
             # Dedent and normalize the original content
-            dedented_content = textwrap.dedent(content).strip()
+            dedented_content = textwrap.dedent(content)
             # Combine with metadata, ensuring proper spacing
             result = f"{dedented_content}\n\n{kv_text}"
         else:
             result = kv_text
 
         # Final dedent to ensure consistent indentation
-        return textwrap.dedent(result).strip()
+        return textwrap.dedent(result)
 
     def _add_id_to_docstring(self, body: cst.IndentedBlock, current_doc: str | None) -> cst.IndentedBlock:
         # Check if ID exists

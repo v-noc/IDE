@@ -1,6 +1,5 @@
 import hashlib
 import logging
-import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
@@ -9,6 +8,7 @@ from app.core.repository.structure.folder_repo import FolderRepo
 from app.core.model.nodes import ProjectNode, FileNode, FolderNode
 from app.core.parser.graph_builder.discovery.change_detector import (
     ChangeSet,
+    MoveEvent,
     TrackedPath,
 )
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
@@ -48,28 +48,27 @@ class FileProcessor:
         folder_path_to_id.update(
             {mv.new: mv.id for mv in change_set.moved_folders})
 
-        # 2. Process Moves (Update Location & Parent)
-        moved_tracked = [TrackedPath(path=mv.new, id=mv.id)
-                         for mv in change_set.moved_files]
-
-        await self._upsert_files_in_batches(
-            files=moved_tracked,
-            folder_path_to_id=folder_path_to_id,
-            scan_result=scan_result,
-            batch_size=batch_size,
-        )
-
-        # 3. Process New Files (Create Shell)
-        await self._upsert_files_in_batches(
+        # 2. Create only files detector classified as new.
+        await self._sync_files_in_batches(
             files=change_set.new_files,
+            mode="create",
             folder_path_to_id=folder_path_to_id,
             scan_result=scan_result,
             batch_size=batch_size,
         )
 
-        # 4. Process Modified Files
-        await self._upsert_files_in_batches(
+        # 3. Update only files detector classified as modified.
+        await self._sync_files_in_batches(
             files=change_set.modified_files,
+            mode="update",
+            folder_path_to_id=folder_path_to_id,
+            scan_result=scan_result,
+            batch_size=batch_size,
+        )
+
+        # 4. Move only files detector classified as moved.
+        await self._move_files_in_batches(
+            moves=change_set.moved_files,
             folder_path_to_id=folder_path_to_id,
             scan_result=scan_result,
             batch_size=batch_size,
@@ -85,10 +84,11 @@ class FileProcessor:
                     await self.file_repo.delete_batch(batch_ids, self.project_node.db_name)
                 logger.info("Deleted %d file(s) in batch", len(deleted_ids))
 
-    async def _upsert_files_in_batches(
+    async def _sync_files_in_batches(
         self,
         *,
         files: List[TrackedPath],
+        mode: str,
         folder_path_to_id: Dict[str, str],
         scan_result: ScanResult,
         batch_size: int,
@@ -98,16 +98,39 @@ class FileProcessor:
 
         for i in range(0, len(files), batch_size):
             batch = files[i: i + batch_size]
-            await self._upsert_files_batch(
+            await self._sync_files_batch(
                 batch=batch,
+                mode=mode,
                 folder_path_to_id=folder_path_to_id,
                 scan_result=scan_result,
             )
 
-    async def _upsert_files_batch(
+    async def _move_files_in_batches(
+        self,
+        *,
+        moves: List[MoveEvent],
+        folder_path_to_id: Dict[str, str],
+        scan_result: ScanResult,
+        batch_size: int,
+    ) -> None:
+        if not moves:
+            return
+
+        moved_files = [TrackedPath(path=move.new, id=move.id) for move in moves]
+        for i in range(0, len(moved_files), batch_size):
+            batch = moved_files[i: i + batch_size]
+            await self._sync_files_batch(
+                batch=batch,
+                mode="move",
+                folder_path_to_id=folder_path_to_id,
+                scan_result=scan_result,
+            )
+
+    async def _sync_files_batch(
         self,
         *,
         batch: List[TrackedPath],
+        mode: str,
         folder_path_to_id: Dict[str, str],
         scan_result: ScanResult,
     ) -> None:
@@ -118,29 +141,14 @@ class FileProcessor:
         existing_by_id = await self.file_repo.get_by_ids(ids, self.project_node.db_name)
         existing_by_id = {file.id: file for file in existing_by_id}
 
-        # Pre-fetch parent scopes that are NOT in the change set map
-        parent_qnames_needed: Set[str] = set()
-        for tp in batch:
-            parent_abs = str(Path(tp.path).parent)
-            if parent_abs == str(self.project_path):
-                continue
-            if parent_abs in folder_path_to_id:
-                continue
-            try:
-                rel_parent = Path(parent_abs).relative_to(self.project_path)
-                parent_qnames_needed.add(self.qname_for_rel_path(rel_parent))
-            except ValueError:
-                continue
-
-        parent_nodes_by_qname: Dict[str, FolderNode] = {}
-        if parent_qnames_needed:
-            parent_nodes_by_qname = await self.folder_repo.get_by_qnames(
-                sorted(parent_qnames_needed), self.project_node.db_name
-            )
+        parent_nodes_by_qname = await self._fetch_parent_nodes_by_qname(
+            batch=batch,
+            folder_path_to_id=folder_path_to_id,
+        )
 
         nodes_to_create: List[FileNode] = []
         nodes_to_update: List[FileNode] = []
-        moves_to_execute: List[tuple[str, str]] = []
+        moves_to_execute: List[tuple[str, str, str]] = []
 
         for tp in batch:
             if not tp.id:
@@ -160,7 +168,8 @@ class FileProcessor:
             desired_name = abs_path.stem
             desired_qname = self.qname_for_rel_path(rel_path, is_file=True)
             desired_path = str(abs_path)
-            checksum = scan_result.files.get(tp.path)
+            checksum = self._resolve_checksum(tp.path, abs_path, scan_result)
+            should_relink_parent = mode in {"create", "move"}
 
             node = existing_by_id.get(tp.id)
             if not node:
@@ -169,9 +178,8 @@ class FileProcessor:
                     name=desired_name,
                     qname=desired_qname,
                     path=desired_path,
-                    hash=self._calculate_checksum(abs_path),
+                    hash=checksum,
                     description=f"File {desired_name}",
-
                 )
                 nodes_to_create.append(node)
             else:
@@ -179,28 +187,26 @@ class FileProcessor:
                     node.name != desired_name
                     or node.qname != desired_qname
                     or node.path != desired_path
-                    or (checksum and node.hash != checksum)
+                    or node.hash != checksum
                 )
                 if changed:
                     node.name = desired_name
                     node.qname = desired_qname
                     node.path = desired_path
-                    if checksum:
-                        node.hash = checksum
+                    node.hash = checksum
                     nodes_to_update.append(node)
 
-            # Link/Relink Parent
-            parent_id = self.resolve_parent_id(
-                abs_path=abs_path,
+            if should_relink_parent:
+                parent_id = self.resolve_parent_id(
+                    abs_path=abs_path,
+                    folder_path_to_id=folder_path_to_id,
+                    parent_nodes_by_qname=parent_nodes_by_qname,
+                )
 
-                folder_path_to_id=folder_path_to_id,
-                parent_nodes_by_qname=parent_nodes_by_qname,
-            )
-
-            if parent_id:
-                moves_to_execute.append((tp.id, parent_id, "file"))
-            else:
-                logger.warning(f"Could not resolve parent for file {tp.path}")
+                if parent_id:
+                    moves_to_execute.append((tp.id, parent_id, "file"))
+                else:
+                    logger.warning("Could not resolve parent for file %s", tp.path)
 
         if nodes_to_create:
             await self.file_repo.create(nodes_to_create, self.project_node.db_name)
@@ -208,6 +214,31 @@ class FileProcessor:
             await self.file_repo.update_batch(nodes_to_update, self.project_node.db_name)
         if moves_to_execute:
             await self.folder_repo.move_batch(moves_to_execute, self.project_node.db_name)
+
+    async def _fetch_parent_nodes_by_qname(
+        self,
+        *,
+        batch: List[TrackedPath],
+        folder_path_to_id: Dict[str, str],
+    ) -> Dict[str, FolderNode]:
+        parent_qnames_needed: Set[str] = set()
+        for tp in batch:
+            parent_abs = str(Path(tp.path).parent)
+            if parent_abs == str(self.project_path):
+                continue
+            if parent_abs in folder_path_to_id:
+                continue
+            try:
+                rel_parent = Path(parent_abs).relative_to(self.project_path)
+            except ValueError:
+                continue
+            parent_qnames_needed.add(self.qname_for_rel_path(rel_parent))
+
+        if not parent_qnames_needed:
+            return {}
+        return await self.folder_repo.get_by_qnames(
+            sorted(parent_qnames_needed), self.project_node.db_name
+        )
 
     def qname_for_rel_path(self, rel_path: Path, is_file: bool = False) -> str:
         parts = [p for p in rel_path.parts if p]
@@ -232,6 +263,14 @@ class FileProcessor:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
+
+    def _resolve_checksum(
+        self,
+        file_path: str,
+        abs_path: Path,
+        scan_result: ScanResult,
+    ) -> str:
+        return scan_result.files.get(file_path) or self._calculate_checksum(abs_path)
 
     def resolve_parent_id(
         self,

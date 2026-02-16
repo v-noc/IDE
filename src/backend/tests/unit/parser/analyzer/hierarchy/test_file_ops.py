@@ -32,10 +32,8 @@ async def _resync_and_get_tree(project_node, repos, db):
     await orchestrator.resync()
 
     project_service = ProjectService(repos)
-    project = await project_service.get(project_node.id)
-    assert project is not None, "Project not found after resync"
 
-    children = await project_service.get_children(project_node.id)
+    children = await project_service.get_children(project_node.db_name)
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
@@ -59,7 +57,7 @@ async def test_file_add(setup_file_project):
     project_name = project_node.name
     new_file_node = find_node_by_qname(tree_after, f"{project_name}.new_file")
     assert new_file_node is not None, "new_file not found in tree after add"
-    assert new_file_node.node_type == "file", "new_file should be a file"
+    assert new_file_node.__class__.__name__ == "FileTreeNode", "new_file should be a file"
 
     # Verify it's in root children
 
@@ -134,7 +132,7 @@ async def test_file_move(setup_file_project):
     file1_new = find_node_by_qname(
         tree_after, f"{project_name}.subfolder.file1")
     assert file1_new is not None, "file1 should exist in new location"
-    assert file1_new.node_type == "file", "file1 should be a file"
+    assert file1_new.__class__.__name__ == "FileTreeNode", "file1 should be a file"
 
     # Verify parent relationships
     subfolder_node = find_node_by_qname(
@@ -178,7 +176,7 @@ async def test_file_rename(setup_file_project):
     renamed_file = find_node_by_qname(
         tree_after, f"{project_name}.renamed_file")
     assert renamed_file is not None, "renamed_file should exist after rename"
-    assert renamed_file.node_type == "file", "renamed_file should be a file"
+    assert renamed_file.__class__.__name__ == "FileTreeNode", "renamed_file should be a file"
 
     # Verify it's in root children with new name
 
@@ -224,7 +222,7 @@ async def test_file_rename_and_move(setup_file_project):
         tree_after, f"{project_name}.subfolder.renamed_file"
     )
     assert renamed_file is not None, "renamed_file should exist in new location"
-    assert renamed_file.node_type == "file", "renamed_file should be a file"
+    assert renamed_file.__class__.__name__ == "FileTreeNode", "renamed_file should be a file"
 
     # Verify parent relationships
     subfolder_node = find_node_by_qname(

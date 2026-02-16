@@ -143,7 +143,7 @@ async def test_folder_move(setup_folder_project):
     assert folder2_node is not None
     folder2_children = folder2_node.children if hasattr(
         folder2_node, "children") else []
-    print("folder2_children --- \n\n", folder2_node)
+
     child_names = {getattr(c, "name", None) for c in folder2_children}
     assert "nested1" in child_names, "nested1 should be in folder2 children"
 
@@ -180,6 +180,8 @@ async def test_folder_rename(setup_folder_project):
         tree_after, f"{project_name}.renamed_folder")
     assert renamed_folder is not None, "renamed_folder should exist after rename"
     assert renamed_folder.__class__.__name__ == "FolderTreeNode", "renamed_folder should be a folder"
+
+    assert renamed_folder.id == folder1_before.id, "renamed_folder should have the same id as folder1"
 
     # Verify it's in root children with new name
 
