@@ -27,7 +27,9 @@ async def setup_folder_project(tmp_path, create_repos, terminusdb_client):
         str(project_path),
     )
 
-    return project_node, create_repos, terminusdb_client, project_path
+    yield project_node, create_repos, terminusdb_client, project_path
+    await project_service.delete(project_node.id)
+    shutil.rmtree(project_path)
 
 
 @pytest_asyncio.fixture
@@ -43,7 +45,9 @@ async def setup_file_project(tmp_path, create_repos, terminusdb_client):
         str(project_path),
     )
 
-    return project_node, create_repos, terminusdb_client, project_path
+    yield project_node, create_repos, terminusdb_client, project_path
+    await project_service.delete(project_node.id)
+    shutil.rmtree(project_path)
 
 
 @pytest_asyncio.fixture
@@ -59,7 +63,9 @@ async def setup_structure_project(tmp_path, create_repos, terminusdb_client):
         str(project_path),
     )
 
-    return project_node, create_repos, terminusdb_client, project_path
+    yield project_node, create_repos, terminusdb_client, project_path
+    await project_service.delete(project_node.id)
+    shutil.rmtree(project_path)
 
 
 async def _build_and_get_tree(project_node, repos, db_client):

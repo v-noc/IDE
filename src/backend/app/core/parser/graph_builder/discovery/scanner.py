@@ -93,7 +93,7 @@ class FileScanner:
                             break
                         folder_set.add(
                             str((self.project_path / parent).absolute()))
-
+        folder_set.remove(str(self.project_path.absolute()))
         return ScanResult(files=file_map, folders=folder_set)
 
     def _is_ignored(self, rel_path: Path) -> bool:
