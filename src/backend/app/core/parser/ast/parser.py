@@ -3,6 +3,7 @@ from parso.python.tree import Class, Function, Name, PythonNode
 from typing import List, Optional, Union
 from .models import ClassNode, FunctionNode, CallNode, NodePosition, BaseNode
 import re
+from app.core.model.schemas import FunctionSchema, ClassSchema
 
 
 class JediParser:
@@ -123,7 +124,7 @@ class JediParser:
 
     def _visit_class(self, node: Class) -> ClassNode:
         return ClassNode(
-            id=self._extract_id(node),
+            id=f"{ClassSchema.__name__}/{self._extract_id(node)}",
             name=node.name.value,
             position=self._get_position(node),
             children=self._scan_children(node)
@@ -139,7 +140,7 @@ class JediParser:
             position = self._get_position(node.parent)
 
         return FunctionNode(
-            id=self._extract_id(target_node),
+            id=f"{FunctionSchema.__name__}/{self._extract_id(target_node)}",
             name=node.name.value,
             position=position,
             children=self._scan_children(target_node)

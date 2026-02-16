@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Union, List, Tuple
 
 from app.core.model.nodes import FunctionNode
 from app.core.model.schemas import FunctionSchema
@@ -20,15 +20,19 @@ class FunctionRepo(BaseRepo[FunctionNode, FunctionSchema]):
 
     @staticmethod
     def _merge_update_fields(existing_raw: dict, _node: FunctionNode, schema: FunctionSchema):
-        BaseRepo.merge_set_fields(schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE)
-        BaseRepo.merge_fields(schema, existing_raw, CODE_OPTIONAL_FIELDS_TO_PRESERVE)
+        BaseRepo.merge_set_fields(
+            schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE)
+        BaseRepo.merge_fields(schema, existing_raw,
+                              CODE_OPTIONAL_FIELDS_TO_PRESERVE)
 
-    async def create(self, function: FunctionNode, project_db_name: str):
+    async def create(self, function: Union[FunctionNode, List[FunctionNode]], project_db_name: str, raw: bool = False):
+
         result = await self.create_nodes(
             function,
             project_db_name,
             singular_name="function",
             plural_name="functions",
+            raw=raw,
         )
         return result
 
@@ -38,9 +42,18 @@ class FunctionRepo(BaseRepo[FunctionNode, FunctionSchema]):
     async def delete(self, function_id: str, project_db_name: str):
         return await self.delete_with_parent_cleanup(
             function_id,
-            parent_field="function_children",
+            parent_field="function_children|class_children",
             project_db_name=project_db_name,
             commit_msg=f"Deleting function {function_id}",
+        )
+
+    async def delete_batch(self, function_ids: List[str], project_db_name: str):
+        return await self.delete_batch_with_parent_cleanup(
+            function_ids,
+            parent_field="function_children|class_children",
+            binding_var="v:function_id",
+            project_db_name=project_db_name,
+            commit_msg=f"Deleting functions {', '.join(function_ids[:5])}",
         )
 
     async def update(self, function: FunctionNode, project_db_name: str):
@@ -48,6 +61,14 @@ class FunctionRepo(BaseRepo[FunctionNode, FunctionSchema]):
             function,
             project_db_name=project_db_name,
             commit_msg=f"Updating function {function.id}",
+            update_schema=self._merge_update_fields,
+        )
+
+    async def update_batch(self, functions: List[FunctionNode], project_db_name: str):
+        return await self.update_nodes(
+            functions,
+            project_db_name=project_db_name,
+            commit_msg=f"Updating functions {len(functions)}",
             update_schema=self._merge_update_fields,
         )
 
@@ -78,6 +99,13 @@ class FunctionRepo(BaseRepo[FunctionNode, FunctionSchema]):
             new_parent_id,
             item_id,
             item_type,
+            child_type_to_field=CODE_CHILD_TYPE_TO_FIELD,
+            project_db_name=project_db_name,
+        )
+
+    async def move_batch(self, moves: List[Tuple[str, str, str]], project_db_name: str):
+        return await self.move_batch_by_type(
+            moves,
             child_type_to_field=CODE_CHILD_TYPE_TO_FIELD,
             project_db_name=project_db_name,
         )

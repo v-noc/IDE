@@ -78,7 +78,7 @@ class Collector:
             return folder_changes
 
     async def process_file(
-        self, file_path: str, checksum: str, progress_tracker=None
+        self, file_path: str, checksum: str, project_db_name: str, progress_tracker=None
     ) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 2 collection (Content/AST).
@@ -104,8 +104,8 @@ class Collector:
 
             # 1. Retrieve File Node
             with tracker.timer("collector.process_file.get_node"):
-                file_node = await self.repos.file_repo.find_one(
-                    {"path": str(abs_path)}
+                file_node = await self.repos.file_repo.get_by_path(
+                    str(abs_path), project_db_name=project_db_name
                 )
             if not file_node:
                 logger.error(
@@ -113,6 +113,9 @@ class Collector:
                     f"structure sync"
                 )
                 return None
+            else:
+
+                file_node = file_node[0]
 
             # 2. Parse Content & Scan AST
             try:
@@ -143,7 +146,7 @@ class Collector:
             # line numbers in ast_nodes match it (IDs injected)
             with tracker.timer("collector.process_file.sync_content"):
                 await self.ast_processor.sync_content(
-                    file_node, ast_nodes, processed_content, progress_tracker
+                    file_node, ast_nodes, project_db_name=project_db_name,   content=processed_content, progress_tracker=progress_tracker
                 )
 
             return CollectionResult(

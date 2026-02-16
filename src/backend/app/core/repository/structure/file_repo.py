@@ -13,6 +13,7 @@ from app.core.repository.utils import (
 )
 from app.db.async_terminus_client import AsyncClient
 
+
 class FileRepo(BaseRepo[FileNode, FileSchema]):
     def __init__(self, client: AsyncClient):
         super().__init__(client, FileNode, FileSchema)
@@ -127,7 +128,7 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         return await self.get_all(project_db_name)
 
     async def get_by_path(self, path: str, project_db_name: str):
-        return await self.find("path", [path], project_db_name)[0]
+        return await self.find("path", [path], project_db_name)
 
     async def get_by_qnames(
         self, qnames: List[str], project_db_name: str

@@ -212,11 +212,11 @@ class GraphBuilderOrchestrator:
         progress_tracker.set_total_files(len(files_to_process))
         await progress_tracker.emit(force=True)
 
-        # collection_results = (
-        #     await self.phase_processor.process_collection_phase(
-        #         change_set, scan_result, progress_tracker
-        #     )
-        # )
+        collection_results = (
+            await self.phase_processor.process_collection_phase(
+                change_set, scan_result, progress_tracker
+            )
+        )
 
         # # Emit final collection phase progress with discovered entities
         # await progress_tracker.emit(force=True)

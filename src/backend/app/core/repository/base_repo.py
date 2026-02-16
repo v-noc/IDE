@@ -297,6 +297,7 @@ class BaseRepo(Generic[TNode, TSchema]):
                 return False
         return True
 
+    # moves is a list of tuples (item_id, parent_id, child_type)
     async def move_batch_by_type(
         self,
         moves: list[tuple[str, str, str]],
@@ -319,6 +320,7 @@ class BaseRepo(Generic[TNode, TSchema]):
             for field_name, item_ids in fields.items():
                 if not item_ids:
                     continue
+
                 query = WQ().member("v:item", list(item_ids)).woql_and(
                     WQ().opt(
                         WQ()
@@ -339,8 +341,9 @@ class BaseRepo(Generic[TNode, TSchema]):
                 query = WQ().woql_or(*queries)
                 parent_ids = ", ".join(list(parsed_data.keys()))
                 await self.client.query(query, commit_msg=f"Moving items to {parent_ids}")
+
             except Exception as exc:
-                print(exc)
+                print(f"error {exc}")
                 return False
         return True
 
@@ -352,7 +355,8 @@ class BaseRepo(Generic[TNode, TSchema]):
             WQ()
             .select("v:item_doc")
             .woql_and(
-                WQ().member(field, [WQ.string(value) for value in values]),
+                WQ().member("v:value", [WQ().string(value)
+                                        for value in values]),
                 WQ().triple("v:item", field, "v:value"),
                 WQ().triple("v:item", "rdf:type",
                             f"@schema:{self.schema_class.__name__}"),
@@ -363,6 +367,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         async with self.session(project_db_name):
             try:
                 result = await self.client.query(query)
+
             except Exception as exc:
                 print(exc)
                 return []

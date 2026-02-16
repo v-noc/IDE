@@ -18,29 +18,19 @@ PROJECT_NAME = "simple_function"
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, arangodb_client):
+async def setup_project(tmp_path, terminusdb_client):
     project_path = tmp_path / "project"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
-    project_node = ProjectNode(
-        name=PROJECT_NAME,
-        path=str(project_path),
-        qname=PROJECT_NAME,
-        description="Test Project",
-    )
-
-    repos = Repositories(arangodb_client)
-    await repos.ensure_collections()
+    repos = Repositories(terminusdb_client)
 
     project_service = ProjectService(repos)
-    # Ensure project node exists in DB
-    # Check if create_node is the right method or if we should use repo directly
-    # Service usually wraps repo.
-    # We might need to handle if it already exists or just create it.
-    # Given clean DB per test (usually), create is fine.
-    project_node = await project_service.create_node(project_node)
 
-    return project_node, repos, arangodb_client
+    project_node = await project_service.create(PROJECT_NAME, "Test Project", str(project_path))
+
+    yield project_node, repos, terminusdb_client
+    await project_service.delete(project_node.id)
+    shutil.rmtree(project_path)
 
 
 def find_node_by_name(nodes: List[AnyTreeNode], name: str):
@@ -49,7 +39,7 @@ def find_node_by_name(nodes: List[AnyTreeNode], name: str):
 
 def find_node(node):
     for child in node.children:
-        if child.node_type == "call":
+        if child.__class__.__name__ == "CallTreeNode":
             return child
         found = find_node(child)
         if found:
@@ -116,9 +106,7 @@ async def test_function_collector(setup_project):
 
     project_service = ProjectService(repos)
 
-    project = await project_service.get_all()
-
-    children = await project_service.get_children(project[0].id)
+    children = await project_service.get_children(project_node.db_name)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -126,13 +114,15 @@ async def test_function_collector(setup_project):
     # 1. Project structure assertions
     assert len(tree) == 2
 
-    file_node = tree[1]
+    file_node = tree[0]
 
     # 2. Function definitions in main.py
     file_functions = [
-        child for child in file_node.children if child.node_type == "function"
+        child for child in file_node.children if child.__class__.__name__ == "FunctionTreeNode"
     ]
+
     func_qnames = sorted([child.qname for child in file_functions])
+    print(f"func_qnames {func_qnames}")
 
     expected_func_qnames = sorted(
         [
@@ -145,8 +135,10 @@ async def test_function_collector(setup_project):
     )
     assert func_qnames == expected_func_qnames
 
-    main_func = find_node_by_qname(file_node.children, f"{file_node.qname}.main")
-    factory_func = find_node_by_qname(file_node.children, f"{file_node.qname}.factory")
+    main_func = find_node_by_qname(
+        file_node.children, f"{file_node.qname}.main")
+    factory_func = find_node_by_qname(
+        file_node.children, f"{file_node.qname}.factory")
     call_back_func = find_node_by_qname(
         file_node.children, f"{file_node.qname}.call_back"
     )
@@ -161,7 +153,8 @@ async def test_function_collector(setup_project):
 
     # 3. Assert functions and calls within `factory` function
     assert len(factory_func.children) == 2
-    add_func = find_node_by_qname(factory_func.children, f"{factory_func.qname}.add")
+    add_func = find_node_by_qname(
+        factory_func.children, f"{factory_func.qname}.add")
     build_func = find_node_by_qname(
         factory_func.children, f"{factory_func.qname}.build"
     )
@@ -192,7 +185,8 @@ async def test_function_collector(setup_project):
 
     # 4.1 Check `factory_call()` in `main`
     assert main_factory_call.target.id == factory_call_func.id
-    children = [{child.name: child.node_type} for child in main_factory_call.children]
+    children = [{child.name: child.node_type}
+                for child in main_factory_call.children]
 
     assert len(main_factory_call.children) == 2
     inner_factory_call = find_node_by_qname(

@@ -13,6 +13,7 @@ from app.core.parser.ast.models import (
     FunctionNode as ASTFunctionNode
 )
 from app.core.parser.jedi_adapter.resolver import MROResolver
+from app.core.model.schemas import CallSchema, CodeElementGroupSchema, FunctionSchema, ClassSchema,  CallGroupSchema
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class ASTProcessor:
         self,
         file_node: FileNode,
         nodes: List[BaseNode],
+        project_db_name: str,
         content: Optional[str] = None,
         progress_tracker=None
     ) -> List[any]:
@@ -36,7 +38,7 @@ class ASTProcessor:
         Handles Creation, Updates, and Deletions of child nodes.
         """
         # 1. Fetch existing nodes from database
-        existing_map = await self._build_existing_map(file_node)
+        existing_map = await self._build_existing_map(file_node, project_db_name)
 
         # 2. Flatten AST & Prepare desired nodes
         desired_nodes_data = []
@@ -50,46 +52,36 @@ class ASTProcessor:
         )
 
         # 4. Execute batch operations
-        await self._execute_batch_operations(sync_ops, file_node.path)
+        await self._execute_batch_operations(sync_ops, file_node.path, project_db_name)
 
         return sync_ops["current_nodes"]
 
     async def _build_existing_map(
-        self, file_node: FileNode
+        self, file_node: FileNode, project_db_name: str
     ) -> Dict[str, Dict[str, Any]]:
         """
         Build a map of existing nodes from the containment tree.
         Returns a dict mapping node_id to {"node": Node, "parent_id": str}
         """
-        existing_tree = await self.repos.nodes.get_containment_tree(
+        existing_tree = await self.repos.file_repo.get_children(
             file_node.id,
-            depth=50,
-            exclude_types=["call", "group"],
+            exclude_types=[CallSchema.__name__,
+                           CodeElementGroupSchema.__name__, CallGroupSchema.__name__],
+            project_db_name=project_db_name,
         )
 
         existing_map = {}
+        child_to_parent = {}
 
-        for item in existing_tree:
-            vertex = item["vertex"]
-            node_type = vertex.get("node_type")
-            if node_type == "function":
-                try:
-                    node = FunctionNode(**vertex)
-                except Exception as e:
-                    logger.warning(f"Failed to parse FunctionNode: {e}")
-                    continue
-            elif node_type == "class":
-                try:
-                    node = ClassNode(**vertex)
-                except Exception as e:
-                    logger.warning(f"Failed to parse ClassNode: {e}")
-                    continue
-            else:
-                continue
+        for node in existing_map:
+            for child in node.children:
+                child_to_parent[node.id].add(child.id)
+
+        for node in existing_tree:
 
             existing_map[node.id] = {
                 "node": node,
-                "parent_id": item["parent_id"]
+                "parent_id": child_to_parent[node.id]
             }
 
         return existing_map
@@ -113,22 +105,22 @@ class ASTProcessor:
         if node_data["type"] == "class":
             mro = node_data.get("mro", [])
             return ClassNode(
-                key=node_id,
+                id=f"{node_id}",
                 name=ast_node.name,
                 qname=node_data["qname"],
-                position=position,
-                implements=mro,
+                code_position=position,
+                base_classes=mro,
                 description=f"Class {ast_node.name}",
-                node_type="class"
+
             )
         else:
             return FunctionNode(
-                key=node_id,
+                id=f"{node_id}",
                 name=ast_node.name,
                 qname=node_data["qname"],
-                position=position,
+                code_position=position,
                 description=f"Function {ast_node.name}",
-                node_type="function"
+
             )
 
     def _update_existing_node(
@@ -143,11 +135,11 @@ class ASTProcessor:
         # Update fields that come from AST parsing
         existing_node.name = new_node.name
         existing_node.qname = new_node.qname
-        existing_node.position = new_node.position
+        existing_node.code_position = new_node.code_position
 
         # Update ClassNode-specific fields
         if isinstance(existing_node, ClassNode) and isinstance(new_node, ClassNode):
-            existing_node.implements = new_node.implements
+            existing_node.base_classes = new_node.base_classes
 
     def _determine_sync_operations(
         self,
@@ -177,10 +169,10 @@ class ASTProcessor:
                 continue
 
             node_id = ast_node.id
-            full_node_id = f"nodes/{node_id}"
-            processed_ids.add(full_node_id)
 
-            existing_entry = existing_map.get(full_node_id)
+            processed_ids.add(node_id)
+
+            existing_entry = existing_map.get(node_id)
             existing_node = existing_entry["node"] if existing_entry else None
             existing_parent_id = (
                 existing_entry["parent_id"] if existing_entry else None
@@ -197,17 +189,18 @@ class ASTProcessor:
                 else:
                     funcs_to_create.append(new_node)
 
-                moves_to_execute.append((node_id, parent_id))
+                moves_to_execute.append((node_id, parent_id, "class" if isinstance(
+                    new_node, ClassNode) else "function"))
                 logger.debug(f"Will create new node: {new_node.qname}")
             else:
                 # Node exists, check if update is needed
                 needs_update = (
                     existing_node.name != new_node.name or
                     existing_node.qname != new_node.qname or
-                    existing_node.position != new_node.position or
+                    existing_node.code_position != new_node.code_position or
                     (isinstance(existing_node, ClassNode) and
                      isinstance(new_node, ClassNode) and
-                     existing_node.implements != new_node.implements)
+                     existing_node.base_classes != new_node.base_classes)
                 )
 
                 if needs_update:
@@ -226,7 +219,8 @@ class ASTProcessor:
                         f"Node moved: {existing_node.qname} -> "
                         f"parent {parent_id}"
                     )
-                    moves_to_execute.append((node_id, parent_id))
+                    moves_to_execute.append((node_id, parent_id, "class" if isinstance(
+                        existing_node, ClassNode) else "function"))
 
         # Calculate nodes to delete
         ids_to_delete = [
@@ -244,7 +238,7 @@ class ASTProcessor:
         }
 
     async def _execute_batch_operations(
-        self, sync_ops: Dict[str, Any], file_path: str
+        self, sync_ops: Dict[str, Any], file_path: str, project_db_name: str
     ) -> None:
         """
         Execute all batch operations (create, update, move, delete).
@@ -257,20 +251,21 @@ class ASTProcessor:
         ids_to_delete = sync_ops["ids_to_delete"]
 
         if funcs_to_create:
-            await self.repos.function_repo.create_batch(funcs_to_create)
+            await self.repos.function_repo.create(funcs_to_create, project_db_name=project_db_name)
+
         if classes_to_create:
-            await self.repos.class_repo.create_batch(classes_to_create)
+            await self.repos.class_repo.create(classes_to_create, project_db_name=project_db_name)
 
         if funcs_to_update:
-            await self.repos.function_repo.update_batch(funcs_to_update)
+            await self.repos.function_repo.update_batch(funcs_to_update, project_db_name=project_db_name)
         if classes_to_update:
-            await self.repos.class_repo.update_batch(classes_to_update)
+            await self.repos.class_repo.update_batch(classes_to_update, project_db_name=project_db_name)
 
         if moves_to_execute:
-            await self.repos.nodes.move_batch(moves_to_execute)
+            await self.repos.file_repo.move_batch(moves_to_execute, project_db_name=project_db_name)
 
         if ids_to_delete:
-            await self.repos.nodes.delete_batch(ids_to_delete)
+            await self.repos.function_repo.delete_batch(ids_to_delete, project_db_name=project_db_name)
             logger.info(
                 f"Deleted {len(ids_to_delete)} stale nodes {ids_to_delete} in {file_path}"
             )
@@ -323,25 +318,23 @@ class ASTProcessor:
                         id=node_id,
                         name=node.name,
                         qname=qname,
-                        position=CodePosition(
+                        code_position=CodePosition(
                             line_no=0, col_offset=0,
                             end_line_no=0, end_col_offset=0
                         ),
-                        implements=[],
+                        base_classes=[],
                         description=f"Class {node.name}",
-                        node_type="class"
                     )
                 else:
                     pseudo_parent = FunctionNode(
                         id=node_id,
                         name=node.name,
                         qname=qname,
-                        position=CodePosition(
+                        code_position=CodePosition(
                             line_no=0, col_offset=0,
                             end_line_no=0, end_col_offset=0
                         ),
                         description=f"Function {node.name}",
-                        node_type="function"
                     )
 
                 if hasattr(node, "children"):

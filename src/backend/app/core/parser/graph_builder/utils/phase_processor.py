@@ -86,7 +86,8 @@ class PhaseProcessor:
                     await progress_tracker.emit()
                 try:
                     result = await asyncio.wait_for(
-                        self.collector.process_file(file_path, checksum, progress_tracker),
+                        self.collector.process_file(
+                            file_path, checksum, project_db_name=self.project_node.db_name, progress_tracker=progress_tracker),
                         timeout=self._file_timeout,
                     )
                     # Update file progress
@@ -149,10 +150,11 @@ class PhaseProcessor:
                             "Analyzing call graph for: %s",
                             result.file_node.qname,
                         )
-                        
+
                         # Set current file at start of processing
                         if progress_tracker:
-                            progress_tracker.set_current_file(result.file_node.path)
+                            progress_tracker.set_current_file(
+                                result.file_node.path)
                             await progress_tracker.emit()
 
                         # NOTE: Do NOT delete descendant calls here.
@@ -165,14 +167,15 @@ class PhaseProcessor:
                                 body_parser.process_ast(result.file_node),
                                 timeout=self._file_timeout,
                             )
-                        
+
                         # Clear current function when file is done
                         if progress_tracker:
                             progress_tracker.clear_current_function()
-                        
+
                         # Update file progress
                         if progress_tracker:
-                            progress_tracker.increment_file_processed(result.file_node.path)
+                            progress_tracker.increment_file_processed(
+                                result.file_node.path)
                             await progress_tracker.emit()
 
                     except Exception as exc:
@@ -182,7 +185,8 @@ class PhaseProcessor:
                         )
                         # Still update progress even on error
                         if progress_tracker:
-                            progress_tracker.increment_file_processed(result.file_node.path)
+                            progress_tracker.increment_file_processed(
+                                result.file_node.path)
                             await progress_tracker.emit()
 
         # Execute in parallel
