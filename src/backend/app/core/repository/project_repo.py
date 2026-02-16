@@ -1,11 +1,14 @@
 from datetime import datetime
 from datetime import timezone
 from app.db.errors import DatabaseError
-
+from app.db.async_terminus_client import WOQLQuery as WQ
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.schemas import ProjectSchema, ensure_schema
 from app.core.model import ProjectNode
 from slugify import slugify
+
+from app.core.repository.utils import parse_structure_child
+from app.core.model.schemas import FileSchema, FolderSchema, FunctionSchema, ClassSchema, CallSchema, CodeElementGroupSchema, CallGroupSchema, StructureGroupSchema
 
 
 class ProjectRepo():
@@ -125,5 +128,32 @@ class ProjectRepo():
             updated_at=old_project["updated_at"],
         )
 
-    def get_children(self, project_id: str):
-        pass
+    async def get_children(self, project_db_name: str, exclude_types: list[str] = []):
+        if self.client.db != project_db_name:
+            await self.client.set_db(project_db_name)
+
+        inlcude_type = [FileSchema.__name__, FolderSchema.__name__, FunctionSchema.__name__, ClassSchema.__name__,
+                        CallSchema.__name__, CodeElementGroupSchema.__name__, CallGroupSchema.__name__, StructureGroupSchema.__name__]
+        filtered_types = set(inlcude_type) - set(exclude_types)
+        try:
+            query = WQ().select("v:doc").woql_and(
+                WQ().triple("v:uri", "rdf:type", "v:type"),
+                WQ().read_document("v:uri", "v:doc"),
+                WQ.woql_and(
+                    WQ().member("v:type", [
+                        f"@schema:{t}" for t in filtered_types]))
+
+            )
+            result = await self.client.query(query)
+
+            children = []
+            for row in [row["doc"] for row in result["bindings"]]:
+
+                children.append(parse_structure_child(row))
+            return children
+        except Exception as e:
+            print(e)
+            return []
+        finally:
+            if self.client.db != project_db_name:
+                await self.client.set_db(project_db_name)

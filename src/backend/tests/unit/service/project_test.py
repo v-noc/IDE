@@ -9,6 +9,8 @@ from app.core.services.project_service import ProjectService
 # from app.api.json_rpc.schemas import RegisterLogsParams, LogEventType
 import pytest
 
+from app.core.model.schemas import FileSchema
+
 
 @pytest.mark.asyncio
 async def test_create_project(create_repos):
@@ -81,3 +83,16 @@ async def test_delete_project(create_project, create_repos):
     projects = await project_service.get_all()
 
     assert len(projects) == 0
+
+
+@pytest.mark.asyncio
+async def test_get_children(create_project, create_repos, create_file, create_folder, create_function, create_class, create_call):
+    project_service = ProjectService(create_repos)
+
+    children = await project_service.get_children(create_project.db_name, [FileSchema.__name__])
+    # print(children)
+
+    assert len(children) == 4
+
+    for child in children:
+        assert type(child) != FileSchema

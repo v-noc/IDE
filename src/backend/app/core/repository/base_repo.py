@@ -176,7 +176,8 @@ class BaseRepo(Generic[TNode, TSchema]):
     ) -> bool:
         query = WQ().woql_and(
             WQ().opt(
-                WQ().triple("v:parent", parent_field, item_id).delete_triple("v:parent", parent_field, item_id)
+                WQ().triple("v:parent", parent_field, item_id).delete_triple(
+                    "v:parent", parent_field, item_id)
             ),
             WQ().delete_document(item_id),
         )
@@ -218,25 +219,45 @@ class BaseRepo(Generic[TNode, TSchema]):
         field_name: str,
         parse_child: Callable[[dict[str, Any]], Any],
         project_db_name: str,
+        filtered_types: list[str] | None = None,
+        allowed_path_fields: tuple[str, ...] | None = None,
     ):
+        if allowed_path_fields is not None:
+            requested_fields = field_name.strip("()").split("|")
+            if any(field not in allowed_path_fields for field in requested_fields):
+                return []
+
+        query_step = (
+            WQ()
+            .eq("v:start", parent_id)
+            .path("v:start", f"{field_name}+", "v:child")
+        )
+        if filtered_types:
+            schema_types = [
+                f"@schema:{schema_type}" for schema_type in filtered_types]
+            query_step = (
+                query_step
+                .triple("v:child", "rdf:type", "v:type")
+                .member("v:type", schema_types)
+            )
+
         query = (
             WQ()
             .select("v:child_doc")
             .woql_and(
-                WQ()
-                .eq("v:start", parent_id)
-                .path("v:start", f"{field_name}+", "v:child")
-                .read_document("v:child", "v:child_doc")
+                query_step.read_document("v:child", "v:child_doc")
             )
         )
         async with self.session(project_db_name):
             try:
                 result = await self.client.query(query)
+
             except Exception as exc:
                 print(exc)
-                return None
+                return []
 
         children = []
+        allowed_types = set(filtered_types or [])
         for child_raw in [row["child_doc"] for row in result["bindings"]]:
             node = parse_child(child_raw)
             if node is not None:
@@ -288,7 +309,8 @@ class BaseRepo(Generic[TNode, TSchema]):
             if not field_name:
                 raise ValueError(f"Invalid child type: {child_type}")
             if parent_id not in parsed_data:
-                parsed_data[parent_id] = {field: set() for field in set(child_type_to_field.values())}
+                parsed_data[parent_id] = {
+                    field: set() for field in set(child_type_to_field.values())}
             parsed_data[parent_id][field_name].add(item_id)
 
         current_time = datetime.now(timezone.utc)

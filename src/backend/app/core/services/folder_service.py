@@ -36,8 +36,8 @@ class FolderService():
     async def add_child(self, parent_folder_id: str, child_id: str, child_type: Literal["folder", "file"]):
         return await self.repos.folder_repo.move_item(parent_folder_id, child_id, child_type, self.project.db_name)
 
-    async def get_children(self, folder_id: str):
-        return await self.repos.folder_repo.get_children(folder_id, [], self.project.db_name)
+    async def get_children(self, folder_id: str, exclude_types: list[str] = []):
+        return await self.repos.folder_repo.get_children(folder_id, exclude_types, self.project.db_name)
 
     async def create_batch(self, folders: List[FolderNode]):
         return await self.repos.folder_repo.create(folders, self.project.db_name)

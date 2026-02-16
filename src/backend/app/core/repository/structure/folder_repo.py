@@ -1,7 +1,7 @@
 from typing import List, Tuple, Union
 
 from app.core.model.nodes import FolderNode
-from app.core.model.schemas import FolderSchema
+from app.core.model.schemas import FileSchema, FolderSchema, StructureGroupSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
     STRUCTURE_FIELDS,
@@ -97,15 +97,24 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
     async def get_children(
         self,
         folder_id: str,
-        child_type: list[str],
+        exclude_types: list[str],
         project_db_name: str,
     ):
-        field_name = build_path_field_name(child_type, STRUCTURE_FIELDS)
+        field_name = build_path_field_name([], STRUCTURE_FIELDS)
+        field_to_schema_type = {
+            FolderSchema.__name__,
+            FileSchema.__name__,
+            StructureGroupSchema.__name__,
+        }
+        filtered_types = set(field_to_schema_type) - set(exclude_types)
+
         return await self.get_children_by_path(
             folder_id,
             field_name,
             parse_structure_child,
             project_db_name,
+            filtered_types=filtered_types,
+            allowed_path_fields=STRUCTURE_FIELDS,
         )
 
     async def get_parent(

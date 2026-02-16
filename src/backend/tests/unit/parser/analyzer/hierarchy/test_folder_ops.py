@@ -22,11 +22,11 @@ def find_node_by_qname(nodes: List[AnyTreeNode], qname: str):
     return None
 
 
-async def _resync_and_get_tree(project_node, repos, db):
+async def _resync_and_get_tree(project_node, repos, db_client):
     """Helper function to resync project and get tree structure."""
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=db,
+        db=db_client,
         ignore_file_name="v-noc.toml",
     )
     await orchestrator.resync()
@@ -42,10 +42,10 @@ async def _resync_and_get_tree(project_node, repos, db):
 
 @pytest.mark.asyncio
 async def test_folder_add(setup_folder_project):
-    project_node, repos, arangodb_client, project_path = setup_folder_project
+    project_node, repos, db_client, project_path = setup_folder_project
 
     # Build initial tree
-    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree_before = await _build_and_get_tree(project_node, repos, db_client)
     assert tree_before, "No tree nodes built"
 
     # Add new folder
@@ -54,7 +54,7 @@ async def test_folder_add(setup_folder_project):
     (new_folder / "dummy.py").write_text("")
 
     # Resync and get updated tree
-    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
+    tree_after = await _resync_and_get_tree(project_node, repos, db_client)
 
     # Check tree structure
     project_name = project_node.name
@@ -71,10 +71,10 @@ async def test_folder_add(setup_folder_project):
 
 @pytest.mark.asyncio
 async def test_folder_remove(setup_folder_project):
-    project_node, repos, arangodb_client, project_path = setup_folder_project
+    project_node, repos, db_client, project_path = setup_folder_project
 
     # Build initial tree
-    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree_before = await _build_and_get_tree(project_node, repos, db_client)
     assert tree_before, "No tree nodes built"
 
     project_name = project_node.name
@@ -88,7 +88,7 @@ async def test_folder_remove(setup_folder_project):
     shutil.rmtree(target)
 
     # Resync and get updated tree
-    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
+    tree_after = await _resync_and_get_tree(project_node, repos, db_client)
 
     # Check tree structure
     folder1_after = find_node_by_qname(tree_after, f"{project_name}.folder1")
@@ -101,10 +101,10 @@ async def test_folder_remove(setup_folder_project):
 
 @pytest.mark.asyncio
 async def test_folder_move(setup_folder_project):
-    project_node, repos, arangodb_client, project_path = setup_folder_project
+    project_node, repos, db_client, project_path = setup_folder_project
 
     # Build initial tree
-    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree_before = await _build_and_get_tree(project_node, repos, db_client)
     assert tree_before, "No tree nodes built"
 
     project_name = project_node.name
@@ -126,7 +126,7 @@ async def test_folder_move(setup_folder_project):
     shutil.move(src, dst)
 
     # Resync and get updated tree
-    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
+    tree_after = await _resync_and_get_tree(project_node, repos, db_client)
 
     # Check tree structure - old location should not exist
     nested_old = find_node_by_qname(
@@ -150,10 +150,10 @@ async def test_folder_move(setup_folder_project):
 
 @pytest.mark.asyncio
 async def test_folder_rename(setup_folder_project):
-    project_node, repos, arangodb_client, project_path = setup_folder_project
+    project_node, repos, db_client, project_path = setup_folder_project
 
     # Build initial tree
-    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree_before = await _build_and_get_tree(project_node, repos, db_client)
     assert tree_before, "No tree nodes built"
 
     project_name = project_node.name
@@ -169,7 +169,7 @@ async def test_folder_rename(setup_folder_project):
     shutil.move(src, dst)
 
     # Resync and get updated tree
-    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
+    tree_after = await _resync_and_get_tree(project_node, repos, db_client)
 
     # Check tree structure - old name should not exist
     folder1_after = find_node_by_qname(tree_after, f"{project_name}.folder1")
@@ -190,10 +190,10 @@ async def test_folder_rename(setup_folder_project):
 
 @pytest.mark.asyncio
 async def test_folder_rename_and_move(setup_folder_project):
-    project_node, repos, arangodb_client, project_path = setup_folder_project
+    project_node, repos, db_client, project_path = setup_folder_project
 
     # Build initial tree
-    tree_before = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree_before = await _build_and_get_tree(project_node, repos, db_client)
     assert tree_before, "No tree nodes built"
 
     project_name = project_node.name
@@ -215,7 +215,7 @@ async def test_folder_rename_and_move(setup_folder_project):
     shutil.move(src, dst)
 
     # Resync and get updated tree
-    tree_after = await _resync_and_get_tree(project_node, repos, arangodb_client)
+    tree_after = await _resync_and_get_tree(project_node, repos, db_client)
 
     # Check tree structure - old location should not exist
     nested_old = find_node_by_qname(

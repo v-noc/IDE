@@ -31,12 +31,11 @@ class ProjectService():
     async def get_all(self):
         return await self.repos.project_repo.get_all()
 
-    async def get_children(self, project_id: str, exclude_groups: bool = False, depth: int | str = 50):
-        exclude_types = ["group"] if exclude_groups else None
-        return await self.repos.project_repo.get_containment_tree(
-            project_id,
-            depth=depth,
-            exclude_types=exclude_types,
+    async def get_children(self, project_db_name: str, exclude_types: list[str] = [], depth: int | str = 50):
+
+        return await self.repos.project_repo.get_children(
+            project_db_name,
+            exclude_types,
         )
 
     async def get_project_structure(

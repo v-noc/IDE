@@ -3,7 +3,7 @@ from app.core.services.folder_service import FolderService
 import pytest
 
 from app.core.model.nodes import FolderNode
-from app.core.model.schemas import FolderSchema
+from app.core.model.schemas import FileSchema, FolderSchema
 
 
 @pytest.mark.asyncio
@@ -48,7 +48,7 @@ async def test_update_folder(create_repos, create_folder, create_project):
 
 
 @pytest.mark.asyncio
-async def test_add_folder_to_folder(create_repos, create_folder, create_project):
+async def test_add_folder_to_folder(create_repos, create_folder, create_project, create_file):
     folder_service = FolderService(create_repos, create_project)
     second_folder = await folder_service.create(
         "second_folder",
@@ -58,8 +58,9 @@ async def test_add_folder_to_folder(create_repos, create_folder, create_project)
         "test_folder/second_folder"
     )
     await folder_service.add_child(create_folder.id, second_folder.id, "folder")
+    await folder_service.add_child(second_folder.id, create_file.id, "file")
 
-    children_tree = await folder_service.get_children(create_folder.id)
+    children_tree = await folder_service.get_children(create_folder.id, exclude_types=[FolderSchema.__name__])
 
     assert len(children_tree) == 1
 

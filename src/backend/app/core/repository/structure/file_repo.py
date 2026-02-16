@@ -1,7 +1,7 @@
 from typing import List, Tuple, Union
 
 from app.core.model.nodes import FileNode
-from app.core.model.schemas import FileSchema
+from app.core.model.schemas import CallGroupSchema, CallSchema, ClassSchema, CodeElementGroupSchema, FileSchema, FunctionSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
     CODE_ELEMENT_FIELDS,
@@ -39,8 +39,10 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         _file: FileNode,
         file_schema: FileSchema,
     ):
-        BaseRepo.merge_set_fields(file_schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE)
-        BaseRepo.merge_fields(file_schema, existing_raw, CODE_OPTIONAL_FIELDS_TO_PRESERVE)
+        BaseRepo.merge_set_fields(
+            file_schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE)
+        BaseRepo.merge_fields(file_schema, existing_raw,
+                              CODE_OPTIONAL_FIELDS_TO_PRESERVE)
 
     async def create(
         self,
@@ -57,15 +59,25 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
     async def get_children(
         self,
         file_id: str,
-        child_type: list[str],
+        exclude_types: list[str],
         project_db_name: str,
     ):
-        field_name = build_path_field_name(child_type, CODE_ELEMENT_FIELDS)
+        field_name = build_path_field_name([], CODE_ELEMENT_FIELDS)
+        field_to_schema_type = {
+            FunctionSchema.__name__,
+            ClassSchema.__name__,
+            CallSchema.__name__,
+            CodeElementGroupSchema.__name__,
+            CallGroupSchema.__name__,
+        }
+        filtered_types = set(field_to_schema_type) - set(exclude_types)
         return await self.get_children_by_path(
             file_id,
             field_name,
             parse_code_element_child,
             project_db_name,
+            filtered_types=filtered_types,
+            allowed_path_fields=CODE_ELEMENT_FIELDS,
         )
 
     async def delete(self, file_id: str, project_db_name: str):
