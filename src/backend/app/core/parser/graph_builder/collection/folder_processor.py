@@ -67,7 +67,9 @@ class FolderProcessor:
             qnames_to_check.append(current_qname)
             qname_paths[current_qname] = (part, str(path_so_far))
 
-        existing_nodes = await self.folder_repo.get_by_qnames(qnames_to_check)
+        existing_nodes = await self.folder_repo.get_by_qnames(
+            qnames_to_check, self.project_node.db_name
+        )
 
         nodes_to_create = []
         moves_to_execute = []  # List of (child_id, parent_id)
@@ -110,9 +112,9 @@ class FolderProcessor:
             current_parent = node
 
         if nodes_to_create:
-            await self.folder_repo.create_batch(nodes_to_create)
+            await self.folder_repo.create(nodes_to_create, self.project_node.db_name)
         if moves_to_execute:
-            await self.folder_repo.move_batch(moves_to_execute)
+            await self.folder_repo.move_batch(moves_to_execute, self.project_node.db_name)
 
         return FolderBuildResult(
             node=current_parent, folder_changes=folder_changes
@@ -162,14 +164,15 @@ class FolderProcessor:
         if change_set.deleted_folders:
             deleted_ids = [tp.id for tp in change_set.deleted_folders if tp.id]
             if deleted_ids:
-                existing = await self.folder_repo.get_by_ids(deleted_ids)
+                existing = await self.folder_repo.get_by_ids(deleted_ids, self.project_node.db_name)
+                existing = {folder.id: folder for folder in existing}
                 for node_id in deleted_ids:
                     node = existing.get(node_id)
                     if node:
                         folder_changes.append(FolderChange(
                             node=node, action="deleted"))
                         self._touched_folder_ids.add(node.id)
-                await self.folder_repo.delete_batch(deleted_ids)
+                await self.folder_repo.delete_batch(deleted_ids, self.project_node.db_name)
 
         return folder_changes
 
@@ -229,7 +232,7 @@ class FolderProcessor:
         parent_nodes_by_qname: Dict[str, FolderNode] = {}
         if parent_qnames_needed:
             parent_nodes_by_qname = await self.folder_repo.get_by_qnames(
-                sorted(parent_qnames_needed)
+                sorted(parent_qnames_needed), self.project_node.db_name
             )
 
         nodes_to_create: List[FolderNode] = []
@@ -298,15 +301,19 @@ class FolderProcessor:
                 path_to_id=path_to_id,
                 parent_nodes_by_qname=parent_nodes_by_qname,
             )
+
             if parent_id:
                 moves_to_execute.append((tp.id, parent_id, "folder"))
 
         if nodes_to_create:
             await self.folder_repo.create(nodes_to_create, self.project_node.db_name)
+            print("nodes_to_create --- \n\n")
         if nodes_to_update:
             await self.folder_repo.update_batch(nodes_to_update, self.project_node.db_name)
+            print("nodes_to_update --- \n\n", )
         if moves_to_execute:
             await self.folder_repo.move_batch(moves_to_execute, self.project_node.db_name)
+            print("moves_to_execute --- \n\n", moves_to_execute)
 
     def qname_for_rel_path(self, rel_path: Path) -> str:
         parts = [p for p in rel_path.parts if p]
@@ -325,10 +332,7 @@ class FolderProcessor:
         parent_abs = abs_path.parent
         if str(parent_abs) == str(self.project_path):
             # Always use self.project_node.id to ensure we use the persisted version
-            if not self.project_node.id:
-                # Fallback to root_node.id if project_node.id is not set
-                return root_node.id if root_node.id else None
-            return self.project_node.id
+            return None
 
         parent_id = path_to_id.get(str(parent_abs))
         if parent_id:

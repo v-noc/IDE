@@ -82,7 +82,7 @@ class FileProcessor:
                 # chunk to avoid very large AQL bind vars / loops
                 for i in range(0, len(deleted_ids), batch_size):
                     batch_ids = deleted_ids[i: i + batch_size]
-                    await self.file_repo.delete_batch(batch_ids)
+                    await self.file_repo.delete_batch(batch_ids, self.project_node.db_name)
                 logger.info("Deleted %d file(s) in batch", len(deleted_ids))
 
     async def _upsert_files_in_batches(
@@ -115,7 +115,8 @@ class FileProcessor:
         if not ids:
             return
 
-        existing_by_id = await self.file_repo.get_by_ids(ids)
+        existing_by_id = await self.file_repo.get_by_ids(ids, self.project_node.db_name)
+        existing_by_id = {file.id: file for file in existing_by_id}
 
         # Pre-fetch parent scopes that are NOT in the change set map
         parent_qnames_needed: Set[str] = set()
@@ -134,7 +135,7 @@ class FileProcessor:
         parent_nodes_by_qname: Dict[str, FolderNode] = {}
         if parent_qnames_needed:
             parent_nodes_by_qname = await self.folder_repo.get_by_qnames(
-                sorted(parent_qnames_needed)
+                sorted(parent_qnames_needed), self.project_node.db_name
             )
 
         nodes_to_create: List[FileNode] = []
@@ -171,13 +172,13 @@ class FileProcessor:
             node = existing_by_id.get(tp.id)
             if not node:
                 node = FileNode(
-                    key=tp.id,
+                    id=tp.id,
                     name=desired_name,
                     qname=desired_qname,
                     path=desired_path,
                     hash=checksum,
                     description=f"File {desired_name}",
-                    node_type="file"
+
                 )
                 nodes_to_create.append(node)
             else:
@@ -204,16 +205,16 @@ class FileProcessor:
             )
 
             if parent_id:
-                moves_to_execute.append((tp.id, parent_id))
+                moves_to_execute.append((tp.id, parent_id, "file"))
             else:
                 logger.warning(f"Could not resolve parent for file {tp.path}")
 
         if nodes_to_create:
-            await self.file_repo.create(nodes_to_create)
+            await self.file_repo.create(nodes_to_create, self.project_node.db_name)
         if nodes_to_update:
-            await self.file_repo.update_batch(nodes_to_update)
+            await self.file_repo.update_batch(nodes_to_update, self.project_node.db_name)
         if moves_to_execute:
-            await self.file_repo.move_batch(moves_to_execute)
+            await self.folder_repo.move_batch(moves_to_execute, self.project_node.db_name)
 
     def qname_for_rel_path(self, rel_path: Path, is_file: bool = False) -> str:
         parts = [p for p in rel_path.parts if p]
@@ -241,11 +242,7 @@ class FileProcessor:
     ) -> Optional[str]:
         parent_abs = abs_path.parent
         if str(parent_abs) == str(self.project_path):
-            # Always use self.project_node.id to ensure we use the persisted version
-            if not self.project_node.id:
-                # Fallback to root_node.id if project_node.id is not set
-                return root_node.id if root_node.id else None
-            return self.project_node.id
+            return None
 
         parent_id = folder_path_to_id.get(str(parent_abs))
         if parent_id:

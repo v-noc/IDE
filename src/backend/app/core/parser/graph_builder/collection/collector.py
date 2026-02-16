@@ -48,36 +48,6 @@ class Collector:
         self.mro_resolver = MROResolver(jedi_manager)
         self.ast_processor = ASTProcessor(repos, self.mro_resolver)
 
-    async def ensure_project_root(self) -> None:
-        """
-        Ensure the project root exists in the DB and can be reused by processors.
-
-        Simplified contract:
-        - If `project_node` has no key/id: treat as new -> create once.
-        - If it has key and/or id: treat as existing -> do not update, just reuse.
-        - Normalize key<->id locally if only one is present.
-        """
-        # Normalize key/id if we have exactly one of them.
-        if self.project_node.id and not self.project_node.key:
-            self.project_node.key = (
-                self.project_node.id.split
-                if "/" in self.project_node.id
-                else self.project_node.id
-            )
-        if self.project_node.key and not self.project_node.id:
-            # ProjectRepo uses the "nodes" collection.
-            self.project_node.id = f"nodes/{self.project_node.key}"
-
-        # Create if new (no identity).
-        if not self.project_node.key and not self.project_node.id:
-            self.project_node = await self.repos.project_repo.create(
-                self.project_node
-            )
-
-        # Update folder_processor and file_processor with the persisted project_node
-        self.folder_processor.project_node = self.project_node
-        self.file_processor.project_node = self.project_node
-
     def reset_session(self) -> None:
         """Reset builder caches between orchestrator runs."""
         self.folder_processor.reset_session()
@@ -186,8 +156,6 @@ class Collector:
         self, folder_path: str
     ) -> Optional[List[FolderChange]]:
         """Ensure folder hierarchy exists for a folder change event."""
-        # Ensure project_root is persisted before processing
-        await self.ensure_project_root()
 
         abs_path = Path(folder_path)
         try:

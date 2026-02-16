@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any, Union
 
 from app.core.repository import Repositories
 from app.core.model.nodes import (
-    FileNode, FunctionNode, ClassNode, CodePosition, ContainerNode
+    FileNode, FunctionNode, ClassNode, CodePosition
 )
 from app.core.parser.ast.models import (
     BaseNode,
@@ -30,7 +30,7 @@ class ASTProcessor:
         nodes: List[BaseNode],
         content: Optional[str] = None,
         progress_tracker=None
-    ) -> List[ContainerNode]:
+    ) -> List[any]:
         """
         Synchronize AST nodes as descendants of the given file node.
         Handles Creation, Updates, and Deletions of child nodes.
