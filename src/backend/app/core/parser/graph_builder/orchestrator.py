@@ -110,9 +110,6 @@ class GraphBuilderOrchestrator:
 
         tracker.reset()
 
-        # Ensure project root exists once (create if new, otherwise reuse).
-        await self.collector.ensure_project_root()
-        self.project_node = self.collector.project_node
         self.phase_processor.project_node = self.project_node
         project_id = self.project_node.id
         print(f"project_id {project_id}")
@@ -195,6 +192,7 @@ class GraphBuilderOrchestrator:
         folder_result = await self.collector.sync_structure(
             change_set, scan_result, batch_size=self.batch_size
         )
+
         if folder_result:
             folder_changes.extend(folder_result)
 

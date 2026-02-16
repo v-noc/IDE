@@ -1,8 +1,8 @@
 import logging
-from typing import List, Set, Optional
+from typing import List,  Optional
 from .models import ResolvedCall, ScopeSyncResult
 from .repository_extension import CallGraphRepository
-from app.core.model.nodes import ContainerNode
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class ScopeProcessor:
 
     async def sync_scope(
         self,
-        parent_node: ContainerNode,
+        parent_node: any,
         resolved_calls: List[ResolvedCall],
         parent_call_node_id: Optional[str] = None
     ) -> ScopeSyncResult:
@@ -72,7 +72,8 @@ class ScopeProcessor:
         # This is the "Merge Sync" key: we need to recurse for everything currently in code
         active_call_map = {**existing_map, **created_map}
         # Filter to only include targets present in the current code resolution
-        active_call_map = {tid: cid for tid, cid in active_call_map.items() if tid in code_targets}
+        active_call_map = {tid: cid for tid,
+                           cid in active_call_map.items() if tid in code_targets}
 
         return ScopeSyncResult(
             parent_id=parent_id,

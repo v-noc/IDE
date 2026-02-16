@@ -51,16 +51,24 @@ class ProjectNode(BaseNode):
                                        description="The remote path of the project.", )
     db_name: str = Field(..., description="The name of the database.")
 
+    @property
+    def path(self) -> str:
+        """Alias for local_path for compatibility with orchestrator and consumers."""
+        return self.local_path
 
-class CodeElementGroupNode(BaseNode):
+
+class BaseGroupNode(BaseNode):
     children: Set[str] = Field(
-        default_factory=set, description="The children of the code element group."
+        default_factory=set, description="The children of the group."
     )
     documents: Set[str] = Field(
-        default_factory=set, description="The documents of the code element group."
+        default_factory=set, description="The documents of the group."
     )
     theme_config: Optional[ThemeConfig] = Field(
-        default=None, description="The theme config of the code element group.")
+        default=None, description="The theme config of the group.")
+
+
+class CodeElementGroupNode(BaseGroupNode):
 
     @staticmethod
     def from_raw_dict(raw_dict):
@@ -76,15 +84,7 @@ class CodeElementGroupNode(BaseNode):
         )
 
 
-class CallGroupNode(BaseNode):
-    children: Set[str] = Field(
-        default_factory=set, description="The children of the call group."
-    )
-    documents: Set[str] = Field(
-        default_factory=set, description="The documents of the call group."
-    )
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None, description="The theme config of the call group.")
+class CallGroupNode(BaseGroupNode):
 
     @staticmethod
     def from_raw_dict(raw_dict):
@@ -100,15 +100,7 @@ class CallGroupNode(BaseNode):
         )
 
 
-class StructureGroupNode(BaseNode):
-    children: Set[str] = Field(
-        default_factory=set, description="The children of the structure group."
-    )
-    documents: Set[str] = Field(
-        default_factory=set, description="The documents of the structure group."
-    )
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None, description="The theme config of the structure group.")
+class StructureGroupNode(BaseGroupNode):
 
     @staticmethod
     def from_raw_dict(raw_dict):

@@ -1,6 +1,5 @@
 from typing import List, Set, Dict, Tuple
 from app.core.model.nodes import CallNode
-from app.core.repository.base.base_node_repo import BaseNodeRepository
 
 
 class CallGraphRepository:

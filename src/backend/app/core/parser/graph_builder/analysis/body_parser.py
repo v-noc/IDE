@@ -9,7 +9,7 @@ from app.core.parser.ast.models import (
     ClassNode as ASTClassNode,
     FunctionNode as ASTFunctionNode
 )
-from app.core.model.nodes import FileNode, ContainerNode
+from app.core.model.nodes import FileNode
 from app.core.parser.ast.scanner import scan
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.repository import Repositories
@@ -58,7 +58,7 @@ class BodyParser:
             exclude_types=["call", "group"]
         )
 
-        node_map: Dict[str, ContainerNode] = {file_node.qname: file_node}
+        node_map: Dict[str, any] = {file_node.qname: file_node}
 
         for item in existing_tree:
 
@@ -101,8 +101,8 @@ class BodyParser:
     async def _traverse_and_process(
         self,
         nodes: List[BaseNode],
-        current_scope: ContainerNode,
-        node_map: Dict[str, ContainerNode],
+        current_scope: any,
+        node_map: Dict[str, any],
         file_path: Path,
         source: str,
     ):
@@ -113,7 +113,7 @@ class BodyParser:
 
 
         """
-        
+
         # Set current function qname for non-file scopes (functions/classes)
         if current_scope.node_type in ("function", "class") and self.progress_tracker:
             self.progress_tracker.set_current_function(current_scope.qname)
@@ -125,14 +125,14 @@ class BodyParser:
             source_code=source,
             visited_ids=None,
         )
-        
+
         # Track entity processing for non-file scopes (functions/classes)
         if current_scope.node_type in ("function", "class") and self.progress_tracker:
             self.progress_tracker.increment_entity_processed()
             # Clear current function after processing
             self.progress_tracker.clear_current_function()
             await self.progress_tracker.emit()
-        
+
         for node in nodes:
             if isinstance(node, (ASTClassNode, ASTFunctionNode)):
                 # 1. Identify the DB Node

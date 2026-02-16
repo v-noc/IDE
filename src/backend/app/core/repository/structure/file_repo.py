@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from app.core.model.nodes import FileNode
 from app.core.model.schemas import CallGroupSchema, CallSchema, ClassSchema, CodeElementGroupSchema, FileSchema, FunctionSchema
@@ -141,3 +141,10 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
 
     async def get_all_files(self, project_db_name: str):
         return await self.get_all(project_db_name)
+
+    async def get_by_qnames(
+        self, qnames: List[str], project_db_name: str
+    ) -> Dict[str, FileNode]:
+        """Return a dict mapping qname -> FileNode for the given qnames."""
+        nodes = await super().get_by_qnames(qnames, project_db_name)
+        return {n.qname: n for n in nodes}

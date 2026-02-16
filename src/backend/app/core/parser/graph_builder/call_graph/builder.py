@@ -10,7 +10,7 @@ from app.core.parser.ast.models import (
     ClassNode as ASTClassNode,
     FunctionNode as ASTFunctionNode
 )
-from app.core.model.nodes import FunctionNode, ClassNode, ContainerNode
+from app.core.model.nodes import FunctionNode, ClassNode
 from app.core.parser.ast.scanner import scan
 from app.core.parser.ast.models import CallNode as ASTCallNode
 from app.core.repository import Repositories
@@ -44,7 +44,7 @@ class CallChainBuilder:
 
         self.max_depth = max_depth
 
-    async def build_full_chain(self, start_node: ContainerNode):
+    async def build_full_chain(self, start_node: any):
         """
         Starts a recursive BFS process to build the call chain starting from start_node.
         """
@@ -75,7 +75,7 @@ class CallChainBuilder:
                         visited_ids.add(node.id)
                         queue.append((node, depth + 1))
 
-    async def _process_single_scope(self, node: ContainerNode) -> Set[str]:
+    async def _process_single_scope(self, node: any) -> Set[str]:
         """
         Reads file, scans AST, Resolves Calls, Syncs DB.
         Returns: Set of target_ids referenced in this scope.
@@ -117,7 +117,7 @@ class CallChainBuilder:
         self,
         source: str,
         path: Path,
-        target_node: ContainerNode
+        target_node: any
     ) -> List[ASTCallNode]:
         """
         Scans file and extracts AST CallNodes specifically belonging to target_node's body.
@@ -191,7 +191,7 @@ class CallChainBuilder:
 
         return _direct_calls(getattr(matched_scope, "children", []) or [])
 
-    async def _fetch_nodes_batch(self, node_ids: List[str]) -> List[ContainerNode]:
+    async def _fetch_nodes_batch(self, node_ids: List[str]) -> List[any]:
         """Fetch multiple nodes from DB."""
         # You can implement a batch fetch in NodeRepo
         results = []
@@ -203,7 +203,7 @@ class CallChainBuilder:
                 results.append(n)
         return results
 
-    async def _load_node_context(self, node: ContainerNode):
+    async def _load_node_context(self, node: any):
         """Helper to load file path and source code for a DB node."""
         file_path_str = ""
         if node.node_type == "file":
@@ -232,7 +232,7 @@ class CallChainBuilder:
 
     async def process_node_scope(
         self,
-        node: ContainerNode,
+        node: any,
         file_path: Optional[Path] = None,
         source_code: Optional[str] = None,
         parent_call_node_id: Optional[str] = None,
