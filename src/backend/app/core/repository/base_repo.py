@@ -344,6 +344,35 @@ class BaseRepo(Generic[TNode, TSchema]):
                 return False
         return True
 
+    async def find(self, field: str, values: list[str], project_db_name: str) -> list[TNode]:
+        if not field or not values:
+            return []
+
+        query = (
+            WQ()
+            .select("v:item_doc")
+            .woql_and(
+                WQ().member(field, [WQ.string(value) for value in values]),
+                WQ().triple("v:item", field, "v:value"),
+                WQ().triple("v:item", "rdf:type",
+                            f"@schema:{self.schema_class.__name__}"),
+                WQ().read_document("v:item", "v:item_doc"),
+            )
+        )
+
+        async with self.session(project_db_name):
+            try:
+                result = await self.client.query(query)
+            except Exception as exc:
+                print(exc)
+                return []
+        nodes: list[TNode] = []
+        for item_raw in [row["item_doc"] for row in result["bindings"]]:
+            node = self._to_node(item_raw)
+            if node is not None:
+                nodes.append(node)
+        return nodes
+
     async def get_by_qnames(self, qnames: list[str], project_db_name: str) -> list[TNode]:
         """Return nodes whose qname is in the given list."""
         if not qnames:

@@ -4,30 +4,14 @@ from app.core.model.nodes import FileNode
 from app.core.model.schemas import CallGroupSchema, CallSchema, ClassSchema, CodeElementGroupSchema, FileSchema, FunctionSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
+    CODE_CHILD_TYPE_TO_FIELD,
     CODE_ELEMENT_FIELDS,
+    CODE_OPTIONAL_FIELDS_TO_PRESERVE,
+    CODE_SET_FIELDS_TO_PRESERVE,
     build_path_field_name,
     parse_code_element_child,
 )
 from app.db.async_terminus_client import AsyncClient
-
-CODE_CHILD_TYPE_TO_FIELD = {
-    "function": "function_children",
-    "class": "class_children",
-    "call": "call_children",
-    "code_element_group": "code_element_group",
-    "call_group": "call_group",
-}
-
-CODE_SET_FIELDS_TO_PRESERVE = [
-    "function_children",
-    "class_children",
-    "call_children",
-    "code_element_group",
-    "call_group",
-    "documents",
-]
-CODE_OPTIONAL_FIELDS_TO_PRESERVE = ["theme_config"]
-
 
 class FileRepo(BaseRepo[FileNode, FileSchema]):
     def __init__(self, client: AsyncClient):
@@ -141,6 +125,9 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
 
     async def get_all_files(self, project_db_name: str):
         return await self.get_all(project_db_name)
+
+    async def get_by_path(self, path: str, project_db_name: str):
+        return await self.find("path", [path], project_db_name)[0]
 
     async def get_by_qnames(
         self, qnames: List[str], project_db_name: str

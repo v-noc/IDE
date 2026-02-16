@@ -23,6 +23,25 @@ CODE_ELEMENT_FIELDS = (
     "call_group",
 )
 
+# Map child type names to schema field names
+CODE_CHILD_TYPE_TO_FIELD = {
+    "function": "function_children",
+    "class": "class_children",
+    "call": "call_children",
+    "code_element_group": "code_element_group",
+    "call_group": "call_group",
+}
+
+CODE_SET_FIELDS_TO_PRESERVE = [
+    "function_children",
+    "class_children",
+    "call_children",
+    "code_element_group",
+    "call_group",
+    "documents",
+]
+CODE_OPTIONAL_FIELDS_TO_PRESERVE = ["theme_config"]
+
 STRUCTURE_FIELDS = (
     "folder_children",
     "file_children",
@@ -65,12 +84,18 @@ def parse_structure_child(raw: dict[str, Any]) -> Optional[FolderNode]:
 def build_path_field_name(
     child_types: list[str],
     all_fields: tuple[str, ...],
+    type_to_field: dict[str, str] | None = None,
 ) -> str:
     """
     Build the path field name string for WOQL path queries.
     If child_types is empty, returns all fields in OR format: "(a|b|c)".
     Otherwise returns the requested fields joined: "a|b".
+    When type_to_field is provided, maps type names (e.g. "function") to field
+    names (e.g. "function_children") before joining.
     """
     if len(child_types) == 0:
         return "(" + "|".join(all_fields) + ")"
+    if type_to_field:
+        fields = [type_to_field.get(t, t) for t in child_types]
+        return "|".join(fields)
     return "|".join(child_types)
