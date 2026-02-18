@@ -161,3 +161,15 @@ async def test_batch_move_files(create_repos, create_project, create_file, creat
     assert len(files) == 2
     assert files[0].id == create_function.id
     assert files[1].id == create_class.id
+
+
+@pytest.mark.asyncio
+async def test_get_parent_file(create_repos, create_project, create_file, create_function, create_class):
+
+    file_service = FileService(create_repos, create_project)
+
+    await file_service.move_batch([(create_function.id, create_file.id, "function"), (create_class.id, create_function.id, "class")])
+    parent_file = await file_service.get_parent_file(create_class.id)
+
+    assert parent_file is not None
+    assert parent_file.id == create_file.id

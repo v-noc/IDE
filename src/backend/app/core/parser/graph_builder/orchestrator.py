@@ -3,8 +3,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 import asyncio
-from arangoasync.database import AsyncDatabase
 
+from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.collection.collector import Collector
 from app.core.parser.graph_builder.discovery.change_detector import (
@@ -40,7 +40,7 @@ class GraphBuilderOrchestrator:
     def __init__(
         self,
         project_node: ProjectNode,
-        db: Optional[AsyncDatabase] = None,
+        db: Optional[AsyncClient] = None,
         # scope_manager: Optional[ScopeManager] = None, # Removed
         ignore_file_name: str = ".gitignore",
         max_concurrent_files: int = 50,
@@ -117,6 +117,8 @@ class GraphBuilderOrchestrator:
         # Initialize progress tracker
         socket_manager = get_socket_manager()
         progress_tracker = ProgressTracker(project_id, socket_manager)
+        current_db = self.db.db
+        self.db.set_db(self.project_node.db_name)
 
         try:
             # 1. Scan Disk
@@ -159,7 +161,8 @@ class GraphBuilderOrchestrator:
             progress_tracker.set_error(str(e))
             await progress_tracker.emit(force=True)
             raise
-
+        finally:
+            self.db.set_db(current_db)
         # 4. Emit project:updated socket event after successful sync
         try:
             socket_manager = get_socket_manager()
@@ -218,30 +221,30 @@ class GraphBuilderOrchestrator:
             )
         )
 
-        # # Emit final collection phase progress with discovered entities
-        # await progress_tracker.emit(force=True)
+        # Emit final collection phase progress with discovered entities
+        await progress_tracker.emit(force=True)
 
-        # # Phase 2: Analysis (Body parsing and call chain building)
-        # logger.info("Starting Phase 2: Analysis")
-        # print("Starting Phase 2: Analysis", flush=True)
-        # progress_tracker.start_phase("analyzing")
-        # # Total entities is set from discovery phase (functions_found + classes_found)
-        # # Total files for analysis is the number of collection results
-        # progress_tracker.set_total_files(len(collection_results))
-        # await progress_tracker.emit(force=True)
+        # Phase 2: Analysis (Body parsing and call chain building)
+        logger.info("Starting Phase 2: Analysis")
+        print("Starting Phase 2: Analysis", flush=True)
+        progress_tracker.start_phase("analyzing")
+        # Total entities is set from discovery phase (functions_found + classes_found)
+        # Total files for analysis is the number of collection results
+        progress_tracker.set_total_files(len(collection_results))
+        await progress_tracker.emit(force=True)
 
-        # try:
-        #     # Phase 2 refactoring is deferred.
-        #     # We pass None for call_sync_service as we removed SyncService.
-        #     await self.phase_processor.process_analysis_phase(
-        #         collection_results, progress_tracker
-        #     )
-        #     logger.info("Phase 2: Analysis completed")
-        #     print("Phase 2: Analysis completed", flush=True)
+        try:
+            # Phase 2 refactoring is deferred.
+            # We pass None for call_sync_service as we removed SyncService.
+            await self.phase_processor.process_analysis_phase(
+                collection_results, progress_tracker
+            )
+            logger.info("Phase 2: Analysis completed")
+            print("Phase 2: Analysis completed", flush=True)
 
-        # finally:
-        #     # Ensure cleanup happens even if there's an error
-        #     logger.debug("Phase 2 cleanup complete")
+        finally:
+            # Ensure cleanup happens even if there's an error
+            logger.debug("Phase 2 cleanup complete")
 
         logger.info("All phases completed successfully")
         print("All phases completed successfully", flush=True)

@@ -23,6 +23,10 @@ CODE_ELEMENT_FIELDS = (
     "call_group",
 )
 
+CALL_CHILD_TYPE_TO_FIELD = {
+    "call": "call_children",
+    "call_group": "call_group",
+}
 # Map child type names to schema field names
 CODE_CHILD_TYPE_TO_FIELD = {
     "function": "function_children",
@@ -31,6 +35,9 @@ CODE_CHILD_TYPE_TO_FIELD = {
     "code_element_group": "code_element_group",
     "call_group": "call_group",
 }
+
+# Call-specific path fields for get_children
+CALL_FIELDS = ("call_children", "call_group")
 
 CODE_SET_FIELDS_TO_PRESERVE = [
     "function_children",
@@ -85,6 +92,7 @@ def build_path_field_name(
     child_types: list[str],
     all_fields: tuple[str, ...],
     type_to_field: dict[str, str] | None = None,
+    is_inverse: bool = False,
 ) -> str:
     """
     Build the path field name string for WOQL path queries.
@@ -94,7 +102,10 @@ def build_path_field_name(
     names (e.g. "function_children") before joining.
     """
     if len(child_types) == 0:
-        return "(" + "|".join(all_fields) + ")"
+        if is_inverse:
+            return "(<" + "|<".join(all_fields) + ")"
+        else:
+            return "(" + "|".join(all_fields) + ")"
     if type_to_field:
         fields = [type_to_field.get(t, t) for t in child_types]
         return "|".join(fields)

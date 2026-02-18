@@ -1,7 +1,7 @@
 
 from datetime import datetime, timezone
 import uuid
-from typing import Literal
+from typing import Literal, List, Tuple
 from app.core.repository import Repositories
 from app.core.model.nodes import CallNode
 from app.core.model.nodes import ProjectNode
@@ -34,6 +34,9 @@ class CallService():
 
         return new_call
 
+    async def create_batch(self, calls: List[CallNode]):
+        return await self.repos.call_repo.create(calls, self.project.db_name)
+
     async def get(self, call_id: str):
         return await self.repos.call_repo.get_by_id(call_id, self.project.db_name)
 
@@ -42,6 +45,12 @@ class CallService():
 
     async def delete(self, call_id: str):
         return await self.repos.call_repo.delete(call_id, self.project.db_name)
+
+    async def move_batch(self, moves: List[Tuple[str, str, str]]):
+        return await self.repos.call_repo.move_batch(moves, self.project.db_name)
+
+    async def batch_delete(self, call_ids: List[str]):
+        return await self.repos.call_repo.batch_delete_calls(call_ids, self.project.db_name)
 
     async def add_call(self, parent_call_id: str, call_id: str):
         return await self.repos.call_repo.move_item(
@@ -54,22 +63,18 @@ class CallService():
     async def get_children(self, call_id: str, child_type: list[Literal["call", "call_group"]] = []):
         return await self.repos.call_repo.get_children(call_id, child_type, self.project.db_name)
 
-    async def get_direct_call_children(self, parent_id: str):
+    async def get_direct_call_children(self, call_site_id: str, child_type: str):
         """
         Get direct call-node children of a given parent (call/group/container).
 
         This only returns vertices whose node_type == \"call\" at depth 1,
         ignoring groups and deeper descendants.
         """
-        children = await self.repos.call_repo.get_containment_tree(
-            parent_id, depth=1
+        children = await self.repos.call_repo.get_direct_children(
+            call_site_id, child_type, self.project.db_name
         )
-        direct_calls = []
-        for item in children:
-            vertex = item.get("vertex", {})
-            if vertex.get("node_type") == "call":
-                direct_calls.append(item)
-        return direct_calls
+
+        return children
 
     async def get_code(self, call_id: str):
         call = await self.repos.call_repo.get_by_id(call_id)
@@ -108,4 +113,4 @@ class CallService():
         )
 
     async def get_call_parent_chain(self, call_id: str):
-        return await self.repos.call_repo.find_upward_call_chain(call_id)
+        return await self.repos.call_repo.get_call_chain(call_id, self.project.db_name)

@@ -1,15 +1,18 @@
 import logging
+import uuid
 from typing import List,  Optional
 from .models import ResolvedCall, ScopeSyncResult
-from .repository_extension import CallGraphRepository
+from app.core.services.call_service import CallService
+from app.core.model.schemas.code_element_schema import CallSchema
+from app.core.model.nodes import CallNode, ProjectNode
 
 
 logger = logging.getLogger(__name__)
 
 
 class ScopeProcessor:
-    def __init__(self, repo: CallGraphRepository):
-        self.repo = repo
+    def __init__(self, service: CallService):
+        self.call_service = service
 
     async def sync_scope(
         self,
@@ -31,7 +34,11 @@ class ScopeProcessor:
 
         # 1. Identify what currently exists in DB
         # Map: target_id -> call_node_id
-        existing_map = await self.repo.get_existing_targets_for_parent(parent_id)
+        existing_children = await self.call_service.get_direct_call_children(parent_id, CallSchema.__name__)
+        existing_map = {}
+        for child in existing_children:
+            existing_map[child["target"]["_id"]] = child["call"]["_id"]
+
         existing_targets = set(existing_map.keys())
 
         # 2. Identify what SHOULD exist (from code)
@@ -47,23 +54,33 @@ class ScopeProcessor:
         if to_delete_targets:
             call_ids_to_remove = [existing_map[tid]
                                   for tid in to_delete_targets]
-            await self.repo.batch_delete_calls(call_ids_to_remove)
+            await self.call_service.batch_delete(call_ids_to_remove)
             logger.debug(
                 f"Removed {len(call_ids_to_remove)} stale calls from {parent_node.qname}")
 
         # 5. Action: Create New
         if to_create_ids:
+
             calls_to_create = [
-                {
-                    "name": c.call_node_name,
-                    "target_id": c.target_id,
-                    "description": f"call{parent_node.qname}::{c.target_qname}",
-                    "position": c.position
-                }
+                CallNode(
+                    id=f"{CallSchema.__name__}/{str(uuid.uuid4())}",
+                    qname=f"{parent_node.id.split('/')[-1]}::{c.target_id.split('/')[-1]}",
+                    name=c.call_node_name,
+                    target_function=c.target_id,
+                    description=f"call{parent_node.qname}::{c.target_qname}",
+
+                )
                 for c in resolved_calls
                 if c.target_id in to_create_ids
             ]
-            created_map = await self.repo.batch_create_call_nodes(parent_id, calls_to_create)
+            created = await self.call_service.create_batch(calls_to_create)
+
+            created_map = {c.target_function: c.id for c in created}
+
+            moves_to_execute = [
+                (c.id, parent_id, "call") for c in calls_to_create
+            ]
+            await self.call_service.move_batch(moves_to_execute)
 
             logger.debug(
                 f"Created {len(calls_to_create)} new calls in {parent_node.qname}")

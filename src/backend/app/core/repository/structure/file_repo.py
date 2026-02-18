@@ -11,6 +11,7 @@ from app.core.repository.utils import (
     build_path_field_name,
     parse_code_element_child,
 )
+from app.db.async_terminus_client import WOQLQuery as WQ
 from app.db.async_terminus_client import AsyncClient
 
 
@@ -47,6 +48,7 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         exclude_types: list[str],
         project_db_name: str,
     ):
+
         field_name = build_path_field_name([], CODE_ELEMENT_FIELDS)
         field_to_schema_type = {
             FunctionSchema.__name__,
@@ -136,3 +138,25 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         """Return a dict mapping qname -> FileNode for the given qnames."""
         nodes = await super().get_by_qnames(qnames, project_db_name)
         return {n.qname: n for n in nodes}
+
+    async def get_parent_file(self, item_id: str, project_db_name: str):
+        field_name = build_path_field_name(
+            [], CODE_ELEMENT_FIELDS, is_inverse=True)
+
+        query = WQ().select("v:parent_doc").woql_and(
+            WQ().eq("v:item", item_id),
+            WQ().path("v:item", f"{field_name}*", "v:parent"),
+            WQ().isa("v:parent", f"@schema:{FileSchema.__name__}"),
+            WQ().read_document("v:parent", "v:parent_doc"),
+        )
+
+        async with self.session(project_db_name):
+            try:
+                result = await self.client.query(query)
+            except Exception as exc:
+                print(exc)
+                return None
+
+        if not result["bindings"]:
+            return None
+        return FileNode.from_raw_dict(result["bindings"][0]["parent_doc"])

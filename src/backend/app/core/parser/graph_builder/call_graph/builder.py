@@ -10,18 +10,18 @@ from app.core.parser.ast.models import (
     ClassNode as ASTClassNode,
     FunctionNode as ASTFunctionNode
 )
-from app.core.model.nodes import FunctionNode, ClassNode
+from app.core.model.nodes import ProjectNode, FileNode
 from app.core.parser.ast.scanner import scan
 from app.core.parser.ast.models import CallNode as ASTCallNode
 from app.core.repository import Repositories
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.graph_builder.call_graph.models import ResolvedCall
 from app.core.parser.graph_builder.performance import tracker
+from app.core.services.call_service import CallService
 
 
 from .resolver import CallResolverService
 from .processor import ScopeProcessor
-from .repository_extension import CallGraphRepository
 
 logger = logging.getLogger(__name__)
 
@@ -29,89 +29,21 @@ logger = logging.getLogger(__name__)
 class CallChainBuilder:
     def __init__(
         self,
-        project_path: Path,
+        project_node: ProjectNode,
         repos: Repositories,
         jedi_manager: JediProjectManager,
         max_depth: int = 10
     ):
-        self.project_path = project_path
+        self.project_node = project_node
+        self.project_path = Path(project_node.path)
         self.repos = repos
 
         # Helper services
-        self.graph_repo = CallGraphRepository(repos.db)
+        self.call_service = CallService(repos, project_node)
         self.resolver = CallResolverService(jedi_manager, repos)
-        self.processor = ScopeProcessor(self.graph_repo)
+        self.processor = ScopeProcessor(self.call_service)
 
         self.max_depth = max_depth
-
-    async def build_full_chain(self, start_node: any):
-        """
-        Starts a recursive BFS process to build the call chain starting from start_node.
-        """
-        visited_ids: Set[str] = {start_node.id}
-        queue = deque([(start_node, 0)])  # (node, depth)
-
-        logger.info(f"Starting recursive call build for {start_node.qname}")
-
-        while queue:
-            current_node, depth = queue.popleft()
-
-            if depth >= self.max_depth:
-                continue
-
-            # 1. Process this specific node (Scope)
-            active_targets = await self._process_single_scope(current_node)
-
-            # 2. Add children to queue
-            # Only add targets we haven't processed in this session yet to avoid infinite loops
-            # and to handle recursion properly.
-
-            # We need to fetch the actual Node objects for these target IDs to process them
-            if active_targets:
-                target_nodes = await self._fetch_nodes_batch(list(active_targets))
-
-                for node in target_nodes:
-                    if node.id not in visited_ids:
-                        visited_ids.add(node.id)
-                        queue.append((node, depth + 1))
-
-    async def _process_single_scope(self, node: any) -> Set[str]:
-        """
-        Reads file, scans AST, Resolves Calls, Syncs DB.
-        Returns: Set of target_ids referenced in this scope.
-        """
-        # 1. Get Source Code
-        file_info = await self.repos.nodes.get_nearest_file_and_project(node.id)
-        if not file_info or not file_info.get("file"):
-            return set()
-
-        file_path_str = file_info["file"]["path"]
-        abs_path = self.project_path / \
-            file_path_str if not Path(
-                file_path_str).is_absolute() else Path(file_path_str)
-
-        try:
-            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
-                source = await f.read()
-        except OSError:
-            logger.error(f"Could not read source for {node.qname}")
-            return set()
-
-        # 2. Parse AST for THIS scope
-        # Note: 'scan' gives us the whole file. We need to filter for the specific function body.
-        # Ideally, your AST parser supports getting a subtree. If not, we scan the whole file
-        # and traverse to find the node matching current_node.name/qname.
-
-        # Assuming we have a helper to get AST body for a specific function:
-        ast_calls = await self._extract_calls_from_source(source, abs_path, node)
-
-        # 3. Resolve Calls
-        resolved = await self.resolver.resolve_scope_calls(abs_path, source, ast_calls)
-
-        # 4. Sync to DB (Create/Delete)
-        result = await self.processor.sync_scope(node, resolved)
-
-        return result.all_active_targets
 
     async def _extract_calls_from_source(
         self,
@@ -158,7 +90,7 @@ class CallChainBuilder:
             return [n for n in node_list if isinstance(n, ASTCallNode)]
 
         # Case A: file scope => top-level direct calls only
-        if target_node.node_type == "file":
+        if isinstance(target_node, FileNode):
             return _direct_calls(nodes)
 
         # Case B: class/function scope => find matching AST scope node
@@ -194,29 +126,25 @@ class CallChainBuilder:
     async def _fetch_nodes_batch(self, node_ids: List[str]) -> List[any]:
         """Fetch multiple nodes from DB."""
         # You can implement a batch fetch in NodeRepo
-        results = []
-        for nid in node_ids:
-            # Try function
-            n = await self.repos.nodes.get_by_id(nid)
 
-            if n:
-                results.append(n)
+        results = await self.repos.function_repo.get_by_ids(node_ids, self.project_node.db_name)
+
         return results
 
     async def _load_node_context(self, node: any):
         """Helper to load file path and source code for a DB node."""
         file_path_str = ""
-        if node.node_type == "file":
+        if isinstance(node, FileNode):
             file_path_str = node.path
 
         else:
             with tracker.timer("call_graph.load_node_context.get_nearest_file_and_project"):
-                file_info = await self.repos.nodes.get_nearest_file_and_project(node.id)
+                file_info = await self.repos.file_repo.get_parent_file(node.id, self.project_node.db_name)
 
-                if not file_info or not file_info.get("file"):
+                if not file_info:
                     return None, None
 
-                file_path_str = file_info["file"]["path"]
+                file_path_str = file_info.path
 
         abs_path = self.project_path / \
             file_path_str if not Path(
@@ -298,6 +226,7 @@ class CallChainBuilder:
         # 3. Sync to DB (Batch Create/Delete)
         # We pass the collected unique values
         with tracker.timer("call_graph.sync_scope"):
+
             sync_result = await self.processor.sync_scope(
                 node,
                 list(all_resolved_map.values()),

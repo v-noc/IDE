@@ -1,163 +1,154 @@
-from datetime import datetime, timezone
-from typing import Literal
-from app.db.async_terminus_client import AsyncClient
+from typing import List, Literal, Tuple, Union
+from app.db.async_terminus_client import WOQLQuery as WQ
 from app.core.model.nodes import CallNode
 from app.core.model.schemas.code_element_schema import CallSchema
-from app.db.async_terminus_client import WOQLQuery as WQ
-from app.core.repository.utils.child_raw import build_path_field_name, parse_code_element_child
+from app.core.repository.base_repo import BaseRepo
+from app.core.repository.utils import (
+    CALL_FIELDS,
+    CODE_CHILD_TYPE_TO_FIELD,
+    CALL_CHILD_TYPE_TO_FIELD,
+    build_path_field_name,
+    parse_code_element_child,
+    parse_structure_child,
+)
+from app.db.async_terminus_client import AsyncClient
+from app.core.model.schemas import FunctionSchema, ClassSchema
+from app.core.model.schemas import FileSchema
+
+# Call-specific fields to preserve on update (CallSchema only has call_children, call_group, documents)
+CALL_SET_FIELDS_TO_PRESERVE = ["call_children", "call_group", "documents"]
+CALL_OPTIONAL_FIELDS_TO_PRESERVE = ["theme_config", "target_function"]
 
 
-class CallRepo():
+class CallRepo(BaseRepo[CallNode, CallSchema]):
     def __init__(self, client: AsyncClient):
-        self.client = client
+        super().__init__(client, CallNode, CallSchema)
 
-    async def create(self, call: CallNode, project_db_name: str):
-        current_db = None
-        if self.client.db != project_db_name:
-            current_db = self.client.db
-            await self.client.set_db(project_db_name)
+    @staticmethod
+    def _merge_update_fields(
+        existing_raw: dict,
+        _call: CallNode,
+        call_schema: CallSchema,
+    ):
+        BaseRepo.merge_set_fields(
+            call_schema, existing_raw, CALL_SET_FIELDS_TO_PRESERVE
+        )
+        BaseRepo.merge_fields(
+            call_schema, existing_raw, CALL_OPTIONAL_FIELDS_TO_PRESERVE
+        )
 
-        call_schema = CallSchema.from_pydantic(call)
+    async def get_call_chain(self, call_id: str, project_db_name: str):
+        query = WQ().select("v:parent_doc").woql_and(
+            WQ().eq("v:call", call_id).
+            path("v:call", "(<call_children|<call_group>)*", "v:owner")
+            .triple("v:owner", "rdf:type", "v:type")
 
-        await self.client.insert_document(call_schema, commit_msg=f"Creating call {call.name}")
+            .read_document("v:parent", "v:parent_doc")
+        )
+        async with self.session(project_db_name):
+            try:
+                result = await self.client.query(query)
+                if len(result["bindings"]) == 0:
+                    return None
+                return [parse_structure_child(row["parent_doc"]) for row in result["bindings"]]
+            except Exception as exc:
+                print(exc)
+                return []
 
-        if current_db:
-            await self.client.set_db(current_db)
-        return call_schema.to_pydantic()
+    async def create(
+        self,
+        call: Union[CallNode, List[CallNode]],
+        project_db_name: str,
+    ):
+        return await self.create_nodes(
+            call,
+            project_db_name,
+            singular_name="call",
+            plural_name="calls",
+        )
 
     async def get_by_id(self, call_id: str, project_db_name: str, raw: bool = False):
-        current_db = None
-        if self.client.db != project_db_name:
-            current_db = self.client.db
-            await self.client.set_db(project_db_name)
-        try:
-            call_schema = await self.client.get_document(call_id)
-        except Exception as e:
-            print(e)
-            return None
-        finally:
-            if current_db:
-                await self.client.set_db(current_db)
-        if raw:
-            return call_schema
-        return CallNode.from_raw_dict(call_schema)
+        return await super().get_by_id(call_id, project_db_name, raw=raw)
 
     async def delete(self, call_id: str, project_db_name: str):
-        current_db = None
-        if self.client.db != project_db_name:
-            current_db = self.client.db
-            await self.client.set_db(project_db_name)
-        try:
-            query = WQ().woql_and(
-                WQ().opt(
-                    WQ().triple("v:parent", "call_children", call_id)
-                    .delete_triple("v:parent", "call_children", call_id)
-                ),
-                WQ().delete_document(call_id)
-            )
-            await self.client.query(query, commit_msg=f"Deleting call {call_id}")
-        except Exception as e:
-            print(e)
-            return False
-        finally:
-            if current_db:
-                await self.client.set_db(current_db)
-        return True
+        return await self.delete_with_parent_cleanup(
+            call_id,
+            parent_field="call_children",
+            project_db_name=project_db_name,
+            commit_msg=f"Deleting call {call_id}",
+        )
+
+    async def batch_delete_calls(self, call_ids: List[str], project_db_name: str):
+        return await self.delete_batch_with_parent_cleanup(call_ids, "call_children", "v:call_id", project_db_name, f"Deleting calls {call_ids}")
 
     async def update(self, call: CallNode, project_db_name: str):
-        current_db = None
-        if self.client.db != project_db_name:
-            current_db = self.client.db
-            await self.client.set_db(project_db_name)
-        call_raw = await self.get_by_id(call.id, project_db_name, raw=True)
-        if not call_raw:
-            return None
-        call_schema = CallSchema.from_pydantic(call)
+        return await self.update_node(
+            call,
+            project_db_name=project_db_name,
+            commit_msg=f"Updating call {call.name}",
+            update_schema=self._merge_update_fields,
+        )
 
-        call_schema.call_children = call_raw.get("call_children", set())
-        call_schema.call_group = call_raw.get("call_group", set())
-        call_schema.target_function = call_raw.get("target_function")
-        call_schema.documents = call_raw.get("documents", set())
-        call_schema.theme_config = call_raw.get("theme_config")
+    async def move_item(
+        self,
+        new_parent_id: str,
+        item_id: str,
+        item_type: Literal["call", "call_group"],
+        project_db_name: str,
+    ):
+        return await self.move_item_by_type(
+            new_parent_id,
+            item_id,
+            item_type,
+            child_type_to_field=CODE_CHILD_TYPE_TO_FIELD,
+            project_db_name=project_db_name,
+        )
 
-        call_schema.updated_at = datetime.now(timezone.utc)
-        try:
-            await self.client.update_document(call_schema, commit_msg=f"Updating call {call.name}")
-        except Exception as e:
-            print(e)
-            return False
-        finally:
-            if current_db:
-                await self.client.set_db(current_db)
-        return call_schema.to_pydantic()
+    async def move_batch(self, moves: List[Tuple[str, str, str]], project_db_name: str):
+        return await self.move_batch_by_type(
+            moves,
+            child_type_to_field=CALL_CHILD_TYPE_TO_FIELD,
+            project_db_name=project_db_name,
+        )
 
-    async def move_item(self, new_parent_id: str, item_id: str, item_type: Literal["call", "call_group"], project_db_name: str):
-        current_db = None
-        if self.client.db != project_db_name:
-            current_db = self.client.db
-            await self.client.set_db(project_db_name)
+    async def get_children(
+        self,
+        call_site_id: str,
+        child_type: list[Literal["call", "call_group"]],
+        project_db_name: str,
+    ):
+        field_name = build_path_field_name(
+            child_type, list(CALL_FIELDS)
+        )
+        return await self.get_children_by_path(
+            call_site_id,
+            field_name,
+            parse_code_element_child,
+            project_db_name,
+            allowed_path_fields=CALL_FIELDS,
+        )
 
-        filed_name = None
-        match item_type:
-            case "call":
-                filed_name = "call_children"
-            case "call_group":
-                filed_name = "call_group"
-            case _:
-                return None
-        if not filed_name:
-            raise ValueError(f"Invalid item type: {item_type}")
-        try:
-            current_time = datetime.now(timezone.utc)
-            query = WQ().woql_and(
-                WQ().opt(
-                    WQ().triple("v:parent", filed_name, item_id)
-                    .delete_triple("v:parent", filed_name, item_id)
-                    .update_triple("v:parent", "updated_at", current_time)
-                ),
-                WQ().add_triple(new_parent_id, filed_name, item_id)
-                    .update_triple(new_parent_id, "updated_at", current_time),
-            )
-            await self.client.query(query, commit_msg=f"Moving call {item_id} to {new_parent_id}")
-        except Exception as e:
-            print(e)
-            return False
-        finally:
-            if current_db:
-                await self.client.set_db(current_db)
-        return True
-
-    async def get_children(self, call_id: str, child_type: list[Literal["call", "call_group"]], project_db_name: str):
-        current_db = None
-        if self.client.db != project_db_name:
-            current_db = self.client.db
-            await self.client.set_db(project_db_name)
-        try:
-            filed_name = build_path_field_name(
-                child_type, ["call_children", "call_group"])
-            query = (
-                WQ()
-                .select("v:child_doc")
-                .woql_and(
-                    WQ().eq("v:start", call_id)
-                    .path("v:start", f"{filed_name}+", "v:child")
-                    .read_document("v:child", "v:child_doc")
-                )
-            )
-            result = await self.client.query(query)
-            children = []
-            for child_raw in [row["child_doc"] for row in result["bindings"]]:
-                node = parse_code_element_child(child_raw)
-                if node is not None:
-                    children.append(node)
-            return children
-        except Exception as e:
-            print(e)
-            return []
-        finally:
-            if current_db:
-                await self.client.set_db(current_db)
-        return []
-
-    def get_direct_children(self, call_id: str, child_type: str):
-        pass
+    async def get_direct_children(self, call_site_id: str, child_type: str, project_db_name: str):
+        query = WQ().select("v:child_doc", "v:target_doc").woql_and(
+            WQ().eq("v:call_site", call_site_id).
+            path("v:call_site", "call_children|call_group", "v:child").
+            triple("v:child",
+                   "rdf:type", "v:type")
+            .triple("v:child", "target_function", "v:target_function")
+            .member("v:type", [f"@schema:{child_type}"])
+            .read_document("v:target", "v:target_doc")
+            .read_document("v:child", "v:child_doc")
+        )
+        async with self.session(project_db_name):
+            try:
+                result = await self.client.query(query)
+                bindings = result["bindings"]
+                children = []
+                for binding in bindings:
+                    child = binding["child_doc"]
+                    target = binding["target_doc"]
+                    children.append({"call": child, "target": target})
+                return children
+            except Exception as exc:
+                print(exc)
+                return []

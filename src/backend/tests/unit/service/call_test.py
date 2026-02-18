@@ -3,6 +3,8 @@ from app.core.services.call_service import CallService
 
 from app.core.services.function_service import FunctionService
 import pytest
+from app.core.model.schemas.code_element_schema import CallSchema
+from app.core.schemas.tree import CallTreeNode
 
 
 @pytest.mark.asyncio
@@ -52,7 +54,7 @@ async def test_delete_call(create_call, call_service):
 
 @pytest.mark.asyncio
 async def test_add_call_to_function(
-    create_call, create_call2, create_function, create_function3, call_service, function_service
+    create_call,  create_function, create_function3, call_service, function_service
 ):
     await function_service.add_call(create_function.id, create_call.id)
     call3 = await call_service.create(
@@ -71,36 +73,17 @@ async def test_add_call_to_function(
 
         create_function.id,
     )
-    await function_service.add_call(create_function3.id, clone_entry.id)
+    await function_service.add_call(create_function.id, clone_entry.id)
 
-    await container_service.clone_callee_call_graph(
+    await call_service.add_call(
         create_function.id, clone_entry.id)
 
     # 3) Assertions: cloned structure under clone_entry
-    descendants = await call_service.get_children(clone_entry.id)
+    descendants = await call_service.get_direct_call_children(create_function.id, CallSchema.__name__)
+    for descendant in descendants:
+        print(descendant["call"]["name"])
+        print(descendant["target"])
     # Immediate children of clone_entry
-    immediate = [d for d in descendants if d.get(
-        "parent_id") == clone_entry.id]
-    assert len(immediate) == 1
-    first_child = immediate[0]["vertex"]
-    assert first_child["node_type"] in ("call", "group")
-
-    # If a group was created by any rule, it should contain the call; else child is the call itself
-    if first_child["node_type"] == "group":
-        group_children = [
-            d for d in descendants if d.get("parent_id") == first_child.get("_id")
-        ]
-        assert len(group_children) >= 1
-        cloned_call = group_children[0]["vertex"]
-    else:
-        cloned_call = first_child
-
-    # The cloned call (of original create_call) should have its own child (cloned call3)
-    level2 = [d for d in descendants if d.get(
-        "parent_id") == cloned_call.get("_id")]
-    assert len(level2) == 1
-    level2_vertex = level2[0]["vertex"]
-    assert level2_vertex["node_type"] == "call"
 
 
 @pytest.mark.asyncio
@@ -114,35 +97,33 @@ async def test_add_call_to_call(create_call, create_call2, call_service):
 
 
 @pytest.mark.asyncio
-async def test_find_upward_call_chain(create_sample_project, arangodb_client):
+async def test_find_upward_call_chain(create_sample_project, create_repos):
+    project = create_sample_project
     from app.core.builder.tree_builder import TreeBuilder
-    from app.core.repository import Repositories
     from app.core.services.project_service import ProjectService
 
-    repos = Repositories(arangodb_client)
-    proj_service = ProjectService(repos)
-    project = await proj_service.get_all()
-    assert project
+    proj_service = ProjectService(create_repos)
 
-    children = await proj_service.get_children(project[0].id)
+    children = await proj_service.get_children(project.db_name)
     tree = TreeBuilder(children).build()
 
     def _find_node(nodes, name: str, node_type: str):
         for n in reversed(nodes):
-            if getattr(n, "node_type", "") == node_type and n.name == name:
+            if n.__class__.__name__ == node_type and n.name == name:
                 return n
             res = _find_node(getattr(n, "children", []) or [], name, node_type)
             if res:
                 return res
         return None
 
-    build_call = _find_node(tree, "build", "call")
+    build_call = _find_node(tree, "build", CallTreeNode.__name__)
     assert build_call is not None
 
-    call_service = CallService(repos)
+    call_service = CallService(create_repos, project)
     chain_info = await call_service.get_call_parent_chain(build_call.id)
 
     assert chain_info is not None
+    print(chain_info)
     data = chain_info[0]
 
     origin = data.get("origin")

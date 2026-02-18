@@ -11,6 +11,7 @@ from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
 
 from .models import ResolvedCall
+from app.core.model.schemas.code_element_schema import FunctionSchema
 
 logger = logging.getLogger(__name__)
 
@@ -67,18 +68,20 @@ class CallResolverService:
                 # We iterate all resolutions to capture all contexts
                 for resolution in resolutions:
                     target_id = getattr(resolution, "callee_id", None)
-                    target_qname = getattr(resolution, "callee_qname", "unknown")
+                    target_qname = getattr(
+                        resolution, "callee_qname", "unknown")
 
                     if not target_id:
                         continue
 
-                    db_target_id = f"nodes/{target_id}"
+                    db_target_id = f"{FunctionSchema.__name__}/{target_id}"
 
                     # 1. Collect Contexts (Do not skip if target_id exists!)
                     if db_target_id not in context_map:
                         context_map[db_target_id] = []
 
-                    next_context = getattr(resolution, "execution_context", None)
+                    next_context = getattr(
+                        resolution, "execution_context", None)
                     if next_context:
                         context_map[db_target_id].append(next_context)
 

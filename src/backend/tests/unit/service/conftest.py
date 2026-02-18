@@ -6,7 +6,7 @@ import pytest_asyncio
 import shutil
 from app.core.model.properties import CodePosition
 
-# from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
 from app.core.services.class_service import ClassService
 from app.core.services.file_service import FileService
@@ -55,32 +55,26 @@ async def _create_call(call_service: CallService, name: str, qname: str, target_
     )
 
 
-# @pytest_asyncio.fixture()
-# async def create_sample_project(arangodb_client, create_repos, tmp_path):
-#     project_path = tmp_path / "project"
-#     shutil.copytree(PROJECT_PATH, project_path)
-#     project_node = ProjectNode(
-#         name="Protector",
-#         description="Protector is a tool for protecting your code.",
-#         qname="protector",
-#         current_version=int(time.time_ns()),
-#         path=project_path.as_posix(),
-#     )
+@pytest_asyncio.fixture()
+async def create_sample_project(terminusdb_client, create_repos, tmp_path):
+    project_path = tmp_path / "project"
+    shutil.copytree(PROJECT_PATH, project_path)
+    project_service = ProjectService(create_repos)
+    project_node = await project_service.create(
+        "Protector",
+        "Protector is a tool for protecting your code.",
+        project_path.as_posix(),
+    )
 
-#     db_path = tmp_path / "db" / project_node.name
-#     db_path.parent.mkdir(parents=True, exist_ok=True)
+    orchestrator = GraphBuilderOrchestrator(
+        project_node=project_node,
+        db=terminusdb_client,
+        ignore_file_name=None,
+    )
+    await orchestrator.resync()
 
-#     project_service = ProjectService(create_repos)
-#     project_node = await project_service.create_node(
-#         project_node
-#     )
-
-#     orchestrator = GraphBuilderOrchestrator(
-#         project_node=project_node,
-#         db=arangodb_client,
-#         ignore_file_name=None,
-#     )
-#     await orchestrator.resync()
+    yield project_node
+    await project_service.delete(project_node.id)
 
 
 @pytest_asyncio.fixture
@@ -175,6 +169,7 @@ async def create_function3(function_service):
         "Test Function 3",
         "test_project.test_function3",
     )
+    yield function3
     await function_service.delete(function3.id)
 
 

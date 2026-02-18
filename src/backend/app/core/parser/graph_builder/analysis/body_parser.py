@@ -9,7 +9,7 @@ from app.core.parser.ast.models import (
     ClassNode as ASTClassNode,
     FunctionNode as ASTFunctionNode
 )
-from app.core.model.nodes import FileNode
+from app.core.model.nodes import FileNode, ProjectNode, FunctionNode, ClassNode
 from app.core.parser.ast.scanner import scan
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.repository import Repositories
@@ -18,26 +18,28 @@ from app.core.parser.graph_builder.performance import tracker
 # IMPORT YOUR NEW BUILDER
 from app.core.parser.graph_builder.call_graph.builder import CallChainBuilder
 
+from app.core.model.schemas import CallSchema, CodeElementGroupSchema, CallGroupSchema
+
 logger = logging.getLogger(__name__)
 
 
 class BodyParser:
     def __init__(
         self,
-        project_path: Path,
-        project_name: str,
+        project_node: ProjectNode,
         repos: Repositories,
         jedi_manager: JediProjectManager,
         batch_size: int = 1000,
         progress_tracker=None,
     ):
-        self.project_path = project_path
+        self.project_node = project_node
+        self.project_path = Path(project_node.path)
         self.repos = repos
         self.progress_tracker = progress_tracker
 
         # Initialize the NEW Builder here
         self.call_chain_builder = CallChainBuilder(
-            project_path=project_path,
+            project_node=project_node,
             repos=repos,
             jedi_manager=jedi_manager
         )
@@ -49,29 +51,21 @@ class BodyParser:
         """
         file_path = Path(file_node.path)
         if not file_path.is_absolute():
-            file_path = Path(self.project_path) / file_path
+            file_path = self.project_path / file_path
 
         # 1. Prefetch DB nodes (Optimization)
-        existing_tree = await self.repos.nodes.get_containment_tree(
+        existing_tree = await self.repos.file_repo.get_children(
             file_node.id,
-            depth=50,
-            exclude_types=["call", "group"]
+            exclude_types=[CallSchema.__name__,
+                           CodeElementGroupSchema.__name__,
+                           CallGroupSchema.__name__,],
+            project_db_name=self.project_node.db_name
         )
 
         node_map: Dict[str, any] = {file_node.qname: file_node}
 
-        for item in existing_tree:
-
-            vertex = item["vertex"]
-            if vertex.get("qname"):
-                # Simply storing the dict or converting to model depending on preference
-                # Assuming your Builder expects Pydantic models:
-                if vertex['node_type'] == 'function':
-                    node_map[vertex['qname']
-                             ] = self.repos.function_repo._validate(vertex)
-                elif vertex['node_type'] == 'class':
-                    node_map[vertex['qname']
-                             ] = self.repos.class_repo._validate(vertex)
+        for node in existing_tree:
+            node_map[node.qname] = node
 
         # 2. Read Source
         try:
@@ -115,7 +109,7 @@ class BodyParser:
         """
 
         # Set current function qname for non-file scopes (functions/classes)
-        if current_scope.node_type in ("function", "class") and self.progress_tracker:
+        if isinstance(current_scope, (FunctionNode, ClassNode)) and self.progress_tracker:
             self.progress_tracker.set_current_function(current_scope.qname)
             await self.progress_tracker.emit()
 
@@ -127,7 +121,7 @@ class BodyParser:
         )
 
         # Track entity processing for non-file scopes (functions/classes)
-        if current_scope.node_type in ("function", "class") and self.progress_tracker:
+        if isinstance(current_scope, (FunctionNode, ClassNode)) and self.progress_tracker:
             self.progress_tracker.increment_entity_processed()
             # Clear current function after processing
             self.progress_tracker.clear_current_function()

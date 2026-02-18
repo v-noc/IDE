@@ -58,3 +58,6 @@ class FileService():
 
     async def get_all_files(self):
         return await self.repos.file_repo.get_all_files(self.project.db_name)
+
+    async def get_parent_file(self, file_id: str):
+        return await self.repos.file_repo.get_parent_file(file_id, self.project.db_name)

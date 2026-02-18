@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from time import time
 from typing import Any, Callable, Generic, Type, TypeVar
 
 from app.db.async_terminus_client import AsyncClient
@@ -51,7 +52,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         nodes = self._ensure_list(node_or_nodes)
         schemas = [self._to_schema(node) for node in nodes]
 
-        if len(nodes) == 1:
+        if len(nodes) == 1 and not isinstance(node_or_nodes, list):
             commit_msg = f"Creating {singular_name} {nodes[0].name}"
         else:
             commit_msg = f"Creating {plural_name} {', '.join([node.name for node in nodes])}"
@@ -61,7 +62,7 @@ class BaseRepo(Generic[TNode, TSchema]):
 
         if raw:
             return schemas
-        if len(schemas) == 1:
+        if len(schemas) == 1 and not isinstance(node_or_nodes, list):
             return schemas[0].to_pydantic()
         return [schema.to_pydantic() for schema in schemas]
 
@@ -85,6 +86,7 @@ class BaseRepo(Generic[TNode, TSchema]):
                 return [] if not raw else None
         if raw:
             return items_raw
+
         return [self._to_node(item_raw) for item_raw in items_raw]
 
     async def get_all(self, project_db_name: str) -> list[TNode]:

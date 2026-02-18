@@ -135,8 +135,7 @@ class PhaseProcessor:
         async def _process_single_file_analysis(result):
             """Process a single file's AST analysis."""
             body_parser = BodyParser(
-                Path(self.project_path),
-                self.project_node.name,
+                self.project_node,
                 self.repos,
                 self.jedi_manager,
                 batch_size=self._batch_size,
