@@ -257,7 +257,7 @@ class AsyncClient(
         self._session = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
             follow_redirects=False,
-            limits=httpx.Limits(max_connections=30),
+            limits=httpx.Limits(max_connections=20),
 
         )
         self._connected = True
@@ -373,7 +373,8 @@ class AsyncClient(
         server_url = overrides.pop("server_url", self.server_url)
         user_agent = overrides.pop(
             "user_agent",
-            self._default_headers.get("user-agent", f"terminusdb-client-python/{__version__}"),
+            self._default_headers.get(
+                "user-agent", f"terminusdb-client-python/{__version__}"),
         )
         session = overrides.pop("session", getattr(self, "_session", None))
 

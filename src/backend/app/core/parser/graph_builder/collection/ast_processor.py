@@ -250,8 +250,8 @@ class ASTProcessor:
         moves_to_execute = sync_ops["moves_to_execute"]
         ids_to_delete = sync_ops["ids_to_delete"]
 
-        client = self.repos.client.clone()
-        await client.set_db(project_db_name)
+        # client = self.repos.client.clone()
+        # await client.set_db(project_db_name)
         new_branch = f"main"
 
         # await client.create_branch(new_branch_id=new_branch)

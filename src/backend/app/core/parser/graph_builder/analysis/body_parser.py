@@ -160,6 +160,7 @@ class BodyParser:
                         branch_name, []).append(call_node)
 
                 for branch_name, calls in grouped_inserts.items():
+                    print(f"syncing data {len(calls)}")
                     await self.call_chain_builder.call_service.create_batch(
                         calls, branch_name=branch_name
                     )
@@ -172,6 +173,9 @@ class BodyParser:
                 move_buffer.clear()
 
         async def _set_insert_batch(calls: List[Any], branch_name: Optional[str]):
+            if len(insert_buffer) == 16:
+                print(calls)
+            print(f"running {len(insert_buffer)} ")
             if not calls:
                 return
             async with batch_lock:
@@ -208,9 +212,18 @@ class BodyParser:
                 self.progress_tracker.clear_current_function()
                 # await self.progress_tracker.emit()
 
-        await asyncio.gather(*[_process_one(n, fp, s) for n, fp, s in items])
+        semaphore = asyncio.Semaphore(10)
+
+        async def bounded_process(n, fp, s):
+            async with semaphore:
+                return await _process_one(n, fp, s)
+        await asyncio.gather(*[bounded_process(n, fp, s) for n, fp, s in items])
+
+        # for n, fp, s in items:
+        #     await _process_one(n, fp, s)
 
         async with batch_lock:
+            print("ended")
             await _flush_buffers_locked()
 
         await client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)

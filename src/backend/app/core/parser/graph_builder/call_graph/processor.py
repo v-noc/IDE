@@ -58,6 +58,7 @@ class ScopeProcessor:
 
         # 4. Action: Delete Stale
         if to_delete_targets:
+
             call_ids_to_remove = [existing_map[tid]
                                   for tid in to_delete_targets]
             await self.call_service.batch_delete(call_ids_to_remove)
