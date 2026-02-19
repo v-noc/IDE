@@ -165,7 +165,7 @@ async def test_function_collector(setup_project):
         add_func.children, f"{add_func.id}::{build_func.id}"
     )
     assert build_call is not None
-    assert build_call.node_type == "call"
+    assert build_call.__class__.__name__ == "CallTreeNode"
     assert build_call.target.id == build_func.id
 
     # 4. Assert calls within `main` function
@@ -185,8 +185,8 @@ async def test_function_collector(setup_project):
 
     # 4.1 Check `factory_call()` in `main`
     assert main_factory_call.target.id == factory_call_func.id
-    children = [{child.name: child.node_type}
-                for child in main_factory_call.children]
+    # children = [{child.name: child.node_type}
+    #             for child in main_factory_call.children]
 
     assert len(main_factory_call.children) == 2
     inner_factory_call = find_node_by_qname(
