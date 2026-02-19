@@ -141,7 +141,6 @@ class BodyParser:
         items = self._traverse_and_collect(
             nodes, current_scope, node_map, file_path, source
         )
-        print("Length of items: ", len(items))
 
         insert_buffer: List[Tuple[Any, Optional[str]]] = []
         move_buffer: List[Tuple[str, str, str]] = []
@@ -155,7 +154,6 @@ class BodyParser:
                         branch_name, []).append(call_node)
 
                 for branch_name, calls in grouped_inserts.items():
-                    pass
                     await self.call_chain_builder.call_service.create_batch(
                         calls, branch_name=branch_name
                     )
@@ -182,7 +180,7 @@ class BodyParser:
                 if len(move_buffer) >= self.batch_size:
                     await _flush_buffers_locked()
         new_branch = f"branch_{"_".join(current_scope.qname.split('.'))}"
-        # await self.repos.client.create_branch(new_branch_id=new_branch)
+        await self.repos.client.create_branch(new_branch_id=new_branch)
 
         async def _process_one(node: any, fp: Path, src: str):
             if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
@@ -194,7 +192,7 @@ class BodyParser:
                 file_path=fp,
                 source_code=src,
                 visited_ids=None,
-                new_branch="main",
+                new_branch=new_branch,
                 insert_batch_setter=_set_insert_batch,
                 move_batch_setter=_set_move_batch,
             )
@@ -210,7 +208,6 @@ class BodyParser:
 
         async with batch_lock:
             await _flush_buffers_locked()
-        print("Squashing commit for ", current_scope.qname)
-        # await self.repos.client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
 
-        # target_commits = await self.repos.client.get_commit_history(branch_name=new_branch, limit=1)
+        await self.repos.client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
+        await self.repos.client.apply(before_version="main", after_version=new_branch, branch="main")
