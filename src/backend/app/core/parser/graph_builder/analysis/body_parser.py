@@ -142,9 +142,15 @@ class BodyParser:
             nodes, current_scope, node_map, file_path, source
         )
 
+        client = self.repos.client.clone()
+        await client.set_db(self.project_node.db_name)
+
         insert_buffer: List[Tuple[Any, Optional[str]]] = []
         move_buffer: List[Tuple[str, str, str]] = []
         batch_lock = asyncio.Lock()
+        new_branch = f"ast_processor_"
+        await client.create_branch(new_branch_id=new_branch)
+        client.branch = new_branch
 
         async def _flush_buffers_locked():
             if insert_buffer:
@@ -160,7 +166,9 @@ class BodyParser:
                 insert_buffer.clear()
 
             if move_buffer:
-                await self.call_chain_builder.call_service.move_batch(move_buffer.copy())
+
+                await self.call_chain_builder.call_service.move_batch(move_buffer.copy(), branch_name=new_branch)
+
                 move_buffer.clear()
 
         async def _set_insert_batch(calls: List[Any], branch_name: Optional[str]):
@@ -179,13 +187,11 @@ class BodyParser:
                 move_buffer.extend(moves)
                 if len(move_buffer) >= self.batch_size:
                     await _flush_buffers_locked()
-        new_branch = f"branch_{"_".join(current_scope.qname.split('.'))}"
-        await self.repos.client.create_branch(new_branch_id=new_branch)
 
         async def _process_one(node: any, fp: Path, src: str):
             if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
                 self.progress_tracker.set_current_function(node.qname)
-                # await self.progress_tracker.emit()
+                await self.progress_tracker.emit()
 
             await self.call_chain_builder.process_node_scope(
                 node=node,
@@ -197,8 +203,6 @@ class BodyParser:
                 move_batch_setter=_set_move_batch,
             )
 
-            # await self.repos.client.apply(source_commits[0]["commit"], target_commits[0]["commit"], branch="main")
-
             if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
                 self.progress_tracker.increment_entity_processed()
                 self.progress_tracker.clear_current_function()
@@ -209,5 +213,7 @@ class BodyParser:
         async with batch_lock:
             await _flush_buffers_locked()
 
-        await self.repos.client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
-        await self.repos.client.apply(before_version="main", after_version=new_branch, branch="main")
+        await client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
+
+        result = await client.apply(before_version="main", after_version=new_branch, branch="main")
+        print(f"Apply result: {result}")

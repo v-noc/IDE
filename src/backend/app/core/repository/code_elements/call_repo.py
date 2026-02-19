@@ -37,19 +37,18 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             call_schema, existing_raw, CALL_OPTIONAL_FIELDS_TO_PRESERVE
         )
 
-    async def get_call_chain(self, call_id: str, project_db_name: str):
-        query = WQ().select("v:parent_doc").woql_and(
+    async def get_call_chain(self, call_id: str, project_db_name: str, branch_name: Optional[str] = None):
+        query = WQ().select("v:parent_doc", "v:owner").woql_and(
             WQ().eq("v:call", call_id).
             path("v:call", "(<call_children|<call_group>)*", "v:owner")
-            .triple("v:owner", "rdf:type", "v:type")
-
-            .read_document("v:parent", "v:parent_doc")
+            .read_document("v:owner", "v:parent_doc")
         )
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                result = await self.client.query(query)
+                result = await new_client.query(query)
                 if len(result["bindings"]) == 0:
                     return None
+                print(result["bindings"])
                 return [parse_structure_child(row["parent_doc"]) for row in result["bindings"]]
             except Exception as exc:
                 print(exc)
@@ -69,15 +68,16 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             branch_name=branch_name,
         )
 
-    async def get_by_id(self, call_id: str, project_db_name: str, raw: bool = False):
-        return await super().get_by_id(call_id, project_db_name, raw=raw)
+    async def get_by_id(self, call_id: str, project_db_name: str, raw: bool = False, branch_name: Optional[str] = None):
+        return await super().get_by_id(call_id, project_db_name, raw=raw, branch_name=branch_name)
 
-    async def delete(self, call_id: str, project_db_name: str):
+    async def delete(self, call_id: str, project_db_name: str, branch_name: Optional[str] = None):
         return await self.delete_with_parent_cleanup(
             call_id,
             parent_field="call_children",
             project_db_name=project_db_name,
             commit_msg=f"Deleting call {call_id}",
+            branch_name=branch_name,
         )
 
     async def batch_delete_calls(self, call_ids: List[str], project_db_name: str):
@@ -97,6 +97,7 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
         item_id: str,
         item_type: Literal["call", "call_group"],
         project_db_name: str,
+        branch_name: Optional[str] = None,
     ):
         return await self.move_item_by_type(
             new_parent_id,
@@ -104,13 +105,15 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             item_type,
             child_type_to_field=CODE_CHILD_TYPE_TO_FIELD,
             project_db_name=project_db_name,
+            branch_name=branch_name,
         )
 
-    async def move_batch(self, moves: List[Tuple[str, str, str]], project_db_name: str):
+    async def move_batch(self, moves: List[Tuple[str, str, str]], project_db_name: str, branch_name: Optional[str] = None):
         return await self.move_batch_by_type(
             moves,
             child_type_to_field=CALL_CHILD_TYPE_TO_FIELD,
             project_db_name=project_db_name,
+            branch_name=branch_name,
         )
 
     async def get_children(
@@ -118,6 +121,7 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
         call_site_id: str,
         child_type: list[Literal["call", "call_group"]],
         project_db_name: str,
+        branch_name: Optional[str] = None,
     ):
         field_name = build_path_field_name(
             child_type, list(CALL_FIELDS)
@@ -128,9 +132,10 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             parse_code_element_child,
             project_db_name,
             allowed_path_fields=CALL_FIELDS,
+            branch_name=branch_name,
         )
 
-    async def get_direct_children(self, call_site_id: str, child_type: str, project_db_name: str):
+    async def get_direct_children(self, call_site_id: str, child_type: str, project_db_name: str, branch_name: Optional[str] = None):
         query = WQ().select("v:child_doc", "v:target_doc").woql_and(
             WQ().eq("v:call_site", call_site_id).
             path("v:call_site", "call_children|call_group", "v:child").
@@ -141,9 +146,9 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             .read_document("v:target", "v:target_doc")
             .read_document("v:child", "v:child_doc")
         )
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                result = await self.client.query(query)
+                result = await new_client.query(query)
                 bindings = result["bindings"]
                 children = []
                 for binding in bindings:

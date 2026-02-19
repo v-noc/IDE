@@ -20,15 +20,23 @@ class BaseRepo(Generic[TNode, TSchema]):
         self.schema_class = schema_class
 
     @asynccontextmanager
-    async def session(self, project_db_name: str):
+    async def session(self, project_db_name: str, branch_name: Optional[str] = None):
         current_db = self.client.db
+        new_client = None
         try:
-            if current_db != project_db_name:
-                await self.client.set_db(project_db_name)
-            yield
+            if current_db != project_db_name or self.client.branch != branch_name:
+                new_client = self.client.clone()
+                if branch_name:
+                    new_client.branch = branch_name
+
+                await new_client.set_db(project_db_name)
+                yield new_client
+            else:
+                yield self.client
         finally:
-            if current_db != project_db_name:
-                await self.client.set_db(current_db)
+            if new_client:
+                # await new_client.close()
+                del new_client
 
     def _to_schema(self, node: TNode) -> TSchema:
         return self.schema_class.from_pydantic(node)
@@ -59,21 +67,12 @@ class BaseRepo(Generic[TNode, TSchema]):
         else:
             commit_msg = f"Creating {plural_name} {', '.join([node.name for node in nodes[:10]])}"
 
-        async with self.session(project_db_name):
-            id = f"file/{uuid.uuid4()}"
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
 
-            time_start = time()
-            print(f"Process started : {id}")
             try:
-                result = await self.client.insert_document(schemas, commit_msg=commit_msg, branch_name=branch_name)
+                await new_client.insert_document(schemas, commit_msg=commit_msg)
             except Exception as exc:
                 print("error inserting document", exc)
-
-            if time()-time_start > 3:
-                print(
-                    f"Time taken: {time() - time_start} seconds {schemas} {result}")
-            print(
-                f"Process ended : {id} - Time taken: {time() - time_start} seconds {len(schemas)}")
 
         if raw:
             return schemas
@@ -81,10 +80,10 @@ class BaseRepo(Generic[TNode, TSchema]):
             return schemas[0].to_pydantic()
         return [schema.to_pydantic() for schema in schemas]
 
-    async def get_by_id(self, item_id: str, project_db_name: str, raw: bool = False):
-        async with self.session(project_db_name):
+    async def get_by_id(self, item_id: str, project_db_name: str, raw: bool = False, branch_name: Optional[str] = None):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                item_raw = await self.client.get_document(item_id)
+                item_raw = await new_client.get_document(item_id)
             except Exception as exc:
                 print(exc)
                 return None
@@ -92,10 +91,10 @@ class BaseRepo(Generic[TNode, TSchema]):
             return item_raw
         return self._to_node(item_raw)
 
-    async def get_by_ids(self, item_ids: list[str], project_db_name: str, raw: bool = False):
-        async with self.session(project_db_name):
+    async def get_by_ids(self, item_ids: list[str], project_db_name: str, raw: bool = False, branch_name: Optional[str] = None):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                items_raw = await self.client.get_documents(item_ids)
+                items_raw = await new_client.get_documents(item_ids)
             except Exception as exc:
                 print(exc)
                 return [] if not raw else None
@@ -104,10 +103,10 @@ class BaseRepo(Generic[TNode, TSchema]):
 
         return [self._to_node(item_raw) for item_raw in items_raw]
 
-    async def get_all(self, project_db_name: str) -> list[TNode]:
-        async with self.session(project_db_name):
+    async def get_all(self, project_db_name: str, branch_name: Optional[str] = None) -> list[TNode]:
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                items_raw = await self.client.get_all_documents(doc_type=self.schema_class.__name__)
+                items_raw = await new_client.get_all_documents(doc_type=self.schema_class.__name__)
             except Exception as exc:
                 print(exc)
                 return []
@@ -138,6 +137,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         project_db_name: str,
         commit_msg: str,
         update_schema: Callable[[dict[str, Any], TNode, TSchema], None],
+        branch_name: Optional[str] = None,
     ):
         existing_raw = await self.get_by_id(node.id, project_db_name, raw=True)
         if not existing_raw:
@@ -147,9 +147,9 @@ class BaseRepo(Generic[TNode, TSchema]):
         update_schema(existing_raw, node, schema)
         self.touch_updated_at(schema)
 
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                await self.client.update_document(schema, commit_msg=commit_msg)
+                await new_client.update_document(schema, commit_msg=commit_msg)
             except Exception as exc:
                 print(exc)
                 return None
@@ -288,6 +288,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         child_type: str,
         child_type_to_field: dict[str, str],
         project_db_name: str,
+        branch_name: Optional[str] = None,
     ) -> bool | None:
         field_name = child_type_to_field.get(child_type)
         if not field_name:
@@ -306,9 +307,9 @@ class BaseRepo(Generic[TNode, TSchema]):
             ),
         )
 
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                await self.client.query(query, commit_msg=f"Moving item {item_id} to {new_parent_id}")
+                await new_client.query(query, commit_msg=f"Moving item {item_id} to {new_parent_id}")
             except Exception as exc:
                 print(exc)
                 return False
@@ -320,8 +321,11 @@ class BaseRepo(Generic[TNode, TSchema]):
         moves: list[tuple[str, str, str]],
         child_type_to_field: dict[str, str],
         project_db_name: str,
+        branch_name: Optional[str] = None,
     ) -> bool:
         parsed_data: dict[str, dict[str, set[str]]] = {}
+        current_time = datetime.now(timezone.utc)
+        queries = []
         for item_id, parent_id, child_type in moves:
             field_name = child_type_to_field.get(child_type)
             if not field_name:
@@ -331,19 +335,17 @@ class BaseRepo(Generic[TNode, TSchema]):
                     field: set() for field in set(child_type_to_field.values())}
             parsed_data[parent_id][field_name].add(item_id)
 
-        current_time = datetime.now(timezone.utc)
-        queries = []
         for parent_id, fields in parsed_data.items():
             for field_name, item_ids in fields.items():
                 if not item_ids:
                     continue
-
                 query = WQ().member("v:item", list(item_ids)).woql_and(
                     WQ().opt(
                         WQ()
                         .triple("v:parent", field_name, "v:item")
                         .delete_triple("v:parent", field_name, "v:item")
                     ),
+
                     WQ().add_triple(parent_id, field_name, "v:item").update_triple(
                         parent_id, "updated_at", current_time
                     ),
@@ -353,11 +355,12 @@ class BaseRepo(Generic[TNode, TSchema]):
         if not queries:
             return True
 
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
                 query = WQ().woql_or(*queries)
-                parent_ids = ", ".join(list(parsed_data.keys()))
-                await self.client.query(query, commit_msg=f"Moving items to {parent_ids}")
+                parent_ids = "Moving items to multiple parents"
+
+                await new_client.query(query, commit_msg=f"Moving items to {parent_ids}")
 
             except Exception as exc:
                 print(f"error {exc}")

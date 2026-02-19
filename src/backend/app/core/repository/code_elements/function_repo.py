@@ -1,4 +1,4 @@
-from typing import Literal, Union, List, Tuple
+from typing import Literal, Optional, Union, List, Tuple
 
 from app.core.model.nodes import FunctionNode
 from app.core.model.schemas import FunctionSchema
@@ -25,7 +25,7 @@ class FunctionRepo(BaseRepo[FunctionNode, FunctionSchema]):
         BaseRepo.merge_fields(schema, existing_raw,
                               CODE_OPTIONAL_FIELDS_TO_PRESERVE)
 
-    async def create(self, function: Union[FunctionNode, List[FunctionNode]], project_db_name: str, raw: bool = False):
+    async def create(self, function: Union[FunctionNode, List[FunctionNode]], project_db_name: str, raw: bool = False, branch_name: Optional[str] = None):
 
         result = await self.create_nodes(
             function,
@@ -33,6 +33,7 @@ class FunctionRepo(BaseRepo[FunctionNode, FunctionSchema]):
             singular_name="function",
             plural_name="functions",
             raw=raw,
+            branch_name=branch_name,
         )
         return result
 

@@ -43,6 +43,7 @@ class FileSchema(BaseSchema):
     @staticmethod
     def from_pydantic(file: FileNode):
         by_type = file.get_children_by_type()
+
         return FileSchema(
             _id=file.id,
             name=file.name,

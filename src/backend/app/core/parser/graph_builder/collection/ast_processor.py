@@ -250,11 +250,18 @@ class ASTProcessor:
         moves_to_execute = sync_ops["moves_to_execute"]
         ids_to_delete = sync_ops["ids_to_delete"]
 
+        client = self.repos.client.clone()
+        await client.set_db(project_db_name)
+        new_branch = f"main"
+
+        # await client.create_branch(new_branch_id=new_branch)
+        # client.branch = new_branch
+
         if funcs_to_create:
-            await self.repos.function_repo.create(funcs_to_create, project_db_name=project_db_name)
+            await self.repos.function_repo.create(funcs_to_create, project_db_name=project_db_name, branch_name=new_branch)
 
         if classes_to_create:
-            await self.repos.class_repo.create(classes_to_create, project_db_name=project_db_name)
+            await self.repos.class_repo.create(classes_to_create, project_db_name=project_db_name, branch_name=new_branch)
 
         if funcs_to_update:
             await self.repos.function_repo.update_batch(funcs_to_update, project_db_name=project_db_name)
@@ -262,7 +269,10 @@ class ASTProcessor:
             await self.repos.class_repo.update_batch(classes_to_update, project_db_name=project_db_name)
 
         if moves_to_execute:
-            await self.repos.file_repo.move_batch(moves_to_execute, project_db_name=project_db_name)
+            await self.repos.file_repo.move_batch(moves_to_execute, project_db_name=project_db_name, branch_name=new_branch)
+
+        # await client.squash("Squash commit for " + file_path, branch_name=new_branch)
+        # await client.apply(before_version="main", after_version=new_branch)
 
         if ids_to_delete:
             await self.repos.function_repo.delete_batch(ids_to_delete, project_db_name=project_db_name)

@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from app.core.model.nodes import FileNode
 from app.core.model.schemas import CallGroupSchema, CallSchema, ClassSchema, CodeElementGroupSchema, FileSchema, FunctionSchema
@@ -34,12 +34,14 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         self,
         file: Union[FileNode, List[FileNode]],
         project_db_name: str,
+        branch_name: Optional[str] = None,
     ):
         return await self.create_nodes(
             file,
             project_db_name,
             singular_name="file",
             plural_name="files",
+            branch_name=branch_name,
         )
 
     async def get_children(
@@ -119,11 +121,13 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         self,
         moves: List[Tuple[str, str, str]],
         project_db_name: str,
+        branch_name: Optional[str] = None,
     ):
         return await self.move_batch_by_type(
             moves,
             child_type_to_field=CODE_CHILD_TYPE_TO_FIELD,
             project_db_name=project_db_name,
+            branch_name=branch_name,
         )
 
     async def get_all_files(self, project_db_name: str):

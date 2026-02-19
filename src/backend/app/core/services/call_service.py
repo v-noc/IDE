@@ -46,18 +46,19 @@ class CallService():
     async def delete(self, call_id: str):
         return await self.repos.call_repo.delete(call_id, self.project.db_name)
 
-    async def move_batch(self, moves: List[Tuple[str, str, str]]):
-        return await self.repos.call_repo.move_batch(moves, self.project.db_name)
+    async def move_batch(self, moves: List[Tuple[str, str, str]], branch_name: Optional[str] = None):
+        return await self.repos.call_repo.move_batch(moves, self.project.db_name, branch_name=branch_name)
 
     async def batch_delete(self, call_ids: List[str]):
         return await self.repos.call_repo.batch_delete_calls(call_ids, self.project.db_name)
 
-    async def add_call(self, parent_call_id: str, call_id: str):
+    async def add_call(self, parent_call_id: str, call_id: str, branch_name: Optional[str] = None):
         return await self.repos.call_repo.move_item(
             parent_call_id,
             call_id,
             "call",
-            self.project.db_name
+            self.project.db_name,
+            branch_name=branch_name
         )
 
     async def get_children(self, call_id: str, child_type: list[Literal["call", "call_group"]] = []):

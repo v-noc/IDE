@@ -34,6 +34,8 @@ class DiffMixin:
         """Diff two different commits and apply changes on branch."""
         self._check_connection()
         branch = branch if branch else self.branch
+        print(
+            f"applying from {before_version} to {after_version} on branch {branch} wihth {self._apply_url(branch=branch)}")
         return json.loads(
             _finish_response(
                 await self._session.post(
@@ -43,6 +45,7 @@ class DiffMixin:
                         "commit_info": self._generate_commit(message, author),
                         "before_commit": before_version,
                         "after_commit": after_version,
+                        "match_final_state": False,
                     },
                     auth=self._auth(),
                 )
