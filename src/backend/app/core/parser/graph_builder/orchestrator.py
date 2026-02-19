@@ -118,7 +118,7 @@ class GraphBuilderOrchestrator:
         socket_manager = get_socket_manager()
         progress_tracker = ProgressTracker(project_id, socket_manager)
         current_db = self.db.db
-        self.db.set_db(self.project_node.db_name)
+        await self.db.set_db(self.project_node.db_name)
 
         try:
             # 1. Scan Disk
@@ -162,7 +162,7 @@ class GraphBuilderOrchestrator:
             await progress_tracker.emit(force=True)
             raise
         finally:
-            self.db.set_db(current_db)
+            await self.db.set_db(current_db)
         # 4. Emit project:updated socket event after successful sync
         try:
             socket_manager = get_socket_manager()

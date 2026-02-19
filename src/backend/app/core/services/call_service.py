@@ -1,7 +1,7 @@
 
 from datetime import datetime, timezone
 import uuid
-from typing import Literal, List, Tuple
+from typing import Literal, List, Optional, Tuple
 from app.core.repository import Repositories
 from app.core.model.nodes import CallNode
 from app.core.model.nodes import ProjectNode
@@ -34,8 +34,8 @@ class CallService():
 
         return new_call
 
-    async def create_batch(self, calls: List[CallNode]):
-        return await self.repos.call_repo.create(calls, self.project.db_name)
+    async def create_batch(self, calls: List[CallNode], branch_name: Optional[str] = None):
+        return await self.repos.call_repo.create(calls, self.project.db_name, branch_name=branch_name)
 
     async def get(self, call_id: str):
         return await self.repos.call_repo.get_by_id(call_id, self.project.db_name)

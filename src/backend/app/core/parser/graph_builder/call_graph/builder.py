@@ -2,7 +2,7 @@ import asyncio
 import aiofiles
 import logging
 from pathlib import Path
-from typing import Any, Set, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Set, Dict, List, Optional, Tuple
 from collections import deque
 
 from app.core.parser.ast.models import (
@@ -166,7 +166,12 @@ class CallChainBuilder:
         parent_call_node_id: Optional[str] = None,
         visited_ids: Optional[Dict[str, int]] = None,
         current_depth: int = 0,
-        parent_contexts: List[Any] = [None]
+        parent_contexts: List[Any] = [None],
+        new_branch: Optional[str] = None,
+        insert_batch_setter: Optional[Callable[[
+            List[Any], Optional[str]], Awaitable[None]]] = None,
+        move_batch_setter: Optional[Callable[[
+            List[Tuple[str, str, str]]], Awaitable[None]]] = None,
     ):
         """
         Public entry point for BodyParser.
@@ -230,7 +235,10 @@ class CallChainBuilder:
             sync_result = await self.processor.sync_scope(
                 node,
                 list(all_resolved_map.values()),
-                parent_call_node_id=parent_call_node_id
+                parent_call_node_id=parent_call_node_id,
+                new_branch=new_branch,
+                insert_batch_setter=insert_batch_setter,
+                move_batch_setter=move_batch_setter,
             )
 
         # =========================================================
@@ -239,26 +247,29 @@ class CallChainBuilder:
         # We found targets (B, C). Now we must process THEM immediately.
 
         if sync_result.created_map:
-            with tracker.timer("call_graph.fetch_nodes_batch"):
-                target_nodes = await self._fetch_nodes_batch(list(sync_result.created_map.keys()))
+            # with tracker.timer("call_graph.fetch_nodes_batch"):
+            #     target_nodes = await self._fetch_nodes_batch(list(sync_result.created_map.keys()))
 
             # Batch process all target nodes concurrently
             tasks = []
-            for target_node in target_nodes:
+            for target_node in list(sync_result.created_map.keys()):
                 # RECURSION: Process B immediately
                 # Get the list of contexts for this target from our merged map
                 next_step_contexts = merged_context_map.get(
-                    target_node.id, [None])
+                    target_node, [None])
 
                 tasks.append(
                     self.process_node_scope(
-                        node=target_node,
-                        parent_call_node_id=sync_result.created_map[target_node.id],
+                        node=TempNode(id=target_node, qname=target_node),
+                        parent_call_node_id=sync_result.created_map[target_node],
                         file_path=None,
                         source_code=None,
                         visited_ids=visited_ids.copy(),
                         current_depth=current_depth + 1,
-                        parent_contexts=next_step_contexts
+                        parent_contexts=next_step_contexts,
+                        new_branch=new_branch,
+                        insert_batch_setter=insert_batch_setter,
+                        move_batch_setter=move_batch_setter,
                     )
                 )
 
@@ -267,3 +278,12 @@ class CallChainBuilder:
                 await asyncio.gather(*tasks)
 
             merged_context_map.clear()
+
+
+class TempNode:
+    id: str
+    qname: str
+
+    def __init__(self, id: str, qname: str):
+        self.id = id
+        self.qname = qname

@@ -1,7 +1,8 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from time import time
-from typing import Any, Callable, Generic, Type, TypeVar
+from typing import Any, Callable, Generic, Optional, Type, TypeVar
+import uuid
 
 from app.db.async_terminus_client import AsyncClient
 from app.db.async_terminus_client import WOQLQuery as WQ
@@ -48,6 +49,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         singular_name: str,
         plural_name: str,
         raw: bool = False,
+        branch_name: Optional[str] = None,
     ) -> TNode | list[TNode] | list[TSchema]:
         nodes = self._ensure_list(node_or_nodes)
         schemas = [self._to_schema(node) for node in nodes]
@@ -55,10 +57,23 @@ class BaseRepo(Generic[TNode, TSchema]):
         if len(nodes) == 1 and not isinstance(node_or_nodes, list):
             commit_msg = f"Creating {singular_name} {nodes[0].name}"
         else:
-            commit_msg = f"Creating {plural_name} {', '.join([node.name for node in nodes])}"
+            commit_msg = f"Creating {plural_name} {', '.join([node.name for node in nodes[:10]])}"
 
         async with self.session(project_db_name):
-            await self.client.insert_document(schemas, commit_msg=commit_msg)
+            id = f"file/{uuid.uuid4()}"
+
+            time_start = time()
+            print(f"Process started : {id}")
+            try:
+                result = await self.client.insert_document(schemas, commit_msg=commit_msg, branch_name=branch_name)
+            except Exception as exc:
+                print("error inserting document", exc)
+
+            if time()-time_start > 3:
+                print(
+                    f"Time taken: {time() - time_start} seconds {schemas} {result}")
+            print(
+                f"Process ended : {id} - Time taken: {time() - time_start} seconds {len(schemas)}")
 
         if raw:
             return schemas

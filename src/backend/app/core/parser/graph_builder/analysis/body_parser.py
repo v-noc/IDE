@@ -2,7 +2,7 @@ import logging
 import asyncio
 import aiofiles
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple, Any
 
 from app.core.parser.ast.models import (
     BaseNode,
@@ -36,6 +36,7 @@ class BodyParser:
         self.project_path = Path(project_node.path)
         self.repos = repos
         self.progress_tracker = progress_tracker
+        self.batch_size = batch_size
 
         # Initialize the NEW Builder here
         self.call_chain_builder = CallChainBuilder(
@@ -92,6 +93,40 @@ class BodyParser:
             source=processed_content
         )
 
+    def _traverse_and_collect(
+        self,
+        nodes: List[BaseNode],
+        current_scope: any,
+        node_map: Dict[str, any],
+        file_path: Path,
+        source: str,
+    ) -> List[tuple]:
+        """
+        Sync traversal to collect all scopes (node, file_path, source) that need processing.
+        """
+        items = [(current_scope, file_path, source)]
+
+        for node in nodes:
+            if isinstance(node, (ASTClassNode, ASTFunctionNode)):
+                qname = f"{current_scope.qname}.{node.name}"
+                db_node = node_map.get(qname)
+
+                if not db_node:
+                    continue
+
+                if hasattr(node, "children"):
+                    items.extend(
+                        self._traverse_and_collect(
+                            node.children,
+                            db_node,
+                            node_map,
+                            file_path,
+                            source,
+                        )
+                    )
+
+        return items
+
     async def _traverse_and_process(
         self,
         nodes: List[BaseNode],
@@ -101,47 +136,81 @@ class BodyParser:
         source: str,
     ):
         """
-        Recursive traversal. When a scope (Function/Class) is found:
-        1. Find its DB node.
-        2. Pass it to CallChainBuilder to handle call synchronization.
-
-
+        Collect all scopes via sync traversal, then run process_node_scope for each in parallel.
         """
-
-        # Set current function qname for non-file scopes (functions/classes)
-        if isinstance(current_scope, (FunctionNode, ClassNode)) and self.progress_tracker:
-            self.progress_tracker.set_current_function(current_scope.qname)
-            await self.progress_tracker.emit()
-
-        await self.call_chain_builder.process_node_scope(
-            node=current_scope,
-            file_path=file_path,
-            source_code=source,
-            visited_ids=None,
+        items = self._traverse_and_collect(
+            nodes, current_scope, node_map, file_path, source
         )
+        print("Length of items: ", len(items))
 
-        # Track entity processing for non-file scopes (functions/classes)
-        if isinstance(current_scope, (FunctionNode, ClassNode)) and self.progress_tracker:
-            self.progress_tracker.increment_entity_processed()
-            # Clear current function after processing
-            self.progress_tracker.clear_current_function()
-            await self.progress_tracker.emit()
+        insert_buffer: List[Tuple[Any, Optional[str]]] = []
+        move_buffer: List[Tuple[str, str, str]] = []
+        batch_lock = asyncio.Lock()
 
-        for node in nodes:
-            if isinstance(node, (ASTClassNode, ASTFunctionNode)):
-                # 1. Identify the DB Node
-                qname = f"{current_scope.qname}.{node.name}"
-                db_node = node_map.get(qname)
+        async def _flush_buffers_locked():
+            if insert_buffer:
+                grouped_inserts: Dict[Optional[str], List[Any]] = {}
+                for call_node, branch_name in insert_buffer:
+                    grouped_inserts.setdefault(
+                        branch_name, []).append(call_node)
 
-                if not db_node:
-                    continue
-
-                # 3. Recurse for nested definitions
-                if hasattr(node, "children"):
-                    await self._traverse_and_process(
-                        node.children,
-                        db_node,
-                        node_map,
-                        file_path,
-                        source,
+                for branch_name, calls in grouped_inserts.items():
+                    pass
+                    await self.call_chain_builder.call_service.create_batch(
+                        calls, branch_name=branch_name
                     )
+                insert_buffer.clear()
+
+            if move_buffer:
+                await self.call_chain_builder.call_service.move_batch(move_buffer.copy())
+                move_buffer.clear()
+
+        async def _set_insert_batch(calls: List[Any], branch_name: Optional[str]):
+            if not calls:
+                return
+            async with batch_lock:
+                insert_buffer.extend((call_node, branch_name)
+                                     for call_node in calls)
+                if len(insert_buffer) >= self.batch_size:
+                    await _flush_buffers_locked()
+
+        async def _set_move_batch(moves: List[Tuple[str, str, str]]):
+            if not moves:
+                return
+            async with batch_lock:
+                move_buffer.extend(moves)
+                if len(move_buffer) >= self.batch_size:
+                    await _flush_buffers_locked()
+        new_branch = f"branch_{"_".join(current_scope.qname.split('.'))}"
+        # await self.repos.client.create_branch(new_branch_id=new_branch)
+
+        async def _process_one(node: any, fp: Path, src: str):
+            if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
+                self.progress_tracker.set_current_function(node.qname)
+                # await self.progress_tracker.emit()
+
+            await self.call_chain_builder.process_node_scope(
+                node=node,
+                file_path=fp,
+                source_code=src,
+                visited_ids=None,
+                new_branch="main",
+                insert_batch_setter=_set_insert_batch,
+                move_batch_setter=_set_move_batch,
+            )
+
+            # await self.repos.client.apply(source_commits[0]["commit"], target_commits[0]["commit"], branch="main")
+
+            if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
+                self.progress_tracker.increment_entity_processed()
+                self.progress_tracker.clear_current_function()
+                # await self.progress_tracker.emit()
+
+        await asyncio.gather(*[_process_one(n, fp, s) for n, fp, s in items])
+
+        async with batch_lock:
+            await _flush_buffers_locked()
+        print("Squashing commit for ", current_scope.qname)
+        # await self.repos.client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
+
+        # target_commits = await self.repos.client.get_commit_history(branch_name=new_branch, limit=1)

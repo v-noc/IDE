@@ -1,4 +1,4 @@
-from typing import List, Literal, Tuple, Union
+from typing import List, Literal, Optional, Tuple, Union
 from app.db.async_terminus_client import WOQLQuery as WQ
 from app.core.model.nodes import CallNode
 from app.core.model.schemas.code_element_schema import CallSchema
@@ -59,12 +59,14 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
         self,
         call: Union[CallNode, List[CallNode]],
         project_db_name: str,
+        branch_name: Optional[str] = None,
     ):
         return await self.create_nodes(
             call,
             project_db_name,
             singular_name="call",
             plural_name="calls",
+            branch_name=branch_name,
         )
 
     async def get_by_id(self, call_id: str, project_db_name: str, raw: bool = False):

@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import List,  Optional
+from typing import Awaitable, Callable, List, Optional, Tuple
 from .models import ResolvedCall, ScopeSyncResult
 from app.core.services.call_service import CallService
 from app.core.model.schemas.code_element_schema import CallSchema
@@ -18,7 +18,12 @@ class ScopeProcessor:
         self,
         parent_node: any,
         resolved_calls: List[ResolvedCall],
-        parent_call_node_id: Optional[str] = None
+        parent_call_node_id: Optional[str] = None,
+        new_branch: Optional[str] = None,
+        insert_batch_setter: Optional[Callable[[
+            List[CallNode], Optional[str]], Awaitable[None]]] = None,
+        move_batch_setter: Optional[Callable[[
+            List[Tuple[str, str, str]]], Awaitable[None]]] = None,
     ) -> ScopeSyncResult:
         """
         Synchronizes the DB for a specific parent node.
@@ -35,6 +40,7 @@ class ScopeProcessor:
         # 1. Identify what currently exists in DB
         # Map: target_id -> call_node_id
         existing_children = await self.call_service.get_direct_call_children(parent_id, CallSchema.__name__)
+
         existing_map = {}
         for child in existing_children:
             existing_map[child["target"]["_id"]] = child["call"]["_id"]
@@ -73,14 +79,20 @@ class ScopeProcessor:
                 for c in resolved_calls
                 if c.target_id in to_create_ids
             ]
-            created = await self.call_service.create_batch(calls_to_create)
+            if insert_batch_setter:
+                await insert_batch_setter(calls_to_create, new_branch)
+            else:
+                await self.call_service.create_batch(calls_to_create, branch_name=new_branch)
 
-            created_map = {c.target_function: c.id for c in created}
+            created_map = {c.target_function: c.id for c in calls_to_create}
 
             moves_to_execute = [
                 (c.id, parent_id, "call") for c in calls_to_create
             ]
-            await self.call_service.move_batch(moves_to_execute)
+            if move_batch_setter:
+                await move_batch_setter(moves_to_execute)
+            else:
+                await self.call_service.move_batch(moves_to_execute)
 
             logger.debug(
                 f"Created {len(calls_to_create)} new calls in {parent_node.qname}")
