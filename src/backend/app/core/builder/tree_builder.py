@@ -64,12 +64,26 @@ class TreeBuilder:
             return [str(x) for x in raw if x]
         return []
 
+    @staticmethod
+    def _target_function_id(d: Dict[str, Any]) -> str | None:
+        raw = d.get("target_function")
+        if raw is None:
+            return None
+        if isinstance(raw, str) and raw:
+            return raw
+        if hasattr(raw, "id"):
+            return str(getattr(raw, "id", None))
+        if isinstance(raw, dict):
+            return raw.get("id") or raw.get("@id")
+        return str(raw) if raw else None
+
     def build(self) -> List[AnyTreeNode]:
         """Build tree from flat nodes; each node has children as string IDs."""
         if not self.flat_nodes:
             return []
 
         child_ids_by_parent: Dict[str, List[str]] = {}
+        target_function_id_by_call: Dict[str, str] = {}
         for item in self.flat_nodes:
             d = self._to_dict(item)
             node_id = d.get("id") or d.get("@id")
@@ -86,6 +100,10 @@ class TreeBuilder:
             node = model_cls.model_validate(validate_d)
             self.nodes_map[node.id] = node
             child_ids_by_parent[node.id] = self._child_ids(d)
+            if model_cls == CallTreeNode:
+                tid = self._target_function_id(d)
+                if tid:
+                    target_function_id_by_call[node.id] = tid
 
         referenced: set[str] = set()
         for pid, cids in child_ids_by_parent.items():
@@ -97,6 +115,17 @@ class TreeBuilder:
                 if child:
                     parent.children.append(child)
                     referenced.add(cid)
+
+        for call_id, target_id in target_function_id_by_call.items():
+            call_node = self.nodes_map.get(call_id)
+            target_node = self.nodes_map.get(target_id)
+            if (
+                call_node
+                and target_node
+                and isinstance(call_node, CallTreeNode)
+                and isinstance(target_node, (FunctionTreeNode, ClassTreeNode))
+            ):
+                call_node.target = target_node
 
         roots: List[AnyTreeNode] = []
         seen: set[str] = set()

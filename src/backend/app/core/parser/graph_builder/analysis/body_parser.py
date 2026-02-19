@@ -148,8 +148,8 @@ class BodyParser:
         insert_buffer: List[Tuple[Any, Optional[str]]] = []
         move_buffer: List[Tuple[str, str, str]] = []
         batch_lock = asyncio.Lock()
-        new_branch = f"ast_processor_"
-        await client.create_branch(new_branch_id=new_branch)
+        new_branch = f"main"
+        # await client.create_branch(new_branch_id=new_branch)
         client.branch = new_branch
 
         async def _flush_buffers_locked():
@@ -215,5 +215,6 @@ class BodyParser:
 
         await client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
 
-        result = await client.apply(before_version="main", after_version=new_branch, branch="main")
-        print(f"Apply result: {result}")
+        # result = await client.apply(before_version="main", after_version=new_branch, branch="main")
+        # print(f"Apply result: {result}")
+        # await client.delete_branch(new_branch)

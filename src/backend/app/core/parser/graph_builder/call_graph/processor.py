@@ -70,7 +70,7 @@ class ScopeProcessor:
             calls_to_create = [
                 CallNode(
                     id=f"{CallSchema.__name__}/{str(uuid.uuid4())}",
-                    qname=f"{parent_node.id.split('/')[-1]}::{c.target_id.split('/')[-1]}",
+                    qname=f"{parent_id}::{c.target_id}",
                     name=c.call_node_name,
                     target_function=c.target_id,
                     description=f"call{parent_node.qname}::{c.target_qname}",
