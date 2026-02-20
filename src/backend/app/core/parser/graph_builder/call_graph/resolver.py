@@ -21,6 +21,7 @@ class CallResolverService:
         self.jedi_manager = jedi_manager
         self.repos = repos
         self.adapter = JediAdapter(jedi_manager)
+        self.semaphore = asyncio.Semaphore(1)
 
     async def resolve_scope_calls(
         self,
@@ -37,10 +38,9 @@ class CallResolverService:
             return [], {}
 
         loop = asyncio.get_event_loop()
-        semaphore = asyncio.Semaphore(2)
 
         async def resolve_with_semaphore(ast_node: ASTCallNode):
-            async with semaphore:
+            async with self.semaphore:
                 return await loop.run_in_executor(
                     None,
                     self.adapter.resolve_call,

@@ -212,7 +212,7 @@ class BodyParser:
                 self.progress_tracker.clear_current_function()
                 # await self.progress_tracker.emit()
 
-        semaphore = asyncio.Semaphore(3)
+        semaphore = asyncio.Semaphore(10)
 
         async def bounded_process(n, fp, s):
             async with semaphore:
