@@ -302,7 +302,7 @@ class DocumentMixin:
                     stacklevel=2,
                 )
                 new_doc.pop(0)
-        api_time_start = time()
+
         result = await self._session.post(
             self._documents_url(branch_name=branch_name),
             headers=headers,
@@ -310,10 +310,9 @@ class DocumentMixin:
             json=new_doc,
             auth=self._auth(),
         )
-        print(f"API Time taken: {time() - api_time_start} seconds")
-        json_time_start = time()
+
         result = json.loads(_finish_response(result))
-        print(f"JSON Time taken: {time() - json_time_start} seconds")
+
         if isinstance(all_docs, list):
             for idx, item in enumerate(all_docs):
                 if hasattr(item, "_obj_to_dict") and not hasattr(

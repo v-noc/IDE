@@ -37,12 +37,11 @@ class CallResolverService:
             return [], {}
 
         loop = asyncio.get_event_loop()
-        tasks = []
+        semaphore = asyncio.Semaphore(2)
 
-        # Prepare parallel resolution tasks
-        for ast_node in ast_calls:
-            tasks.append(
-                loop.run_in_executor(
+        async def resolve_with_semaphore(ast_node: ASTCallNode):
+            async with semaphore:
+                return await loop.run_in_executor(
                     None,
                     self.adapter.resolve_call,
                     str(file_path),
@@ -51,7 +50,9 @@ class CallResolverService:
                     ast_node.call_col_pos,
                     parent_context,
                 )
-            )
+
+        # Prepare parallel resolution tasks
+        tasks = [resolve_with_semaphore(ast_node) for ast_node in ast_calls]
 
         # 1. Resolve to Jedi Definitions
         with tracker.timer("call_graph.resolve_jedi_calls"):
@@ -63,6 +64,11 @@ class CallResolverService:
         with tracker.timer("call_graph.process_resolved_calls"):
             for i, resolutions in enumerate(jedi_results):
                 if isinstance(resolutions, Exception) or not resolutions:
+                    if isinstance(resolutions, Exception):
+                        print(f"Error resolving call: {resolutions}")
+                    else:
+                        print(
+                            f"\n\nNo resolutions found for call: {ast_calls[i]} has parent context -{parent_context == None}")
                     continue
 
                 # We iterate all resolutions to capture all contexts

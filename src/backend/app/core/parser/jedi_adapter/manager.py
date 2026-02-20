@@ -27,10 +27,10 @@ class JediProjectManager:
         # self.executor = ThreadPoolExecutor(max_workers=1)
         # Thread lock for Jedi operations (Jedi is not thread-safe)
         # Using RLock to allow reentrant locking from same thread
-        self.project = jedi.Project(path=str(self.project_path.parent))
-        self.env = jedi.InterpreterEnvironment()
 
     def get_script(self, path: str, source: str) -> jedi.Script:
+        self.project = jedi.Project(path=str(self.project_path.parent))
+        self.env = jedi.InterpreterEnvironment()
         # Acquire lock for thread-safe Jedi operations
         # Using RLock allows reentrant access if called from resolve_call
         # with self._lock:

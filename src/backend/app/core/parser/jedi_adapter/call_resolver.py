@@ -113,7 +113,8 @@ class CallResolver:
             try:
                 # Create context at call site
                 call_context = context.create_context(leaf)
-            except:
+            except Exception as e:
+                print(f"Error creating context: {e}")
                 call_context = script._get_module_context().create_context(leaf)
 
             # Use Jedi's infer_call_of_leaf to get the callee
@@ -125,6 +126,8 @@ class CallResolver:
             )
 
             if not callee_values:
+                print(
+                    f"No callee values found for {file_path} {line}:{column}")
                 return []
 
             results = []
@@ -221,6 +224,8 @@ class CallResolver:
             )
 
             return []
+        finally:
+            del script
 
     def _extract_id_from_docstring(self, value) -> Optional[str]:
         """

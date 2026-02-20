@@ -185,13 +185,11 @@ class CallChainBuilder:
         if node.id in visited_ids:
             visited_ids[node.id] = visited_ids[node.id] + 1
             if visited_ids[node.id] > 2:
-                print("visited_ids reached")
                 return
         else:
             visited_ids[node.id] = 1
 
         if current_depth >= self.max_depth:
-            print("max depth reached")
             return
 
         # 1. Load Context (File & Source)
@@ -281,8 +279,9 @@ class CallChainBuilder:
                 await asyncio.gather(*tasks)
 
             merged_context_map.clear()
-        else:
-            print(f"{node.id} - {file_path} all_resolved_map -{all_resolved_map}")
+        elif len(ast_calls) > 0:
+            print(
+                f"ast_calls: {file_path} - {(ast_calls)} resolved_list: {resolved_list}")
 
 
 class TempNode:
