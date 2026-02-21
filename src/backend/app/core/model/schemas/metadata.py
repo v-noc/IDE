@@ -5,6 +5,7 @@ from app.db.woqlschema import (
 from datetime import datetime
 
 from app.core.model.properties import CodePosition, ThemeConfig
+from app.core.model.nodes import DocumentNode
 
 
 class CodePositionSchema(DocumentTemplate):
@@ -72,9 +73,30 @@ class ThemeConfigSchema(DocumentTemplate):
 
 class DocumentSchema(DocumentTemplate):
     """Document schema — embedded inside node documents."""
-    _subdocument = []
+
     name: str
     description: str
     data: str
     created_at: datetime
     updated_at: datetime
+
+    @staticmethod
+    def from_pydantic(document: DocumentNode):
+        return DocumentSchema(
+            _id=document.id,
+            name=document.name,
+            description=document.description,
+            data=document.data,
+            created_at=document.created_at,
+            updated_at=document.updated_at,
+        )
+
+    def to_pydantic(self):
+        return DocumentNode(
+            id=self._id,
+            name=self.name,
+            description=self.description,
+            data=self.data,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )

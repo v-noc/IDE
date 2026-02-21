@@ -1,63 +1,49 @@
+import uuid
 from app.core.repository import Repositories
-from app.core.model.documents import DocumentNode
-from typing import List
+from app.core.model.nodes import DocumentNode
+from app.core.model.nodes import ProjectNode
+from typing import List, Optional
 
 
 class DocumentService:
-    def __init__(self, repos: Repositories):
+    def __init__(self, repos: Repositories, project: ProjectNode):
         self.repos = repos
+        self.project = project
 
-    async def get(self, document_id):
-        return await self.repos.document_repo.get_by_key(document_id)
+    async def get(self, document_id, branch_name: Optional[str] = None):
+        return await self.repos.document_repo.get_by_id(document_id, self.project.db_name, branch_name=branch_name)
 
     async def get_nodes_by_parent_node(self, node_id: str) -> List[DocumentNode]:
-        # Use repository AQL to avoid N+1 lookups
-        node = await self.repos.nodes.get_by_key(node_id)
-        if not node:
-            raise ValueError(f"Node {node_id} not found")
-        return await self.repos.document_repo.get_documents_for_node(node.id)
+        return await self.repos.document_repo.get_by_parent_node(node_id, self.project.db_name)
 
     async def create(self,
                      name: str,
                      description: str,
                      node_id: str,
+                     branch_name: Optional[str] = None,
                      ):
 
         document = DocumentNode(
+            id=f"DocumentSchema/{str(uuid.uuid4())}",
             name=name,
             description=description,
             data="",
-            children=[],
         )
-        node = await self.repos.nodes.get_by_key(node_id)
-        if not node:
-            raise ValueError(f"Node {node_id} not found")
 
-        created = await self.repos.document_repo.create(document)
-        node = await self.repos.nodes.get_by_key(node_id)
+        # node = await self.repos.nodes.get_by_key(node_id)
+        # if not node:
+        #     raise ValueError(f"Node {node_id} not found")
 
-        if not node:
-            raise ValueError(f"Node {node_id} not found")
+        created = await self.repos.document_repo.create_nodes(document, self.project.db_name, singular_name="document", plural_name="documents", branch_name=branch_name)
 
-        else:
-            print("created===--->", created.id)
-            node.documents.append(created.id)
-            await self.repos.nodes.update(node.key, node)
+        if created:
+            print("adding to parent node", document.id, node_id)
+            await self.repos.document_repo.add_to_parent_node(document.id, node_id, self.project.db_name, branch_name=branch_name)
 
         return created
 
-    async def update(self, document: DocumentNode):
-        return await self.repos.document_repo.update(document.key, document)
+    async def update(self, document: DocumentNode, branch_name: Optional[str] = None):
+        return await self.repos.document_repo.update(document, self.project.db_name, branch_name=branch_name)
 
-    async def delete(self, document_id: str, node_id: str):
-        node = await self.repos.nodes.get_by_key(node_id)
-
-        if not node:
-            raise ValueError(f"Node {node_id} not found")
-        document = await self.repos.document_repo.get_by_key(document_id)
-        if not document:
-            raise ValueError(f"Document {document_id} not found")
-
-        node.documents.remove(document.id)
-        await self.repos.nodes.update(node.key, node)
-        return await self.repos.document_repo.delete(document_id)
+    async def delete(self, document_id: str, branch_name: Optional[str] = None):
+        return await self.repos.document_repo.delete(document_id, self.project.db_name, branch_name=branch_name)
