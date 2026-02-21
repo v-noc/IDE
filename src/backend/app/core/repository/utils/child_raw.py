@@ -12,6 +12,7 @@ from app.core.model.nodes import (
     CallGroupNode,
     FolderNode,
     FileNode,
+    StructureGroupNode,
 )
 
 # Field names for path queries
@@ -27,6 +28,9 @@ CALL_CHILD_TYPE_TO_FIELD = {
     "call": "call_children",
     "call_group": "call_group",
 }
+CALL_SET_FIELDS_TO_PRESERVE = ["call_children", "call_group", "documents"]
+CALL_OPTIONAL_FIELDS_TO_PRESERVE = ["theme_config", "target_function"]
+
 # Map child type names to schema field names
 CODE_CHILD_TYPE_TO_FIELD = {
     "function": "function_children",
@@ -56,6 +60,20 @@ STRUCTURE_FIELDS = (
 )
 
 
+def parse_call_child(raw: dict[str, Any]) -> Optional[Any]:
+    """
+    Convert a raw child document to the appropriate call Node based on
+    @type. Returns CallNode or CallGroupNode. Returns None if the schema type is not recognized.
+    """
+    schema_type = raw.get("@type")
+    parsers = {
+        "CallSchema": CallNode.from_raw_dict,
+        "CallGroupSchema": CallGroupNode.from_raw_dict,
+    }
+    parser = parsers.get(schema_type)
+    return parser(raw) if parser else None
+
+
 def parse_code_element_child(raw: dict[str, Any]) -> Optional[Any]:
     """
     Convert a raw child document to the appropriate code element Node based on
@@ -83,6 +101,8 @@ def parse_structure_child(raw: dict[str, Any]) -> Optional[FolderNode]:
     schema_type = raw.get("@type")
     if schema_type == "FolderSchema":
         return FolderNode.from_raw_dict(raw)
+    elif schema_type == "StructureGroupSchema":
+        return StructureGroupNode.from_raw_dict(raw)
     elif schema_type == "FileSchema":
         return FileNode.from_raw_dict(raw)
     return parse_code_element_child(raw)

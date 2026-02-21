@@ -7,6 +7,8 @@ from app.core.repository.utils import (
     CALL_FIELDS,
     CODE_CHILD_TYPE_TO_FIELD,
     CALL_CHILD_TYPE_TO_FIELD,
+    CALL_SET_FIELDS_TO_PRESERVE,
+    CALL_OPTIONAL_FIELDS_TO_PRESERVE,
     build_path_field_name,
     parse_code_element_child,
     parse_structure_child,
@@ -16,8 +18,6 @@ from app.core.model.schemas import FunctionSchema, ClassSchema
 from app.core.model.schemas import FileSchema
 
 # Call-specific fields to preserve on update (CallSchema only has call_children, call_group, documents)
-CALL_SET_FIELDS_TO_PRESERVE = ["call_children", "call_group", "documents"]
-CALL_OPTIONAL_FIELDS_TO_PRESERVE = ["theme_config", "target_function"]
 
 
 class CallRepo(BaseRepo[CallNode, CallSchema]):

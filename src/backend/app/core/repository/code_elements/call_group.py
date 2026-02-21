@@ -1,14 +1,28 @@
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Tuple
 from app.core.repository.base_repo import BaseRepo, WQ
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import CallGroupNode
 from app.core.model.schemas import CallGroupSchema
-from app.core.repository.utils import CODE_CHILD_TYPE_TO_FIELD
+from app.core.repository.utils import CALL_FIELDS, CODE_CHILD_TYPE_TO_FIELD, CALL_SET_FIELDS_TO_PRESERVE, build_path_field_name, parse_call_child
 
 
 class CallGroupRepo(BaseRepo[CallGroupNode, CallGroupSchema]):
     def __init__(self, client: AsyncClient):
-        self.client = client
+        super().__init__(client, CallGroupNode, CallGroupSchema)
+
+    @staticmethod
+    def _merge_update_fields(existing_raw: dict, _node: CallGroupNode, schema: CallGroupSchema):
+        BaseRepo.merge_set_fields(
+            schema, existing_raw, CALL_SET_FIELDS_TO_PRESERVE)
+
+    async def create(self, call_group: CallGroupNode, project_db_name: str, branch_name: Optional[str] = None):
+        return await self.create_nodes(
+            call_group,
+            project_db_name,
+            singular_name="call_group",
+            plural_name="call_groups",
+            branch_name=branch_name,
+        )
 
     async def move_item(
         self,
@@ -27,25 +41,48 @@ class CallGroupRepo(BaseRepo[CallGroupNode, CallGroupSchema]):
             branch_name=branch_name,
         )
 
+    async def move_batch(self, moves: List[Tuple[str, str, str]], project_db_name: str, branch_name: Optional[str] = None):
+        return await self.move_batch_by_type(
+            moves,
+            child_type_to_field=CODE_CHILD_TYPE_TO_FIELD,
+            project_db_name=project_db_name,
+            branch_name=branch_name,
+        )
+
+    async def get_children(self, call_group_id: str, project_db_name: str, branch_name: Optional[str] = None):
+        field_name = build_path_field_name(
+            [], list(CALL_FIELDS)
+        )
+        return await self.get_children_by_path(
+            call_group_id,
+            field_name,
+            parse_call_child,
+            project_db_name,
+            allowed_path_fields=CALL_FIELDS,
+            branch_name=branch_name,
+        )
+
     async def delete(self, code_element_group_id: str, project_db_name: str, branch_name: Optional[str] = None):
         query = WQ().woql_and(
             WQ().opt(
-                WQ().triple("v:parent", "call_group", code_element_group_id).opt(
+                WQ().woql_and(
+                    WQ().triple("v:parent", "call_group", code_element_group_id),
+                    WQ().eq("v:current", code_element_group_id),
 
-                    WQ().eq("v:current", code_element_group_id).woql_and(
-                        WQ().opt(
-                            WQ().triple("v:current", "call_children", "v:child").
-                            delete_triple("v:current", "call_children", "v:child").
-                            add_triple(
-                                "v:parent", "call_children", "v:child")
-                        ),
-                        WQ().opt(
-                            WQ().triple("v:current", "call_group", "v:child").
-                            delete_triple("v:current", "call_group", "v:child").
-                            add_triple(
-                                "v:parent", "call_group", "v:child")
-                        )
+
+                    WQ().opt(
+                        WQ().triple("v:current", "call_children", "v:child").
+                        delete_triple("v:current", "call_children", "v:child").
+                        add_triple(
+                            "v:parent", "call_children", "v:child")
                     ),
+                    WQ().opt(
+                        WQ().triple("v:current", "call_group", "v:child").
+                        delete_triple("v:current", "call_group", "v:child").
+                        add_triple(
+                            "v:parent", "call_group", "v:child")
+                    ),
+
 
                     WQ().delete_triple(
                         "v:parent", "call_group", code_element_group_id)

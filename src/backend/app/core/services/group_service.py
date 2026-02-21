@@ -42,6 +42,16 @@ class GroupService():
         else:
             raise ValueError(f"Invalid group type: {group_type}")
 
+    def current_schema(self, group_type: GroupType):
+        if group_type == GroupType.STRUCTURE:
+            return StructureGroupSchema
+        elif group_type == GroupType.CODE_ELEMENT:
+            return CodeElementGroupSchema
+        elif group_type == GroupType.CALL:
+            return CallGroupSchema
+        else:
+            raise ValueError(f"Invalid group type: {group_type}")
+
     async def get_children(self, group_id: str, group_type: GroupType, branch_name: Optional[str] = None):
         repo = self.current_repo(group_type)
         return await repo.get_children(group_id, self.project.db_name, branch_name=branch_name)
@@ -54,12 +64,12 @@ class GroupService():
         repo = self.current_repo(group_type)
         return await repo.move_batch(moves, self.project.db_name, branch_name=branch_name)
 
-    async def create(self, name: str, description: str, parent_id: str, children: List[Tuple[str, str]], group_type: GroupType, branch_name: Optional[str] = None):
+    async def create(self, name: str, description: str, parent_id: Optional[str], children: List[Tuple[str, str]], group_type: GroupType, branch_name: Optional[str] = None):
         repo = self.current_repo(group_type)
         node = self.current_node(group_type)
-
+        schema = self.current_schema(group_type)
         group = node(
-            id=f"{CodeElementGroupSchema.__name__}/{str(uuid.uuid4())}",
+            id=f"{schema.__name__}/{str(uuid.uuid4())}",
             name=name,
             description=description
         )
@@ -69,11 +79,11 @@ class GroupService():
         moves = []
         for child in children:
             moves.append((child[0], group.id, child[1]))
-
-        await repo.move_item(parent_id, group.id, group_type.value, self.project.db_name, branch_name=branch_name)
+        if parent_id:
+            await repo.move_item(parent_id, group.id, group_type.value, self.project.db_name, branch_name=branch_name)
         if moves:
             print(f" moves {moves}")
-            await repo.move_batch(moves, project_db_name=self.project.db_name, branch_name=branch_name)
+            await repo.move_batch(moves, self.project.db_name, branch_name=branch_name)
 
         return group
 

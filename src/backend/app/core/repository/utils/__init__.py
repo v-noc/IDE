@@ -2,6 +2,7 @@ from .child_raw import (
     parse_code_element_child,
     parse_structure_child,
     build_path_field_name,
+    parse_call_child,
     CODE_ELEMENT_FIELDS,
     CODE_CHILD_TYPE_TO_FIELD,
     CODE_SET_FIELDS_TO_PRESERVE,
@@ -9,6 +10,8 @@ from .child_raw import (
     STRUCTURE_FIELDS,
     CALL_CHILD_TYPE_TO_FIELD,
     CALL_FIELDS,
+    CALL_SET_FIELDS_TO_PRESERVE,
+    CALL_OPTIONAL_FIELDS_TO_PRESERVE,
 )
 
 __all__ = [
@@ -22,4 +25,7 @@ __all__ = [
     "STRUCTURE_FIELDS",
     "CALL_FIELDS",
     "CALL_CHILD_TYPE_TO_FIELD",
+    "CALL_SET_FIELDS_TO_PRESERVE",
+    "CALL_OPTIONAL_FIELDS_TO_PRESERVE",
+    "parse_call_child",
 ]

@@ -108,6 +108,21 @@ async def create_folder(folder_service):
 
 
 @pytest_asyncio.fixture
+async def create_file2(create_repos, create_project):
+    file_service = FileService(create_repos, create_project)
+    file = await file_service.create(
+        id="file2",
+        name="Test File",
+        qname="test_project.test_file",
+        description="This is a test file",
+        path="test_file",
+        hash="hash"
+    )
+    yield file
+    await file_service.delete(file.id)
+
+
+@pytest_asyncio.fixture
 async def create_file(create_repos, create_project):
     file_service = FileService(create_repos, create_project)
     file = await file_service.create(

@@ -85,6 +85,7 @@ class TreeBuilder:
         child_ids_by_parent: Dict[str, List[str]] = {}
         target_function_id_by_call: Dict[str, str] = {}
         for item in self.flat_nodes:
+
             d = self._to_dict(item)
             node_id = d.get("id") or d.get("@id")
             if not node_id:

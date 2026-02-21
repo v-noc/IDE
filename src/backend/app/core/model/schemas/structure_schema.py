@@ -2,7 +2,7 @@
 from typing import Optional, Set
 
 from app.db.schema.schema import LexicalKey
-from app.core.model.nodes import FileNode, FolderNode
+from app.core.model.nodes import FileNode, FolderNode, StructureGroupNode
 
 from .base import BaseSchema
 from .code_element_schema import (
@@ -23,6 +23,40 @@ class StructureGroupSchema(BaseSchema):
     structure_group: Set["StructureGroupSchema"]
     documents: Set[DocumentSchema]
     theme_config: Optional[ThemeConfigSchema]
+
+    @staticmethod
+    def from_pydantic(structure_group: StructureGroupNode):
+        by_type = structure_group.get_children_by_type()
+        return StructureGroupSchema(
+            _id=structure_group.id,
+            name=structure_group.name,
+            description=structure_group.description,
+            folder_children=by_type.get("folder_children", set()),
+            file_children=by_type.get("file_children", set()),
+            structure_group=by_type.get("structure_group", set()),
+            documents=structure_group.documents,
+            theme_config=ThemeConfigSchema.from_pydantic(
+                structure_group.theme_config),
+            created_at=structure_group.created_at,
+            updated_at=structure_group.updated_at,
+        )
+
+    def to_pydantic(self):
+        return StructureGroupNode(
+            id=self._id,
+            name=self.name,
+            description=self.description,
+            children=self.folder_children | self.file_children | self.structure_group or set(),
+            children_by_type={
+                "folder_children": self.folder_children or set(),
+                "file_children": self.file_children or set(),
+                "structure_group": self.structure_group or set(),
+            },
+            documents=self.documents or set(),
+            theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class FileSchema(BaseSchema):
