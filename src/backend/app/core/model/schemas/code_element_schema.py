@@ -1,7 +1,7 @@
 
 from typing import Optional, Set
 
-from app.core.model.nodes import CallNode, ClassNode, FunctionNode
+from app.core.model.nodes import CallNode, ClassNode, CodeElementGroupNode, FunctionNode
 
 from .base import BaseSchema
 from .metadata import CodePositionSchema, DocumentSchema, ThemeConfigSchema
@@ -16,6 +16,44 @@ class CodeElementGroupSchema(BaseSchema):
     function_children: Set["FunctionSchema"]
     code_element_group: Set["CodeElementGroupSchema"]
     theme_config: Optional[ThemeConfigSchema]
+    documents: Set[DocumentSchema]
+
+    @staticmethod
+    def from_pydantic(code_element_group: CodeElementGroupNode):
+        by_type = code_element_group.get_children_by_type()
+
+        return CodeElementGroupSchema(
+            _id=code_element_group.id,
+            name=code_element_group.name,
+            description=code_element_group.description,
+            documents=code_element_group.documents,
+            class_children=by_type.get("class_children", set()),
+            function_children=by_type.get("function_children", set()),
+            code_element_group=by_type.get("code_element_group", set()),
+            theme_config=ThemeConfigSchema.from_pydantic(
+                code_element_group.theme_config),
+            created_at=code_element_group.created_at,
+            updated_at=code_element_group.updated_at,
+        )
+
+    def to_pydantic(self):
+        children = self.class_children | self.function_children | self.code_element_group
+        children_by_type = {
+            "class_children": self.class_children,
+            "function_children": self.function_children,
+            "code_element_group": self.code_element_group,
+        }
+        return CodeElementGroupNode(
+            id=self._id,
+            name=self.name,
+            description=self.description,
+            documents=self.documents,
+            theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
+            children=children,
+            children_by_type=children_by_type,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class CallGroupSchema(BaseSchema):

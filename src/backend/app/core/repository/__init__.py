@@ -1,5 +1,8 @@
 
 from app.db.async_terminus_client import AsyncClient
+from app.core.repository.code_elements.code_element_group import CodeElementGroupRepo
+from app.core.repository.code_elements.call_group import CallGroupRepo
+from app.core.repository.structure.structure_group import StructureGroupRepo
 
 
 from .project_repo import ProjectRepo
@@ -10,7 +13,6 @@ from .code_elements.class_repo import ClassRepo
 from .code_elements.call_repo import CallRepo
 from .log_repo import LogRepository
 from .document_repo import DocumentRepo
-from .group_repo import GroupRepo
 
 
 class Repositories:
@@ -27,6 +29,9 @@ class Repositories:
         self.function_repo = FunctionRepo(client)
         self.class_repo = ClassRepo(client)
         self.call_repo = CallRepo(client)
-        self.group_repo = GroupRepo(client)
+
+        self.structure_group_repo = StructureGroupRepo(client)
+        self.code_element_group_repo = CodeElementGroupRepo(client)
+        self.call_group_repo = CallGroupRepo(client)
         self.log_repo = LogRepository(client)
         self.document_repo = DocumentRepo(client)

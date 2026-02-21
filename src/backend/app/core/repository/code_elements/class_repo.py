@@ -22,8 +22,6 @@ class ClassRepo(BaseRepo[ClassNode, ClassSchema]):
     def _merge_update_fields(existing_raw: dict, _node: ClassNode, schema: ClassSchema):
         BaseRepo.merge_set_fields(
             schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE)
-        BaseRepo.merge_fields(schema, existing_raw,
-                              CODE_OPTIONAL_FIELDS_TO_PRESERVE)
 
     async def create(self, class_node: Union[ClassNode, List[ClassNode]], project_db_name: str, raw: bool = False, branch_name: Optional[str] = None):
         result = await self.create_nodes(

@@ -27,8 +27,6 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
     ):
         BaseRepo.merge_set_fields(
             file_schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE)
-        BaseRepo.merge_fields(file_schema, existing_raw,
-                              CODE_OPTIONAL_FIELDS_TO_PRESERVE)
 
     async def create(
         self,

@@ -118,8 +118,6 @@ class PhaseProcessor:
                 results.append(result)
                 removed_scope_ids.update(result.removed_scope_ids)
 
-        if removed_scope_ids:
-            await self._batch_delete_scopes(list(removed_scope_ids))
         return results
 
     async def process_analysis_phase(
@@ -197,25 +195,3 @@ class PhaseProcessor:
 
         for task in tasks:
             task.result()
-
-    async def _batch_delete_scopes(self, scope_ids: List[str]) -> None:
-        """Batch delete scopes with concurrency control."""
-        clean_keys = [
-            sid.split("/")[-1] if "/" in sid else sid for sid in scope_ids]
-        if not clean_keys:
-            return
-
-        # Using AQL is much faster than individual deletes
-        async with self._db_semaphore:
-            query = """
-                 FOR doc IN nodes
-                    FILTER doc._key IN @keys
-                    REMOVE doc IN nodes
-             """
-            try:
-                await self.repos.nodes.db.aql.execute(
-                    query,
-                    bind_vars={"keys": clean_keys}
-                )
-            except Exception as e:
-                logger.error(f"Batch delete failed: {e}")

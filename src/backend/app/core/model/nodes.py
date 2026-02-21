@@ -21,6 +21,27 @@ def _children_by_type(raw_dict: dict, key_to_field: tuple[tuple[str, str], ...])
     }
 
 
+# Keys for schema persistence (raw_dict key -> schema field name)
+_FOLDER_CHILDREN_KEYS = (
+    ("folder_children", "folder_children"),
+    ("file_children", "file_children"),
+    ("structure_group", "structure_group"),
+)
+_CODE_ELEMENT_CHILDREN_KEYS = (
+    ("class_children", "class_children"),
+    ("function_children", "function_children"),
+    ("code_element_group", "code_element_group"),
+
+)
+_CALL_CHILDREN_KEYS = (
+    ("call_children", "call_children"),
+    ("call_group", "call_group"),
+)
+
+
+_FILE_CHILDREN_KEYS = (_CODE_ELEMENT_CHILDREN_KEYS + _CALL_CHILDREN_KEYS)
+
+
 class BaseNode(BaseModel):
     id: Optional[str] = Field(..., description="The ID of the node.")
     name: str = Field(..., description="The name of the node.")
@@ -61,6 +82,10 @@ class BaseGroupNode(BaseNode):
     children: Set[str] = Field(
         default_factory=set, description="The children of the group."
     )
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence.",
+    )
     documents: Set[str] = Field(
         default_factory=set, description="The documents of the group."
     )
@@ -73,14 +98,23 @@ class CodeElementGroupNode(BaseGroupNode):
     @staticmethod
     def from_raw_dict(raw_dict):
         base = BaseNode.from_raw_dict(raw_dict)
+        by_type = _children_by_type(raw_dict, _CODE_ELEMENT_CHILDREN_KEYS)
         return CodeElementGroupNode(
             **base.model_dump(),
             children=_merge_children(
                 raw_dict,
                 ("class_children", "function_children"),
             ),
+            children_by_type=by_type,
             documents=raw_dict.get("documents", set()) or set(),
             theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("class_children", "function_children", "code_element_group"), set()
         )
 
 
@@ -89,14 +123,23 @@ class CallGroupNode(BaseGroupNode):
     @staticmethod
     def from_raw_dict(raw_dict):
         base = BaseNode.from_raw_dict(raw_dict)
+        by_type = _children_by_type(raw_dict, _CALL_CHILDREN_KEYS)
         return CallGroupNode(
             **base.model_dump(),
             children=_merge_children(
                 raw_dict,
-                ("call_children", "code_element_group"),
+                ("call_children", "call_group"),
             ),
+            children_by_type=by_type,
             documents=raw_dict.get("documents", set()) or set(),
             theme_config=raw_dict.get("theme_config"),
+        )
+
+    def children_by_type(self) -> dict[str, set]:
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("call_children", "call_group"), set()
         )
 
 
@@ -105,36 +148,24 @@ class StructureGroupNode(BaseGroupNode):
     @staticmethod
     def from_raw_dict(raw_dict):
         base = BaseNode.from_raw_dict(raw_dict)
+        by_type = _children_by_type(raw_dict, _FOLDER_CHILDREN_KEYS)
         return StructureGroupNode(
             **base.model_dump(),
             children=_merge_children(
                 raw_dict,
                 ("folder_children", "file_children", "structure_group"),
             ),
+            children_by_type=by_type,
             documents=raw_dict.get("documents", set()) or set(),
             theme_config=raw_dict.get("theme_config"),
         )
 
-
-# Keys for schema persistence (raw_dict key -> schema field name)
-_FOLDER_CHILDREN_KEYS = (
-    ("folder_children", "folder_children"),
-    ("file_children", "file_children"),
-    ("structure_group", "structure_group"),
-)
-_CODE_ELEMENT_CHILDREN_KEYS = (
-    ("class_children", "class_children"),
-    ("function_children", "function_children"),
-    ("code_element_group", "code_element_group"),
-
-)
-_CALL_CHILDREN_KEYS = (
-    ("call_children", "call_children"),
-    ("call_group", "call_group"),
-)
-
-
-_FILE_CHILDREN_KEYS = (_CODE_ELEMENT_CHILDREN_KEYS + _CALL_CHILDREN_KEYS)
+    def children_by_type(self) -> dict[str, set]:
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("folder_children", "file_children", "structure_group"), set()
+        )
 
 
 class FolderNode(BaseNode):

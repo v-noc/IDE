@@ -22,8 +22,6 @@ class FunctionRepo(BaseRepo[FunctionNode, FunctionSchema]):
     def _merge_update_fields(existing_raw: dict, _node: FunctionNode, schema: FunctionSchema):
         BaseRepo.merge_set_fields(
             schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE)
-        BaseRepo.merge_fields(schema, existing_raw,
-                              CODE_OPTIONAL_FIELDS_TO_PRESERVE)
 
     async def create(self, function: Union[FunctionNode, List[FunctionNode]], project_db_name: str, raw: bool = False, branch_name: Optional[str] = None):
 

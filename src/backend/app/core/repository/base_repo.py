@@ -308,9 +308,10 @@ class BaseRepo(Generic[TNode, TSchema]):
                 .delete_triple("v:parent", field_name, item_id)
                 .update_triple("v:parent", "updated_at", current_time)
             ),
-            WQ().add_triple(new_parent_id, field_name, item_id).update_triple(
-                new_parent_id, "updated_at", current_time
-            ),
+            WQ().add_triple(new_parent_id, field_name, item_id).opt(
+                WQ().triple("v:parent", "updated_at", current_time).
+                update_triple("v: parent", "updated_at", current_time),
+            )
         )
 
         async with self.session(project_db_name, branch_name=branch_name) as new_client:
@@ -354,7 +355,7 @@ class BaseRepo(Generic[TNode, TSchema]):
 
                     WQ().add_triple(parent_id, field_name, "v:item").opt(
                         WQ().triple("v:parent", "updated_at", current_time).update_triple(
-                            parent_id, "updated_at", current_time
+                            "v:parent", "updated_at", current_time
                         )
                     )
                 )

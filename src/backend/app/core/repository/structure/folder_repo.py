@@ -39,9 +39,6 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
         BaseRepo.merge_set_fields(
             folder_schema, existing_raw, STRUCTURE_SET_FIELDS_TO_PRESERVE
         )
-        BaseRepo.merge_fields(
-            folder_schema, existing_raw, STRUCTURE_OPTIONAL_FIELDS_TO_PRESERVE
-        )
 
     async def create(
         self,
