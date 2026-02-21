@@ -26,7 +26,9 @@ async def setup_project(tmp_path, terminusdb_client):
 
     project_service = ProjectService(repos)
 
-    project_node = await project_service.create(PROJECT_NAME, "Test Project", str(project_path))
+    project_node = await project_service.create(
+        PROJECT_NAME, "Test Project", str(project_path)
+    )
 
     yield project_node, repos, terminusdb_client
     await project_service.delete(project_node.id)
@@ -53,30 +55,29 @@ def find_node_by_qname(nodes: List[AnyTreeNode], qname: str):
 
 @pytest.mark.asyncio
 async def test_function_get_code(setup_project):
-    project_node, repos, arangodb_client = setup_project
+    project_node, repos, terminus_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=arangodb_client,
+        db=terminus_client,
     )
     await orchestrator.resync()
 
     proj_service = ProjectService(repos)
-    project = await proj_service.get_all()
 
-    children = await proj_service.get_children(project[0].id)
+    children = await proj_service.get_children(project_node.db_name)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
     assert tree, "No tree nodes built"
 
-    file_node = tree[1]
+    file_node = tree[0]
     factory_qname = f"{file_node.qname}.factory"
     factory_func = find_node_by_qname(file_node.children, factory_qname)
     assert factory_func is not None, "No 'factory' function node found"
 
-    func_service = FunctionService(repos)
+    func_service = FunctionService(repos, project_node)
     snippet = await func_service.get_code(factory_func.id)
 
     assert snippet is not None, "get_code returned None"
@@ -95,11 +96,11 @@ async def test_function_get_code(setup_project):
 
 @pytest.mark.asyncio
 async def test_function_collector(setup_project):
-    project_node, repos, arangodb_client = setup_project
+    project_node, repos, terminus_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=arangodb_client,
+        db=terminus_client,
     )
 
     await orchestrator.resync()
@@ -118,7 +119,9 @@ async def test_function_collector(setup_project):
 
     # 2. Function definitions in main.py
     file_functions = [
-        child for child in file_node.children if child.__class__.__name__ == "FunctionTreeNode"
+        child
+        for child in file_node.children
+        if child.__class__.__name__ == "FunctionTreeNode"
     ]
 
     func_qnames = sorted([child.qname for child in file_functions])

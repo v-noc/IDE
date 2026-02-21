@@ -5,6 +5,7 @@ from app.core.repository import Repositories
 from app.core.model.nodes import ClassNode
 from app.core.model.properties import CodePosition
 from app.core.model.nodes import ProjectNode
+from app.core.utils.code_utils import build_abs_file_path, extract_code_from_file
 
 
 class ClassService():
@@ -88,3 +89,28 @@ class ClassService():
         return await self.repos.class_repo.get_children(
             class_id, child_type or [], self.project.db_name
         )
+
+    async def get_code(self, class_id: str):
+        class_node = await self.get(class_id)
+        if not class_node:
+            return None
+
+        parent_file = await self.repos.file_repo.get_parent_file(
+            class_id, self.project.db_name
+        )
+        if not parent_file:
+            return None
+
+        abs_path = build_abs_file_path(self.project.path, parent_file.path)
+        code = await extract_code_from_file(abs_path, class_node.code_position)
+
+        result = {
+            "id": class_node.id,
+            "name": class_node.name,
+            "qname": class_node.qname,
+            "file_path": parent_file.path,
+            "file_name": parent_file.name,
+            "code": code,
+        }
+        result["position"] = class_node.code_position.model_dump()
+        return result

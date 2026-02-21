@@ -1,5 +1,6 @@
 from app.core.repository import Repositories
 from app.core.model.nodes import FileNode, ProjectNode
+from app.core.utils.code_utils import build_abs_file_path, extract_code_from_file
 from typing import List, Optional, Tuple
 from datetime import datetime, timezone
 
@@ -61,3 +62,20 @@ class FileService():
 
     async def get_parent_file(self, file_id: str):
         return await self.repos.file_repo.get_parent_file(file_id, self.project.db_name)
+
+    async def get_code(self, file_id: str):
+        file_node = await self.get(file_id)
+        if not file_node:
+            return None
+
+        abs_path = build_abs_file_path(self.project.path, file_node.path)
+        code = await extract_code_from_file(abs_path, None)
+
+        return {
+            "id": file_node.id,
+            "name": file_node.name,
+            "qname": file_node.qname,
+            "file_path": file_node.path,
+            "file_name": file_node.name,
+            "code": code,
+        }
