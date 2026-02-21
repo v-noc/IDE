@@ -17,39 +17,36 @@ PROJECT_NAME = "sample_class"
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, arangodb_client):
-    project_path = tmp_path / "sample_class"
+async def setup_project(tmp_path, terminusdb_client):
+    project_path = tmp_path / "project"
     shutil.copytree(PROJECT_PATH, project_path)
 
-    project_node = ProjectNode(
-        name=PROJECT_NAME,
-        path=str(project_path),
-        qname=PROJECT_NAME,
-        description="Protector is a tool for protecting your code.",
-    )
-    repos = Repositories(arangodb_client)
-    await repos.ensure_collections()
-    project_service = ProjectService(repos)
-    project_node = await project_service.create_node(project_node)
+    repos = Repositories(terminusdb_client)
 
-    return project_node, repos, arangodb_client
+    project_service = ProjectService(repos)
+
+    project_node = await project_service.create(
+        PROJECT_NAME, "Test Project", str(project_path)
+    )
+
+    yield project_node, repos, terminusdb_client
+    await project_service.delete(project_node.id)
+    shutil.rmtree(project_path)
 
 
 @pytest.mark.asyncio
 async def test_class_analysis(setup_project):
-    project_node, repos, arangodb_client = setup_project
+    project_node, repos, terminusdb_client = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=arangodb_client,
+        db=terminusdb_client,
     )
     await orchestrator.resync()
 
     project_service = ProjectService(repos)
 
-    project = await project_service.get_all()
-
-    children = await project_service.get_children(project[0].id)
+    children = await project_service.get_children(project_node.db_name)
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 

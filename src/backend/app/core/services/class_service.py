@@ -21,6 +21,7 @@ class ClassService():
         description: str,
         position: CodePosition,
         base_classes: Optional[set] = None,
+        branch_name: Optional[str] = None,
     ):
         class_node = ClassNode(
             id=id,
@@ -33,21 +34,21 @@ class ClassService():
             updated_at=datetime.now(timezone.utc),
         )
 
-        return await self.repos.class_repo.create(class_node, self.project.db_name)
+        return await self.repos.class_repo.create(class_node, self.project.db_name, branch_name=branch_name)
 
-    async def get(self, class_id: str):
+    async def get(self, class_id: str, branch_name: Optional[str] = None):
         return await self.repos.class_repo.get_by_id(
-            class_id, self.project.db_name
+            class_id, self.project.db_name, branch_name=branch_name
         )
 
-    async def update(self, class_node: ClassNode):
+    async def update(self, class_node: ClassNode, branch_name: Optional[str] = None):
         return await self.repos.class_repo.update(
-            class_node, self.project.db_name
+            class_node, self.project.db_name, branch_name=branch_name
         )
 
-    async def delete(self, class_id: str):
+    async def delete(self, class_id: str, branch_name: Optional[str] = None):
         return await self.repos.class_repo.delete(
-            class_id, self.project.db_name
+            class_id, self.project.db_name, branch_name=branch_name
         )
 
     async def add_child(
@@ -57,19 +58,20 @@ class ClassService():
         item_type: Literal[
             "function", "class", "call", "code_element_group", "call_group"
         ],
+        branch_name: Optional[str] = None,
     ):
         return await self.repos.class_repo.move_item(
-            parent_class_id, item_id, item_type, self.project.db_name
+            parent_class_id, item_id, item_type, self.project.db_name, branch_name=branch_name
         )
 
-    async def add_function(self, parent_class_id: str, function_id: str):
-        return await self.add_child(parent_class_id, function_id, "function")
+    async def add_function(self, parent_class_id: str, function_id: str, branch_name: Optional[str] = None):
+        return await self.add_child(parent_class_id, function_id, "function", branch_name=branch_name)
 
-    async def add_call(self, parent_class_id: str, call_id: str):
-        return await self.add_child(parent_class_id, call_id, "call")
+    async def add_call(self, parent_class_id: str, call_id: str, branch_name: Optional[str] = None):
+        return await self.add_child(parent_class_id, call_id, "call", branch_name=branch_name)
 
-    async def add_class(self, parent_class_id: str, class_id: str):
-        return await self.add_child(parent_class_id, class_id, "class")
+    async def add_class(self, parent_class_id: str, class_id: str, branch_name: Optional[str] = None):
+        return await self.add_child(parent_class_id, class_id, "class", branch_name=branch_name)
 
     async def move_item(
         self,
@@ -78,25 +80,26 @@ class ClassService():
         item_type: Literal[
             "function", "class", "call", "code_element_group", "call_group"
         ],
+        branch_name: Optional[str] = None,
     ):
         return await self.repos.class_repo.move_item(
-            new_parent_id, item_id, item_type, self.project.db_name
+            new_parent_id, item_id, item_type, self.project.db_name, branch_name=branch_name
         )
 
     async def get_children(
-        self, class_id: str, child_type: Optional[list[str]] = None
+        self, class_id: str, child_type: Optional[list[str]] = None, branch_name: Optional[str] = None
     ):
         return await self.repos.class_repo.get_children(
-            class_id, child_type or [], self.project.db_name
+            class_id, child_type or [], self.project.db_name, branch_name=branch_name
         )
 
-    async def get_code(self, class_id: str):
+    async def get_code(self, class_id: str, branch_name: Optional[str] = None):
         class_node = await self.get(class_id)
         if not class_node:
             return None
 
         parent_file = await self.repos.file_repo.get_parent_file(
-            class_id, self.project.db_name
+            class_id, self.project.db_name, branch_name=branch_name
         )
         if not parent_file:
             return None
