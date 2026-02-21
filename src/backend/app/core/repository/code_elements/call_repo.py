@@ -141,7 +141,7 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             path("v:call_site", "call_children|call_group", "v:child").
             triple("v:child",
                    "rdf:type", "v:type")
-            .triple("v:child", "target_function", "v:target_function")
+            .triple("v:child", "target_function", "v:target")
             .member("v:type", [f"@schema:{child_type}"])
             .read_document("v:target", "v:target_doc")
             .read_document("v:child", "v:child_doc")
@@ -154,7 +154,8 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
                 for binding in bindings:
                     child = binding["child_doc"]
                     target = binding["target_doc"]
-                    children.append({"call": child, "target": target})
+                    children.append(
+                        {"call": parse_code_element_child(child), "target": parse_code_element_child(target)})
                 return children
             except Exception as exc:
                 print(exc)

@@ -204,6 +204,8 @@ class BodyParser:
                     move_batch_setter=_set_move_batch,
                 )
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print(f"Error processing node {node.qname}: {e}")
                 raise e
 
@@ -212,7 +214,7 @@ class BodyParser:
                 self.progress_tracker.clear_current_function()
                 # await self.progress_tracker.emit()
 
-        semaphore = asyncio.Semaphore(10)
+        semaphore = asyncio.Semaphore(3)
 
         async def bounded_process(n, fp, s):
             async with semaphore:
@@ -225,7 +227,7 @@ class BodyParser:
         async with batch_lock:
             await _flush_buffers_locked()
 
-        await client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
+        # await client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
 
         # result = await client.apply(before_version="main", after_version=new_branch, branch="main")
         # print(f"Apply result: {result}")
