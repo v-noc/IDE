@@ -24,6 +24,7 @@ from jedi.inference.value import BoundMethod
 from jedi.inference.value.instance import TreeInstance
 
 from .manager import JediProjectManager
+from app.core.model.schemas.code_element_schema import FunctionSchema, ClassSchema
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,7 @@ class CallResolver:
                     )
 
                 if callee_for_args.is_function():
+                    result.callee_id = f"{FunctionSchema.__name__}/{result.callee_id}"
                     if arguments:
                         result.execution_context = callee_for_args.as_context(
                             arguments
@@ -193,8 +195,10 @@ class CallResolver:
 
                         if init_id:
 
-                            result.callee_id = init_id
+                            result.callee_id = f"{FunctionSchema.__name__}/{init_id}"
                             result.qname = init_qname
+                        else:
+                            result.callee_id = f"{ClassSchema.__name__}/{result.callee_id}"
                         bound_method = BoundMethod(
                             created_instance, callee_for_args, init_method
                         )

@@ -80,7 +80,7 @@ class CallResolverService:
                     if not target_id:
                         continue
 
-                    db_target_id = f"{FunctionSchema.__name__}/{target_id}"
+                    db_target_id = target_id
 
                     # 1. Collect Contexts (Do not skip if target_id exists!)
                     if db_target_id not in context_map:

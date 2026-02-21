@@ -116,7 +116,8 @@ class FileProcessor:
         if not moves:
             return
 
-        moved_files = [TrackedPath(path=move.new, id=move.id) for move in moves]
+        moved_files = [TrackedPath(path=move.new, id=move.id)
+                       for move in moves]
         for i in range(0, len(moved_files), batch_size):
             batch = moved_files[i: i + batch_size]
             await self._sync_files_batch(
@@ -206,7 +207,8 @@ class FileProcessor:
                 if parent_id:
                     moves_to_execute.append((tp.id, parent_id, "file"))
                 else:
-                    logger.warning("Could not resolve parent for file %s", tp.path)
+                    logger.warning(
+                        "Could not resolve parent for file %s", tp.id)
 
         if nodes_to_create:
             await self.file_repo.create(nodes_to_create, self.project_node.db_name)
