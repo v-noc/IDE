@@ -34,22 +34,21 @@ def _find_node_by_name_recursive(
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, arangodb_client):
-    project_path = tmp_path / "sample_class"
+async def setup_project(tmp_path, terminusdb_client):
+    project_path = tmp_path / "project"
     shutil.copytree(SAMPLES_PATH, project_path)
 
-    project_node = ProjectNode(
-        name=PROJECT_NAME,
-        path=str(project_path),
-        qname=PROJECT_NAME,
-        description="Protector is a tool for protecting your code.",
-    )
-    repos = Repositories(arangodb_client)
-    await repos.ensure_collections()
-    project_service = ProjectService(repos)
-    project_node = await project_service.create_node(project_node)
+    repos = Repositories(terminusdb_client)
 
-    return project_node, repos, arangodb_client, project_path
+    project_service = ProjectService(repos)
+
+    project_node = await project_service.create(
+        PROJECT_NAME, "Test Project", str(project_path)
+    )
+
+    yield project_node, repos, terminusdb_client, project_path
+    await project_service.delete(project_node.id)
+    shutil.rmtree(project_path)
 
 
 def _read_file(path: Path) -> str:
@@ -93,7 +92,7 @@ async def _build_and_get_tree(project_node, repos, db):
     project = await project_service.get(project_node.id)
     assert project is not None, "Project not found after build"
 
-    children = await project_service.get_children(project_node.id)
+    children = await project_service.get_children(project_node.db_name)
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
@@ -106,22 +105,20 @@ async def _resync_and_get_tree(project_node, repos, db):
     await orchestrator.resync()
 
     project_service = ProjectService(repos)
-    project = await project_service.get(project_node.id)
-    assert project is not None, "Project not found before resync"
 
-    children = await project_service.get_children(project_node.id)
+    children = await project_service.get_children(project_node.db_name)
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
 @pytest.mark.asyncio
 async def test_class_sync_add_and_remove(setup_project):
-    project_node, repos, arangodb_client, project_path = setup_project
+    project_node, repos, terminusdb_client, project_path = setup_project
     target_file = project_path / "main.py"
 
     # 1) Build once
     tree = await _build_and_get_tree(
-        project_node, repos, arangodb_client
+        project_node, repos, terminusdb_client
     )
     assert tree, "No tree nodes built"
 
@@ -137,9 +134,9 @@ async def test_class_sync_add_and_remove(setup_project):
 
         # 3) Resync and verify class is present
         tree_after_add = await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, repos, terminusdb_client
         )
-        file_node_after_add = tree_after_add[1]
+        file_node_after_add = tree_after_add[0]
         names_after_add = [
             getattr(c, "name", None) for c in file_node_after_add.children
         ]
@@ -156,9 +153,9 @@ async def test_class_sync_add_and_remove(setup_project):
         _write_file(target_file, updated)
 
         tree_after_remove = await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, repos, terminusdb_client
         )
-        file_node_after_remove = tree_after_remove[1]
+        file_node_after_remove = tree_after_remove[0]
         names_after_remove = [
             getattr(c, "name", None) for c in file_node_after_remove.children
         ]
@@ -171,7 +168,7 @@ async def test_class_sync_add_and_remove(setup_project):
         _write_file(target_file, original)
         # Final resync to leave DB in original state
         await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, repos, terminusdb_client
         )
 
 
@@ -189,11 +186,12 @@ async def test_class_sync_add_and_remove_inside_class(setup_project):
     # 2) Find the target class to modify
     parent_class = _find_node_by_name_recursive(tree, "Parent")
     assert parent_class is not None, "'Parent' class not found"
-    assert hasattr(parent_class, "position"), "Node has no position attribute"
+    assert hasattr(
+        parent_class, "code_position"), "Node has no position attribute"
 
     # Use the position to insert new code block
-    end_line = parent_class.position.end_line_no
-    indent = parent_class.position.col_offset + 4
+    end_line = parent_class.code_position.end_line_no
+    indent = parent_class.code_position.col_offset + 4
 
     def _insert_block(path: Path):
         lines = _read_file(path).splitlines()

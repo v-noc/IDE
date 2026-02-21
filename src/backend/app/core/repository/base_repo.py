@@ -161,6 +161,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         project_db_name: str,
         commit_msg: str,
         update_schema: Callable[[dict[str, Any], TNode, TSchema], None],
+        branch_name: Optional[str] = None,
     ) -> bool | None:
         existing_raw_items = await self.get_by_ids([node.id for node in nodes], project_db_name, raw=True)
         if not existing_raw_items:
@@ -174,11 +175,13 @@ class BaseRepo(Generic[TNode, TSchema]):
             schemas.append(schema)
 
         if len(schemas) != len(nodes):
+            print(f"Error updating nodes: {len(schemas)} != {len(nodes)}")
             return None
 
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                await self.client.update_document(schemas, commit_msg=commit_msg)
+                await new_client.update_document(schemas, commit_msg=commit_msg)
+
             except Exception as exc:
                 print(exc)
                 return False
@@ -190,6 +193,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         parent_field: str,
         project_db_name: str,
         commit_msg: str,
+        branch_name: Optional[str] = None,
     ) -> bool:
         query = WQ().woql_and(
             WQ().opt(
@@ -198,9 +202,9 @@ class BaseRepo(Generic[TNode, TSchema]):
             ),
             WQ().delete_document(item_id),
         )
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                await self.client.query(query, commit_msg=commit_msg)
+                await new_client.query(query, commit_msg=commit_msg)
             except Exception as exc:
                 print(exc)
                 return False
@@ -213,6 +217,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         binding_var: str,
         project_db_name: str,
         commit_msg: str,
+        branch_name: Optional[str] = None,
     ) -> bool:
         query = WQ().member(binding_var, item_ids).woql_and(
             WQ().opt(
@@ -222,9 +227,9 @@ class BaseRepo(Generic[TNode, TSchema]):
             ),
             WQ().delete_document(binding_var),
         )
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                await self.client.query(query, commit_msg=commit_msg)
+                await new_client.query(query, commit_msg=commit_msg)
             except Exception as exc:
                 print(exc)
                 return False
@@ -238,6 +243,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         project_db_name: str,
         filtered_types: list[str] | None = None,
         allowed_path_fields: tuple[str, ...] | None = None,
+        branch_name: Optional[str] = None,
     ):
         if allowed_path_fields is not None:
             requested_fields = field_name.strip("()").split("|")
@@ -265,9 +271,9 @@ class BaseRepo(Generic[TNode, TSchema]):
                 query_step.read_document("v:child", "v:child_doc")
             )
         )
-        async with self.session(project_db_name):
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                result = await self.client.query(query)
+                result = await new_client.query(query)
 
             except Exception as exc:
                 print(exc)
