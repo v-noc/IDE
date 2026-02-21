@@ -100,6 +100,7 @@ class FunctionSchema(BaseSchema):
     class_children: Set["ClassSchema"]
     call_children: Set["CallSchema"]
     code_element_group: Set["CodeElementGroupSchema"]
+
     call_group: Set["CallGroupSchema"]
     documents: Set[DocumentSchema]
     code_position: CodePositionSchema

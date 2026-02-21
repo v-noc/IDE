@@ -4,12 +4,7 @@ from typing import Any, Dict, Optional, List
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
-class LogEventType(str, Enum):
-    ENTER = "enter"
-    EXIT = "exit"
-    ERROR = "error"
-    LOG = "log"
+from app.core.model.logs import LogLevelName, LogEventType
 
 
 class RegisterLogsParams(BaseModel):
@@ -36,7 +31,7 @@ class RegisterLogsParams(BaseModel):
     message: str = Field(
         ..., description="Message"
     )
-    level_name: Optional[str] = Field(
+    level_name: Optional[LogLevelName] = Field(
         None, description="Log level name (e.g., info, warning, error)"
     )
     payload: Optional[Dict[str, Any]] = Field(
