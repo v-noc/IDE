@@ -23,6 +23,9 @@ class LogService:
 
         return LogTreeBuilder(flat_logs).build()
 
+    async def get_parent_log(self, log_id: str):
+        return await self.repos.log_repo.get_parent_log(log_id, self.project.db_name)
+
     async def create_batch(self, batch_params: List["RegisterLogsParams"]):
 
         log_docs = []
@@ -52,11 +55,10 @@ class LogService:
             ))
 
             if p.parent_log_id:
-                log_edges.append({
+                log_edges.append([
                     f"{LogSchema.__name__}/{p.id}",
                     f"{LogSchema.__name__}/{p.parent_log_id}", "log"
-                })
-            print(f"Log edge {p.id} -> {p.parent_log_id}")
+                ])
 
         # 2. Bulk Insert Logs (One DB Call)
 

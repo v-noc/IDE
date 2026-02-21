@@ -352,9 +352,11 @@ class BaseRepo(Generic[TNode, TSchema]):
                         .delete_triple("v:parent", field_name, "v:item")
                     ),
 
-                    WQ().add_triple(parent_id, field_name, "v:item").update_triple(
-                        parent_id, "updated_at", current_time
-                    ),
+                    WQ().add_triple(parent_id, field_name, "v:item").opt(
+                        WQ().triple("v:parent", "updated_at", current_time).update_triple(
+                            parent_id, "updated_at", current_time
+                        )
+                    )
                 )
                 queries.append(query)
 

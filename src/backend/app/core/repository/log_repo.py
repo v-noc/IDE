@@ -20,8 +20,8 @@ class LogRepository(BaseRepo[LogNode, LogSchema]):
                 for log in logs:
                     raw_dict_batch.append(log.to_raw_dict())
 
-                result = await new_client.insert_document(raw_dict_batch, commit_msg=f"Creating {len(logs)} logs")
-                print(result)
+                await new_client.insert_document(raw_dict_batch, commit_msg=f"Creating {len(logs)} logs")
+
             except Exception as exc:
                 print(exc)
                 return False
