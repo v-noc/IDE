@@ -43,7 +43,7 @@ class ScopeProcessor:
 
         existing_map = {}
         for child in existing_children:
-            existing_map[child["target"]["_id"]] = child["call"]["_id"]
+            existing_map[child["target"].id] = child["call"].id
 
         existing_targets = set(existing_map.keys())
 

@@ -9,7 +9,7 @@ from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.repository import Repositories
-from app.core.schemas.tree import AnyTreeNode
+from app.core.schemas.tree import AnyTreeNode, FunctionTreeNode
 from app.core.services.project_service import ProjectService
 
 FIXTURE_PROJECT = Path(__file__).parent / "simple_function"
@@ -50,7 +50,7 @@ def find_node_by_qname_recursive(nodes: List[AnyTreeNode], qname: str):
 
 def find_node_by_name_recursive(nodes: List[AnyTreeNode], name: str) -> AnyTreeNode:
     for node in nodes:
-        if getattr(node, "name", None) == name:
+        if getattr(node, "name", None) == name and isinstance(node, FunctionTreeNode):
             return node
         if hasattr(node, "children") and node.children:
             found = find_node_by_name_recursive(node.children, name)
@@ -181,11 +181,12 @@ async def test_function_sync_add_and_remove_inside_function(setup_project):
     # 2) Find the target function to modify
     add_func_node = find_node_by_name_recursive(tree, "add")
     assert add_func_node is not None, "'add' function not found"
-    assert hasattr(add_func_node, "position"), "Node has no position attribute"
+    assert hasattr(
+        add_func_node, "code_position"), "Node has no position attribute"
 
     # Use the position to insert new code block
-    end_line = add_func_node.position.end_line_no
-    indent = add_func_node.position.col_offset + 4
+    end_line = add_func_node.code_position.end_line_no
+    indent = add_func_node.code_position.col_offset + 4
 
     def _insert_block(path: Path):
         lines = _read_file(path).splitlines()
@@ -196,7 +197,7 @@ async def test_function_sync_add_and_remove_inside_function(setup_project):
             f"{' ' * indent}# SYNC_TEST_END",
         ]
         # Insert before the last line of the function's body
-        lines[end_line - 1 : end_line - 1] = block
+        lines[end_line - 1: end_line - 1] = block
         _write_file(path, "\n".join(lines))
 
     original_content = _read_file(target_file)
