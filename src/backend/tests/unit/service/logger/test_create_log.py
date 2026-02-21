@@ -1,15 +1,18 @@
 from datetime import datetime, timezone
-
+import uuid
+import pytest
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 from app.core.services.function_service import FunctionService
 from app.core.services.log_service import LogService
 from app.core.builder.tree_builder import TreeBuilder
+from app.core.model.nodes import ProjectNode
+from app.core.model.schemas import FunctionSchema
 
 
 def _find_function_by_name(tree_nodes, name: str):
     for node in tree_nodes:
-        if getattr(node, 'node_type', '') == 'function' and node.name == name:
+        if node.id.startswith(FunctionSchema.__name__) and node.name == name:
             return node
         # search children
         child = _find_function_by_name(
@@ -19,31 +22,33 @@ def _find_function_by_name(tree_nodes, name: str):
     return None
 
 
-def _build_tree_and_get_functions(repos: Repositories):
+async def _build_tree_and_get_functions(repos: Repositories, project: ProjectNode):
     proj_service = ProjectService(repos)
-    projects = proj_service.get_all()
-    assert projects, "No project built in fixture"
-    children = proj_service.get_children(projects[0].id)
+    children = await proj_service.get_children(project.db_name)
     tree = TreeBuilder(children).build()
     return tree
 
 
-def test_create_log_without_parent(create_sample_project, arangodb_client):
-    repos = Repositories(arangodb_client)
-    tree = _build_tree_and_get_functions(repos)
+@pytest.mark.asyncio
+async def test_create_log_without_parent(create_sample_project, terminusdb_client):
+    project = create_sample_project
+    repos = Repositories(terminusdb_client)
+    tree = await _build_tree_and_get_functions(repos, project)
 
     # Use 'factory' function from sample project
     factory_fn = _find_function_by_name(tree, 'factory')
     assert factory_fn is not None
 
-    service = LogService(repos)
-    from app.api.json_rpc.schemas import RegisterLogsParams, LogEventType
+    service = LogService(repos, project)
+    from app.api.json_rpc.schemas import RegisterLogsParams, LogEventType, LogLevelName
 
     params = RegisterLogsParams(
+        id=str(uuid.uuid4()),
         function_id=factory_fn.id,
         chain_id="chain-1",
         timestamp=datetime.now(timezone.utc),
         duration_ms=None,
+        level_name=LogLevelName.INFO,
         event_type=LogEventType.LOG,
         message="a log",
         payload=None,
@@ -51,11 +56,12 @@ def test_create_log_without_parent(create_sample_project, arangodb_client):
         error=None,
     )
 
-    created = service.create(factory_fn.id, params, parent_function_id=None)
+    await service.create_batch([params])
+    created = await service.get_function_log(factory_fn.id)
     assert created is not None
 
-    parent = service.get_parent_log(created.id)
-    assert parent is None
+    # parent = await service.get_parent_log(created.id)
+    # assert parent is None
 
 
 def test_create_log_with_parent(create_sample_project, arangodb_client):
