@@ -1,3 +1,5 @@
+import aiofiles
+
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
@@ -118,29 +120,52 @@ class ClassService():
         result["position"] = class_node.code_position.model_dump()
         return result
 
-    async def get_code(self, function_id: str):
-        function = await self.get(function_id)
-
-        if not function:
-            return None
+    async def write_code(
+        self, class_id: str, code_block: str, branch_name: Optional[str] = None
+    ) -> dict:
+        """Write code for a class at its position. Returns {success: bool, error?: str}."""
+        class_node = await self.get(class_id, branch_name=branch_name)
+        if not class_node:
+            return {"success": False, "error": "Class not found"}
 
         parent_file = await self.repos.file_repo.get_parent_file(
-            function_id, self.project.db_name
+            class_id, self.project.db_name
         )
-
         if not parent_file:
-            return None
+            return {"success": False, "error": "Enclosing file not found"}
 
         abs_path = build_abs_file_path(self.project.path, parent_file.path)
-        code = await extract_code_from_file(abs_path, function.code_position)
+        position = class_node.code_position
 
-        result = {
-            "id": function.id,
-            "name": function.name,
-            "qname": function.qname,
-            "file_path": parent_file.path,
-            "file_name": parent_file.name,
-            "code": code,
-        }
-        result["position"] = function.code_position.model_dump()
-        return result
+        try:
+            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            lines = content.splitlines(True)
+            start_line = max(1, position.line_no) - 1
+            end_line = position.end_line_no
+            start_col = max(0, position.col_offset)
+            end_col = position.end_col_offset
+
+            prefix = lines[start_line][:start_col] if 0 <= start_line < len(lines) else ""
+            new_lines = [
+                (prefix + l if i > 0 else (prefix + l))
+                for i, l in enumerate(code_block.splitlines(True))
+            ]
+
+            if end_line is None:
+                lines[start_line:] = new_lines
+            else:
+                tail = ""
+                if 0 <= (end_line - 1) < len(lines) and end_col is not None:
+                    original = lines[end_line - 1]
+                    tail = original[end_col:]
+                lines[start_line:end_line] = new_lines
+                if tail:
+                    lines.insert(start_line + len(new_lines), tail)
+
+            async with aiofiles.open(abs_path, "w", encoding="utf-8") as f:
+                await f.writelines(lines)
+            return {"success": True}
+        except IOError as e:
+            return {"success": False, "error": str(e)}

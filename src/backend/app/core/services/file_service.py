@@ -1,3 +1,5 @@
+import aiofiles
+
 from app.core.repository import Repositories
 from app.core.model.nodes import FileNode, ProjectNode
 from app.core.utils.code_utils import build_abs_file_path, extract_code_from_file
@@ -79,3 +81,17 @@ class FileService():
             "file_name": file_node.name,
             "code": code,
         }
+
+    async def write_code(self, file_id: str, code_block: str) -> dict:
+        """Write entire file content. Returns {success: bool, error?: str}."""
+        file_node = await self.get(file_id)
+        if not file_node:
+            return {"success": False, "error": "File not found"}
+
+        abs_path = build_abs_file_path(self.project.path, file_node.path)
+        try:
+            async with aiofiles.open(abs_path, "w", encoding="utf-8") as f:
+                await f.write(code_block)
+            return {"success": True}
+        except IOError as e:
+            return {"success": False, "error": str(e)}

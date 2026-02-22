@@ -1,3 +1,5 @@
+import aiofiles
+
 from datetime import datetime, timezone
 from typing import Literal, Optional
 from app.core.repository import Repositories
@@ -95,3 +97,51 @@ class FunctionService():
         }
         result["position"] = function.code_position.model_dump()
         return result
+
+    async def write_code(self, function_id: str, code_block: str) -> dict:
+        """Write code for a function at its position. Returns {success: bool, error?: str}."""
+        function = await self.get(function_id)
+        if not function:
+            return {"success": False, "error": "Function not found"}
+
+        parent_file = await self.repos.file_repo.get_parent_file(
+            function_id, self.project.db_name
+        )
+        if not parent_file:
+            return {"success": False, "error": "Enclosing file not found"}
+
+        abs_path = build_abs_file_path(self.project.path, parent_file.path)
+        position = function.code_position
+
+        try:
+            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            lines = content.splitlines(True)
+            start_line = max(1, position.line_no) - 1
+            end_line = position.end_line_no
+            start_col = max(0, position.col_offset)
+            end_col = position.end_col_offset
+
+            prefix = lines[start_line][:start_col] if 0 <= start_line < len(lines) else ""
+            new_lines = [
+                (prefix + l if i > 0 else (prefix + l))
+                for i, l in enumerate(code_block.splitlines(True))
+            ]
+
+            if end_line is None:
+                lines[start_line:] = new_lines
+            else:
+                tail = ""
+                if 0 <= (end_line - 1) < len(lines) and end_col is not None:
+                    original = lines[end_line - 1]
+                    tail = original[end_col:]
+                lines[start_line:end_line] = new_lines
+                if tail:
+                    lines.insert(start_line + len(new_lines), tail)
+
+            async with aiofiles.open(abs_path, "w", encoding="utf-8") as f:
+                await f.writelines(lines)
+            return {"success": True}
+        except IOError as e:
+            return {"success": False, "error": str(e)}
