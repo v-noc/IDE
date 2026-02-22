@@ -180,7 +180,7 @@ class WatcherService:
                 self.resume_watching(project_id)
 
         # Initialize and start
-        watcher = ProjectWatcher(project_node.path, resync_project)
+        watcher = ProjectWatcher(project_node.local_path, resync_project)
         watcher.start()
         self.watchers[project_id] = watcher
         print(f"Started watching project {project_id}")

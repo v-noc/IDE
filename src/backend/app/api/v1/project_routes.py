@@ -108,10 +108,11 @@ async def get_project(
             detail="Project not found",
         )
 
+    project_node = ProjectNode.from_raw_dict(project_node)
     watcher_service.start_watching(project_node)
 
     children = await project_service.get_children(
-        project_node.db_name, exclude_groups=exclude_groups)
+        project_node.db_name)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()

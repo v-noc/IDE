@@ -72,6 +72,16 @@ class ProjectNode(BaseNode):
                                        description="The remote path of the project.", )
     db_name: str = Field(..., description="The name of the database.")
 
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        return ProjectNode(
+            **base.model_dump(),
+            local_path=raw_dict["local_path"],
+            remote_path=raw_dict.get("remote_path", None),
+            db_name=raw_dict["db_name"],
+        )
+
     @property
     def path(self) -> str:
         """Alias for local_path for compatibility with orchestrator and consumers."""

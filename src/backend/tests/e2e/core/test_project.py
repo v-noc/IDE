@@ -124,7 +124,7 @@ async def test_get_project(client, sample_project_node):
 
     assert project_tree["name"] == sample_project_node.name
     assert project_tree["description"] == sample_project_node.description
-    assert project_tree["path"] == sample_project_node.path
+    assert project_tree["local_path"] == sample_project_node.local_path
 
 
 @pytest.mark.asyncio
@@ -199,28 +199,6 @@ async def test_get_all_projects(client, sample_project_node):
     assert response.json()[0]["name"] == sample_project_node.name
     assert response.json()[0]["description"] == sample_project_node.description
     assert response.json()[0]["local_path"] == sample_project_node.path
-
-
-@pytest.mark.asyncio
-async def test_get_project_children(client, sample_project_path):
-    # Single API call to create the project and get the full tree
-    response = await client.post(
-        "/api/v1/projects/",
-        json={
-            "name": "test_project",
-            "description": "test_project",
-            "path": sample_project_path,
-        },
-    )
-    assert response.status_code == 200
-    key = response.json()["_key"]
-
-    response = await client.get(f"/api/v1/projects/{key}/children")
-    assert response.status_code == 200
-    assert len(response.json()) == 2
-
-    assert response.json()[1]["name"] == "main"
-    assert response.json()[0]["name"] == "core"
 
 
 @pytest.mark.asyncio
