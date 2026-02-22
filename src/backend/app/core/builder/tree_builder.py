@@ -146,6 +146,8 @@ class TreeBuilder:
                 and isinstance(call_node, CallTreeNode)
                 and isinstance(target_node, (FunctionTreeNode, ClassTreeNode))
             ):
+                target_node = target_node.model_copy(
+                    update={"node_type": "function", "children": []})
                 call_node.target = target_node
 
         roots: List[AnyTreeNode] = []

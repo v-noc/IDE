@@ -152,9 +152,10 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
             WQ().read_document("v:parent", "v:parent_doc"),
         )
 
-        async with self.session(project_db_name):
+        async with self.session(project_db_name) as new_client:
             try:
-                result = await self.client.query(query)
+                result = await new_client.query(query)
+
             except Exception as exc:
                 print(exc)
                 return None

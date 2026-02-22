@@ -57,6 +57,7 @@ async def test_get_code_for_function(client, sample_project_path):
     assert response.status_code == 200
     project_tree = response.json()
 
+    project_key = project_tree["id"]
     # Navigate to core/utils/helper.py -> create_child
     project_tree["children"].sort(key=lambda x: x["name"])
     core_folder = find_child(project_tree, "core")
@@ -73,11 +74,13 @@ async def test_get_code_for_function(client, sample_project_path):
     assert create_child_func is not None
 
     # Call get_code for function
-    func_key = create_child_func["_key"]
-    r_func = await client.get(f"/api/v1/code-elements/{func_key}/read-code")
+    func_key = create_child_func["id"]
+
+    r_func = await client.get(f"/api/v1/code-elements/read-code/?node_id={func_key}&project_id={project_key}")
     assert r_func.status_code == 200
     payload = r_func.json()
-    assert payload["node_type"] == "function"
+    print(f"payload: {payload}")
+
     assert payload["name"] == "create_child"
     assert isinstance(payload.get("code"), str)
     assert "def create_child" in payload["code"]
@@ -108,7 +111,7 @@ async def test_get_code_for_class(client, sample_project_path):
     )
     assert response.status_code == 200
     project_tree = response.json()
-
+    project_key = project_tree["id"]
     # Navigate to core/model/child.py -> class Child
     project_tree["children"].sort(key=lambda x: x["name"])
     core_folder = find_child(project_tree, "core")
@@ -123,11 +126,10 @@ async def test_get_code_for_class(client, sample_project_path):
     child_class = find_child(child_py, "Child")
     assert child_class is not None
 
-    class_key = child_class["_key"]
-    r_class = await client.get(f"/api/v1/code-elements/{class_key}/read-code")
+    class_key = child_class["id"]
+    r_class = await client.get(f"/api/v1/code-elements/read-code/?node_id={class_key}&project_id={project_key}")
     assert r_class.status_code == 200
     payload = r_class.json()
-    assert payload["node_type"] == "class"
     assert payload["name"] == "Child"
     assert isinstance(payload.get("code"), str)
     assert "class Child" in payload["code"]
@@ -163,6 +165,8 @@ async def test_get_code_for_nested_function(client):
     assert response.status_code == 200
     project_tree = response.json()
 
+    project_key = project_tree["id"]
+
     # Navigate to main.py -> factory -> add
     project_tree["children"].sort(key=lambda x: x["name"])
     main_py = find_child(project_tree, "main")
@@ -174,11 +178,10 @@ async def test_get_code_for_nested_function(client):
     add_func = find_child(factory_func, "add")
     assert add_func is not None
 
-    nested_key = add_func["_key"]
-    r_nested = await client.get(f"/api/v1/code-elements/{nested_key}/read-code")
+    nested_key = add_func["id"]
+    r_nested = await client.get(f"/api/v1/code-elements/read-code/?node_id={nested_key}&project_id={project_key}")
     assert r_nested.status_code == 200
     payload = r_nested.json()
-    assert payload["node_type"] == "function"
     assert payload["name"] == "add"
     assert isinstance(payload.get("code"), str)
     assert "def add" in payload["code"]

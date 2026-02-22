@@ -54,7 +54,6 @@ async def create_project(
         )
 
     try:
-
         project_node = await project_service.create(
             name=project.name,
             description=project.description or "",
@@ -90,6 +89,7 @@ async def create_project(
     tree = tree_builder.build()
 
     project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
+
     return project_tree
 
 

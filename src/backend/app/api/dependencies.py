@@ -1,4 +1,4 @@
-from fastapi import Depends
+from fastapi import Depends, Query
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 
@@ -11,6 +11,7 @@ from app.core.services.group_service import GroupService
 from app.core.services.document_service import DocumentService
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
+from app.core.model.nodes import ProjectNode
 
 
 def get_group_service(
@@ -27,25 +28,38 @@ def get_project_service(
     return ProjectService(repos)
 
 
-def get_file_service(
+async def get_file_service(
     db: AsyncClient = Depends(get_terminus_client),
+    project_service: ProjectService = Depends(get_project_service),
+    project_id: str = Query(..., description="The ID of the project to get"),
 ) -> FileService:
+    project = await project_service.get(project_id)
     repos = Repositories(db)
-    return FileService(repos)
+    project = ProjectNode.from_raw_dict(project)
+    return FileService(repos, project)
 
 
-def get_class_service(
+async def get_class_service(
     db: AsyncClient = Depends(get_terminus_client),
+    project_service: ProjectService = Depends(get_project_service),
+    project_id: str = Query(..., description="The ID of the project to get"),
 ) -> ClassService:
+    project = await project_service.get(project_id)
     repos = Repositories(db)
-    return ClassService(repos)
+    project = ProjectNode.from_raw_dict(project)
+    return ClassService(repos, project)
 
 
-def get_function_service(
+async def get_function_service(
+    project_service: ProjectService = Depends(get_project_service),
+    project_id: str = Query(..., description="The ID of the project to get"),
     db: AsyncClient = Depends(get_terminus_client),
 ) -> FunctionService:
+    print(f"project_id: {project_id}")
+    project = await project_service.get(project_id)
+    project = ProjectNode.from_raw_dict(project)
     repos = Repositories(db)
-    return FunctionService(repos)
+    return FunctionService(repos, project)
 
 
 def get_call_service(

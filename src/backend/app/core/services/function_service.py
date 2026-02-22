@@ -71,12 +71,14 @@ class FunctionService():
 
     async def get_code(self, function_id: str):
         function = await self.get(function_id)
+
         if not function:
             return None
 
         parent_file = await self.repos.file_repo.get_parent_file(
             function_id, self.project.db_name
         )
+
         if not parent_file:
             return None
 

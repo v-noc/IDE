@@ -1,20 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, status
+from fastapi import APIRouter, Depends, HTTPException, Body, Query, status
 from typing import Dict, Any
 from pydantic import BaseModel
 import os
 
 from app.core.sandbox.code_run import CodeResponse, CodeRunner
-from app.db.client import get_db
-from arangoasync.database import AsyncDatabase
+
+from app.db.client import get_terminus_client, AsyncClient
 from app.api.dependencies import (
     get_project_service,
-    get_container_service,
+    get_function_service,
+    get_file_service,
+    get_class_service,
 )
 from app.core.watcher.service import WatcherService, get_watcher_service
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.services.project_service import ProjectService
-from app.core.services.container_service import ContainerService
+
 from app.core.socket.manager import get_socket_manager
+from app.core.services import FunctionService, FileService, ClassService
 
 
 router = APIRouter()
@@ -32,10 +35,9 @@ class RunCode(BaseModel):
 async def write_code(
     element_id: str,
     code_block: str = Body(..., embed=True, alias="code"),
-    container_service: ContainerService = Depends(get_container_service),
     project_service: ProjectService = Depends(get_project_service),
     watcher_service: WatcherService = Depends(get_watcher_service),
-    db: AsyncDatabase = Depends(get_db),
+    db: AsyncClient = Depends(get_terminus_client),
 ) -> Dict[str, Any]:
     """
     Writes a block of code to the location of a given code element.
@@ -95,17 +97,29 @@ async def write_code(
     return result
 
 
-@router.get("/{element_id}/read-code")
+@router.get("/read-code/")
 async def get_code(
-    element_id: str,
-    container_service: ContainerService = Depends(get_container_service),
+    node_id: str = Query(..., description="The ID of the element to get"),
+
+    function_service: FunctionService = Depends(get_function_service),
+    file_service: FileService = Depends(get_file_service),
+    class_service: ClassService = Depends(get_class_service),
 ) -> Dict[str, Any]:
     """
     Retrieves the code for a given element.
     Accepts document key (not full _id).
     """
-    node_id = f"nodes/{element_id}"
-    code_details = await container_service.get_code(node_id)
+
+    if node_id.startswith("FunctionSchema/"):
+        code_details = await function_service.get_code(node_id)
+
+    elif node_id.startswith("FileSchema/"):
+        code_details = await file_service.get_code(node_id)
+    elif node_id.startswith("ClassSchema/"):
+        code_details = await class_service.get_code(node_id)
+    else:
+        raise HTTPException(
+            status_code=400, detail="Invalid node ID")
 
     if code_details is None:
         raise HTTPException(

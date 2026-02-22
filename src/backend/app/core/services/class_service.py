@@ -117,3 +117,30 @@ class ClassService():
         }
         result["position"] = class_node.code_position.model_dump()
         return result
+
+    async def get_code(self, function_id: str):
+        function = await self.get(function_id)
+
+        if not function:
+            return None
+
+        parent_file = await self.repos.file_repo.get_parent_file(
+            function_id, self.project.db_name
+        )
+
+        if not parent_file:
+            return None
+
+        abs_path = build_abs_file_path(self.project.path, parent_file.path)
+        code = await extract_code_from_file(abs_path, function.code_position)
+
+        result = {
+            "id": function.id,
+            "name": function.name,
+            "qname": function.qname,
+            "file_path": parent_file.path,
+            "file_name": parent_file.name,
+            "code": code,
+        }
+        result["position"] = function.code_position.model_dump()
+        return result
