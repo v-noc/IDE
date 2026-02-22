@@ -5,7 +5,7 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from pathlib import Path
-from app.db.client import get_db
+from app.db.client import get_terminus_client
 from app.core.services.project_service import ProjectService
 from app.db.async_terminus_client import AsyncClient as TerminusClient
 
@@ -20,7 +20,7 @@ async def client(terminusdb_client: TerminusClient) -> AsyncClient:
     def override_get_db():
         return terminusdb_client
 
-    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_terminus_client] = override_get_db
 
     transport = ASGITransport(app=app)
     async with AsyncClient(

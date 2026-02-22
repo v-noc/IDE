@@ -4,13 +4,13 @@ import logging
 import asyncio
 from typing import Dict, Optional
 from threading import Lock
-from arangoasync.database import AsyncDatabase
 from fastapi import Depends, Request
 
 from app.core.model.nodes import ProjectNode
 from app.core.watcher.project_watcher import ProjectWatcher
 from app.core.socket.manager import get_socket_manager
-from app.db.client import get_db
+from app.db.client import get_terminus_client
+from app.db.async_terminus_client import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class WatcherService:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, db: AsyncDatabase | None = None):
+    def __init__(self, db: AsyncClient = Depends(get_terminus_client)):
         if not hasattr(self, 'initialized'):
             self.watchers: Dict[str, ProjectWatcher] = {}
             self.db = db
@@ -38,7 +38,7 @@ class WatcherService:
         """Set the main event loop for async operations from sync threads."""
         self.main_event_loop = loop
 
-    def set_db(self, db: AsyncDatabase):
+    def set_db(self, db: AsyncClient):
         if self.db is None:
             self.db = db
 
@@ -212,11 +212,11 @@ class WatcherService:
 
 
 def get_watcher_service(
-    request: Request, db: AsyncDatabase = Depends(get_db)
+    request: Request, db: AsyncClient = Depends(get_terminus_client)
 ) -> WatcherService:
     service = getattr(request.app.state, "watcher_service", None)
     if service is None:
-        service = WatcherService()
+        service = WatcherService(db)
         request.app.state.watcher_service = service
     service.set_db(db)
     return service

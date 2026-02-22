@@ -59,7 +59,7 @@ async def get_terminus_client() -> AsyncClient:
     return _client
 
 
-async def get_db() -> AsyncClient:
+async def get_terminus_client() -> AsyncClient:
     """FastAPI dependency — returns the async TerminusDB client."""
     return await get_terminus_client()
 

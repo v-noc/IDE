@@ -257,7 +257,7 @@ class AsyncClient(
         self._session = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
             follow_redirects=False,
-            limits=httpx.Limits(max_connections=20),
+            limits=httpx.Limits(max_connections=30),
 
         )
         self._connected = True

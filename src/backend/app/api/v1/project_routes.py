@@ -5,9 +5,8 @@ from typing import Optional
 from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.builder.tree_builder import TreeBuilder
-from app.db.client import get_db
-from arangoasync.database import AsyncDatabase
-from app.core.repository import Repositories
+from app.db.client import get_terminus_client
+
 from app.core.services.project_service import ProjectService
 from app.api.dependencies import get_project_service
 from pathlib import Path
@@ -15,6 +14,7 @@ from app.core.watcher.service import WatcherService, get_watcher_service
 from loguru import logger
 import time
 from app.core.model.nodes import ProjectNode
+from app.db.async_terminus_client import AsyncClient
 
 
 class CreateProjectRequest(BaseModel):
@@ -34,7 +34,7 @@ router = APIRouter()
 @router.post("/", response_model=ProjectTreeNode)
 async def create_project(
     project: CreateProjectRequest,
-    db: AsyncDatabase = Depends(get_db),
+    db: AsyncClient = Depends(get_terminus_client),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectTreeNode:
     """Create a project graph from a local path.
@@ -54,13 +54,12 @@ async def create_project(
         )
 
     try:
-        project_node = ProjectNode(
+
+        project_node = await project_service.create(
             name=project.name,
             description=project.description or "",
-            qname=project.name.lower().replace(" ", "_"),
             path=project.path,
         )
-        project_node = await project_service.create_node(project_node)
         start_time = time.time()
         orchestrator = GraphBuilderOrchestrator(
             project_node=project_node,
@@ -83,7 +82,7 @@ async def create_project(
         logger.exception(f"Failed to build project graph: {exc}")
         raise
 
-    children = await project_service.get_children(project_node.id)
+    children = await project_service.get_children(project_node.db_name)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -152,7 +151,7 @@ async def delete_project(
     if project:
         result = await project_service.delete(project)
         if result is False:
-             raise HTTPException(
+            raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to delete project {project_id}"
             )
