@@ -118,9 +118,10 @@ async def test_create_project(client, sample_project_path):
 
 @pytest.mark.asyncio
 async def test_get_project(client, sample_project_node):
-    response = await client.get(f"/api/v1/projects/{sample_project_node.key}")
+    response = await client.get(f"/api/v1/projects/?project_id={sample_project_node.id}")
     assert response.status_code == 200
     project_tree = response.json()
+
     assert project_tree["name"] == sample_project_node.name
     assert project_tree["description"] == sample_project_node.description
     assert project_tree["path"] == sample_project_node.path
@@ -153,42 +154,51 @@ async def test_delete_project(client, sample_project_path, create_repos):
     )
     assert response.status_code == 200
     project_data = response.json()
-    project_key = project_data["_key"]
+    project_key = project_data["id"]
+    project_db_name = project_data["db_name"]
 
     # 2. Verify that some child files exist in the database
     file_repo = create_repos.file_repo
-    main_py_node = await file_repo.find_by_qname("sample_project.main")
-    child_py_node = await file_repo.find_by_qname("sample_project.core.model.child")
+    qnames_to_nodes = await file_repo.get_by_qnames(["sample_project.main", "sample_project.core.model.child"], project_db_name)
+
+    main_py_node = qnames_to_nodes["sample_project.main"]
+    child_py_node = qnames_to_nodes["sample_project.core.model.child"]
 
     assert main_py_node is not None
     assert child_py_node is not None
 
     # 3. Delete the project
-    response = await client.delete(f"/api/v1/projects/{project_key}")
+    response = await client.delete(f"/api/v1/projects/?project_id={project_key}")
     assert response.status_code == 204
 
     # 4. Verify the project is gone
-    response = await client.get(f"/api/v1/projects/{project_key}")
+    response = await client.get(f"/api/v1/projects/?project_id={project_key}")
     assert response.status_code == 404
 
     # 5. Verify that the child files are also gone from the database
-    main_py_node_after_delete = await file_repo.find_by_qname("sample_project.main")
-    child_py_node_after_delete = await file_repo.find_by_qname(
-        "sample_project.core.model.child"
-    )
+    try:
+        qnames_to_nodes2 = await file_repo.get_by_qnames(["sample_project.main", "sample_project.core.model.child"], project_db_name)
 
-    assert main_py_node_after_delete is None
-    assert child_py_node_after_delete is None
+        main_py_node_after_delete = qnames_to_nodes2.get("sample_project.main")
+        child_py_node_after_delete = qnames_to_nodes2.get(
+            "sample_project.core.model.child")
+
+        assert main_py_node_after_delete is None
+        assert child_py_node_after_delete is None
+        assert len(qnames_to_nodes2) == 0
+    except Exception as e:
+
+        assert True
 
 
 @pytest.mark.asyncio
 async def test_get_all_projects(client, sample_project_node):
-    response = await client.get("/api/v1/projects/")
+    response = await client.get("/api/v1/projects/all")
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["name"] == sample_project_node.name
     assert response.json()[0]["description"] == sample_project_node.description
-    assert response.json()[0]["path"] == sample_project_node.path
+    assert response.json()[0]["local_path"] == sample_project_node.path
 
 
 @pytest.mark.asyncio

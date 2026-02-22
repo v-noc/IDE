@@ -117,7 +117,6 @@ class GraphBuilderOrchestrator:
         # Initialize progress tracker
         socket_manager = get_socket_manager()
         progress_tracker = ProgressTracker(project_id, socket_manager)
-        current_db = self.db.db
         await self.db.set_db(self.project_node.db_name)
 
         try:
@@ -161,8 +160,7 @@ class GraphBuilderOrchestrator:
             progress_tracker.set_error(str(e))
             await progress_tracker.emit(force=True)
             raise
-        finally:
-            await self.db.set_db(current_db)
+
         # 4. Emit project:updated socket event after successful sync
         try:
             socket_manager = get_socket_manager()

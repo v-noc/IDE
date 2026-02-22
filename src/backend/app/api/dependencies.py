@@ -23,7 +23,7 @@ def get_group_service(
 def get_project_service(
     db: AsyncClient = Depends(get_terminus_client),
 ) -> ProjectService:
-    repos = Repositories(db)
+    repos = Repositories(db.clone())
     return ProjectService(repos)
 
 

@@ -393,9 +393,9 @@ class BaseRepo(Generic[TNode, TSchema]):
             )
         )
 
-        async with self.session(project_db_name):
+        async with self.session(project_db_name) as new_client:
             try:
-                result = await self.client.query(query)
+                result = await new_client.query(query)
 
             except Exception as exc:
                 print(exc)
@@ -423,9 +423,9 @@ class BaseRepo(Generic[TNode, TSchema]):
             )
         )
 
-        async with self.session(project_db_name):
+        async with self.session(project_db_name) as new_client:
             try:
-                result = await self.client.query(query)
+                result = await new_client.query(query)
 
             except Exception as exc:
                 print(exc)

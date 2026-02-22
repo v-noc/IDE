@@ -35,6 +35,16 @@ SCHEMA_TO_TREE = {
     "StructureGroupNode": GroupTreeNode,
 }
 
+# Schema @type or Node class -> node_type for GroupTreeNode
+GROUP_SCHEMA_TO_NODE_TYPE = {
+    "CodeElementGroupSchema": "code_element_group",
+    "CallGroupSchema": "call_group",
+    "StructureGroupSchema": "structure_group",
+    "CodeElementGroupNode": "code_element_group",
+    "CallGroupNode": "call_group",
+    "StructureGroupNode": "structure_group",
+}
+
 
 class TreeBuilder:
     def __init__(self, flat_nodes: List[Any]):
@@ -98,6 +108,16 @@ class TreeBuilder:
             # Exclude children: raw nodes have string IDs; tree expects nested nodes
             validate_d = {k: v for k, v in d.items() if k != "children"}
             validate_d["children"] = []
+            if model_cls == GroupTreeNode:
+                schema = d.get("@type") or getattr(item, "__class__", None)
+                if isinstance(schema, str):
+                    node_type = GROUP_SCHEMA_TO_NODE_TYPE.get(schema)
+                elif schema is not None:
+                    node_type = GROUP_SCHEMA_TO_NODE_TYPE.get(schema.__name__)
+                else:
+                    node_type = None
+                if node_type is not None:
+                    validate_d["node_type"] = node_type
             node = model_cls.model_validate(validate_d)
             self.nodes_map[node.id] = node
             child_ids_by_parent[node.id] = self._child_ids(d)

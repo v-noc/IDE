@@ -73,4 +73,4 @@ async def create_repos(terminusdb_client):
     """
     from app.core.repository import Repositories
 
-    return Repositories(terminusdb_client)
+    return Repositories(terminusdb_client.clone())

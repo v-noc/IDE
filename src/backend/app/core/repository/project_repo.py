@@ -21,14 +21,15 @@ class ProjectRepo():
 
             return True
 
-        current_db = self.client.db
+        clone_client = self.client.clone()
 
         try:
-            await self.client.delete_database(project["db_name"])
-            await self.client.set_db(current_db)
+            await clone_client.delete_database(project["db_name"])
             await self.client.delete_document(project, commit_msg=f"Deleting project {project_id}")
+
             return True
         except DatabaseError as e:
+
             if e.error_obj.get("api.error", {}).get("@type", "") == "api:DatabaseNotFound":
                 raise ValueError(f"Database {project_id} not found")
             else:
@@ -36,20 +37,19 @@ class ProjectRepo():
 
     async def create(self, name, description, path):
 
-        current_db = self.client.db
         db_name = slugify(name)
+        clone_db = self.client.clone()
+
         try:
-            await self.client.create_database(db_name, label=db_name, description="V-NOC code analysis graph")
+            await clone_db.create_database(db_name, label=db_name, description="V-NOC code analysis graph")
         except DatabaseError as e:
             if e.error_obj.get("api:error", {}).get("@type", "") == "api:DatabaseAlreadyExists":
                 db_name = f"{db_name}_{datetime.now().strftime("%Y%m%d%H%M%S")}"
-                await self.client.create_database(db_name, label=db_name, description="V-NOC code analysis graph")
+                await clone_db.create_database(db_name, label=db_name, description="V-NOC code analysis graph")
             else:
                 raise e
-
-        await ensure_schema(self.client, f"{name} Schema", description, [f"{name} Team"])
-        await self.client.set_db(current_db)
-        print(f" current database {current_db}")
+        print(f"clone_db--: {self.client.db} {clone_db.db}")
+        await ensure_schema(clone_db, f"{name} Schema", description, [f"{name} Team"])
 
         project = ProjectSchema(
             _id=f"{db_name}",
@@ -84,8 +84,7 @@ class ProjectRepo():
             else:
                 raise e
         except Exception as e:
-            import traceback
-            print(traceback.format_exc())
+            print(f"error getting project by id: {e}")
             return None
 
     async def get_all(self):

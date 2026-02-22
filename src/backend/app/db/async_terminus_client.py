@@ -381,6 +381,7 @@ class AsyncClient(
         cloned = AsyncClient(server_url=server_url, user_agent=user_agent)
 
         cloned.team = overrides.pop("team", self.team)
+
         cloned.db = overrides.pop("db", self.db)
         cloned.user = overrides.pop("user", self.user)
         cloned.branch = overrides.pop("branch", self.branch)

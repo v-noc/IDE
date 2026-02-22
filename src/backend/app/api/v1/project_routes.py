@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -61,12 +61,14 @@ async def create_project(
             path=project.path,
         )
         start_time = time.time()
+        clone_db = db.clone()
         orchestrator = GraphBuilderOrchestrator(
             project_node=project_node,
-            db=db,
+            db=clone_db,
 
         )
         await orchestrator.resync()
+        print(f"clone_db: {db.db}")
         end_time = time.time()
         print(f"Time taken to resync: {end_time - start_time} seconds")
     except FileNotFoundError as exc:
@@ -91,38 +93,14 @@ async def create_project(
     return project_tree
 
 
-@router.get("/", response_model=list[ProjectNode])
-async def get_projects(
-    project_service: ProjectService = Depends(get_project_service),
-) -> list[AnyTreeNode]:
-    projects = await project_service.get_all()
-
-    return projects
-
-
-@router.get("/{project_id}/children", response_model=list[AnyTreeNode])
-async def get_project_children(
-    project_id: str,
-    exclude_groups: bool = False,
-    project_service: ProjectService = Depends(get_project_service),
-) -> list[AnyTreeNode]:
-    project_node = await project_service.get(project_id)
-    children = await project_service.get_children(
-        project_node.id, exclude_groups=exclude_groups)
-
-    tree_builder = TreeBuilder(children)
-    tree = tree_builder.build()
-
-    return tree
-
-
-@router.get("/{project_id}", response_model=ProjectTreeNode)
+@router.get("/", response_model=ProjectTreeNode)
 async def get_project(
-    project_id: str,
+    project_id: str = Query(..., description="The ID of the project to get"),
     exclude_groups: bool = False,
     project_service: ProjectService = Depends(get_project_service),
     watcher_service: WatcherService = Depends(get_watcher_service),
 ) -> ProjectTreeNode:
+
     project_node = await project_service.get(project_id)
     if project_node is None:
         raise HTTPException(
@@ -133,7 +111,7 @@ async def get_project(
     watcher_service.start_watching(project_node)
 
     children = await project_service.get_children(
-        project_node.id, exclude_groups=exclude_groups)
+        project_node.db_name, exclude_groups=exclude_groups)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -142,14 +120,29 @@ async def get_project(
     return project_tree
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.get("/all", response_model=list[ProjectNode])
+async def get_projects(
+    project_service: ProjectService = Depends(get_project_service),
+) -> list[AnyTreeNode]:
+
+    projects = await project_service.get_all()
+
+    return projects
+
+
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
-    project_id: str,
+    project_id: str = Query(...,
+                            description="The ID of the project to delete"),
+
     project_service: ProjectService = Depends(get_project_service),
 ):
+
     project = await project_service.get(project_id=project_id)
+
     if project:
-        result = await project_service.delete(project)
+        result = await project_service.delete(project_id)
+
         if result is False:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
