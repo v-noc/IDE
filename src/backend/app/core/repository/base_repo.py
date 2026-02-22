@@ -73,6 +73,7 @@ class BaseRepo(Generic[TNode, TSchema]):
                 await new_client.insert_document(schemas, commit_msg=commit_msg)
             except Exception as exc:
                 print("error inserting document", exc)
+                return None
 
         if raw:
             return schemas
@@ -136,7 +137,7 @@ class BaseRepo(Generic[TNode, TSchema]):
         node: TNode,
         project_db_name: str,
         commit_msg: str,
-        update_schema: Callable[[dict[str, Any], TNode, TSchema], None],
+        update_schema: Callable[[dict[str, Any], TNode, TSchema], None] = None,
         branch_name: Optional[str] = None,
     ):
         existing_raw = await self.get_by_id(node.id, project_db_name, raw=True)
@@ -144,7 +145,8 @@ class BaseRepo(Generic[TNode, TSchema]):
             return None
 
         schema = self._to_schema(node)
-        update_schema(existing_raw, node, schema)
+        if update_schema:
+            update_schema(existing_raw, node, schema)
         self.touch_updated_at(schema)
 
         async with self.session(project_db_name, branch_name=branch_name) as new_client:

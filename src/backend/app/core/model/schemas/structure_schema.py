@@ -178,3 +178,6 @@ class ProjectSchema(BaseSchema):
     db_name: str
     local_path: str
     remote_path: Optional[str]
+
+    documents: Set[DocumentSchema]
+    theme_config: Optional[ThemeConfigSchema]

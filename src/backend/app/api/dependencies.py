@@ -1,4 +1,4 @@
-from fastapi import Depends, Query
+from fastapi import Depends, Query, HTTPException
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 
@@ -55,7 +55,7 @@ async def get_function_service(
     project_id: str = Query(..., description="The ID of the project to get"),
     db: AsyncClient = Depends(get_terminus_client),
 ) -> FunctionService:
-    print(f"project_id: {project_id}")
+
     project = await project_service.get(project_id)
     project = ProjectNode.from_raw_dict(project)
     repos = Repositories(db)
@@ -76,8 +76,15 @@ def get_log_service(
     return LogService(repos)
 
 
-def get_document_service(
+async def get_document_service(
     db: AsyncClient = Depends(get_terminus_client),
+    project_service: ProjectService = Depends(get_project_service),
+    project_id: str = Query(..., description="The ID of the project to get"),
 ) -> DocumentService:
+
+    project = await project_service.get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = ProjectNode.from_raw_dict(project)
     repos = Repositories(db)
-    return DocumentService(repos)
+    return DocumentService(repos, project)

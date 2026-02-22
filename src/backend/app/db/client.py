@@ -7,7 +7,7 @@ management for use with FastAPI.
 
 from .async_terminus_client import AsyncClient
 from ..config.settings import get_settings
-from app.core.model.schemas import ProjectSchema, BaseSchema, TerminusBase
+from app.core.model.schemas import DocumentSchema, ProjectSchema, BaseSchema, TerminusBase, ThemeConfigSchema
 from app.db.woqlschema import *
 
 _client: AsyncClient | None = None
@@ -21,6 +21,8 @@ async def migrate_base(client):
     )
     schema_obj.add_obj(TerminusBase.__name__, TerminusBase)
     schema_obj.add_obj(BaseSchema.__name__, BaseSchema)
+    schema_obj.add_obj(DocumentSchema.__name__, DocumentSchema)
+    schema_obj.add_obj(ThemeConfigSchema.__name__, ThemeConfigSchema)
     schema_obj.add_obj(ProjectSchema.__name__, ProjectSchema)
     await schema_obj.commit(client, "Add ProjectSchema to schema", full_replace=True)
 

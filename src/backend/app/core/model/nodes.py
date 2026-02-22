@@ -65,6 +65,14 @@ class BaseNode(BaseModel):
 class DocumentNode(BaseNode):
     data: str = Field(..., description="The data of the document.")
 
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        return DocumentNode(
+            **base.model_dump(),
+            data=raw_dict["data"],
+        )
+
 
 class ProjectNode(BaseNode):
     local_path: str = Field(..., description="The local path of the project.")

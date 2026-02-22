@@ -26,13 +26,13 @@ class DocumentRepo(BaseRepo[DocumentNode, DocumentSchema]):
                 print(exc)
                 return []
 
-        return [self._to_node(item_raw) for item_raw in items_raw]
+        return [DocumentNode.from_raw_dict(item_raw) for item_raw in items_raw]
 
     async def add_to_parent_node(self, document_id: str, node_id: str, project_db_name: str, branch_name: Optional[str] = None):
         await self.move_item_by_type(node_id, document_id, "document", {"document": "documents"}, project_db_name, branch_name=branch_name)
 
     async def update(self, document: DocumentNode, project_db_name: str, branch_name: Optional[str] = None):
-        await self.update_node(document, project_db_name, branch_name=branch_name)
+        return await self.update_node(document, project_db_name, branch_name=branch_name, commit_msg=f"Updating document {document.id}", )
 
     async def delete(self, document_id: str, project_db_name: str, branch_name: Optional[str] = None):
         await self.delete_with_parent_cleanup(document_id, "documents", project_db_name, f"Deleting document {document_id}", branch_name=branch_name)
