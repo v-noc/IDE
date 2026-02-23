@@ -63,7 +63,7 @@ const CreateProjectDialog = ({
   const onSubmit = (data: FormValues) => {
     createProject(data, {
       onSuccess(data) {
-        const key = data._key;
+        const key = data.id;
         console.log("project ket", key);
         setTimeout(() => navigate(`/project/${key}`));
       },
@@ -109,7 +109,7 @@ const CreateProjectDialog = ({
       if (tomlFile) {
         // Find the actual File object from the files array
         const tomlFileObject = allFiles.find(
-          (file) => file.name === "v-noc.toml"
+          (file) => file.name === "v-noc.toml",
         );
         if (tomlFileObject) {
           const tomlContent = await new Promise<string>((resolve, reject) => {
@@ -193,7 +193,7 @@ const CreateProjectDialog = ({
           <div className="flex justify-end gap-3">
             <Button
               variant="outline"
-            // onClick={() => setIsImportDialogOpen(false)}
+              // onClick={() => setIsImportDialogOpen(false)}
             >
               Cancel
             </Button>

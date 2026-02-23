@@ -49,7 +49,7 @@ const SelectNodeDialog = ({
       const children = Array.isArray(rawChildren)
         ? (rawChildren as unknown[])
             .filter(
-              (child: unknown) => (child as AnyNodeTree).node_type !== "call"
+              (child: unknown) => (child as AnyNodeTree).node_type !== "call",
             )
             .map((child) => toTreeDataItem(child as AnyNodeTree))
         : undefined;
@@ -62,7 +62,7 @@ const SelectNodeDialog = ({
       );
 
       return {
-        id: node._key,
+        id: node.id,
         name: `${node.name} (${node.node_type})`,
         icon: IconComp,
         children,
@@ -73,7 +73,7 @@ const SelectNodeDialog = ({
         },
       };
     },
-    [selectNodeType]
+    [selectNodeType],
   );
 
   const treeData = useMemo<TreeDataItem[]>(() => {
@@ -84,7 +84,7 @@ const SelectNodeDialog = ({
       return pipe(
         list,
         rFilter((n: AnyNodeTree) => n.node_type !== "call"),
-        rMap(toTreeDataItem)
+        rMap(toTreeDataItem),
       );
     }
 
@@ -95,7 +95,7 @@ const SelectNodeDialog = ({
 
     const flattenAll = (
       nodes: AnyNodeTree[],
-      parents: string[] = []
+      parents: string[] = [],
     ): FlatRecord[] =>
       nodes.flatMap((n) => {
         // Exclude call nodes and their subtrees
@@ -114,7 +114,7 @@ const SelectNodeDialog = ({
     const matches = flat.filter(
       (r) =>
         r.node.node_type !== "call" &&
-        r.node.name.toLowerCase().includes(queryLc)
+        r.node.name.toLowerCase().includes(queryLc),
     );
 
     return matches.map((r) => {
@@ -127,7 +127,7 @@ const SelectNodeDialog = ({
       const parentsTail = r.parents.slice(-2);
       const pathText = parentsTail.join(" / ");
       return {
-        id: r.node._key,
+        id: r.node.id,
         name: `${r.node.name} (${r.node.node_type})`,
         subtitle: pathText,
         icon: IconComp,

@@ -7,7 +7,7 @@ import type { ProjectNode, ProjectNodeTree } from '@/types/project';
 
 // API functions using the new client
 export const fetchProjects = (): Promise<ProjectNode[]> => {
-  return api(API_ROUTES.PROJECTS);
+  return api(`${API_ROUTES.PROJECTS}all`);
 };
 
 export const createProject = (newProject: { name: string; description: string; path: string }): Promise<ProjectNodeTree> => {

@@ -102,9 +102,9 @@ export function DocumentEditor({
             updateMutation.mutate({ id: payload.id, data: payload.data });
           }
         },
-        { waitMs: debounceMs }
+        { waitMs: debounceMs },
       ),
-    [autoSave, nodeId, debounceMs, updateMutation]
+    [autoSave, nodeId, debounceMs, updateMutation],
   );
 
   // Load content when document changes
@@ -168,7 +168,7 @@ export function DocumentEditor({
               block &&
               typeof block === "object" &&
               block !== null &&
-              "id" in block
+              "id" in block,
           );
 
           if (isValidBlocks) {
@@ -202,7 +202,7 @@ export function DocumentEditor({
     };
 
     loadContent();
-  }, [editor, document, document?._key, document?.data]);
+  }, [editor, document, document?.id, document?.data]);
 
   // Handle content changes
   const handleChange = async (currentEditor: typeof editor) => {
@@ -214,9 +214,9 @@ export function DocumentEditor({
     onChange?.(jsonData);
 
     // Auto-save if enabled and document exists
-    if (autoSave && document?._key && nodeId) {
+    if (autoSave && document?.id && nodeId) {
       saveDocumentDebounced.call({
-        id: document._key,
+        id: document.id,
         data: jsonData,
       });
     }

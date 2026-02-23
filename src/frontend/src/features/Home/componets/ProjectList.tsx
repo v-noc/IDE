@@ -21,7 +21,7 @@ import {
   Trash,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { truncatePath } from "@/utils";
+import { idPrefixRemover, truncatePath } from "@/utils";
 import type { ProjectNode } from "@/types/project";
 import { useDeleteProject } from "../hook/useProject";
 import { formatDate } from "date-fns";
@@ -40,14 +40,14 @@ const ProjectList = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
           <Card
-            key={project._key}
+            key={project.id}
             className="hover:shadow-md transition-shadow p-4 cursor-pointer"
-            onClick={() => navigate(`/project/${project._key}`)}
+            onClick={() => navigate(`/project/${idPrefixRemover(project.id)}`)}
           >
             <CardHeader className="p-0 ">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Folder className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  <Folder className="h-5 w-5 text-muted-foreground shrink-0" />
                   <CardTitle className="text-lg truncate">
                     {project.name}
                   </CardTitle>
@@ -70,7 +70,7 @@ const ProjectList = ({
                     <DropdownMenuItem
                       onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
-                        deleteProject(project._key);
+                        deleteProject(idPrefixRemover(project.id));
                       }}
                     >
                       <Trash className="h-4 w-4 mr-2" />
@@ -82,7 +82,7 @@ const ProjectList = ({
             </CardHeader>
             <CardContent className="p-0">
               <p className="text-xs text-muted-foreground mb-3 font-mono break-all">
-                {truncatePath(project.path, 40)}
+                {truncatePath(project.local_path, 40)}
               </p>
               <CardDescription className="mb-4 line-clamp-2">
                 {project.description}
@@ -107,9 +107,9 @@ const ProjectList = ({
     <div className="space-y-4">
       {projects.map((project) => (
         <Card
-          key={project._key}
+          key={project.id}
           className="hover:shadow-md transition-shadow p-4 cursor-pointer"
-          onClick={() => navigate(`/project/${project._key}`)}
+          onClick={() => navigate(`/project/${idPrefixRemover(project.id)}`)}
         >
           <CardContent className="p-2">
             <div className="flex items-start justify-between">
@@ -121,7 +121,7 @@ const ProjectList = ({
                   </h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-2 font-mono">
-                  {truncatePath(project.path)}
+                  {truncatePath(project.local_path)}
                 </p>
                 <p className="text-sm text-muted-foreground mb-3">
                   {project.description}
@@ -151,7 +151,7 @@ const ProjectList = ({
                   <DropdownMenuItem
                     onClick={(e: React.MouseEvent) => {
                       e.preventDefault();
-                      deleteProject(project._key);
+                      deleteProject(idPrefixRemover(project.id));
                     }}
                   >
                     <Trash className="h-4 w-4 mr-2" />

@@ -65,7 +65,6 @@ class JediParser:
         return None
 
     def _scan_children(self, scope_node) -> List[BaseNode]:
-        children = []
 
         nodes = []
 
@@ -155,18 +154,6 @@ class JediParser:
         return ""
 
     def _visit_call(self, node) -> List[CallNode]:
-        # node is an atom_expr.
-        # children[0] is the atom (Name) or another atom_expr.
-        # We want the code up to the call trailer.
-        # Simplified: just get the code of the atom part.
-
-        # If it's `a.b()`, children are [atom(a), trailer(.b), trailer(())]
-        # Wait, `a.b` is an atom_expr? No.
-        # `a.b` is `atom_expr(atom(a), trailer(.b))`
-        # `a.b()` is `atom_expr(atom(a), trailer(.b), trailer(())`
-
-        # We want the name to be `a.b`.
-        # We can reconstruct it from children excluding the last trailer (the call parens).
 
         call_nodes: List[CallNode] = []
         prefix_children = []

@@ -20,12 +20,6 @@ async def lifespan(app: FastAPI):
     # Startup
     # setup_logging()
     db = await get_terminus_client()
-    try:
-        await db.properties()
-        print("✅ Database connection established successfully")
-    except Exception as e:
-        print(f"❌ Database connection failed: {e}")
-        raise
 
     # Initialize a process-wide watcher service singleton
     watcher_service = WatcherService()

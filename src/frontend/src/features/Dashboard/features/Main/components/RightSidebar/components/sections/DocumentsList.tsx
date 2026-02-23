@@ -27,16 +27,20 @@ import type { CallNodeTree } from "@/types/project";
 const DocumentsList: React.FC = () => {
   const activeTabId = useTabStore((s) => s.activeTabId);
   const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
-  const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[activeTabId]);
-  const selectedDocumentId = useProjectStore((s) => s.selectedDocumentId[activeTabId]);
+  const secondarySelectedNode = useProjectStore(
+    (s) => s.secondarySelectedNode[activeTabId],
+  );
+  const selectedDocumentId = useProjectStore(
+    (s) => s.selectedDocumentId[activeTabId],
+  );
   const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
   const nodeKey = useMemo(() => {
     if (secondarySelectedNode) {
       return (secondarySelectedNode as CallNodeTree).target
-        ? (secondarySelectedNode as CallNodeTree)?.target?._key ?? ""
-        : secondarySelectedNode._key;
+        ? ((secondarySelectedNode as CallNodeTree)?.target?.id ?? "")
+        : secondarySelectedNode.id;
     }
-    return selectedNode?._key;
+    return selectedNode?.id;
   }, [selectedNode, secondarySelectedNode]);
   const { data: docs = [], isLoading } = useDocuments(nodeKey ?? undefined);
   const createMutation = useCreateDocument();
@@ -59,7 +63,7 @@ const DocumentsList: React.FC = () => {
   };
 
   const startEdit = (doc: DocumentData) => {
-    setEditingId(doc._key);
+    setEditingId(doc.id);
     setFormName(doc.name);
     setFormDesc(doc.description);
     setOpen(true);
@@ -89,7 +93,7 @@ const DocumentsList: React.FC = () => {
   const onDelete = async (doc: DocumentData) => {
     if (!canUseDocs) return;
     await deleteMutation.mutateAsync({
-      documentId: doc._key,
+      documentId: doc.id,
       nodeId: nodeKey ?? "",
     });
     // Cache updates are handled automatically by mutations
@@ -178,16 +182,15 @@ const DocumentsList: React.FC = () => {
         ) : (
           docs.map((doc) => (
             <Card
-              key={doc._key}
+              key={doc.id}
               className={
                 "p-3 shadow-none rounded-sm hover:cursor-pointer transition " +
-                (selectedDocumentId === doc._key
+                (selectedDocumentId === doc.id
                   ? "ring-2 ring-primary ring-offset-1"
                   : "")
               }
               onClick={() => {
-
-                setSelectedDocumentId(activeTabId, doc._key);
+                setSelectedDocumentId(activeTabId, doc.id);
                 useProjectStore.getState().setDocSidebarOpen(activeTabId, true);
               }}
             >

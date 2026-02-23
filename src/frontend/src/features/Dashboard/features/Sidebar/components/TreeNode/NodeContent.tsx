@@ -45,14 +45,14 @@ export const NodeContent = memo(function NodeContent({
             "mx-1 my-0.5",
             nestingLevel > 0 && "ml-2",
             isSelected && "ring-1 ring-blue-500/80",
-            isActive && "ring-2 ring-blue-600"
+            isActive && "ring-2 ring-blue-600",
           )}
           style={{
             backgroundColor: style.backgroundColor,
             color: style.color,
             borderColor: style.borderColor,
           }}
-          data-node-key={node._key}
+          data-node-key={node.id}
         >
           <NodeRow
             node={node}

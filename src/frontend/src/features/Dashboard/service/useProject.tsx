@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import queryKeys from "@/lib/queryKeys";
 
 const getProjectTreeWithKey = async (key: string): Promise<ProjectNodeTree> => {
-  const response = await api(`${API_ROUTES.PROJECTS}${key}`);
+  const response = await api(`${API_ROUTES.PROJECTS}?project_id=${key}`);
   return response as ProjectNodeTree;
 };
 export const useGetProjectTreeWithKeyProject = ({ key }: { key: string }) => {

@@ -48,7 +48,7 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
     if (secondarySelectedNode) {
       setSecondarySelectedNode(tabId, null);
     }
-    if (selectedNode?._key === nodeId) return;
+    if (selectedNode?.id === nodeId) return;
 
     const node = getNode();
     if (!node) return;
@@ -59,7 +59,7 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
   const handleFocus = useCallback(() => {
     if (!nodeId) return;
     const lastFocused = focusStack[focusStack.length - 1];
-    if (lastFocused?._key === nodeId) return;
+    if (lastFocused?.id === nodeId) return;
 
     const node = getNode();
     if (!node) return;

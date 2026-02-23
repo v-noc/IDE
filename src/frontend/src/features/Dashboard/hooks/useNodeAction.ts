@@ -9,23 +9,23 @@ import type { AnyNodeTree, ContainerNodeTree, CallNodeTree } from '@/types/proje
  * Only initialize mutations when needed.
  */
 export function useTreeNodeActions(node: ContainerNodeTree) {
-  const projectKey = useProjectStore((s) => s.projectData?._key ?? '');
+  const projectKey = useProjectStore((s) => s.projectData?.id ?? '');
 
   // Lazy initialization - only create mutations when called
-  const addCall = useAddCall(node?._key ?? '', projectKey);
+  const addCall = useAddCall(node?.id ?? '', projectKey);
   const removeCall = useRemoveCall(projectKey);
-  const deleteGroup = useDeleteGroup(node?._key ?? '', projectKey);
+  const deleteGroup = useDeleteGroup(node?.id ?? '', projectKey);
 
   const handleAddCall = useCallback((targetNode: AnyNodeTree) => {
     addCall.mutate({
-      callee_target_id: targetNode._key,
+      callee_target_id: targetNode.id,
       name: targetNode.name,
       description: targetNode.description,
     });
   }, [addCall]);
 
   const handleRemoveCall = useCallback((callNode: CallNodeTree) => {
-    removeCall.mutate(callNode._key);
+    removeCall.mutate(callNode.id);
   }, [removeCall]);
 
   const handleDeleteGroup = useCallback(() => {

@@ -20,11 +20,11 @@ export interface UsePromptBuilderState {
 }
 
 export const usePromptBuilder = (rootNode: ContainerNodeTree): UsePromptBuilderState => {
-  const [checked, setChecked] = useState<Record<string, boolean>>({ [rootNode._key]: true });
+  const [checked, setChecked] = useState<Record<string, boolean>>({ [rootNode.id]: true });
   const [includeDocs, setIncludeDocs] = useState<Record<string, boolean>>({});
   const [includeCode, setIncludeCode] = useState<Record<string, boolean>>({});
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ [rootNode._key]: true });
-  const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(rootNode._key);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ [rootNode.id]: true });
+  const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(rootNode.id);
   const [documentsByNode, setDocumentsByNode] = useState<Record<string, DocumentData[]>>({});
   const [codeByNode, setCodeByNode] = useState<Record<string, string>>({});
 
@@ -45,7 +45,7 @@ export const usePromptBuilder = (rootNode: ContainerNodeTree): UsePromptBuilderS
   }, []);
 
   const findNodeByKey = useCallback((key: string, node: AnyNodeTree): AnyNodeTree | null => {
-    if (node._key === key) return node;
+    if (node.id === key) return node;
     for (const child of (node.children ?? []) as AnyNodeTree[]) {
       const found = findNodeByKey(key, child);
       if (found) return found;
@@ -57,7 +57,7 @@ export const usePromptBuilder = (rootNode: ContainerNodeTree): UsePromptBuilderS
   const wrapCdata = (text: string) => `<![CDATA[${text ?? ""}]]>`;
 
   const buildXml = useCallback((node: AnyNodeTree): string => {
-    if (!checked[node._key]) return "";
+    if (!checked[node.id]) return "";
     const attrs: string[] = [
       `name="${escapeAttr(node.name)}"`,
     ];
@@ -69,14 +69,14 @@ export const usePromptBuilder = (rootNode: ContainerNodeTree): UsePromptBuilderS
 
     const parts: string[] = [];
     // documents
-    if (includeDocs[node._key]) {
-      const docs = documentsByNode[node._key] ?? [];
+    if (includeDocs[node.id]) {
+      const docs = documentsByNode[node.id] ?? [];
       const docsXml = docs.map(d => `<doc name="${escapeAttr(d.name)}">${wrapCdata(d.data)}</doc>`).join("");
       parts.push(`<documents>${docsXml}</documents>`);
     }
     // code
-    if (includeCode[node._key] && supportsCode(node.node_type)) {
-      const code = codeByNode[node._key] ?? "";
+    if (includeCode[node.id] && supportsCode(node.node_type)) {
+      const code = codeByNode[node.id] ?? "";
       parts.push(`<code>${wrapCdata(code)}</code>`);
     }
 

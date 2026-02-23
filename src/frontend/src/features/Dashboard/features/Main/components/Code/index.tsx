@@ -14,7 +14,9 @@ interface EditorCodeProps {
 
 const EditorCode = ({ tabId }: EditorCodeProps) => {
   const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
-  const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[tabId]);
+  const secondarySelectedNode = useProjectStore(
+    (s) => s.secondarySelectedNode[tabId],
+  );
   const projectData = useProjectStore((s) => s.projectData);
   const effectiveNode = useMemo(() => {
     if (secondarySelectedNode) {
@@ -29,9 +31,9 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
     return selectedNode;
   }, [secondarySelectedNode, selectedNode]);
 
-  const elementId = effectiveNode?._key ?? "";
+  const elementId = effectiveNode?.id ?? "";
   const nodeType = effectiveNode?.node_type;
-  const projectId = projectData?._key;
+  const projectId = projectData?.id;
   const { data } = useCode(elementId, nodeType);
   const {
     editorValue,
@@ -45,7 +47,7 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
 
   const language = useMemo(
     () => detectLanguage(data?.file_name || data?.file_path || ""),
-    [data?.file_name, data?.file_path]
+    [data?.file_name, data?.file_path],
   );
 
   if (!elementId) {

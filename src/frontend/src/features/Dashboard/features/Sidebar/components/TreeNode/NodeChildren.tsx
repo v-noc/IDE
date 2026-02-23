@@ -20,7 +20,7 @@ export const NodeChildren = memo(function NodeChildren({
 }: NodeChildrenProps) {
   const sortedChildren = useMemo(() => {
     const filtered = (node.children ?? []).filter((n) =>
-      childFilter ? childFilter(n as ContainerNodeTree) : true
+      childFilter ? childFilter(n as ContainerNodeTree) : true,
     );
     return sortNodeChildren(filtered as ContainerNodeTree[], node.node_type);
   }, [node.children, node.node_type, childFilter]);
@@ -31,7 +31,7 @@ export const NodeChildren = memo(function NodeChildren({
     <ul className="pl-2 pt-1 space-y-1">
       {sortedChildren.map((child) => (
         <TreeNode
-          key={child._key}
+          key={child.id}
           node={child}
           tabId={tabId}
           nestingLevel={nestingLevel + 1}

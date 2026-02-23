@@ -6,15 +6,15 @@ import { useLogTree } from "@/services/logs";
  * Now uses the global consolidated logs service.
  */
 export function useLogsState(tabId: string) {
-    const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
-    const nodeId = selectedNode?._key || "";
+  const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
+  const nodeId = selectedNode?.id || "";
 
-    const { data: logs, isLoading } = useLogTree(nodeId);
+  const { data: logs, isLoading } = useLogTree(nodeId);
 
-    return {
-        logs: logs ?? [],
-        isLoading,
-        hasSelection: !!selectedNode,
-        nodeType: selectedNode?.node_type,
-    };
+  return {
+    logs: logs ?? [],
+    isLoading,
+    hasSelection: !!selectedNode,
+    nodeType: selectedNode?.node_type,
+  };
 }

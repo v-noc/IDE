@@ -2,8 +2,7 @@ import { api } from "@/lib/api";
 import API_ROUTES from '@/lib/apiRoutes';
 
 export interface DocumentData {
-  _id: string;
-  _key: string;
+  id: string;
   name: string;
   description: string;
   data: string;
@@ -26,10 +25,7 @@ export interface UpdateDocumentRequest {
 
 // Backend shape we receive from API
 interface BackendDocumentRaw {
-  _id?: string;
   id?: string;
-  _key?: string;
-  key?: string;
   name: string;
   description: string;
   data: string;
@@ -37,12 +33,8 @@ interface BackendDocumentRaw {
   updated_at: string;
 }
 
-const getKeyFromId = (id: string): string =>
-  id.includes("/") ? id.split("/").pop() as string : id;
-
 const mapBackendDocument = (d: BackendDocumentRaw): DocumentData => ({
-  _id: d._id ?? d.id!,
-  _key: d._key ?? d.key!,
+  id: d.id ?? "",
   name: d.name,
   description: d.description,
   data: d.data,
@@ -73,7 +65,7 @@ export const documentsApi = {
       description: payload.description,
       data: payload.data,
     } as Partial<Omit<UpdateDocumentRequest, "id">>;
-    const response = await api(`${API_ROUTES.DOCUMENTS}${key}`, {
+    const response = await api(`${API_ROUTES.DOCUMENTS}${payload.id}`, {
       method: "PUT",
       body: JSON.stringify(body),
     });

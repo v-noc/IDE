@@ -1,6 +1,6 @@
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
-import { useShallow } from 'zustand/react/shallow';
+import { useShallow } from "zustand/react/shallow";
 import { useMemo } from "react";
 import { TreeNode } from "../../../Sidebar/components/TreeNode";
 import {
@@ -16,8 +16,12 @@ type CallSidebarProps = {
 const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
   const activeTabId = useTabStore((s) => s.activeTabId);
   const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
-  const focusStack = useProjectStore(useShallow((s) => s.focusStack[activeTabId] ?? []));
-  const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
+  const focusStack = useProjectStore(
+    useShallow((s) => s.focusStack[activeTabId] ?? []),
+  );
+  const setSecondarySelectedNode = useProjectStore(
+    (s) => s.setSecondarySelectedNode,
+  );
 
   const callChildren = useMemo(() => {
     if (selectedNode && selectedNode.children) {
@@ -25,7 +29,7 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
         (node) =>
           node.node_type == "call" ||
           (node.node_type == "group" &&
-            (node as GroupNode).group_type == "call")
+            (node as GroupNode).group_type == "call"),
       );
     }
     if (focusStack.length > 0) {
@@ -33,7 +37,7 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
         (node) =>
           node.node_type == "call" ||
           (node.node_type == "group" &&
-            (node as GroupNode).group_type == "call")
+            (node as GroupNode).group_type == "call"),
       );
     }
 
@@ -57,7 +61,7 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
         ) : (
           callChildren.map((call_node) => (
             <TreeNode
-              key={call_node._key}
+              key={call_node.id}
               node={call_node as ContainerNodeTree}
               tabId={activeTabId}
               childFilter={(node) =>
@@ -65,7 +69,9 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
                 (node.node_type == "group" &&
                   (node as unknown as GroupNode).group_type == "call")
               }
-              onSelect={(n) => setSecondarySelectedNode(activeTabId, n as AnyNodeTree)}
+              onSelect={(n) =>
+                setSecondarySelectedNode(activeTabId, n as AnyNodeTree)
+              }
             />
           ))
         )}

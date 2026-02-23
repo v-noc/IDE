@@ -1,16 +1,16 @@
-import type { AnyNodeTree, ContainerNodeTree, CallNodeTree } from '@/types/project';
+import type { AnyNodeTree, ContainerNodeTree, CallNodeTree, ProjectNodeTree } from '@/types/project';
 
 export const findNodeByFunctionId = (
   root: AnyNodeTree,
   targetFunctionId: string
 ): AnyNodeTree | null => {
   // Check current node
-  if (root._id === targetFunctionId) return root;
+  if (root.id === targetFunctionId) return root;
 
   // Check if it's a CallNode and its target matches
   if (
     root.node_type === "call" &&
-    (root as CallNodeTree).target?._id === targetFunctionId
+    (root as CallNodeTree).target?.id === targetFunctionId
   ) {
     return root;
   }
@@ -30,12 +30,12 @@ export const findPathToNode = (
   targetId: string,
   path: string[] = []
 ): string[] | null => {
-  if (root._id === targetId) return path;
+  if (root.id === targetId) return path;
   if (root.children) {
     for (const child of root.children) {
       const result = findPathToNode(child as AnyNodeTree, targetId, [
         ...path,
-        root._id,
+        root.id,
       ]);
       if (result) return result;
     }
@@ -46,12 +46,12 @@ export const findPathToNode = (
 /**
  * Collect ancestor keys path to a target key (for auto-expansion)
  */
-export function collectAncestorKeys(root: AnyNodeTree, targetKey: string): string[] {
+export function collectAncestorKeys(root: ProjectNodeTree, targetKey: string): string[] {
   const path: string[] = [];
 
   const dfs = (node: AnyNodeTree): boolean => {
-    path.push(node._key);
-    if (node._key === targetKey) return true;
+    path.push(node.id);
+    if (node.id === targetKey) return true;
     if (node.children) {
       for (const child of node.children as AnyNodeTree[]) {
         if (dfs(child)) return true;
@@ -89,7 +89,7 @@ export function getParentNode(
   node: AnyNodeTree,
   root: ContainerNodeTree
 ): ContainerNodeTree | null {
-  if (root.children?.some((child) => child._key === node._key)) {
+  if (root.children?.some((child) => child.id === node.id)) {
     return root;
   }
   for (const child of root.children ?? []) {
@@ -112,7 +112,7 @@ export function getSiblings(
   const parentNode = getParentNode(node, root);
   if (!parentNode) return [];
   const children = parentNode.children ?? [];
-  return children.filter((child) => child._key !== node._key) as AnyNodeTree[];
+  return children.filter((child) => child.id !== node.id) as AnyNodeTree[];
 }
 
 /**
@@ -163,7 +163,7 @@ export function findNodeByFocusToken(
 
   while (stack.length > 0) {
     const node = stack.pop()!;
-    if (extractShortFocusToken(node._key) === token) return node;
+    if (extractShortFocusToken(node.id) === token) return node;
 
     const children = (node as { children?: AnyNodeTree[] }).children ?? [];
     stack.push(...[...children].reverse());

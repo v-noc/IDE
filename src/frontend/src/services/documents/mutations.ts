@@ -38,7 +38,7 @@ export const useUpdateDocument = (nodeId: string) => {
 
           let hasChanges = false;
           const updatedDocs = oldData.map((doc) => {
-            if (doc._key !== updatedDocument._key) {
+            if (doc.id !== updatedDocument.id) {
               return doc; // Return same reference for unchanged docs
             }
 

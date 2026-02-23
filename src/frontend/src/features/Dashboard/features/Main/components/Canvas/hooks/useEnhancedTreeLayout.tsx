@@ -26,17 +26,15 @@ interface UseEnhancedTreeLayoutProps {
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
- 
 }
 
 export const useEnhancedTreeLayout = ({
   centerNode,
-  
+
   expandedNodeIds,
   toggleNodeExpansion,
   nodeMetadataMap,
   layoutConfig: _layoutConfig,
-
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
 
@@ -67,7 +65,7 @@ export const useEnhancedTreeLayout = ({
       expandedNodeIds.length === 0 || expandedNodeIds.includes(nodeId);
 
     const mergeMetadata = (node: SimpleTreeNode): NodeMetadata | undefined => {
-      const mapped = metadataMap.get(node._key);
+      const mapped = metadataMap.get(node.id);
       return {
         ...mapped,
         ...(node.metadata ?? {}),
@@ -79,7 +77,7 @@ export const useEnhancedTreeLayout = ({
 
     // 2. Recursive Traversal to build the Graph Data (Nodes/Edges)
     const traverse = (node: SimpleTreeNode) => {
-      const nodeId = node._key;
+      const nodeId = node.id;
 
       // Prepare Node Data
       const nodeStyle = getNodeStyle(node as unknown as ContainerNodeTree);
@@ -95,7 +93,7 @@ export const useEnhancedTreeLayout = ({
           ) : (
             <DynamicIcon
               iconName={getIcons(
-                node.target ? node.target.node_type : node.node_type
+                node.target ? node.target.node_type : node.node_type,
               )}
             />
           ),
@@ -111,9 +109,10 @@ export const useEnhancedTreeLayout = ({
           nodeType: node.node_type,
           nodeId: nodeId,
           target: node.target,
-   
-       
-          manuallyCreated: (node as unknown as { manually_created?: boolean }).manually_created ?? false,
+
+          manuallyCreated:
+            (node as unknown as { manually_created?: boolean })
+              .manually_created ?? false,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,
@@ -129,7 +128,7 @@ export const useEnhancedTreeLayout = ({
       if (isExpanded(nodeId) && node.children && node.children.length > 0) {
         node.children.forEach((child: AnyNodeTree) => {
           const simpleChild = child as unknown as SimpleTreeNode;
-          const childId = simpleChild._key;
+          const childId = simpleChild.id;
 
           // Create Edge
           edges.push({
@@ -178,7 +177,7 @@ export const useEnhancedTreeLayout = ({
     // This prevents "orphaned" edges when nodes are collapsed/removed
     const nodeIds = new Set(layoutedNodes.map((node) => node.id));
     const validEdges = edges.filter(
-      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
+      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target),
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };

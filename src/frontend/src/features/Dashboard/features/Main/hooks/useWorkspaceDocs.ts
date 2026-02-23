@@ -15,73 +15,73 @@ import { useDocuments } from "@/services/documents";
  * Uses React 19 rules and useEffectEvent for non-reactive logic.
  */
 export function useWorkspaceDocs(
-    tabId: string,
-    effectiveNode: any,
-    selectedNode: any,
-    secondarySelectedNode: any
+  tabId: string,
+  effectiveNode: any,
+  selectedNode: any,
+  secondarySelectedNode: any
 ) {
-    const selectedDocumentId = useProjectStore((s) => s.selectedDocumentId[tabId]);
-    const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
+  const selectedDocumentId = useProjectStore((s) => s.selectedDocumentId[tabId]);
+  const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
 
-    const nodeKey = effectiveNode?._key || "";
-    const { data: documents = [] } = useDocuments(nodeKey);
+  const nodeKey = effectiveNode?.id || "";
+  const { data: documents = [] } = useDocuments(nodeKey);
 
-    const selectedDocument = useMemo(
-        () => documents.find((d) => d._key === selectedDocumentId) || null,
-        [documents, selectedDocumentId]
-    );
+  const selectedDocument = useMemo(
+    () => documents.find((d) => d.id === selectedDocumentId) || null,
+    [documents, selectedDocumentId]
+  );
 
-    // Sync document selection when node changes
-    // Wrapped logic in useEffectEvent to isolate non-reactive parts
-    const syncDocumentSelection = useEffectEvent(() => {
-        const currentSelected = secondarySelectedNode
-            ? (secondarySelectedNode as CallNodeTree)?.target ?? selectedNode
-            : selectedNode;
+  // Sync document selection when node changes
+  // Wrapped logic in useEffectEvent to isolate non-reactive parts
+  const syncDocumentSelection = useEffectEvent(() => {
+    const currentSelected = secondarySelectedNode
+      ? (secondarySelectedNode as CallNodeTree)?.target ?? selectedNode
+      : selectedNode;
 
-        // Get current node key for comparison
-        const currentNodeKey = currentSelected?._key || "";
-        
-        // If no node is selected, clear document selection
-        if (!currentSelected) {
-            if (selectedDocumentId) {
-                setSelectedDocumentId(tabId, null);
-            }
-            return;
-        }
+    // Get current node key for comparison
+    const currentNodeKey = currentSelected?.id || "";
 
-        // Check if selected document belongs to current node
-        const documentBelongsToNode = selectedDocumentId
-            ? currentSelected?.documents?.includes(`documents/${selectedDocumentId}`)
-            : false;
+    // If no node is selected, clear document selection
+    if (!currentSelected) {
+      if (selectedDocumentId) {
+        setSelectedDocumentId(tabId, null);
+      }
+      return;
+    }
 
-        // If we have documents and either:
-        // - No document is selected, OR
-        // - Selected document doesn't belong to current node
-        if (documents.length > 0) {
-            if (!selectedDocumentId || !documentBelongsToNode) {
-                setSelectedDocumentId(tabId, documents[0]._key);
-            }
-        } else {
-            // No documents available, clear selection
-            if (selectedDocumentId) {
-                setSelectedDocumentId(tabId, null);
-            }
-        }
-    });
+    // Check if selected document belongs to current node
+    const documentBelongsToNode = selectedDocumentId
+      ? currentSelected?.documents?.includes(`documents/${selectedDocumentId}`)
+      : false;
 
-    useEffect(() => {
-        syncDocumentSelection();
-    }, [tabId, documents, selectedNode?._key, secondarySelectedNode?._key, syncDocumentSelection]);
+    // If we have documents and either:
+    // - No document is selected, OR
+    // - Selected document doesn't belong to current node
+    if (documents.length > 0) {
+      if (!selectedDocumentId || !documentBelongsToNode) {
+        setSelectedDocumentId(tabId, documents[0].id);
+      }
+    } else {
+      // No documents available, clear selection
+      if (selectedDocumentId) {
+        setSelectedDocumentId(tabId, null);
+      }
+    }
+  });
 
-    const selectDocument = (id: string) => {
-        setSelectedDocumentId(tabId, id);
-    };
+  useEffect(() => {
+    syncDocumentSelection();
+  }, [tabId, documents, selectedNode?.id, secondarySelectedNode?.id, syncDocumentSelection]);
 
-    return {
-        documents,
-        selectedDocumentId,
-        selectedDocument,
-        nodeKey,
-        selectDocument,
-    };
+  const selectDocument = (id: string) => {
+    setSelectedDocumentId(tabId, id);
+  };
+
+  return {
+    documents,
+    selectedDocumentId,
+    selectedDocument,
+    nodeKey,
+    selectDocument,
+  };
 }

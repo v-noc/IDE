@@ -28,7 +28,7 @@ const PromptBuilder = ({
 
   const selectedNode: AnyNodeTree | null = useMemo(() => {
     const walk = (n: AnyNodeTree): AnyNodeTree | null => {
-      if (n._key === state.selectedNodeKey) return n;
+      if (n.id === state.selectedNodeKey) return n;
       for (const c of (n.children ?? []) as AnyNodeTree[]) {
         const found = walk(c);
         if (found) return found;
@@ -94,21 +94,19 @@ const PromptBuilder = ({
                     <SelectionDetailPane
                       node={selectedNode}
                       checked={
-                        !!(selectedNode && state.checked[selectedNode._key])
+                        !!(selectedNode && state.checked[selectedNode.id])
                       }
                       includeDocs={
-                        !!(selectedNode && state.includeDocs[selectedNode._key])
+                        !!(selectedNode && state.includeDocs[selectedNode.id])
                       }
                       includeCode={
-                        !!(selectedNode && state.includeCode[selectedNode._key])
+                        !!(selectedNode && state.includeCode[selectedNode.id])
                       }
                       onToggleDocs={() =>
-                        selectedNode &&
-                        state.toggleIncludeDocs(selectedNode._key)
+                        selectedNode && state.toggleIncludeDocs(selectedNode.id)
                       }
                       onToggleCode={() =>
-                        selectedNode &&
-                        state.toggleIncludeCode(selectedNode._key)
+                        selectedNode && state.toggleIncludeCode(selectedNode.id)
                       }
                       setDocumentsForNode={state.setDocumentsForNode}
                       setCodeForNode={state.setCodeForNode}

@@ -13,14 +13,14 @@ export function useTreeNodeState(
   tabId: string
 ) {
   // Selective subscriptions - only re-render when these change
-  const selectedNodeKey = useProjectStore((s) => s.selectedNode[tabId]?._key);
-  const secondarySelectedKey = useProjectStore((s) => s.secondarySelectedNode[tabId]?._key);
+  const selectedNodeKey = useProjectStore((s) => s.selectedNode[tabId]?.id);
+  const secondarySelectedKey = useProjectStore((s) => s.secondarySelectedNode[tabId]?.id);
   const activeNodeId = useProjectStore((s) => s.activeNodeId[tabId]);
   const expandedNodeIds = useProjectStore(useShallow((s) => s.expandedNodeIds[tabId] ?? []));
 
-  const isOpen = node ? expandedNodeIds.includes(node._key) : false;
-  const isSelected = node ? (selectedNodeKey === node._key || secondarySelectedKey === node._key) : false;
-  const isActive = node ? activeNodeId === node._key : false;
+  const isOpen = node ? expandedNodeIds.includes(node.id) : false;
+  const isSelected = node ? (selectedNodeKey === node.id || secondarySelectedKey === node.id) : false;
+  const isActive = node ? activeNodeId === node.id : false;
 
   const hasChildren = useMemo(() => {
     if (!node) return false;
