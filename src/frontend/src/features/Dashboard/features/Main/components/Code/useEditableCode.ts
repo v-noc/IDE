@@ -21,7 +21,9 @@ export function useEditableCode(
   projectId?: string,
   nodeType?: string
 ): UseEditableCodeResult {
-  const { data, isLoading, isError } = useCode(elementId, nodeType);
+
+
+  const { data, isLoading, isError } = useCode(elementId, nodeType, projectId);
   const { mutate: saveCode, isPending: isSaving } = useWriteCode();
 
   const [editorValue, setEditorValue] = useState<string>("");
