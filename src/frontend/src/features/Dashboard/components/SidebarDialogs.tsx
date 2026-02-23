@@ -68,6 +68,7 @@ export function SidebarDialogs() {
         open={activeModal === "prompt-builder"}
         onOpenChange={(open) => !open && closeModal()}
         rootNode={targetNode as ContainerNodeTree}
+        projectId={projectData?.id ?? ""}
       />
     </>
   );

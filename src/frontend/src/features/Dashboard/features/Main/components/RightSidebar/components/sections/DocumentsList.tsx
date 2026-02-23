@@ -34,6 +34,7 @@ const DocumentsList: React.FC = () => {
     (s) => s.selectedDocumentId[activeTabId],
   );
   const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
+  const projectId = useProjectStore((s) => s.projectData?.id);
   const nodeKey = useMemo(() => {
     if (secondarySelectedNode) {
       return (secondarySelectedNode as CallNodeTree).target
@@ -42,9 +43,9 @@ const DocumentsList: React.FC = () => {
     }
     return selectedNode?.id;
   }, [selectedNode, secondarySelectedNode]);
-  const { data: docs = [], isLoading } = useDocuments(nodeKey ?? undefined);
+  const { data: docs = [], isLoading } = useDocuments(nodeKey ?? undefined, projectId ?? undefined);
   const createMutation = useCreateDocument();
-  const updateMutation = useUpdateDocument(nodeKey ?? "");
+  const updateMutation = useUpdateDocument(nodeKey ?? "", projectId ?? "");
   const deleteMutation = useDeleteDocument();
 
   const [formName, setFormName] = useState("");
@@ -74,15 +75,19 @@ const DocumentsList: React.FC = () => {
     if (editingId) {
       await updateMutation.mutateAsync({
         id: editingId,
+        node_id: nodeKey ?? "",
         name: formName.trim(),
         description: formDesc.trim(),
       });
     } else {
-      if (!canUseDocs) return;
+      if (!canUseDocs || !projectId) return;
       await createMutation.mutateAsync({
-        name: formName.trim(),
-        description: formDesc.trim(),
-        node_id: nodeKey ?? "",
+        payload: {
+          name: formName.trim(),
+          description: formDesc.trim(),
+          node_id: nodeKey ?? "",
+        },
+        projectId,
       });
     }
     setOpen(false);
@@ -91,10 +96,11 @@ const DocumentsList: React.FC = () => {
   };
 
   const onDelete = async (doc: DocumentData) => {
-    if (!canUseDocs) return;
+    if (!canUseDocs || !projectId) return;
     await deleteMutation.mutateAsync({
       documentId: doc.id,
       nodeId: nodeKey ?? "",
+      projectId,
     });
     // Cache updates are handled automatically by mutations
   };

@@ -41,7 +41,7 @@ export function useEditableCode(
   };
 
   const handleSave = () => {
-    if (hasChanges && !isSaving && elementId) {
+    if (hasChanges && !isSaving && elementId && projectId) {
       saveCode({ elementId, code: editorValue, projectId });
       setHasChanges(false);
     }

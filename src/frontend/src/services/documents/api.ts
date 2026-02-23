@@ -18,9 +18,19 @@ export interface CreateDocumentRequest {
 
 export interface UpdateDocumentRequest {
   id: string;
+  node_id: string;
   name?: string;
   description?: string;
   data?: string;
+}
+
+function buildQueryString(params: Record<string, string>): string {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v != null && v !== '') search.set(k, v);
+  });
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
 }
 
 // Backend shape we receive from API
@@ -43,39 +53,42 @@ const mapBackendDocument = (d: BackendDocumentRaw): DocumentData => ({
 });
 
 export const documentsApi = {
-  getDocuments: async (nodeId: string): Promise<DocumentData[]> => {
-    const response = await api(`${API_ROUTES.DOCUMENTS}${nodeId}`);
+  getDocuments: async (nodeId: string, projectId: string): Promise<DocumentData[]> => {
+    const qs = buildQueryString({ node_id: nodeId, project_id: projectId });
+    const response = await api(`${API_ROUTES.DOCUMENTS}${qs}`);
     const list = response as unknown as BackendDocumentRaw[];
     return list.map(mapBackendDocument);
   },
 
-  createDocument: async (payload: CreateDocumentRequest): Promise<DocumentData> => {
-    const response = await api(`${API_ROUTES.DOCUMENTS}`, {
+  createDocument: async (payload: CreateDocumentRequest, projectId: string): Promise<DocumentData> => {
+    const qs = buildQueryString({ project_id: projectId });
+    const response = await api(`${API_ROUTES.DOCUMENTS}${qs}`, {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: payload,
     });
     const d = response as unknown as BackendDocumentRaw;
     return mapBackendDocument(d);
   },
 
-  updateDocument: async (payload: UpdateDocumentRequest): Promise<DocumentData> => {
-    const key = getKeyFromId(payload.id);
+  updateDocument: async (payload: UpdateDocumentRequest, projectId: string): Promise<DocumentData> => {
     const body = {
+      node_id: payload.node_id,
       name: payload.name,
       description: payload.description,
       data: payload.data,
-    } as Partial<Omit<UpdateDocumentRequest, "id">>;
-    const response = await api(`${API_ROUTES.DOCUMENTS}${payload.id}`, {
+    };
+    const qs = buildQueryString({ document_id: payload.id, project_id: projectId });
+    const response = await api(`${API_ROUTES.DOCUMENTS}${qs}`, {
       method: "PUT",
-      body: JSON.stringify(body),
+      body,
     });
     const d = response as unknown as BackendDocumentRaw;
     return mapBackendDocument(d);
   },
 
-  deleteDocument: async (documentId: string, nodeId: string): Promise<void> => {
-    const key = getKeyFromId(documentId);
-    await api(`${API_ROUTES.DOCUMENTS}${key}?node_id=${encodeURIComponent(nodeId)}`, {
+  deleteDocument: async (documentId: string, nodeId: string, projectId: string): Promise<void> => {
+    const qs = buildQueryString({ document_id: documentId, node_id: nodeId, project_id: projectId });
+    await api(`${API_ROUTES.DOCUMENTS}${qs}`, {
       method: "DELETE",
     });
   },

@@ -34,6 +34,11 @@ export interface DocumentEditorProps {
   nodeId?: string;
 
   /**
+   * Project ID for API calls. Required if auto-save is enabled.
+   */
+  projectId?: string;
+
+  /**
    * Whether to auto-save changes to the API. Defaults to true.
    */
   autoSave?: boolean;
@@ -72,6 +77,7 @@ export function DocumentEditor({
   document,
   onChange,
   nodeId = "",
+  projectId = "",
   autoSave = true,
   debounceMs = 1000,
   containerClassName = "",
@@ -88,23 +94,23 @@ export function DocumentEditor({
   const lastAppliedDataRef = useRef<string | null>(null);
 
   // API mutation for auto-save
-  const updateMutation = useUpdateDocument(nodeId);
+  const updateMutation = useUpdateDocument(nodeId, projectId);
 
   // Debounced save function
   const saveDocumentDebounced = useMemo(
     () =>
       debounce(
-        (payload: { id: string; data: string }) => {
-          if (autoSave && nodeId) {
+        (payload: { id: string; node_id: string; data: string }) => {
+          if (autoSave && nodeId && projectId) {
             // Update lastAppliedDataRef to the data we're about to save
             // This prevents reloading when cache updates with the same content
             lastAppliedDataRef.current = payload.data;
-            updateMutation.mutate({ id: payload.id, data: payload.data });
+            updateMutation.mutate({ id: payload.id, node_id: payload.node_id, data: payload.data });
           }
         },
         { waitMs: debounceMs },
       ),
-    [autoSave, nodeId, debounceMs, updateMutation],
+    [autoSave, nodeId, projectId, debounceMs, updateMutation],
   );
 
   // Load content when document changes
@@ -214,9 +220,10 @@ export function DocumentEditor({
     onChange?.(jsonData);
 
     // Auto-save if enabled and document exists
-    if (autoSave && document?.id && nodeId) {
+    if (autoSave && document?.id && nodeId && projectId) {
       saveDocumentDebounced.call({
         id: document.id,
+        node_id: nodeId,
         data: jsonData,
       });
     }

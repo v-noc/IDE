@@ -17,12 +17,14 @@ interface PromptBuilderProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rootNode: ContainerNodeTree;
+  projectId?: string;
 }
 
 const PromptBuilder = ({
   open,
   onOpenChange,
   rootNode,
+  projectId = "",
 }: PromptBuilderProps) => {
   const state = usePromptBuilder(rootNode);
 
@@ -93,6 +95,7 @@ const PromptBuilder = ({
                   <div className="p-3">
                     <SelectionDetailPane
                       node={selectedNode}
+                      projectId={projectId}
                       checked={
                         !!(selectedNode && state.checked[selectedNode.id])
                       }

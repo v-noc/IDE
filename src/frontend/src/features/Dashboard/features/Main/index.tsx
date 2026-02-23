@@ -46,6 +46,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
     selectedDocumentId: activeDocId,
     selectedDocument,
     nodeKey,
+    projectId,
     selectDocument,
   } = useWorkspaceDocs(
     tabId,
@@ -88,6 +89,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
             documents={documents}
             selectedDocumentId={activeDocId}
             nodeId={nodeKey}
+            projectId={projectId ?? ""}
             onSelectDocument={selectDocument}
             onClose={() => setDocSidebarOpen(tabId, false)}
           />

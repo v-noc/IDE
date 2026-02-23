@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface SelectionDetailPaneProps {
   node: AnyNodeTree | null;
+  projectId?: string;
   checked: boolean;
   includeDocs: boolean;
   includeCode: boolean;
@@ -21,6 +22,7 @@ interface SelectionDetailPaneProps {
 
 export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
   node,
+  projectId = "",
   checked,
   includeDocs,
   includeCode,
@@ -32,7 +34,7 @@ export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
   const nodeId = node?.id ?? "";
 
   // Documents fetch when toggled on and node checked/selected
-  const docsQuery = useDocuments(nodeId || undefined);
+  const docsQuery = useDocuments(nodeId || undefined, projectId || undefined);
   useEffect(() => {
     if (node && checked && includeDocs && docsQuery.data) {
       setDocumentsForNode(node.id, docsQuery.data);
@@ -40,7 +42,7 @@ export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
   }, [node, checked, includeDocs, docsQuery.data, setDocumentsForNode]);
 
   // Code fetch when toggled on and supported type
-  const codeQuery = useCode(nodeId || undefined, node?.node_type);
+  const codeQuery = useCode(nodeId || undefined, node?.node_type, projectId || undefined);
   useEffect(() => {
     if (node && checked && includeCode && codeQuery.data?.code) {
       setCodeForNode(node.id, codeQuery.data.code);

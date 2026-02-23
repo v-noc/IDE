@@ -16,16 +16,17 @@ type ValidCodeNodeType = typeof VALID_CODE_NODE_TYPES[number];
  */
 export const useCode = (
   elementId: string | undefined,
-  nodeType?: string
+  nodeType?: string,
+  projectId?: string
 ) => {
   // Validate node type if provided
   const isValidNodeType =
     !nodeType || VALID_CODE_NODE_TYPES.includes(nodeType as ValidCodeNodeType);
 
   return useQuery<CodeData>({
-    queryKey: queryKeys.code.detail(elementId ?? ''),
-    queryFn: () => codeApi.getCode(elementId!),
-    enabled: !!elementId && isValidNodeType,
+    queryKey: [...queryKeys.code.detail(elementId ?? ''), projectId ?? ''],
+    queryFn: () => codeApi.getCode(elementId!, projectId!),
+    enabled: !!elementId && !!projectId && isValidNodeType,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };

@@ -10,10 +10,25 @@ export interface CodeData {
   code: string;
 }
 
+function buildQueryString(params: Record<string, string>): string {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v != null && v !== '') search.set(k, v);
+  });
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
+}
+
 export const codeApi = {
-  getCode: (elementId: string): Promise<CodeData> => api(`${API_ROUTES.CODE_ELEMENTS}${elementId}/read-code`),
-  writeCode: (elementId: string, code: string): Promise<void> => api(`${API_ROUTES.CODE_ELEMENTS}${elementId}/write-code`, {
-    method: 'POST',
-    body: { code },
-  }),
+  getCode: (elementId: string, projectId: string): Promise<CodeData> => {
+    const qs = buildQueryString({ node_id: elementId, project_id: projectId });
+    return api(`${API_ROUTES.CODE_ELEMENTS}read-code/${qs}`);
+  },
+  writeCode: (elementId: string, code: string, projectId: string): Promise<void> => {
+    const qs = buildQueryString({ node_id: elementId, project_id: projectId });
+    return api(`${API_ROUTES.CODE_ELEMENTS}write-code${qs}`, {
+      method: 'POST',
+      body: { code },
+    });
+  },
 }

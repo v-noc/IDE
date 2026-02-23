@@ -22,9 +22,10 @@ export function useWorkspaceDocs(
 ) {
   const selectedDocumentId = useProjectStore((s) => s.selectedDocumentId[tabId]);
   const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
+  const projectId = useProjectStore((s) => s.projectData?.id);
 
   const nodeKey = effectiveNode?.id || "";
-  const { data: documents = [] } = useDocuments(nodeKey);
+  const { data: documents = [] } = useDocuments(nodeKey, projectId ?? undefined);
 
   const selectedDocument = useMemo(
     () => documents.find((d) => d.id === selectedDocumentId) || null,
@@ -82,6 +83,7 @@ export function useWorkspaceDocs(
     selectedDocumentId,
     selectedDocument,
     nodeKey,
+    projectId,
     selectDocument,
   };
 }

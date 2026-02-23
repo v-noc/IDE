@@ -8,6 +8,7 @@ interface DocSidebarProps {
   documents: DocumentData[];
   selectedDocumentId: string | null;
   nodeId: string;
+  projectId: string;
   onSelectDocument: (id: string) => void;
   onClose?: () => void;
   /**
@@ -32,6 +33,7 @@ export function DocSidebar({
   documents,
   selectedDocumentId,
   nodeId,
+  projectId,
   onSelectDocument,
   onClose,
   onDocumentChange,
@@ -84,6 +86,7 @@ export function DocSidebar({
           key={selectedDocument?.id || "new"}
           document={selectedDocument || null}
           nodeId={nodeId}
+          projectId={projectId}
           autoSave={true}
           onChange={onDocumentChange}
           containerClassName="px-2 py-2"

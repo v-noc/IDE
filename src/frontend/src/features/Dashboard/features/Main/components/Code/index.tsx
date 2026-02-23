@@ -33,8 +33,8 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
 
   const elementId = effectiveNode?.id ?? "";
   const nodeType = effectiveNode?.node_type;
-  const projectId = projectData?.id;
-  const { data } = useCode(elementId, nodeType);
+  const projectId = projectData?.id ?? "";
+  const { data } = useCode(elementId, nodeType, projectId);
   const {
     editorValue,
     hasChanges,

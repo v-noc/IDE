@@ -23,7 +23,7 @@ const queryKeys = {
   },
   documents: {
     all: ['documents'] as const,
-    list: (nodeKey: string) => [...queryKeys.documents.all, 'list', nodeKey] as const,
+    list: (nodeKey: string, projectKey?: string) => [...queryKeys.documents.all, 'list', nodeKey, projectKey ?? ''] as const,
     detail: (docId: string) => [...queryKeys.documents.all, 'detail', docId] as const,
   },
 } as const;

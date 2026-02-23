@@ -22,7 +22,8 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
 
   const { data: codeData } = useCode(
     showCode ? effectiveNodeId : undefined,
-    effectiveNodeType
+    effectiveNodeType,
+    projectId
   );
 
   const {
