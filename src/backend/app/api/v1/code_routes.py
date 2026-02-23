@@ -31,39 +31,45 @@ class RunCode(BaseModel):
     filename: str | None = None
 
 
-@router.post("/{element_id}/write-code")
+@router.post("/write-code")
 async def write_code(
-    element_id: str,
+    node_id: str = Query(..., description="The ID of the node to write code to"),
+    project_id: str = Query(..., description="The ID of the project"),
     code_block: str = Body(..., embed=True, alias="code"),
     project_service: ProjectService = Depends(get_project_service),
+    function_service: FunctionService = Depends(get_function_service),
+    file_service: FileService = Depends(get_file_service),
+    class_service: ClassService = Depends(get_class_service),
     watcher_service: WatcherService = Depends(get_watcher_service),
     db: AsyncClient = Depends(get_terminus_client),
 ) -> Dict[str, Any]:
     """
     Writes a block of code to the location of a given code element.
+    Accepts document key (not full _id). Routes to function/file/class service by node_id prefix.
     """
-    node_id = f"nodes/{element_id}"
 
-    # Get project node and stop watcher before writing
-    project_node = None
-    try:
-        _, project_doc = await container_service._resolve_file_and_project(node_id)
-        if project_doc:
-            project_id = project_doc.get("_id")
-            project_node = await project_service.get(project_id)
-            if project_node:
-                # Stop watcher (not pause) to prevent event bubbling
-                watcher_service.stop_watching(project_node.id)
-    except Exception:
-        # Non-fatal: failure to stop watcher should not block write
-        pass
+    # Get project node and stop watcher before writing (to prevent event bubbling)
+    project_node = await project_service.get(project_id)
+    if project_node:
+        try:
+            watcher_service.stop_watching(project_node.id)
+        except Exception:
+            pass
 
-    # Write the code
-    result = await container_service.write_code(node_id, code_block)
+    # Route to appropriate service by node_id prefix (same as get_code)
+    if node_id.startswith("FunctionSchema/"):
+        result = await function_service.write_code(node_id, code_block)
+    elif node_id.startswith("FileSchema/"):
+        result = await file_service.write_code(node_id, code_block)
+    elif node_id.startswith("ClassSchema/"):
+        result = await class_service.write_code(node_id, code_block)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid node ID")
+
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result.get("error"))
 
-    # Run orchestrator manually to sync changes
+    # Run orchestrator, emit socket, restart watcher
     if project_node:
         try:
             orchestrator = GraphBuilderOrchestrator(
@@ -72,7 +78,6 @@ async def write_code(
             )
             await orchestrator.resync()
         except Exception:
-            # Non-fatal: failure to sync should not block write response
             pass
 
         # Emit code:updated socket event
@@ -81,17 +86,15 @@ async def write_code(
             await socket_manager.emit_to_project(
                 project_node.id,
                 "code:updated",
-                {"element_id": element_id}
+                {"element_id": node_id},
             )
         except Exception:
-            # Non-fatal: failure to emit socket event should not block write
             pass
 
         # Start watcher again after sync
         try:
             watcher_service.start_watching(project_node)
         except Exception:
-            # Non-fatal: failure to start watcher should not block write
             pass
 
     return result
