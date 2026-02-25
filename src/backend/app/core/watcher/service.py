@@ -26,7 +26,7 @@ class WatcherService:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, db: AsyncClient = Depends(get_terminus_client)):
+    def __init__(self, db: Optional[AsyncClient] = None):
         if not hasattr(self, 'initialized'):
             self.watchers: Dict[str, ProjectWatcher] = {}
             self.db = db
@@ -39,13 +39,14 @@ class WatcherService:
         self.main_event_loop = loop
 
     def set_db(self, db: AsyncClient):
-        if self.db is None:
+        if db is not None:
             self.db = db
 
     def start_watching(self, project_node: ProjectNode):
         project_id = project_node.id
 
         # Helper to run async socket events from the sync thread
+
         def emit_sync_event(event_type: str, data: dict):
             try:
                 # Try to use the main event loop if available
@@ -135,7 +136,7 @@ class WatcherService:
                 # Note: We create a fresh one to ensure clean state
                 orchestrator = GraphBuilderOrchestrator(
                     project_node=project_node,
-                    db=self.db
+                    db=self.db.clone()
                 )
 
                 # Perform the sync (orchestrator is async; run in main loop)
@@ -218,5 +219,6 @@ def get_watcher_service(
     if service is None:
         service = WatcherService(db)
         request.app.state.watcher_service = service
-    service.set_db(db)
+    else:
+        service.set_db(db)
     return service

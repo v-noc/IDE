@@ -22,8 +22,7 @@ async def lifespan(app: FastAPI):
     db = await get_terminus_client()
 
     # Initialize a process-wide watcher service singleton
-    watcher_service = WatcherService()
-    watcher_service.set_db(db)
+    watcher_service = WatcherService(db)
     # Set the main event loop so watcher can emit socket events
     # from sync threads
     # Use get_running_loop() since we're in an async context
