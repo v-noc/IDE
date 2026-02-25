@@ -10,11 +10,11 @@ function buildQueryString(params: Record<string, string | number>): string {
   return qs ? `?${qs}` : "";
 }
 
+/** Backend commit response - matches CommitResponse from commits.py */
 export interface Commit {
   id: string;
   message: string;
-  timestamp: string;
-  parent_id: string;
+  timestamp: string; // ISO datetime from backend
   author: string;
 }
 

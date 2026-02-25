@@ -1,8 +1,8 @@
-import React from 'react';
-import type { Commit } from '../store/useVersioningStore';
+import React from "react";
+import type { CommitDisplay } from "../store/useVersioningStore";
 
 interface CommitItemProps {
-    commit: Commit;
+  commit: CommitDisplay;
     isLast?: boolean;
     isActive?: boolean;
     onClick?: () => void;
@@ -40,12 +40,12 @@ const CommitItem: React.FC<CommitItemProps> = ({ commit, isLast, isActive, onCli
                         {commit.author}
                     </span>
                     <span className="shrink-0 text-[10px] font-medium text-slate-400 uppercase tracking-tight">
-                        {commit.timestamp.split(' ')[1] + ' ' + commit.timestamp.split(' ')[2]}
+                        {commit.timestamp.split(" ").slice(1).join(" ") || commit.timestamp}
                     </span>
                 </div>
 
                 <span className="text-[11px] font-medium text-slate-400">
-                    {commit.timestamp.split(' ')[0]}
+                    {commit.timestamp.split(" ")[0] || commit.timestamp}
                 </span>
 
                 <div className={`mt-2 rounded-lg py-1 text-[13px] leading-snug transition-colors ${isActive ? 'text-slate-800' : 'text-slate-600'

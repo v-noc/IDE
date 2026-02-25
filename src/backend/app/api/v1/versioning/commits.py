@@ -48,13 +48,18 @@ async def get_commits(
     branch_name = get_db_context["branch"]
     if branch_name:
         clone.branch = branch_name
-    result = await clone.get_document_history(node_id, start=start, count=count)
+    if node_id.startswith("ProjectSchema/"):
+        result = await clone.log(start=start, count=count)
+    else:
+        result = await clone.get_document_history(node_id, start=start, count=count)
     return [CommitResponse.from_result(commit) for commit in result]
 
 
 @router.get("/diff")
 async def get_diff(
     project_id: str = Query(..., description="The ID of the project"),
+    after_commit_id: str = Query(...,
+                                 description="The ID of the after commit"),
     before_commit_id: str = Query(...,
                                   description="The ID of the before commit"),
     get_db_context: dict = Depends(get_db_context),
@@ -70,7 +75,7 @@ async def get_diff(
     clone = db.clone()
     clone.db = project["db_name"]
     branch_name = get_db_context["branch"]
-    after_commit_id = get_db_context["ref"]
+
     if branch_name:
         clone.branch = branch_name
     result = await clone.diff_version(after_version=after_commit_id, before_version=before_commit_id)
