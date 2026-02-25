@@ -154,19 +154,15 @@ make dev          # Start both Backend and Frontend
 > Use `make help` to see all available commands.
 
 
-
 ## 🤝 Community & License
 
-V-NOC is source-available under the Functional Source License (FSL-1.1-Apache-2.0).
+V-NOC is licensed under the **Apache License 1.0**.
 
-- Free for development, testing, non-production, and personal use.
-- Commercial or production hosting requires a separate license — contact me for details.
-- Automatically becomes Apache 2.0 after 2 years.
+- Free for personal, commercial, and production use.
+- Modification and redistribution are permitted under the terms of the license.
+- See the `LICENSE` file for full details.
 
-- **Join the Discord:** [discord.gg/J5nfPHqyBr](https://discord.gg/J5nfPHqyBr)
-
-> [!NOTE]
-> Commercial/proprietary use requires a separate license. Contact the maintainers for details.
+- **Join the Discord:** https://discord.gg/J5nfPHqyBr
 
 ---
 
