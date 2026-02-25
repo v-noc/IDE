@@ -163,3 +163,85 @@ class BranchMixin:
                 auth=self._auth(),
             )
         )
+
+    async def get_document_history(self,
+                                   doc_id: str,
+                                   team: Optional[str] = None,
+                                   db: Optional[str] = None,
+                                   start: int = 0,
+                                   count: int = -1,
+                                   created: bool = False,
+                                   updated: bool = False):
+        """Get commit history for a SPECIFIC document (uses the /history endpoint)
+
+        This is the official, fast, server-side implementation of:
+            terminusdb history admin/myDB/branch/main --id "Person/john"
+
+        It only returns commits that actually touched the document (added, updated, or deleted it).
+        Much faster and more efficient than looping over /log yourself.
+
+        Parameters
+        ----------
+        doc_id : str
+            The full document @id (e.g. "Person/john")
+        team : str, optional
+            Defaults to self.team
+        db : str, optional
+            Defaults to self.db
+        start : int, optional
+            Pagination start index (newest first). Default 0.
+        count : int, optional
+            Number of commits to return. Default -1 = all.
+        created : bool, optional
+            Return ONLY the commit where the document was created
+        updated : bool, optional
+            Return ONLY the commit where the document was last updated
+
+        Returns
+        -------
+        list
+            List of commit dictionaries (exactly like the log() method):
+            [
+              {
+                "author": "admin",
+                "identifier": "prh0yvftqmsrgctn8gqvdxv7gc4i8p8",
+                "message": "Updated John's address",
+                "timestamp": datetime.datetime(2024, ...),
+                "commit": "prh0yvftqmsrgctn8gqvdxv7gc4i8p8"   # alias for backwards compatibility
+              },
+              ...
+            ]
+        """
+        self._check_connection(check_db=(not team or not db))
+
+        team = team if team else self.team
+        db = db if db else self.db
+
+        params = {
+            'id': doc_id,
+            'start': start,
+            'count': count
+        }
+        if created:
+            params['created'] = 'true'
+        if updated:
+            params['updated'] = 'true'
+
+        result = await self._session.get(
+            f"{self.api}/history/{team}/{db}",
+            params=params,
+            headers=self._default_headers,
+            auth=self._auth(),
+        )
+
+        commits = json.loads(_finish_response(result))
+
+        # Post-process exactly like your log() method
+        for commit in commits:
+            if isinstance(commit.get('timestamp'), (int, float)):
+                commit['timestamp'] = datetime.fromtimestamp(
+                    commit['timestamp'])
+            commit['commit'] = commit.get(
+                'identifier')  # backwards compatibility
+
+        return commits
