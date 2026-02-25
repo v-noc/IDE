@@ -54,25 +54,6 @@ export interface DocumentEditorProps {
   containerClassName?: string;
 }
 
-/**
- * Self-contained document editor component.
- *
- * Handles:
- * - Editor initialization and configuration
- * - Document loading and syncing
- * - Auto-save with debouncing
- * - Empty state display
- *
- * Usage:
- * ```tsx
- * <DocumentEditor
- *   document={selectedDocument}
- *   nodeId={nodeKey}
- *   autoSave={true}
- *   onChange={(data) => console.log('Content changed:', data)}
- * />
- * ```
- */
 export function DocumentEditor({
   document,
   onChange,
@@ -105,7 +86,11 @@ export function DocumentEditor({
             // Update lastAppliedDataRef to the data we're about to save
             // This prevents reloading when cache updates with the same content
             lastAppliedDataRef.current = payload.data;
-            updateMutation.mutate({ id: payload.id, node_id: payload.node_id, data: payload.data });
+            updateMutation.mutate({
+              id: payload.id,
+              node_id: payload.node_id,
+              data: payload.data,
+            });
           }
         },
         { waitMs: debounceMs },
@@ -156,8 +141,16 @@ export function DocumentEditor({
 
     const loadContent = async () => {
       try {
+        // Handle empty or whitespace-only data before parsing
+        const trimmed = (data ?? "").trim();
+        if (!trimmed) {
+          editor.replaceBlocks(editor.document, []);
+          lastAppliedDataRef.current = data;
+          return;
+        }
+
         // Parse JSON (BlockNote blocks)
-        const parsedDocument = JSON.parse(data);
+        const parsedDocument = JSON.parse(trimmed);
 
         // Validate that parsedDocument is an array of blocks
         if (Array.isArray(parsedDocument)) {

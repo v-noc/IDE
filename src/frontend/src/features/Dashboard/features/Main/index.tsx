@@ -103,6 +103,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
           onTabValueChange={setTabValue}
           selectedDocument={selectedDocument}
           nodeId={nodeKey}
+          projectId={projectId ?? ""}
           headerSlot={
             <WorkspaceHeader
               displayPath={displayPath}

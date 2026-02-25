@@ -30,19 +30,7 @@ type DocumentsProps = {
  */
 const Documents = ({ document, onChange, nodeId }: DocumentsProps) => {
   // Convert legacy format to DocumentType
-  const doc: DocumentData | null = document
-    ? "_key" in document
-      ? (document as DocumentData)
-      : {
-          _key: document.id,
-          _id: document.id,
-          name: "",
-          description: "",
-          data: document.data || "",
-          created_at: "",
-          updated_at: "",
-        }
-    : null;
+  const doc: DocumentData | null = document;
 
   return (
     <DocumentEditor

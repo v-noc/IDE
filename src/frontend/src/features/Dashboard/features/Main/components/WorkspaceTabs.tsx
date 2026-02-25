@@ -1,8 +1,9 @@
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EditorCode from "./Code";
-import Documents from "./Docs";
+import { DocumentEditor } from "./Docs/DocumentEditor";
 import Canvas from "./Canvas";
+import type { DocumentData } from "@/services/documents";
 
 interface WorkspaceTabsProps {
   tabId: string;
@@ -11,8 +12,9 @@ interface WorkspaceTabsProps {
   onTabValueChange: (value: string) => void;
   headerSlot: React.ReactNode;
   // Document props
-  selectedDocument: any;
+  selectedDocument: DocumentData | null | undefined;
   nodeId?: string;
+  projectId?: string;
 }
 
 /**
@@ -27,6 +29,7 @@ export function WorkspaceTabs({
   headerSlot,
   selectedDocument,
   nodeId,
+  projectId = "",
 }: WorkspaceTabsProps) {
   return (
     <Tabs
@@ -77,21 +80,15 @@ export function WorkspaceTabs({
         value="docs"
         className="flex flex-col overflow-hidden bg-white border-t"
       >
-        <div className="flex-1 overflow-hidden">
-          <div className="h-full pt-2 w-full overflow-auto">
-            <Documents
-              key={selectedDocument?.id || "new"}
-              document={
-                selectedDocument
-                  ? {
-                      id: selectedDocument.id,
-                      data: selectedDocument.data,
-                    }
-                  : undefined
-              }
-              nodeId={nodeId}
-            />
-          </div>
+        <div className="flex-1 overflow-hidden py-2">
+          <DocumentEditor
+            key={selectedDocument?.id || "new"}
+            document={selectedDocument || null}
+            nodeId={nodeId ?? ""}
+            projectId={projectId}
+            autoSave={true}
+            containerClassName="px-2 py-2"
+          />
         </div>
       </TabsContent>
       <TabsContent
