@@ -43,8 +43,8 @@ const Navbar = ({ projectId }: NavbarProps) => {
         </MenubarMenu>
       </Menubar>
       <div className="flex items-center gap-2 mr-4">
-        <HistoryButton />
         <ProgressIndicator projectId={projectId} />
+        <HistoryButton />
       </div>
     </div>
   );
