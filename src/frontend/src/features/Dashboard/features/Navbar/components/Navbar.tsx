@@ -8,6 +8,7 @@ import {
   MenubarShortcut,
 } from "@/components/ui/menubar";
 import { ProgressIndicator } from "./ProgressIndicator";
+import HistoryButton from "../../Versioning/components/HistoryButton";
 
 interface NavbarProps {
   projectId?: string;
@@ -42,6 +43,7 @@ const Navbar = ({ projectId }: NavbarProps) => {
         </MenubarMenu>
       </Menubar>
       <div className="flex items-center gap-2 mr-4">
+        <HistoryButton />
         <ProgressIndicator projectId={projectId} />
       </div>
     </div>

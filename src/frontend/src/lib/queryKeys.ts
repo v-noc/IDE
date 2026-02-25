@@ -26,6 +26,12 @@ const queryKeys = {
     list: (nodeKey: string, projectKey?: string) => [...queryKeys.documents.all, 'list', nodeKey, projectKey ?? ''] as const,
     detail: (docId: string) => [...queryKeys.documents.all, 'detail', docId] as const,
   },
+  versioning: {
+    all: ['versioning'] as const,
+    branches: (projectId: string) => [...queryKeys.versioning.all, 'branches', projectId] as const,
+    commits: (projectId: string, nodeId: string, start?: number, count?: number) =>
+      [...queryKeys.versioning.all, 'commits', projectId, nodeId, start ?? 0, count ?? 10] as const,
+  },
 } as const;
 
 export default queryKeys;
