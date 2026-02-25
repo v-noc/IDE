@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import queryKeys from "@/lib/queryKeys";
 import { versioningApi, type Commit, type Branch } from "./api";
 
@@ -28,5 +28,25 @@ export const useCommits = (
         count: options?.count,
       }),
     enabled: !!projectId && !!nodeId,
+  });
+};
+
+export const useSuspenseCommits = (
+  projectId: string,
+  nodeId: string,
+  options?: { start?: number; count?: number }
+) => {
+  return useSuspenseQuery<Commit[]>({
+    queryKey: queryKeys.versioning.commits(
+      projectId,
+      nodeId,
+      options?.start,
+      options?.count
+    ),
+    queryFn: () =>
+      versioningApi.getCommits(projectId, nodeId, {
+        start: options?.start,
+        count: options?.count,
+      }),
   });
 };

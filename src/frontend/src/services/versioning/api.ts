@@ -14,6 +14,7 @@ export interface Commit {
   id: string;
   message: string;
   timestamp: string;
+  parent_id: string;
   author: string;
 }
 

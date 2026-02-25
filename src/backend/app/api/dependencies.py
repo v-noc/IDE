@@ -1,4 +1,5 @@
-from fastapi import Depends, Query, HTTPException
+from typing import Optional
+from fastapi import Depends, Header, Query, HTTPException
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 
@@ -26,6 +27,16 @@ def get_project_service(
 ) -> ProjectService:
     repos = Repositories(db.clone())
     return ProjectService(repos)
+
+
+async def get_db_context(
+    x_vnoc_branch: Optional[str] = Header("main", alias="X-Vnoc-Branch"),
+    ref: Optional[str] = Query(None, description="Specific commit ID to query")
+):
+    return {
+        "branch": x_vnoc_branch,
+        "commit": ref
+    }
 
 
 async def get_file_service(

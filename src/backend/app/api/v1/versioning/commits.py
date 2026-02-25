@@ -14,6 +14,7 @@ class CommitResponse(BaseModel):
     id: str
     message: str
     timestamp: datetime
+    parent_id: str
     author: str
 
     @staticmethod
@@ -23,6 +24,7 @@ class CommitResponse(BaseModel):
             message=result["message"],
             timestamp=datetime.fromtimestamp(result["timestamp"]),
             author=result["author"],
+            parent_id=result["parent"],
         )
 
 
