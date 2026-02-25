@@ -26,7 +26,6 @@ interface UseEnhancedTreeLayoutProps {
   selectedNode?: SimpleTreeNode;
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
-  nodeDiffs?: Record<string, 'added' | 'removed' | 'updated' | null>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
 }
 
@@ -36,7 +35,6 @@ export const useEnhancedTreeLayout = ({
   expandedNodeIds,
   toggleNodeExpansion,
   nodeMetadataMap,
-  nodeDiffs,
   layoutConfig: _layoutConfig,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
@@ -62,6 +60,7 @@ export const useEnhancedTreeLayout = ({
 
     const nodes: Node[] = [];
     const edges: Edge[] = [];
+    const visitedNodeIds = new Set<string>();
 
     // Helper to check expansion
     const isExpanded = (nodeId: string) =>
@@ -81,6 +80,10 @@ export const useEnhancedTreeLayout = ({
     // 2. Recursive Traversal to build the Graph Data (Nodes/Edges)
     const traverse = (node: SimpleTreeNode) => {
       const nodeId = node.id;
+      if (visitedNodeIds.has(nodeId)) {
+        return;
+      }
+      visitedNodeIds.add(nodeId);
 
       // Prepare Node Data
       const nodeStyle = getNodeStyle(node as unknown as ContainerNodeTree);
@@ -112,7 +115,6 @@ export const useEnhancedTreeLayout = ({
           nodeType: node.node_type,
           nodeId: nodeId,
           target: node.target,
-          diffStatus: nodeDiffs?.[nodeId] ?? null,
 
           manuallyCreated:
             (node as unknown as { manually_created?: boolean })
@@ -129,8 +131,14 @@ export const useEnhancedTreeLayout = ({
       dagreGraph.setNode(nodeId, { width: NODE_WIDTH, height: NODE_HEIGHT });
 
       // Process Children if expanded
-      if (isExpanded(nodeId) && node.children && node.children.length > 0) {
-        node.children.forEach((child: AnyNodeTree) => {
+      if (isExpanded(nodeId)) {
+        const childrenToRender: AnyNodeTree[] = [...(node.children ?? [])];
+
+        if (childrenToRender.length === 0) {
+          return;
+        }
+
+        childrenToRender.forEach((child: AnyNodeTree) => {
           const simpleChild = child as unknown as SimpleTreeNode;
           const childId = simpleChild.id;
 
@@ -151,7 +159,9 @@ export const useEnhancedTreeLayout = ({
           dagreGraph.setEdge(nodeId, childId);
 
           // Recurse
-          traverse(simpleChild);
+          if (!visitedNodeIds.has(childId)) {
+            traverse(simpleChild);
+          }
         });
       }
     };
@@ -185,6 +195,6 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap, nodeDiffs]);
+  }, [centerNode, expandedNodeIds, metadataMap]);
   return { initialNodes, initialEdges };
 };

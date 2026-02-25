@@ -1,6 +1,6 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import queryKeys from "@/lib/queryKeys";
-import { versioningApi, type Commit, type Branch } from "./api";
+import { versioningApi, type Commit, type Branch, type TerminusJsonDiff } from "./api";
 
 export const useBranches = (projectId: string | undefined) => {
   return useQuery<Branch[]>({
@@ -48,5 +48,26 @@ export const useSuspenseCommits = (
         start: options?.start,
         count: options?.count,
       }),
+  });
+};
+
+export const useCommitDiff = (
+  projectId: string | undefined,
+  afterCommitId: string | null,
+  beforeCommitId: string | null
+) => {
+  return useQuery<TerminusJsonDiff>({
+    queryKey: queryKeys.versioning.diff(
+      projectId ?? "",
+      afterCommitId ?? "",
+      beforeCommitId ?? ""
+    ),
+    queryFn: () =>
+      versioningApi.getDiff(projectId!, afterCommitId!, beforeCommitId!),
+    enabled:
+      !!projectId &&
+      !!afterCommitId &&
+      !!beforeCommitId &&
+      afterCommitId !== beforeCommitId,
   });
 };

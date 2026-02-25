@@ -24,6 +24,10 @@ import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import {
+  buildDiffOverlayEdges,
+  buildDiffOverlayNodes,
+} from "@/features/Dashboard/features/Versioning/utils/canvasDiffOverlay";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
@@ -63,6 +67,9 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     useShallow((s) => s.handleNodeSelection),
   );
   const nodeDiffs = useVersioningStore(useShallow((s) => s.nodeDiffs));
+  const parentChildDiffs = useVersioningStore(
+    useShallow((s) => s.parentChildDiffs),
+  );
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -85,7 +92,6 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     selectedNode: effectiveSelectedNode as SimpleTreeNode,
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
-    nodeDiffs,
     layoutConfig,
   });
 
@@ -93,33 +99,30 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   useEffect(() => {
+    let nextNodeIds = new Set<string>();
+
     setNodes((currentNodes) => {
-      // 1. Create a map of existing nodes for quick lookup
-      const currentNodeMap = new Map(currentNodes.map((n) => [n.id, n]));
-
-      // 2. Map the new layout onto the current state
-      return initialNodes.map((newNode) => {
-        const existingNode = currentNodeMap.get(newNode.id);
-
-        if (existingNode) {
-          // Only update the properties that the layout changed (position, data)
-          // This preserves the internal object reference if nothing changed
-          return {
-            ...existingNode,
-            position: newNode.position,
-            data: {
-              ...existingNode.data,
-              ...newNode.data, // Sync expanded/expandable state
-            },
-          };
-        }
-
-        // 3. If it doesn't exist, it's a brand new node being added (expanded)
-        return newNode;
-      });
+      const { nodes: overlayNodes, nodeIds } = buildDiffOverlayNodes(
+        initialNodes,
+        currentNodes,
+        parentChildDiffs,
+        nodeDiffs
+      );
+      nextNodeIds = nodeIds;
+      return overlayNodes;
     });
-    setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+    setEdges(() =>
+      buildDiffOverlayEdges(initialEdges, parentChildDiffs, nextNodeIds)
+    );
+  }, [
+    initialNodes,
+    initialEdges,
+    parentChildDiffs,
+    setNodes,
+    setEdges,
+    nodeDiffs,
+  ]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 
@@ -156,7 +159,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     } else {
       lastCenteredTargetIdRef.current = null;
     }
-  }, [centerNode]);
+  }, [centerNode, centerOnTarget]);
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstanceRef.current = instance;

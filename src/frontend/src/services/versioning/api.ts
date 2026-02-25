@@ -24,6 +24,8 @@ export interface Branch {
   [key: string]: unknown;
 }
 
+export type TerminusJsonDiff = Record<string, unknown> | unknown[];
+
 export const versioningApi = {
   getBranches: (projectId: string): Promise<Branch[]> => {
     const qs = buildQueryString({ project_id: projectId });
@@ -51,5 +53,18 @@ export const versioningApi = {
       count,
     });
     return api(`${API_ROUTES.VERSIONING}/commits${qs}`);
+  },
+
+  getDiff: (
+    projectId: string,
+    afterCommitId: string,
+    beforeCommitId: string
+  ): Promise<TerminusJsonDiff> => {
+    const qs = buildQueryString({
+      project_id: projectId,
+      after_commit_id: afterCommitId,
+      before_commit_id: beforeCommitId,
+    });
+    return api(`${API_ROUTES.VERSIONING}/commits/diff${qs}`);
   },
 };

@@ -31,6 +31,8 @@ const queryKeys = {
     branches: (projectId: string) => [...queryKeys.versioning.all, 'branches', projectId] as const,
     commits: (projectId: string, nodeId: string, start?: number, count?: number) =>
       [...queryKeys.versioning.all, 'commits', projectId, nodeId, start ?? 0, count ?? 10] as const,
+    diff: (projectId: string, afterCommitId: string, beforeCommitId: string) =>
+      [...queryKeys.versioning.all, 'diff', projectId, afterCommitId, beforeCommitId] as const,
   },
 } as const;
 
