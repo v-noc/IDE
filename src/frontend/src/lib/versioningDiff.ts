@@ -1,5 +1,10 @@
-import type { DiffStatus } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import type {
+  DiffNodeRef,
+  DiffStatus,
+  ParentChildDiff,
+} from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import type { TerminusJsonDiff } from "@/services/versioning";
+import type { NodeType } from "@/types/project";
 
 const CHILD_SET_FIELDS = new Set([
   "folder_children",
@@ -11,11 +16,6 @@ const CHILD_SET_FIELDS = new Set([
   "call_group",
   "call_children",
 ]);
-
-export interface ParentChildDiff {
-  added: string[];
-  removed: string[];
-}
 
 export interface CanvasDiffResult {
   nodeDiffs: Record<string, DiffStatus>;
@@ -31,26 +31,120 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function toIdList(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === "string");
+function readId(value: Record<string, unknown>): string | null {
+  if (typeof value["@id"] === "string") return value["@id"];
+  if (typeof value.id === "string") return value.id;
+  if (typeof value._id === "string") return value._id;
+  return null;
+}
+
+function extractSchemaTypeName(raw: string): string {
+  const compact = raw.trim();
+  const slashToken = compact.split("/").pop() ?? compact;
+  const hashToken = slashToken.split("#").pop() ?? slashToken;
+  const colonToken = hashToken.split(":").pop() ?? hashToken;
+  return colonToken;
+}
+
+function toFrontendNodeType(typeValue: unknown): NodeType | null {
+  if (typeof typeValue !== "string" || typeValue.trim() === "") {
+    return null;
   }
+  const normalized = extractSchemaTypeName(typeValue).toLowerCase();
+  if (normalized.includes("project")) return "project";
+  if (normalized.includes("folder")) return "folder";
+  if (normalized.includes("file")) return "file";
+  if (normalized.includes("function")) return "function";
+  if (normalized.includes("class")) return "class";
+  if (normalized.includes("codeelementgroup")) return "group";
+  if (normalized.includes("structuregroup")) return "group";
+  if (normalized.includes("callgroup")) return "group";
+  if (normalized.includes("group")) return "group";
+  if (normalized.includes("call")) return "call";
+  return null;
+}
+
+function normalizeTarget(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = readId(value);
+  if (!id) return undefined;
+
+  const targetNodeType =
+    (typeof value.node_type === "string" && (value.node_type as NodeType)) ||
+    toFrontendNodeType(value["@type"]) ||
+    "function";
+
+  return {
+    ...value,
+    id,
+    node_type: targetNodeType,
+  };
+}
+
+function normalizeDiffNodeBody(value: Record<string, unknown>): Record<string, unknown> {
+  const id = readId(value);
+  const nodeType =
+    (typeof value.node_type === "string" && (value.node_type as NodeType)) ||
+    toFrontendNodeType(value["@type"]);
+  const target =
+    normalizeTarget(value.target) ?? normalizeTarget(value.target_function);
+
+  return {
+    ...value,
+    ...(id ? { id, "@id": id } : {}),
+    ...(nodeType ? { node_type: nodeType } : {}),
+    ...(target ? { target } : {}),
+  };
+}
+
+function toNodeRef(value: unknown): DiffNodeRef | null {
   if (typeof value === "string") {
-    return [value];
+    return { id: value };
   }
-  return [];
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const normalized = normalizeDiffNodeBody(value);
+  const id = readId(normalized);
+  if (!id) {
+    return null;
+  }
+  return { id, body: normalized };
+}
+
+function mergeNodeRefs(existing: DiffNodeRef[], next: DiffNodeRef[]): DiffNodeRef[] {
+  const merged = new Map(existing.map((entry) => [entry.id, entry]));
+  for (const entry of next) {
+    const current = merged.get(entry.id);
+    if (!current || (!current.body && entry.body)) {
+      merged.set(entry.id, entry);
+    }
+  }
+  return [...merged.values()];
+}
+
+function toNodeRefList(value: unknown): DiffNodeRef[] {
+  if (Array.isArray(value)) {
+    const refs = value
+      .map((item) => toNodeRef(item))
+      .filter((item): item is DiffNodeRef => item !== null);
+    return mergeNodeRefs([], refs);
+  }
+  const ref = toNodeRef(value);
+  return ref ? [ref] : [];
 }
 
 function extractSwapListOps(operation: Record<string, unknown>): {
-  before: string[];
-  after: string[];
+  before: DiffNodeRef[];
+  after: DiffNodeRef[];
 }[] {
   const op = operation["@op"];
-  const result: { before: string[]; after: string[] }[] = [];
+  const result: { before: DiffNodeRef[]; after: DiffNodeRef[] }[] = [];
   if (op === "SwapList") {
     result.push({
-      before: toIdList(operation["@before"]),
-      after: toIdList(operation["@after"]),
+      before: toNodeRefList(operation["@before"]),
+      after: toNodeRefList(operation["@after"]),
     });
     const rest = operation["@rest"];
     if (isRecord(rest)) {
@@ -66,8 +160,8 @@ function extractSwapListOps(operation: Record<string, unknown>): {
         if (!isRecord(patchItem)) continue;
         if (patchItem["@op"] === "SwapValue") {
           result.push({
-            before: toIdList(patchItem["@before"]),
-            after: toIdList(patchItem["@after"]),
+            before: toNodeRefList(patchItem["@before"]),
+            after: toNodeRefList(patchItem["@after"]),
           });
         }
       }
@@ -111,25 +205,16 @@ function addNodeDiff(
 function addParentChildDiff(
   parentChildDiffs: Record<string, ParentChildDiff>,
   parentId: string,
-  added: string[],
-  removed: string[]
+  added: DiffNodeRef[],
+  removed: DiffNodeRef[]
 ) {
   if (!added.length && !removed.length) return;
 
   const current = parentChildDiffs[parentId] ?? { added: [], removed: [] };
-  const addedSet = new Set(current.added);
-  const removedSet = new Set(current.removed);
-
-  for (const id of added) {
-    addedSet.add(id);
-  }
-  for (const id of removed) {
-    removedSet.add(id);
-  }
 
   parentChildDiffs[parentId] = {
-    added: [...addedSet],
-    removed: [...removedSet],
+    added: mergeNodeRefs(current.added, added),
+    removed: mergeNodeRefs(current.removed, removed),
   };
 }
 
@@ -151,29 +236,35 @@ function handleOperation(
   );
 
   if (isChildSetOperation) {
-    const before = toIdList(opObject["@before"]);
-    const after = toIdList(opObject["@after"]);
+    let before = toNodeRefList(opObject["@before"]);
+    let after = toNodeRefList(opObject["@after"]);
 
     const swapListOps = extractSwapListOps(opObject);
     for (const swap of swapListOps) {
-      before.push(...swap.before);
-      after.push(...swap.after);
+      before = mergeNodeRefs(before, swap.before);
+      after = mergeNodeRefs(after, swap.after);
     }
 
-    const beforeSet = new Set(before);
-    const afterSet = new Set(after);
+    const beforeMap = new Map(before.map((entry) => [entry.id, entry]));
+    const afterMap = new Map(after.map((entry) => [entry.id, entry]));
 
-    const removed = [...beforeSet].filter((id) => !afterSet.has(id));
-    const added = [...afterSet].filter((id) => !beforeSet.has(id));
+    const removed = [...beforeMap.keys()]
+      .filter((id) => !afterMap.has(id))
+      .map((id) => beforeMap.get(id))
+      .filter((entry): entry is DiffNodeRef => !!entry);
+    const added = [...afterMap.keys()]
+      .filter((id) => !beforeMap.has(id))
+      .map((id) => afterMap.get(id))
+      .filter((entry): entry is DiffNodeRef => !!entry);
 
     // The parent document changed because its child-set membership changed.
     addNodeDiff(nodeDiffs, currentDocId, "updated");
     addParentChildDiff(parentChildDiffs, currentDocId, added, removed);
-    for (const id of added) {
-      addNodeDiff(nodeDiffs, id, "added");
+    for (const entry of added) {
+      addNodeDiff(nodeDiffs, entry.id, "added");
     }
-    for (const id of removed) {
-      addNodeDiff(nodeDiffs, id, "removed");
+    for (const entry of removed) {
+      addNodeDiff(nodeDiffs, entry.id, "removed");
     }
     return;
   }

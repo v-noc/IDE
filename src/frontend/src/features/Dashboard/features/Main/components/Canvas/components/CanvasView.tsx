@@ -98,7 +98,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  useEffect(() => {
+  const syncDiffOverlay = useEffectEvent(() => {
     let nextNodeIds = new Set<string>();
 
     setNodes((currentNodes) => {
@@ -106,23 +106,22 @@ const CanvasView: React.FC<CanvasViewProps> = ({
         initialNodes,
         currentNodes,
         parentChildDiffs,
-        nodeDiffs
+        nodeDiffs,
+        projectData,
       );
       nextNodeIds = nodeIds;
       return overlayNodes;
     });
+    console.log("overlayNodes", parentChildDiffs, nodeDiffs);
 
     setEdges(() =>
-      buildDiffOverlayEdges(initialEdges, parentChildDiffs, nextNodeIds)
+      buildDiffOverlayEdges(initialEdges, parentChildDiffs, nextNodeIds),
     );
-  }, [
-    initialNodes,
-    initialEdges,
-    parentChildDiffs,
-    setNodes,
-    setEdges,
-    nodeDiffs,
-  ]);
+  });
+
+  useEffect(() => {
+    syncDiffOverlay();
+  }, [initialNodes, initialEdges, parentChildDiffs, nodeDiffs]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 

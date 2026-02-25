@@ -1,5 +1,15 @@
 
 export type NodeType = "container" | "function" | "class" | "call" | "file" | "folder" | "project" | "group"
+export type TerminusSchemaType =
+  | "ProjectSchema"
+  | "FolderSchema"
+  | "FileSchema"
+  | "StructureGroupSchema"
+  | "CodeElementGroupSchema"
+  | "CallGroupSchema"
+  | "ClassSchema"
+  | "FunctionSchema"
+  | "CallSchema";
 
 
 export interface BaseNode {

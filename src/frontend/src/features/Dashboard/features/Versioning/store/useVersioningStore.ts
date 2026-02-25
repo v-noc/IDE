@@ -11,9 +11,13 @@ export interface CommitDisplay {
 }
 
 export type DiffStatus = 'added' | 'removed' | 'updated' | null;
+export interface DiffNodeRef {
+  id: string;
+  body?: Record<string, unknown>;
+}
 export interface ParentChildDiff {
-  added: string[];
-  removed: string[];
+  added: DiffNodeRef[];
+  removed: DiffNodeRef[];
 }
 
 interface VersioningState {
