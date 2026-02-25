@@ -56,19 +56,43 @@ const EnhancedNode = memo(function EnhancedNode({
 
   const activeTabId = useTabStore((s) => s.activeTabId);
 
-  const statusStyles = useMemo(() => {
+  const { statusStyles, contentStyles } = useMemo(() => {
     const status = data.metadata?.status;
-    if (!status || status === "idle") return {};
-    const colors: Record<string, string> = {
-      error: "#ef4444",
-      warning: "#f59e0b",
-      success: "#10b981",
+    const diffStatus = data.diffStatus;
+
+    let sStyles: React.CSSProperties = {};
+    let cStyles: React.CSSProperties = {};
+
+    // Base colors for diff statuses
+    const diffBorderColors: Record<string, string> = {
+      added: "#22c55e", // green-500
+      updated: "#3b82f6", // blue-500
+      removed: "#dc262676", // red-600 (more vibrant)
     };
-    return {
-      borderColor: colors[status],
-      boxShadow: `0 0 10px ${colors[status]}55`,
-    };
-  }, [data.metadata?.status]);
+
+    if (diffStatus && diffBorderColors[diffStatus as string]) {
+      sStyles.borderColor = diffBorderColors[diffStatus as string];
+      sStyles.borderWidth = "3px";
+
+      if (diffStatus === "removed") {
+        sStyles.opacity = 0.6;
+        cStyles.filter = "grayscale(100%) brightness(2)"; // Brighten to make white text pop on red
+        sStyles.backgroundColor = "#dc2626"; // red-600
+        sStyles.color = "#ffffff";
+        sStyles.pointerEvents = "none";
+      }
+    } else if (status && status !== "idle") {
+      const colors: Record<string, string> = {
+        error: "#ef4444",
+        warning: "#f59e0b",
+        success: "#10b981",
+      };
+      sStyles.borderColor = colors[status];
+      sStyles.boxShadow = `0 0 10px ${colors[status]}55`;
+    }
+
+    return { statusStyles: sStyles, contentStyles: cStyles };
+  }, [data.metadata?.status, data.diffStatus]);
 
   const { onAction } = useNodeHandlers(data.nodeId ?? "", activeTabId);
 
@@ -83,9 +107,11 @@ const EnhancedNode = memo(function EnhancedNode({
         selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
       }`}
       style={{
-        backgroundColor: data.bgColor,
-        color: data.textColor,
-        borderColor: selected ? "#f59e0b" : data.borderColor,
+        backgroundColor: statusStyles.backgroundColor || data.bgColor,
+        color: statusStyles.color || data.textColor,
+        borderColor: selected
+          ? "#f59e0b"
+          : statusStyles.borderColor || data.borderColor,
         ...statusStyles,
       }}
     >
@@ -95,49 +121,58 @@ const EnhancedNode = memo(function EnhancedNode({
         manuallyCreated={data.manuallyCreated}
         onAction={onAction}
       >
-        <NodeHeader
-          name={data.name}
-          icon={data.mainIcon}
-          iconColor={data.iconColor}
-          borderColor={data.borderColor}
-          textColor={data.textColor}
-          expandable={data.expandable}
-          expanded={data.expanded}
-          onToggle={data.onToggle}
-          hasCode={Boolean(nodeCode.hasCode)}
-          showCode={nodeCode.showCode}
-          onCodeToggle={handleCodeToggle}
-          status={data.metadata?.status}
-        />
+        <div style={contentStyles}>
+          <NodeHeader
+            name={data.name}
+            icon={data.mainIcon}
+            iconColor={(statusStyles.color as string) || data.iconColor}
+            borderColor={
+              (statusStyles.borderColor as string) || data.borderColor
+            }
+            textColor={(statusStyles.color as string) || data.textColor}
+            expandable={data.expandable}
+            expanded={data.expanded}
+            onToggle={data.onToggle}
+            hasCode={Boolean(nodeCode.hasCode)}
+            showCode={nodeCode.showCode}
+            onCodeToggle={handleCodeToggle}
+            status={data.metadata?.status}
+            diffStatus={data.diffStatus as any}
+          />
+
+          {nodeCode.showCode && nodeCode.hasCode ? (
+            <NodeCodeView
+              code={nodeCode.code}
+              fileName={nodeCode.fileName}
+              language={nodeCode.language}
+              onChange={nodeCode.setCode}
+              onSave={nodeCode.handleSave}
+              hasChanges={nodeCode.hasChanges}
+              isSaving={nodeCode.isSaving}
+              isLoading={nodeCode.isLoading}
+              borderColor={
+                (statusStyles.borderColor as string) || data.borderColor
+              }
+              iconColor={(statusStyles.color as string) || data.iconColor}
+            />
+          ) : (
+            <NodeDescription
+              description={data.metadata?.description}
+              textColor={data.textColor}
+            />
+          )}
+
+          <NodeFooter
+            createdAt={data.metadata?.createdAt}
+            updatedAt={data.metadata?.updatedAt}
+            textColor={(statusStyles.color as string) || data.textColor}
+            borderColor={
+              (statusStyles.borderColor as string) || data.borderColor
+            }
+            iconColor={(statusStyles.color as string) || data.iconColor}
+          />
+        </div>
       </NodeContextMenu>
-
-      {nodeCode.showCode && nodeCode.hasCode ? (
-        <NodeCodeView
-          code={nodeCode.code}
-          fileName={nodeCode.fileName}
-          language={nodeCode.language}
-          onChange={nodeCode.setCode}
-          onSave={nodeCode.handleSave}
-          hasChanges={nodeCode.hasChanges}
-          isSaving={nodeCode.isSaving}
-          isLoading={nodeCode.isLoading}
-          borderColor={data.borderColor}
-          iconColor={data.iconColor}
-        />
-      ) : (
-        <NodeDescription
-          description={data.metadata?.description}
-          textColor={data.textColor}
-        />
-      )}
-
-      <NodeFooter
-        createdAt={data.metadata?.createdAt}
-        updatedAt={data.metadata?.updatedAt}
-        textColor={data.textColor}
-        borderColor={data.borderColor}
-        iconColor={data.iconColor}
-      />
 
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />

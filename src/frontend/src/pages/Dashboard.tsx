@@ -57,7 +57,7 @@ const Dashboard = () => {
                 key={tab.id}
                 className={cn(
                   "h-full w-full",
-                  tab.id !== activeTabId && "hidden"
+                  tab.id !== activeTabId && "hidden",
                 )}
               >
                 <Workspace tabId={tab.id} />
@@ -67,7 +67,9 @@ const Dashboard = () => {
         }
         navbar={<Navbar projectId={projectId} />}
         leftSidebar={<SideBar />}
-        rightSidebar={isVersioningOpen ? <VersioningPanel /> : undefined}
+        rightSidebar={
+          isVersioningOpen ? <VersioningPanel tabId={activeTabId} /> : undefined
+        }
       />
       <SidebarDialogs />
     </ResizablePanelGroup>

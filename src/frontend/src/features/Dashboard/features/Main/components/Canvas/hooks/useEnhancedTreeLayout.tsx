@@ -23,8 +23,10 @@ const NODE_HEIGHT = 150;
 interface UseEnhancedTreeLayoutProps {
   centerNode: SimpleTreeNode | null;
   expandedNodeIds: string[];
+  selectedNode?: SimpleTreeNode;
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
+  nodeDiffs?: Record<string, 'added' | 'removed' | 'updated' | null>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
 }
 
@@ -34,6 +36,7 @@ export const useEnhancedTreeLayout = ({
   expandedNodeIds,
   toggleNodeExpansion,
   nodeMetadataMap,
+  nodeDiffs,
   layoutConfig: _layoutConfig,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
@@ -109,6 +112,7 @@ export const useEnhancedTreeLayout = ({
           nodeType: node.node_type,
           nodeId: nodeId,
           target: node.target,
+          diffStatus: nodeDiffs?.[nodeId] ?? null,
 
           manuallyCreated:
             (node as unknown as { manually_created?: boolean })
@@ -181,6 +185,6 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap]);
+  }, [centerNode, expandedNodeIds, metadataMap, nodeDiffs]);
   return { initialNodes, initialEdges };
 };

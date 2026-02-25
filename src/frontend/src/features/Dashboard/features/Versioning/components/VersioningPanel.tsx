@@ -2,9 +2,19 @@ import React from "react";
 import { X } from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitHistory from "./CommitHistory";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useCommitHistory } from "../hooks/useCommitHistory";
 
-const VersioningPanel: React.FC = () => {
+const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const { togglePanel } = useVersioningStore();
+  const { projectData, selectedNode, secondarySelectedNode } =
+    useProjectStore();
+
+  const nodeId = secondarySelectedNode?.[tabId] || selectedNode?.[tabId];
+
+  const { data: commits } = useCommitHistory(projectData?.id, nodeId?.id);
+  console.log(commits);
+  console.log(nodeId, " ", projectData?.id);
 
   return (
     <div className="flex h-full w-full flex-col border-l bg-white shadow-sm transition-all duration-300">

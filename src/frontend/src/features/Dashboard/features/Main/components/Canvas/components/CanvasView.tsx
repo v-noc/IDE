@@ -23,6 +23,7 @@ import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
@@ -61,6 +62,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const handleNodeSelection = useTabStore(
     useShallow((s) => s.handleNodeSelection),
   );
+  const nodeDiffs = useVersioningStore(useShallow((s) => s.nodeDiffs));
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -83,6 +85,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     selectedNode: effectiveSelectedNode as SimpleTreeNode,
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
+    nodeDiffs,
     layoutConfig,
   });
 

@@ -14,12 +14,19 @@ interface NodeHeaderProps {
   showCode?: boolean;
   onCodeToggle?: () => void;
   status?: "error" | "warning" | "success" | "idle";
+  diffStatus?: "added" | "removed" | "updated" | null;
 }
 
 const statusColors: Record<string, string> = {
   error: "#ef4444",
   warning: "#f59e0b",
   success: "#10b981",
+};
+
+const diffColors: Record<string, { bg: string; text: string; label: string }> = {
+  added: { bg: "bg-green-100", text: "text-green-700", label: "Added" },
+  removed: { bg: "bg-red-100", text: "text-red-700", label: "Removed" },
+  updated: { bg: "bg-blue-100", text: "text-blue-700", label: "Updated" },
 };
 
 export const NodeHeader = memo(function NodeHeader({
@@ -35,23 +42,23 @@ export const NodeHeader = memo(function NodeHeader({
   showCode,
   onCodeToggle,
   status,
+  diffStatus,
 }: NodeHeaderProps) {
   return (
     <div
       className="flex items-center gap-3 border-b px-4 py-3.5 bg-slate-50/30"
-      style={{ borderColor }}
+      style={{ borderColor: diffStatus ? 'transparent' : borderColor }}
     >
       {expandable && (
         <button
           onClick={() => {
             onToggle?.();
           }}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
-            expanded ? "bg-slate-200/5" : "bg-slate-100/15"
-          }`}
+          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${expanded ? "bg-slate-200/5" : "bg-slate-100/15"
+            }`}
           style={{
             borderColor,
-          
+
           }}
         >
           {expanded ? (
@@ -80,14 +87,21 @@ export const NodeHeader = memo(function NodeHeader({
         />
       )}
 
+      {diffStatus && diffColors[diffStatus] && (
+        <span
+          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm ${diffColors[diffStatus].bg} ${diffColors[diffStatus].text} border border-current/20`}
+        >
+          {diffColors[diffStatus].label}
+        </span>
+      )}
+
       {hasCode && (
         <button
           onClick={() => {
             onCodeToggle?.()
           }}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
-            showCode ? "bg-slate-200/5" : "bg-slate-100/15"
-          }`}
+          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${showCode ? "bg-slate-200/5" : "bg-slate-100/15"
+            }`}
           style={{
             borderColor,
             color: iconColor,
