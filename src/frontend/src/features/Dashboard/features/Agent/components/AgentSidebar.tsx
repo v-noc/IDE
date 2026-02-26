@@ -1,9 +1,9 @@
-import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useConversationStore } from "../store/useConversationStore";
 import { selectMessageText } from "../store/selectors/conversationSelectors";
 import { useShallow } from "zustand/react/shallow";
 import { AgentChatInput } from "./AgentChatInput";
+import { WalkthroughView } from "./WalkthroughView/WalkthroughView";
 
 interface AgentSidebarProps {
   className?: string;
@@ -19,13 +19,6 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
   );
 
   const messages = currentConversation?.messages;
-  const totalEvents = useMemo(() => {
-    return (currentConversation?.messages ?? []).flatMap((message) =>
-      message.parts
-        .filter((part) => part.type === "event")
-        .map((part) => part.event),
-    ).length;
-  }, [currentConversation]);
 
   return (
     <aside
@@ -69,17 +62,7 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
             )}
           </section>
         ) : (
-          <section className="rounded-md border border-border bg-muted/40 p-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Walkthrough Snapshot
-            </p>
-            <p className="text-xs text-foreground">
-              Events in current conversation: {totalEvents}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Playback controls are intentionally out of scope for this step.
-            </p>
-          </section>
+          <WalkthroughView conversation={currentConversation} />
         )}
       </div>
 

@@ -102,4 +102,72 @@ export const conversationFixtures: Conversation[] = [
       },
     ],
   },
+  {
+    id: "chat-4",
+    title: "Node spotlight demo",
+    date: "Feb 26, 2026",
+    duration: "3 min",
+    messages: [
+      {
+        id: "chat-4-assistant-1",
+        role: "assistant",
+        parts: [
+          {
+            type: "text",
+            text: "File node highlight: `main` (node_type: file). ID: FileSchema/372f9c6e-7ea2-44ed-9678-b56a0ca8c3f1.",
+          },
+          {
+            type: "event",
+            event: {
+              at: 0,
+              type: "focus",
+              payload: {
+                nodeId: "FileSchema/372f9c6e-7ea2-44ed-9678-b56a0ca8c3f1",
+              },
+            },
+          },
+        ],
+      },
+      {
+        id: "chat-4-assistant-2",
+        role: "assistant",
+        parts: [
+          {
+            type: "text",
+            text: "Call node highlight: `main` (node_type: call). ID: CallSchema/9a1dc48d-1099-4fcb-8610-d266765bf6f8. Target function: FunctionSchema/11b1c19e-faa5-44f1-836a-c1ef80d43c87.",
+          },
+          {
+            type: "event",
+            event: {
+              at: 1200,
+              type: "focus",
+              payload: {
+                nodeId: "CallSchema/9a1dc48d-1099-4fcb-8610-d266765bf6f8",
+              },
+            },
+          },
+        ],
+      },
+      {
+        id: "chat-4-assistant-3",
+        role: "assistant",
+        parts: [
+          {
+            type: "text",
+            text: "Function node highlight: `runner` (node_type: function). ID: FunctionSchema/fb04a14a-2746-4212-8bdd-cb70779c416c. qname: sample_project.main.runner.",
+          },
+          {
+            type: "event",
+            event: {
+              at: 2400,
+              type: "focus",
+              payload: {
+                nodeId: "FunctionSchema/fb04a14a-2746-4212-8bdd-cb70779c416c",
+              },
+            },
+          },
+        ],
+      },
+    ],
+  },
 ];
