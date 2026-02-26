@@ -18,6 +18,7 @@ import { useShallow } from "zustand/react/shallow";
 import { SidebarDialogs } from "@/features/Dashboard/components/SidebarDialogs";
 import VersioningPanel from "@/features/Dashboard/features/Versioning/components/VersioningPanel";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import AgentOverlay from "@/features/Dashboard/features/Agent";
 
 /**
  * Dashboard Page - Entry point for the IDE dashboard.
@@ -56,11 +57,12 @@ const Dashboard = () => {
               <div
                 key={tab.id}
                 className={cn(
-                  "h-full w-full",
+                  "relative h-full w-full",
                   tab.id !== activeTabId && "hidden",
                 )}
               >
                 <Workspace tabId={tab.id} />
+                <AgentOverlay />
               </div>
             ))}
           </RightSidebar>

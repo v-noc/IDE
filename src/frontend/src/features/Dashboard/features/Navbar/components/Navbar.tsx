@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/menubar";
 import { ProgressIndicator } from "./ProgressIndicator";
 import HistoryButton from "../../Versioning/components/HistoryButton";
+import { AgentToggleButton } from "../../Agent/components/AgentToggleButton";
 
 interface NavbarProps {
   projectId?: string;
@@ -44,6 +45,7 @@ const Navbar = ({ projectId }: NavbarProps) => {
       </Menubar>
       <div className="flex items-center gap-2 mr-4">
         <ProgressIndicator projectId={projectId} />
+        <AgentToggleButton />
         <HistoryButton />
       </div>
     </div>
