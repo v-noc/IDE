@@ -67,7 +67,7 @@ export async function focusHandler(
   activeCleanup?.();
 
   const nodeId = readNodeId(event);
-  console.log("nodeId", nodeId);
+
   if (!nodeId) return;
 
   // const escapedId = cssEscape(nodeId);
