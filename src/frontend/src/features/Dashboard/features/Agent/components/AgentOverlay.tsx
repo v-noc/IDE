@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Clock3, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -13,16 +14,37 @@ const MIN_WIDTH = 280;
 const DEFAULT_WIDTH = 360;
 const MAX_WIDTH = 720;
 const CHAT_HISTORY_ITEMS = [
-  "Analyze dependency graph",
-  "Explain selected node changes",
-  "Summarize version diff",
-  "Generate test checklist",
+  {
+    id: "chat-1",
+    title: "Analyze dependency graph",
+    date: "Feb 26, 2026",
+    duration: "18 min",
+  },
+  {
+    id: "chat-2",
+    title: "Explain selected node changes",
+    date: "Feb 25, 2026",
+    duration: "1 hr 05 min",
+  },
+  {
+    id: "chat-3",
+    title: "Summarize version diff",
+    date: "Feb 24, 2026",
+    duration: "42 min",
+  },
+  {
+    id: "chat-4",
+    title: "Generate test checklist",
+    date: "Feb 21, 2026",
+    duration: "27 min",
+  },
 ];
 
 export function AgentOverlay() {
   const { isOpen, setOpen } = useAgentOverlayStore();
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const startResize = useCallback(() => {
     setIsResizing(true);
@@ -55,6 +77,16 @@ export function AgentOverlay() {
     };
   }, [isResizing]);
 
+  const filteredHistory = CHAT_HISTORY_ITEMS.filter((item) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      item.title.toLowerCase().includes(query) ||
+      item.date.toLowerCase().includes(query) ||
+      item.duration.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <div className="pointer-events-none absolute inset-0 z-30">
       <div
@@ -84,20 +116,41 @@ export function AgentOverlay() {
                 <Clock3 size={14} />
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" side="bottom" className="w-64 p-2">
-              <div className="space-y-1">
-                <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <PopoverContent align="end" side="bottom" className="w-80 p-2">
+              <div className="space-y-2">
+                <p className="px-2 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Chat history
                 </p>
-                {CHAT_HISTORY_ITEMS.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className="w-full rounded-sm px-2 py-1.5 text-left text-xs text-foreground transition hover:bg-muted"
-                  >
-                    {item}
-                  </button>
-                ))}
+                <div className="px-2">
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Search chats..."
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div className="max-h-72 space-y-1 overflow-auto px-1 pb-1">
+                  {filteredHistory.length > 0 ? (
+                    filteredHistory.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="w-full rounded-sm px-2 py-2 text-left transition hover:bg-muted"
+                      >
+                        <p className="truncate text-xs font-medium text-foreground">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {item.date} · {item.duration}
+                        </p>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                      No chat history found.
+                    </p>
+                  )}
+                </div>
               </div>
             </PopoverContent>
           </Popover>
