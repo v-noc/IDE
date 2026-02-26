@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Clock3, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   Popover,
   PopoverContent,
@@ -9,39 +10,23 @@ import {
 } from "@/components/ui/popover";
 import { AgentSidebar } from "./AgentSidebar";
 import { useAgentOverlayStore } from "../store/useAgentOverlayStore";
+import { useConversationStore } from "../store/useConversationStore";
+import { useShallow } from "zustand/react/shallow";
 
 const MIN_WIDTH = 280;
 const DEFAULT_WIDTH = 360;
 const MAX_WIDTH = 720;
-const CHAT_HISTORY_ITEMS = [
-  {
-    id: "chat-1",
-    title: "Analyze dependency graph",
-    date: "Feb 26, 2026",
-    duration: "18 min",
-  },
-  {
-    id: "chat-2",
-    title: "Explain selected node changes",
-    date: "Feb 25, 2026",
-    duration: "1 hr 05 min",
-  },
-  {
-    id: "chat-3",
-    title: "Summarize version diff",
-    date: "Feb 24, 2026",
-    duration: "42 min",
-  },
-  {
-    id: "chat-4",
-    title: "Generate test checklist",
-    date: "Feb 21, 2026",
-    duration: "27 min",
-  },
-];
 
 export function AgentOverlay() {
   const { isOpen, setOpen } = useAgentOverlayStore();
+  const [conversations, currentConversationId, setCurrentConversation] =
+    useConversationStore(
+      useShallow((state) => [
+        state.allConversations,
+        state.currentConversation?.id,
+        state.setCurrentConversation,
+      ]),
+    );
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,7 +41,10 @@ export function AgentOverlay() {
     const handleMouseMove = (event: MouseEvent) => {
       const viewportMax = Math.min(MAX_WIDTH, window.innerWidth * 0.6);
       const nextWidth = window.innerWidth - event.clientX;
-      const clampedWidth = Math.max(MIN_WIDTH, Math.min(viewportMax, nextWidth));
+      const clampedWidth = Math.max(
+        MIN_WIDTH,
+        Math.min(viewportMax, nextWidth),
+      );
       setWidth(clampedWidth);
     };
 
@@ -77,7 +65,7 @@ export function AgentOverlay() {
     };
   }, [isResizing]);
 
-  const filteredHistory = CHAT_HISTORY_ITEMS.filter((item) => {
+  const filteredHistory = conversations.filter((item) => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return true;
     return (
@@ -135,7 +123,11 @@ export function AgentOverlay() {
                       <button
                         key={item.id}
                         type="button"
-                        className="w-full rounded-sm px-2 py-2 text-left transition hover:bg-muted"
+                        onClick={() => setCurrentConversation(item.id)}
+                        className={cn(
+                          "w-full rounded-sm px-2 py-2 text-left transition hover:bg-muted",
+                          currentConversationId === item.id && "bg-muted",
+                        )}
                       >
                         <p className="truncate text-xs font-medium text-foreground">
                           {item.title}

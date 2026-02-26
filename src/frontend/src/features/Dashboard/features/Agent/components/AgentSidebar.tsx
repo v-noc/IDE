@@ -1,10 +1,31 @@
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useConversationStore } from "../store/useConversationStore";
+import { selectMessageText } from "../store/selectors/conversationSelectors";
+import { useShallow } from "zustand/react/shallow";
 
 interface AgentSidebarProps {
   className?: string;
 }
 
 export function AgentSidebar({ className }: AgentSidebarProps) {
+  const [viewMode, setViewMode, currentConversation] = useConversationStore(
+    useShallow((state) => [
+      state.viewMode,
+      state.setViewMode,
+      state.currentConversation,
+    ]),
+  );
+
+  const messages = currentConversation?.messages;
+  const totalEvents = useMemo(() => {
+    return (currentConversation?.messages ?? []).flatMap((message) =>
+      message.parts
+        .filter((part) => part.type === "event")
+        .map((part) => part.event),
+    ).length;
+  }, [currentConversation]);
+
   return (
     <aside
       className={cn(
@@ -13,32 +34,80 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
       )}
     >
       <div className="border-b border-border px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          AI Cognitive Replay
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              AI Cognitive Replay
+            </p>
+            <p className="mt-1 truncate text-xs text-foreground">
+              {currentConversation?.title ?? "No conversation selected"}
+            </p>
+          </div>
+          <div className="rounded-md border border-border p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("chat")}
+              className={cn(
+                "rounded px-2 py-1 text-[11px] transition",
+                viewMode === "chat"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("walkthrough")}
+              className={cn(
+                "rounded px-2 py-1 text-[11px] transition",
+                viewMode === "walkthrough"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              Walkthrough
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-4">
-        <section className="rounded-md border border-border bg-muted/40 p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Thought Stream
-          </p>
-          <ul className="space-y-1 text-xs text-foreground">
-            <li>Analyzing dependencies...</li>
-            <li>Identifying entry point...</li>
-            <li>Focusing on selected node...</li>
-          </ul>
-        </section>
-
-        <section className="rounded-md border border-border bg-muted/40 p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Explanation
-          </p>
-          <p className="text-xs leading-relaxed text-foreground">
-            Basic placeholder panel for agent explanations. Replace this with
-            live stream and context when logic is added.
-          </p>
-        </section>
+        {viewMode === "chat" ? (
+          <section className="space-y-2">
+            {messages && messages.length > 0 ? (
+              messages.map((message) => (
+                <article
+                  key={message.id}
+                  className="rounded-md border border-border bg-muted/40 p-3"
+                >
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {message.role}
+                  </p>
+                  <p className="text-xs leading-relaxed text-foreground">
+                    {selectMessageText(message.parts) || "No text content."}
+                  </p>
+                </article>
+              ))
+            ) : (
+              <p className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                No messages in this conversation.
+              </p>
+            )}
+          </section>
+        ) : (
+          <section className="rounded-md border border-border bg-muted/40 p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Walkthrough Snapshot
+            </p>
+            <p className="text-xs text-foreground">
+              Events in current conversation: {totalEvents}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Playback controls are intentionally out of scope for this step.
+            </p>
+          </section>
+        )}
       </div>
 
       <div className="border-t border-border p-3">

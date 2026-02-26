@@ -7,7 +7,7 @@ interface AgentOverlayState {
 }
 
 export const useAgentOverlayStore = create<AgentOverlayState>((set) => ({
-  isOpen: true,
+  isOpen: false,
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
   setOpen: (open) => set({ isOpen: open }),
 }));

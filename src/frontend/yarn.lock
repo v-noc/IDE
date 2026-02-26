@@ -4472,6 +4472,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"driver.js@npm:^1.4.0":
+  version: 1.4.0
+  resolution: "driver.js@npm:1.4.0"
+  checksum: 10c0/f868e85037d4180d55a883ec5bdad7a59e3b16e84438af4285ad605cab651b21fe565839a1607992362b0c028309d4ae6d052926d1c4ab67b2c62142a579b529
+  languageName: node
+  linkType: hard
+
 "eastasianwidth@npm:^0.2.0":
   version: 0.2.0
   resolution: "eastasianwidth@npm:0.2.0"
@@ -5016,6 +5023,7 @@ __metadata:
     cmdk: "npm:^1.1.1"
     dagre: "npm:^0.8.5"
     date-fns: "npm:^4.1.0"
+    driver.js: "npm:^1.4.0"
     eslint: "npm:^9.30.1"
     eslint-plugin-react-hooks: "npm:^5.2.0"
     eslint-plugin-react-refresh: "npm:^0.4.20"
