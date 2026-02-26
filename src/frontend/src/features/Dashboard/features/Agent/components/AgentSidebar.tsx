@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useConversationStore } from "../store/useConversationStore";
 import { selectMessageText } from "../store/selectors/conversationSelectors";
 import { useShallow } from "zustand/react/shallow";
+import { AgentChatInput } from "./AgentChatInput";
 
 interface AgentSidebarProps {
   className?: string;
@@ -34,41 +35,13 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
       )}
     >
       <div className="border-b border-border px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              AI Cognitive Replay
-            </p>
-            <p className="mt-1 truncate text-xs text-foreground">
-              {currentConversation?.title ?? "No conversation selected"}
-            </p>
-          </div>
-          <div className="rounded-md border border-border p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode("chat")}
-              className={cn(
-                "rounded px-2 py-1 text-[11px] transition",
-                viewMode === "chat"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              Chat
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("walkthrough")}
-              className={cn(
-                "rounded px-2 py-1 text-[11px] transition",
-                viewMode === "walkthrough"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              Walkthrough
-            </button>
-          </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            AI Cognitive Replay
+          </p>
+          <p className="mt-1 truncate text-xs text-foreground">
+            {currentConversation?.title ?? "No conversation selected"}
+          </p>
         </div>
       </div>
 
@@ -111,8 +84,34 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
       </div>
 
       <div className="border-t border-border p-3">
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          Ask AI about this code...
+        <AgentChatInput />
+        <div className="mt-3 flex justify-center">
+          <div className="rounded-md border border-border p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("chat")}
+              className={cn(
+                "rounded px-2 py-1 text-[11px] transition",
+                viewMode === "chat"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("walkthrough")}
+              className={cn(
+                "rounded px-2 py-1 text-[11px] transition",
+                viewMode === "walkthrough"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              Walkthrough
+            </button>
+          </div>
         </div>
       </div>
     </aside>
