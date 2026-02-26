@@ -20,6 +20,7 @@ const CHILD_SET_FIELDS = new Set([
 export interface CanvasDiffResult {
   nodeDiffs: Record<string, DiffStatus>;
   parentChildDiffs: Record<string, ParentChildDiff>;
+  diffNodesMap: Record<string, Record<string, unknown>>;
 }
 
 type DiffCtx = {
@@ -46,7 +47,7 @@ function extractSchemaTypeName(raw: string): string {
   return colonToken;
 }
 
-function toFrontendNodeType(typeValue: unknown): NodeType | null {
+export function toFrontendNodeType(typeValue: unknown): NodeType | null {
   if (typeof typeValue !== "string" || typeValue.trim() === "") {
     return null;
   }
@@ -278,16 +279,35 @@ function walkDiff(
   value: unknown,
   ctx: DiffCtx,
   nodeDiffs: Record<string, DiffStatus>,
-  parentChildDiffs: Record<string, ParentChildDiff>
+  parentChildDiffs: Record<string, ParentChildDiff>,
+  diffNodesMap: Record<string, Record<string, unknown>>
 ) {
   if (Array.isArray(value)) {
     for (const item of value) {
-      walkDiff(item, ctx, nodeDiffs, parentChildDiffs);
+      walkDiff(item, ctx, nodeDiffs, parentChildDiffs, diffNodesMap);
     }
     return;
   }
 
   if (!isRecord(value)) return;
+
+  if (typeof value["@op"] === "string" && (value["@op"] === "Insert" || value["@op"] === "Delete")) {
+    const nodeBody = (value["@insert"] || value["@delete"]) as Record<string, unknown>;
+    if (isRecord(nodeBody) && typeof nodeBody["@id"] === "string") {
+      const id = nodeBody["@id"];
+      const cached = diffNodesMap[id] || {};
+      let addedKeys = false;
+      for (const [k, v] of Object.entries(nodeBody)) {
+        if (!k.startsWith("@") || k === "@type" || k === "@id") {
+          cached[k] = v;
+          addedKeys = true;
+        }
+      }
+      if (addedKeys) {
+        diffNodesMap[id] = cached;
+      }
+    }
+  }
 
   const nextCtx: DiffCtx = {
     currentDocumentId:
@@ -305,7 +325,8 @@ function walkDiff(
       nested,
       { ...nextCtx, currentField: key },
       nodeDiffs,
-      parentChildDiffs
+      parentChildDiffs,
+      diffNodesMap
     );
   }
 }
@@ -313,17 +334,19 @@ function walkDiff(
 export function parseTerminusJsonDiff(diff: TerminusJsonDiff | undefined): CanvasDiffResult {
   const nodeDiffs: Record<string, DiffStatus> = {};
   const parentChildDiffs: Record<string, ParentChildDiff> = {};
+  const diffNodesMap: Record<string, Record<string, unknown>> = {};
 
   if (!diff) {
-    return { nodeDiffs, parentChildDiffs };
+    return { nodeDiffs, parentChildDiffs, diffNodesMap };
   }
 
   walkDiff(
     diff,
     { currentDocumentId: null, currentField: null },
     nodeDiffs,
-    parentChildDiffs
+    parentChildDiffs,
+    diffNodesMap
   );
 
-  return { nodeDiffs, parentChildDiffs };
+  return { nodeDiffs, parentChildDiffs, diffNodesMap };
 }

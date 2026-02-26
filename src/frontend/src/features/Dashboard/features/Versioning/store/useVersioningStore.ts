@@ -25,12 +25,14 @@ interface VersioningState {
   selectedCommitId: string | null;
   nodeDiffs: Record<string, DiffStatus>;
   parentChildDiffs: Record<string, ParentChildDiff>;
+  diffNodesMap: Record<string, Record<string, unknown>>;
   currentCommitId: string | null;
   setCurrentCommitId: (id: string | null) => void;
   setSelectedCommit: (id: string | null) => void;
   setDiffState: (
     nodeDiffs: Record<string, DiffStatus>,
-    parentChildDiffs: Record<string, ParentChildDiff>
+    parentChildDiffs: Record<string, ParentChildDiff>,
+    diffNodesMap: Record<string, Record<string, unknown>>
   ) => void;
   clearDiffState: () => void;
   togglePanel: () => void;
@@ -44,6 +46,7 @@ export const useVersioningStore = create<VersioningState>()(
       selectedCommitId: null,
       nodeDiffs: {},
       parentChildDiffs: {},
+      diffNodesMap: {},
       currentCommitId: null,
       setCurrentCommitId: (id) => set({ currentCommitId: id }),
       togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
@@ -52,14 +55,17 @@ export const useVersioningStore = create<VersioningState>()(
         selectedCommitId: id,
         nodeDiffs: {},
         parentChildDiffs: {},
+        diffNodesMap: {},
       }),
-      setDiffState: (nodeDiffs, parentChildDiffs) => set({
+      setDiffState: (nodeDiffs, parentChildDiffs, diffNodesMap) => set({
         nodeDiffs,
         parentChildDiffs,
+        diffNodesMap,
       }),
       clearDiffState: () => set({
         nodeDiffs: {},
         parentChildDiffs: {},
+        diffNodesMap: {},
       }),
     }),
     { name: 'versioning-store' }

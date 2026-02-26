@@ -24,10 +24,7 @@ import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
-import {
-  buildDiffOverlayEdges,
-  buildDiffOverlayNodes,
-} from "@/features/Dashboard/features/Versioning/utils/canvasDiffOverlay";
+
 
 const nodeTypes = {
   enhanced: EnhancedNode,
@@ -66,10 +63,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const handleNodeSelection = useTabStore(
     useShallow((s) => s.handleNodeSelection),
   );
+
   const nodeDiffs = useVersioningStore(useShallow((s) => s.nodeDiffs));
   const parentChildDiffs = useVersioningStore(
     useShallow((s) => s.parentChildDiffs),
   );
+  const diffNodesMap = useVersioningStore(useShallow((s) => s.diffNodesMap));
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -87,41 +86,31 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const effectiveSelectedNode = secondarySelectedNode
     ? secondarySelectedNode
     : centerNode;
+
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
     centerNode: centerNode,
     selectedNode: effectiveSelectedNode as SimpleTreeNode,
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
+    parentChildDiffs,
+    nodeDiffs,
+    diffNodesMap,
+    projectData,
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const syncDiffOverlay = useEffectEvent(() => {
-    let nextNodeIds = new Set<string>();
-
-    setNodes((currentNodes) => {
-      const { nodes: overlayNodes, nodeIds } = buildDiffOverlayNodes(
-        initialNodes,
-        currentNodes,
-        parentChildDiffs,
-        nodeDiffs,
-        projectData,
-      );
-      nextNodeIds = nodeIds;
-      return overlayNodes;
-    });
-    console.log("overlayNodes", parentChildDiffs, nodeDiffs);
-
-    setEdges(() =>
-      buildDiffOverlayEdges(initialEdges, parentChildDiffs, nextNodeIds),
-    );
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    console.log("syncDiffOverlay", parentChildDiffs, nodeDiffs, diffNodesMap);
   });
 
   useEffect(() => {
     syncDiffOverlay();
-  }, [initialNodes, initialEdges, parentChildDiffs, nodeDiffs]);
+  }, [initialNodes, initialEdges, parentChildDiffs, nodeDiffs, diffNodesMap]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 

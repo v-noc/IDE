@@ -15,6 +15,7 @@ import type {
   DiffStatus,
   ParentChildDiff,
 } from "../store/useVersioningStore";
+import { toFrontendNodeType } from "@/lib/versioningDiff";
 
 type OverlayNodesResult = {
   nodes: Node[];
@@ -56,7 +57,7 @@ function asNodeType(value: unknown, fallback: NodeType = "file"): NodeType {
   return fallback;
 }
 
-type FallbackNodeData = {
+export type FallbackNodeData = {
   id: string;
   name: string;
   node_type: NodeType;
@@ -101,8 +102,14 @@ function fromProjectNode(node: AnyNodeTree): FallbackNodeData {
   };
 }
 
-function fromDiffBody(ref: DiffNodeRef): FallbackNodeData | null {
-  const body = asRecord(ref.body);
+function fromDiffBody(
+  ref: DiffNodeRef,
+  diffNodesMap?: Record<string, Record<string, unknown>>
+): FallbackNodeData | null {
+  let body = asRecord(ref.body);
+  if (!body && diffNodesMap) {
+    body = asRecord(diffNodesMap[ref.id]);
+  }
   if (!body) return null;
 
   const id =
@@ -115,14 +122,16 @@ function fromDiffBody(ref: DiffNodeRef): FallbackNodeData | null {
   const targetRecord = asRecord(body.target);
   const targetId = targetRecord && typeof targetRecord.id === "string"
     ? targetRecord.id
-      : null;
+    : null;
 
 
+
+  const fallbackType = (body.node_type ?? toFrontendNodeType(body["@type"])) || "file";
 
   return {
     id,
     name: typeof body.name === "string" ? body.name : id,
-    node_type: asNodeType(body.node_type ?? body["@type"], "file"),
+    node_type: asNodeType(fallbackType, "file"),
     icon: typeof body.icon === "string" ? body.icon : undefined,
     description: typeof body.description === "string" ? body.description : undefined,
     created_at: typeof body.created_at === "string" ? body.created_at : undefined,
@@ -141,15 +150,16 @@ function fromDiffBody(ref: DiffNodeRef): FallbackNodeData | null {
   };
 }
 
-function createFallbackNode(
+export function createFallbackNode(
   childRef: DiffNodeRef,
   parentId: string,
   parentNode: Node | undefined,
   projectData: ProjectNodeTree | null | undefined,
-  index: number
+  index: number,
+  diffNodesMap?: Record<string, Record<string, unknown>>
 ): Node | null {
   const fromStore = projectData ? findNodeByKey(projectData, childRef.id) : null;
-  const source = fromStore ? fromProjectNode(fromStore) : fromDiffBody(childRef);
+  const source = fromStore ? fromProjectNode(fromStore) : fromDiffBody(childRef, diffNodesMap);
   if (!source) return null;
 
   const nodeStyle = getNodeStyle(source as unknown as ContainerNodeTree);
@@ -185,6 +195,7 @@ function createFallbackNode(
       target: source.target,
       manuallyCreated: source.manually_created ?? false,
       parentId,
+      isInjected: true,
     },
   };
 }
@@ -194,6 +205,7 @@ export function buildDiffOverlayNodes(
   currentNodes: Node[],
   parentChildDiffs: Record<string, ParentChildDiff>,
   nodeDiffs: Record<string, DiffStatus>,
+  diffNodesMap?: Record<string, Record<string, unknown>>,
   projectData?: ProjectNodeTree | null
 ): OverlayNodesResult {
   const currentNodeMap = new Map(currentNodes.map((n) => [n.id, n]));
@@ -249,7 +261,8 @@ export function buildDiffOverlayNodes(
         parentId,
         parentNode,
         projectData,
-        injectionIndex
+        injectionIndex,
+        diffNodesMap
       );
       if (!fallbackNode) continue;
       mergedNodeMap.set(childId, withDiffStatus(fallbackNode, nodeDiffs));

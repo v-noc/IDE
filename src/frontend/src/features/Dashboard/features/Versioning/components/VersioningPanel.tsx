@@ -80,7 +80,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
 
     const parsed = parseTerminusJsonDiff(rawDiff);
 
-    setDiffState(parsed.nodeDiffs, parsed.parentChildDiffs);
+    setDiffState(parsed.nodeDiffs, parsed.parentChildDiffs, parsed.diffNodesMap);
   }, [
     selectedCommitId,
     currentCommitId,

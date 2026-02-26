@@ -38,6 +38,7 @@ export interface EnhancedNodeData {
   focused?: boolean;
   selected?: boolean;
   manuallyCreated?: boolean;
+  isInjected?: boolean;
   [key: string]: unknown;
 }
 
@@ -74,6 +75,10 @@ const EnhancedNode = memo(function EnhancedNode({
       sStyles.borderColor = diffBorderColors[diffStatus as string];
       sStyles.borderWidth = "3px";
 
+      if (diffStatus === "added" && data.isInjected) {
+        sStyles.opacity = 0.6;
+      }
+
       if (diffStatus === "removed") {
         sStyles.opacity = 0.6;
         cStyles.filter = "grayscale(100%) brightness(2)"; // Brighten to make white text pop on red
@@ -81,13 +86,17 @@ const EnhancedNode = memo(function EnhancedNode({
         sStyles.color = "#ffffff";
         sStyles.pointerEvents = "none";
       }
-    } else if (status && status !== "idle") {
+    }
+
+    if (status && status !== "idle") {
       const colors: Record<string, string> = {
         error: "#ef4444",
         warning: "#f59e0b",
         success: "#10b981",
       };
-      sStyles.borderColor = colors[status];
+      if (!sStyles.borderColor) {
+        sStyles.borderColor = colors[status];
+      }
       sStyles.boxShadow = `0 0 10px ${colors[status]}55`;
     }
 
@@ -103,9 +112,8 @@ const EnhancedNode = memo(function EnhancedNode({
 
   return (
     <div
-      className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${
-        selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
-      }`}
+      className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
+        }`}
       style={{
         backgroundColor: statusStyles.backgroundColor || data.bgColor,
         color: statusStyles.color || data.textColor,
