@@ -25,7 +25,6 @@ import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 
-
 const nodeTypes = {
   enhanced: EnhancedNode,
 };
@@ -105,7 +104,6 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const syncDiffOverlay = useEffectEvent(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
-    console.log("syncDiffOverlay", parentChildDiffs, nodeDiffs, diffNodesMap);
   });
 
   useEffect(() => {
