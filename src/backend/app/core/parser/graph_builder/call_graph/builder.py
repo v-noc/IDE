@@ -18,6 +18,7 @@ from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.graph_builder.call_graph.models import ResolvedCall
 from app.core.parser.graph_builder.performance import tracker
 from app.core.services.call_service import CallService
+from app.core.parser.jedi_adapter.call_resolver.call_resolver import CallFrameStack, CallHierarchyResolver
 
 
 from .resolver import CallResolverService
@@ -40,6 +41,7 @@ class CallChainBuilder:
 
         # Helper services
         self.call_service = CallService(repos, project_node)
+        self.call_hierarchy_resolver = CallHierarchyResolver(jedi_manager)
         self.resolver = CallResolverService(jedi_manager, repos)
         self.processor = ScopeProcessor(self.call_service)
 
@@ -282,6 +284,26 @@ class CallChainBuilder:
         elif len(ast_calls) > 0:
             print(
                 f"ast_calls: {file_path} - {(ast_calls)} resolved_list: {resolved_list}")
+
+    async def resolve_call_hierarchy(self, file_path: Path, node: any, calls: List[Any]) -> CallFrameStack:
+
+        print(f"calls: {node.id} {len(calls)}")
+        for call in calls:
+            returned_call_frame_stack = self.call_hierarchy_resolver.resolve_call_hierarchy(
+                str(file_path), call)
+
+            def print_call_frame_stack(call_frame_stack: CallFrameStack, depth: int = 0):
+                print(
+                    f"{'  ' * depth}call_frame_stack: {call_frame_stack.target_qname}")
+                for child in call_frame_stack.children:
+                    print_call_frame_stack(child, depth + 1)
+
+            print_call_frame_stack(returned_call_frame_stack)
+            print(
+                f"call_frame_stack:  {call.position} \n\n")
+
+    async def preprocess_call_hierarchy(self, call_frame_stack: CallFrameStack) -> CallFrameStack:
+        pass
 
 
 class TempNode:

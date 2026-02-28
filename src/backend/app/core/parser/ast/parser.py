@@ -7,10 +7,11 @@ from app.core.model.schemas import FunctionSchema, ClassSchema
 
 
 class JediParser:
-    def __init__(self, content: str):
-        self.content = content
-        # Use parso to parse the content. We assume Python 3.
-        self.module = parso.parse(content)
+    def __init__(self, content: Optional[str] = None):
+        if content is not None:
+            self.content = content
+            # Use parso to parse the content. We assume Python 3.
+            self.module = parso.parse(content)
 
     def _get_position(self, node) -> NodePosition:
         start_pos = node.start_pos

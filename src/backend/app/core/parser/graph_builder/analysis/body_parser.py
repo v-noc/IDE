@@ -104,7 +104,13 @@ class BodyParser:
         """
         Sync traversal to collect all scopes (node, file_path, source) that need processing.
         """
-        items = [(current_scope, file_path, source)]
+
+        calls = []
+        for node in nodes:
+            if node.type == 'call':
+                calls.append(node)
+
+        items = [(current_scope, file_path, source, calls)]
 
         for node in nodes:
             if isinstance(node, (ASTClassNode, ASTFunctionNode)):
@@ -189,20 +195,21 @@ class BodyParser:
                 if len(move_buffer) >= self.batch_size:
                     await _flush_buffers_locked()
 
-        async def _process_one(node: any, fp: Path, src: str):
+        async def _process_one(node: any, fp: Path, src: str, calls: List[Any]):
             if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
                 self.progress_tracker.set_current_function(node.qname)
                 await self.progress_tracker.emit()
             try:
-                await self.call_chain_builder.process_node_scope(
-                    node=node,
-                    file_path=fp,
-                    source_code=src,
-                    visited_ids=None,
-                    new_branch=new_branch,
-                    insert_batch_setter=_set_insert_batch,
-                    move_batch_setter=_set_move_batch,
-                )
+                await self.call_chain_builder.resolve_call_hierarchy(fp, node, calls)
+                # await self.call_chain_builder.process_node_scope(
+                #     node=node,
+                #     file_path=fp,
+                #     source_code=src,
+                #     visited_ids=None,
+                #     new_branch=new_branch,
+                #     insert_batch_setter=_set_insert_batch,
+                #     move_batch_setter=_set_move_batch,
+                # )
             except Exception as e:
                 import traceback
                 traceback.print_exc()
@@ -216,10 +223,10 @@ class BodyParser:
 
         semaphore = asyncio.Semaphore(3)
 
-        async def bounded_process(n, fp, s):
+        async def bounded_process(n, fp, s, c):
             async with semaphore:
-                return await _process_one(n, fp, s)
-        await asyncio.gather(*[bounded_process(n, fp, s) for n, fp, s in items], return_exceptions=True)
+                return await _process_one(n, fp, s, c)
+        await asyncio.gather(*[bounded_process(n, fp, s, c) for n, fp, s, c in items], return_exceptions=True)
 
         # for n, fp, s in items:
         #     await _process_one(n, fp, s)

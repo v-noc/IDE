@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from app.core.model.nodes import CodePosition
 from app.core.parser.ast.models import CallNode as ASTCallNode
-from app.core.parser.jedi_adapter.call_resolver import CallResolver as JediAdapter
+from app.core.parser.jedi_adapter.call_resolver_legacy import CallResolver as JediAdapter
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
