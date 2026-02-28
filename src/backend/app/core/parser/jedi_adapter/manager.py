@@ -26,10 +26,6 @@ class JediProjectManager:
         self.project = jedi.Project(path=str(self.project_path.parent))
         self.env = jedi.InterpreterEnvironment()
 
-    def get_script(self, path: str, source: str) -> jedi.Script:
-
-        return jedi.Script(code=source, path=path, project=self.project, environment=self.env)
-
     def get_script(self, path: str) -> jedi.Script:
         return jedi.Script(path=path, project=self.project, environment=self.env)
 

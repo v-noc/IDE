@@ -24,7 +24,7 @@ class MROResolver:
         # Acquire lock for thread-safe Jedi operations
 
         try:
-            script = self.project_manager.get_script(file_path, source)
+            script = self.project_manager.get_script(file_path)
 
             # Infer the definition at the class name position
             # Note: Jedi uses 1-based lines and 0-based columns

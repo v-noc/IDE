@@ -153,12 +153,17 @@ class BodyParser:
 
         insert_buffer: List[Tuple[Any, Optional[str]]] = []
         move_buffer: List[Tuple[str, str, str]] = []
+        delete_buffer: List[str] = []
         batch_lock = asyncio.Lock()
         new_branch = f"main"
         # await client.create_branch(new_branch_id=new_branch)
         client.branch = new_branch
 
         async def _flush_buffers_locked():
+            if delete_buffer:
+                await self.call_chain_builder.call_service.batch_delete(delete_buffer.copy())
+                delete_buffer.clear()
+
             if insert_buffer:
                 grouped_inserts: Dict[Optional[str], List[Any]] = {}
                 for call_node, branch_name in insert_buffer:
@@ -195,21 +200,27 @@ class BodyParser:
                 if len(move_buffer) >= self.batch_size:
                     await _flush_buffers_locked()
 
+        async def _set_delete_batch(call_ids: List[str]):
+            if not call_ids:
+                return
+            async with batch_lock:
+                delete_buffer.extend(call_ids)
+                if len(delete_buffer) >= self.batch_size:
+                    await _flush_buffers_locked()
+
         async def _process_one(node: any, fp: Path, src: str, calls: List[Any]):
             if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
                 self.progress_tracker.set_current_function(node.qname)
                 await self.progress_tracker.emit()
             try:
-                await self.call_chain_builder.resolve_call_hierarchy(fp, node, calls)
-                # await self.call_chain_builder.process_node_scope(
-                #     node=node,
-                #     file_path=fp,
-                #     source_code=src,
-                #     visited_ids=None,
-                #     new_branch=new_branch,
-                #     insert_batch_setter=_set_insert_batch,
-                #     move_batch_setter=_set_move_batch,
-                # )
+                results = await self.call_chain_builder.resolve_call_hierarchy(fp, node, calls)
+                await _set_insert_batch(results.calls_to_create, new_branch)
+                await _set_move_batch(results.moves_to_execute)
+                await _set_delete_batch(results.call_ids_to_remove)
+
+                # for call_id in results.call_ids_to_remove:
+                #     await self.call_chain_builder.call_service.delete(call_id)
+
             except Exception as e:
                 import traceback
                 traceback.print_exc()
@@ -227,9 +238,6 @@ class BodyParser:
             async with semaphore:
                 return await _process_one(n, fp, s, c)
         await asyncio.gather(*[bounded_process(n, fp, s, c) for n, fp, s, c in items], return_exceptions=True)
-
-        # for n, fp, s in items:
-        #     await _process_one(n, fp, s)
 
         async with batch_lock:
             await _flush_buffers_locked()

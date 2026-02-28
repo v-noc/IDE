@@ -16,13 +16,15 @@ from app.core.parser.ast.models import CallNode as ASTCallNode
 from app.core.repository import Repositories
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.graph_builder.call_graph.models import ResolvedCall
+from app.core.parser.graph_builder.call_graph.models import ScopeSyncResult
 from app.core.parser.graph_builder.performance import tracker
 from app.core.services.call_service import CallService
 from app.core.parser.jedi_adapter.call_resolver.call_resolver import CallFrameStack, CallHierarchyResolver
-
+from app.core.builder.tree_builder import TreeBuilder
 
 from .resolver import CallResolverService
 from .processor import ScopeProcessor
+from .diff_calulator import DiffCalculator
 
 logger = logging.getLogger(__name__)
 
@@ -43,122 +45,9 @@ class CallChainBuilder:
         self.call_service = CallService(repos, project_node)
         self.call_hierarchy_resolver = CallHierarchyResolver(jedi_manager)
         self.resolver = CallResolverService(jedi_manager, repos)
-        self.processor = ScopeProcessor(self.call_service)
+        self.diff_calculator = DiffCalculator()
 
         self.max_depth = max_depth
-
-    async def _extract_calls_from_source(
-        self,
-        source: str,
-        path: Path,
-        target_node: any
-    ) -> List[ASTCallNode]:
-        """
-        Scans file and extracts AST CallNodes specifically belonging to target_node's body.
-        Only returns **direct-child** calls for the given scope:
-        - file: calls that appear at module level (not inside any class/function)
-        - class: calls that appear directly in the class body (not inside methods/nested defs)
-        - function: calls that appear directly in the function body (not inside nested defs)
-        """
-        # 1. Scan the AST
-        loop = asyncio.get_event_loop()
-        nodes, _ = await loop.run_in_executor(None, scan, source, str(path))
-
-        def _normalize_id(raw: Optional[str]) -> Optional[str]:
-            if not raw:
-                return None
-            # DB ids are often like "nodes/<uuid>" while AST ids are "<uuid>"
-            return raw.split("/")[-1]
-
-        def _iter_scopes(node_list: List[BaseNode]) -> List[BaseNode]:
-            """Returns all AST class/function nodes in the tree (DFS)."""
-            scopes: List[BaseNode] = []
-            stack = list(node_list)
-            while stack:
-                n = stack.pop()
-                if isinstance(n, (ASTClassNode, ASTFunctionNode)):
-                    scopes.append(n)
-                    # nested defs live in children
-                    if getattr(n, "children", None):
-                        stack.extend(n.children)
-                else:
-                    # We only expect children on class/function nodes, but keep safe.
-                    if getattr(n, "children", None):
-                        stack.extend(n.children)
-            return scopes
-
-        def _direct_calls(node_list: List[BaseNode]) -> List[ASTCallNode]:
-            """Only direct children that are calls (no recursion)."""
-            return [n for n in node_list if isinstance(n, ASTCallNode)]
-
-        # Case A: file scope => top-level direct calls only
-        if isinstance(target_node, FileNode):
-            return _direct_calls(nodes)
-
-        # Case B: class/function scope => find matching AST scope node
-        target_id = _normalize_id(getattr(target_node, "id", None))
-        target_name = getattr(target_node, "name", None)
-        target_line = target_node.position.line_no if getattr(
-            target_node, "position", None) else None
-
-        matched_scope: Optional[BaseNode] = None
-        all_scopes = _iter_scopes(nodes)
-
-        # 1) Prefer exact ID match when possible
-        if target_id:
-            for s in all_scopes:
-                if _normalize_id(getattr(s, "id", None)) == target_id:
-                    matched_scope = s
-                    break
-
-        # 2) Fallback to (name + start line)
-        if not matched_scope and target_name and target_line is not None:
-            for s in all_scopes:
-                if getattr(s, "name", None) == target_name and getattr(s, "position", None):
-                    if s.position.line == target_line:
-                        matched_scope = s
-                        break
-
-        if not matched_scope:
-            # Could not map DB node -> AST node (likely out of sync); return nothing.
-            return []
-
-        return _direct_calls(getattr(matched_scope, "children", []) or [])
-
-    async def _fetch_nodes_batch(self, node_ids: List[str]) -> List[any]:
-        """Fetch multiple nodes from DB."""
-        # You can implement a batch fetch in NodeRepo
-
-        results = await self.repos.function_repo.get_by_ids(node_ids, self.project_node.db_name)
-
-        return results
-
-    async def _load_node_context(self, node: any):
-        """Helper to load file path and source code for a DB node."""
-        file_path_str = ""
-        if isinstance(node, FileNode):
-            file_path_str = node.path
-
-        else:
-            with tracker.timer("call_graph.load_node_context.get_nearest_file_and_project"):
-                file_info = await self.repos.file_repo.get_parent_file(node.id, self.project_node.db_name)
-
-                if not file_info:
-                    return None, None
-
-                file_path_str = file_info.path
-
-        abs_path = self.project_path / \
-            file_path_str if not Path(
-                file_path_str).is_absolute() else Path(file_path_str)
-
-        try:
-            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
-                source = await f.read()
-            return abs_path, source
-        except OSError:
-            logger.error(f"Could not read source for {node.qname}")
-            return None, None
 
     async def process_node_scope(
         self,
@@ -285,25 +174,47 @@ class CallChainBuilder:
             print(
                 f"ast_calls: {file_path} - {(ast_calls)} resolved_list: {resolved_list}")
 
-    async def resolve_call_hierarchy(self, file_path: Path, node: any, calls: List[Any]) -> CallFrameStack:
+    async def resolve_call_hierarchy(self, file_path: Path, node: any, calls: List[Any]) -> ScopeSyncResult:
 
-        print(f"calls: {node.id} {len(calls)}")
+        merged_stack = CallFrameStack(
+            target_qname="root", target_id="root", children=[])
         for call in calls:
-            returned_call_frame_stack = self.call_hierarchy_resolver.resolve_call_hierarchy(
+            returned_stack = self.call_hierarchy_resolver.resolve_call_hierarchy(
                 str(file_path), call)
+            self._merge_frame_stack(merged_stack, returned_stack)
 
-            def print_call_frame_stack(call_frame_stack: CallFrameStack, depth: int = 0):
-                print(
-                    f"{'  ' * depth}call_frame_stack: {call_frame_stack.target_qname}")
-                for child in call_frame_stack.children:
-                    print_call_frame_stack(child, depth + 1)
+        old_children = await self.call_service.get_children(node.id)
+        results = await self.preprocess_call_hierarchy(merged_stack, old_children, node.id)
+        return results
 
-            print_call_frame_stack(returned_call_frame_stack)
-            print(
-                f"call_frame_stack:  {call.position} \n\n")
+    def _merge_frame_stack(self, target: CallFrameStack, source: CallFrameStack):
+        """Merge source tree into target tree by target_id."""
+        for source_child in source.children:
+            matched = next(
+                (c for c in target.children if c.target_id == source_child.target_id),
+                None,
+            )
+            if not matched:
+                matched = CallFrameStack(
+                    target_qname=source_child.target_qname,
+                    target_id=source_child.target_id,
+                    children=[],
+                )
+                target.add_child(matched)
+            self._merge_frame_stack(matched, source_child)
 
-    async def preprocess_call_hierarchy(self, call_frame_stack: CallFrameStack) -> CallFrameStack:
-        pass
+    async def preprocess_call_hierarchy(
+        self,
+        call_frame_stack: CallFrameStack,
+        old_children: List[Any],
+        root_parent_id: str,
+    ) -> ScopeSyncResult:
+        old_tree = TreeBuilder(old_children).build()
+        return self.diff_calculator.calculate_diff(
+            root_parent_id=root_parent_id,
+            new_tree=call_frame_stack,
+            old_tree=old_tree,
+        )
 
 
 class TempNode:

@@ -11,6 +11,7 @@ from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.parser.ast.parser import JediParser
 from pydantic import BaseModel
 from app.core.model.nodes import CodePosition
+from app.core.model.schemas import ClassSchema, FunctionSchema
 logger = logging.getLogger(__name__)
 
 
@@ -124,7 +125,7 @@ class CallHierarchyResolver:
             if call_frame_stack.is_ancestor(qname):
                 continue
             new_call_frame = CallFrameStack(
-                target_qname=qname, target_id=target_id, children=[])
+                target_qname=qname, target_id=f"{FunctionSchema.__name__}/{target_id}", children=[])
             current_call_frame = call_frame_stack.add_child(
                 new_call_frame)
 
@@ -156,6 +157,7 @@ class CallHierarchyResolver:
                 )
             elif callee_for_args.api_type == "class":
                 inits = callee_for_args.py__getattribute__("__init__")
+                new_call_frame.target_id = f"{ClassSchema.__name__}/{target_id}"
                 created_instance = TreeInstance(
                     self.inference_state,
                     callee_for_args.parent_context,
