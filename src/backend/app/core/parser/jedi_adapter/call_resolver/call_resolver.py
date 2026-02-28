@@ -124,6 +124,10 @@ class CallHierarchyResolver:
 
             if call_frame_stack.is_ancestor(qname):
                 continue
+            new_call_frame = CallFrameStack(
+                target_qname=qname, target_id=f"{FunctionSchema.__name__}/{target_id}", children=[])
+            current_call_frame = call_frame_stack.add_child(
+                new_call_frame)
 
             arguments = None
             if trailer:
@@ -135,10 +139,6 @@ class CallHierarchyResolver:
                 )
 
             if callee_for_args.is_function():
-                new_call_frame = CallFrameStack(
-                    target_qname=qname, target_id=f"{FunctionSchema.__name__}/{target_id}", children=[])
-                current_call_frame = call_frame_stack.add_child(
-                    new_call_frame)
                 if arguments:
                     function_context = callee_for_args.as_context(
                         arguments)
@@ -157,7 +157,7 @@ class CallHierarchyResolver:
                 )
             elif callee_for_args.api_type == "class":
                 inits = callee_for_args.py__getattribute__("__init__")
-                # new_call_frame.target_id = f"{ClassSchema.__name__}/{target_id}"
+                new_call_frame.target_id = f"{ClassSchema.__name__}/{target_id}"
                 created_instance = TreeInstance(
                     self.inference_state,
                     callee_for_args.parent_context,
@@ -172,6 +172,7 @@ class CallHierarchyResolver:
                     )
                     init_tree_node = getattr(
                         init_method, "tree_node", None)
+                    # init_id = self._extract_id_from_docstring(init_method)
 
                     if arguments:
                         execution_context = bound_method.as_context(
@@ -180,8 +181,8 @@ class CallHierarchyResolver:
                     else:
                         execution_context = bound_method.as_context()
 
-                    # self._analyze_function(
-                    #     init_tree_node, execution_context, current_call_frame)
+                    self._analyze_function(
+                        init_tree_node, execution_context, current_call_frame)
 
     def _analyze_function(self, function_node, function_context, call_frame_stack):
         call_nodes = []

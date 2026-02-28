@@ -70,7 +70,8 @@ class BaseRepo(Generic[TNode, TSchema]):
         async with self.session(project_db_name, branch_name=branch_name) as new_client:
 
             try:
-                await new_client.insert_document(schemas, commit_msg=commit_msg)
+                result = await new_client.insert_document(schemas, commit_msg=commit_msg)
+                print(result)
             except Exception as exc:
                 print("error inserting document", exc)
                 return None

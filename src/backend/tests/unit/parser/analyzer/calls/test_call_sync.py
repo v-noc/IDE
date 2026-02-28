@@ -52,6 +52,7 @@ async def _build_and_get_tree(project_node, create_repos, db):
     project_service = ProjectService(create_repos)
 
     children = await project_service.get_children(project_node.db_name)
+
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
@@ -167,6 +168,7 @@ async def test_call_sync_add_and_remove(setup_project):
 
     # 1) Build once
     tree = await _build_and_get_tree(project_node, create_repos, terminusdb_client)
+
     file_node = _get_file_node(tree)
 
     # There should be exactly one top-level 'reader' call under the file

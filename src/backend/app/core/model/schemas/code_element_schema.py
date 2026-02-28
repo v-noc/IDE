@@ -199,20 +199,44 @@ class CallSchema(BaseSchema):
     """
     qname: str
     call_children: Set["CallSchema"]
-    target_function: "FunctionSchema"
+    target_function: Optional["FunctionSchema"]
+    target_class: Optional["ClassSchema"]
     call_group: Set["CallGroupSchema"]
     theme_config: Optional[ThemeConfigSchema]
     documents: Set[DocumentSchema]
 
+    @classmethod
+    def _to_dict(self, skip_checking=False):
+        result = super()._to_dict(skip_checking=skip_checking)
+
+        result.pop("target_function")
+        result.pop("target_class")
+
+        result["@oneOf"] = {
+
+            "target_function": "FunctionSchema",
+            "target_class": "ClassSchema",
+        }
+
+        return result
+
     @staticmethod
     def from_pydantic(call: CallNode):
         by_type = call.get_children_by_type()
+        is_function = call.target_function.startswith(FunctionSchema.__name__)
+        target_function = None
+        target_class = None
+        if is_function:
+            target_function = call.target_function
+        else:
+            target_class = call.target_function
         return CallSchema(
             _id=call.id,
             name=call.name,
             qname=call.qname,
             description=call.description,
-            target_function=call.target_function,
+            target_function=target_function,
+            target_class=target_class,
             call_children=by_type.get("call_children", set()),
             call_group=by_type.get("call_group", set()),
             theme_config=ThemeConfigSchema.from_pydantic(
@@ -234,7 +258,7 @@ class CallSchema(BaseSchema):
             name=self.name,
             qname=self.qname,
             description=self.description,
-            target_function=self.target_function,
+            target_function=self.target_function if self.target_function else self.target_class,
             children=children,
             children_by_type=children_by_type,
             documents=self.documents,

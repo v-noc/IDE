@@ -149,6 +149,7 @@ class ProjectRepo():
             for row in [row["doc"] for row in result["bindings"]]:
 
                 children.append(parse_structure_child(row))
+
             return children
         except Exception as e:
             print(e)
