@@ -160,35 +160,45 @@ class BodyParser:
         client.branch = new_branch
 
         async def _flush_buffers_locked():
-            if delete_buffer:
-                await self.call_chain_builder.call_service.batch_delete(delete_buffer.copy())
-                delete_buffer.clear()
-
             if insert_buffer:
-                grouped_inserts: Dict[Optional[str], List[Any]] = {}
-                for call_node, branch_name in insert_buffer:
-                    grouped_inserts.setdefault(
-                        branch_name, []).append(call_node)
-
-                for branch_name, calls in grouped_inserts.items():
-                    await self.call_chain_builder.call_service.create_batch(
-                        calls, branch_name=branch_name
-                    )
+                await self.call_chain_builder.call_service.create_batch(
+                    insert_buffer, branch_name=new_branch)
                 insert_buffer.clear()
 
-            if move_buffer:
+            await self.call_chain_builder.call_service.flush_batch(
+                [], delete_buffer, move_buffer)
 
-                await self.call_chain_builder.call_service.move_batch(move_buffer.copy(), branch_name=new_branch)
+            delete_buffer.clear()
+            move_buffer.clear()
+            # if delete_buffer:
+            #     await self.call_chain_builder.call_service.batch_delete(delete_buffer.copy())
+            #     delete_buffer.clear()
 
-                move_buffer.clear()
+            # if insert_buffer:
+            #     grouped_inserts: Dict[Optional[str], List[Any]] = {}
+            #     for call_node, branch_name in insert_buffer:
+            #         grouped_inserts.setdefault(
+            #             branch_name, []).append(call_node)
 
-        async def _set_insert_batch(calls: List[Any], branch_name: Optional[str]):
+            #     for branch_name, calls in grouped_inserts.items():
+            #         await self.call_chain_builder.call_service.create_batch(
+            #             calls, branch_name=branch_name
+            #         )
+            #     insert_buffer.clear()
+
+            # if move_buffer:
+
+            #     await self.call_chain_builder.call_service.move_batch(move_buffer.copy(), branch_name=new_branch)
+
+            #     move_buffer.clear()
+
+        async def _set_insert_batch(calls: List[Any]):
 
             if not calls:
                 return
             async with batch_lock:
-                insert_buffer.extend((call_node, branch_name)
-                                     for call_node in calls)
+                insert_buffer.extend(calls)
+
                 if len(insert_buffer) >= self.batch_size:
                     await _flush_buffers_locked()
 
@@ -214,7 +224,8 @@ class BodyParser:
                 await self.progress_tracker.emit()
             try:
                 results = await self.call_chain_builder.resolve_call_hierarchy(fp, node, calls)
-                await _set_insert_batch(results.calls_to_create, new_branch)
+
+                await _set_insert_batch(results.calls_to_create)
                 await _set_move_batch(results.moves_to_execute)
                 await _set_delete_batch(results.call_ids_to_remove)
 

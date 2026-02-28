@@ -22,8 +22,7 @@ from app.core.services.call_service import CallService
 from app.core.parser.jedi_adapter.call_resolver.call_resolver import CallFrameStack, CallHierarchyResolver
 from app.core.builder.tree_builder import TreeBuilder
 
-from .resolver import CallResolverService
-from .processor import ScopeProcessor
+
 from .diff_calulator import DiffCalculator
 
 logger = logging.getLogger(__name__)
@@ -56,6 +55,13 @@ class CallChainBuilder:
             returned_stack = self.call_hierarchy_resolver.resolve_call_hierarchy(
                 str(file_path), call)
             self._merge_frame_stack(merged_stack, returned_stack)
+
+        def print_frame_stack(frame_stack: CallFrameStack):
+            print(
+                f"target_qname: {frame_stack.target_qname} target_id: {frame_stack.target_id}")
+            for child in frame_stack.children:
+                print_frame_stack(child)
+        print_frame_stack(merged_stack)
 
         old_children = await self.call_service.get_children(node.id)
         results = await self.preprocess_call_hierarchy(merged_stack, old_children, node.id)

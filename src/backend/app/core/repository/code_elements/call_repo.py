@@ -135,6 +135,70 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             branch_name=branch_name,
         )
 
+    async def _flush_batch_combined(self, inserts: List[CallNode], deletes: List[str], moves: List[Tuple[str, str, str]], project_db_name: str, branch_name: Optional[str] = None):
+        """Execute inserts, deletes, and moves in one atomic WOQL query."""
+        if not inserts and not deletes and not moves:
+            return True
+
+        queries = []
+
+        # Build delete operations (with parent cleanup)
+        for call_id in deletes:
+            queries.append(
+                WQ().woql_and(
+                    WQ().opt(
+                        WQ().triple("v:parent", "call_children", call_id)
+                        .delete_triple("v:parent", "call_children", call_id)
+                    ),
+                    WQ().delete_document(call_id)
+                )
+            )
+
+        # Build move operations (remove from old parent, add to new)
+        for item_id, new_parent_id, child_type in moves:
+            field = CALL_CHILD_TYPE_TO_FIELD.get(child_type, "call_children")
+            queries.append(
+                WQ().woql_or(
+                    WQ().opt(
+                        WQ().triple("v:old_parent", field, item_id)
+                        .delete_triple("v:old_parent", field, item_id)
+                    ),
+                    WQ().add_triple(new_parent_id, field, item_id)
+                )
+            )
+
+        # Build insert operations
+        # Note: Convert Pydantic models to dicts compatible with WOQL
+        for call_node in inserts:
+            pass
+            # # or .dict() depending on your Pydantic version
+            # call_dict = CallSchema.from_pydantic(
+            #     call_node)._obj_to_dict()[0]
+
+            # # Ensure @id/@type are set correctly for Terminus
+            # call_dict.pop("@id")
+            # call_dict.pop("documents")
+            # # call_dict.pop("theme_config")
+            # call_dict.pop("call_children")
+            # call_dict.pop("call_group")
+            # # call_dict["@type"] = "CallSchema"
+
+            # queries.append(WQ().insert_document(
+            #     {**call_dict, "target_function": {"@id": call_node.target_function}, "created_at": {"@type": "xsd:dateTime", "@value": call_node.created_at.isoformat()}, "updated_at": {"@type": "xsd:dateTime", "@value": call_node.created_at.isoformat()}}, call_node.id))
+
+        if not queries:
+            return True
+
+        combined = WQ().woql_and(*queries)
+
+        async with self.session(project_db_name, branch_name=branch_name) as client:
+            try:
+                await client.query(combined, commit_msg=f"Batch: {len(inserts)} inserts, {len(deletes)} deletes, {len(moves)} moves")
+                return True
+            except Exception as exc:
+                print(f"Batch operation failed: {exc}")
+                return False
+
     async def get_direct_children(self, call_site_id: str, child_type: str, project_db_name: str, branch_name: Optional[str] = None):
         query = WQ().select("v:child_doc", "v:target_doc").woql_and(
             WQ().eq("v:call_site", call_site_id).

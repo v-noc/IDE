@@ -106,6 +106,9 @@ class CallService():
             "code": code,
         }
 
+    async def flush_batch(self, inserts: List[CallNode], deletes: List[str], moves: List[Tuple[str, str, str]]):
+        return await self.repos.call_repo._flush_batch_combined(inserts, deletes, moves, self.project.db_name)
+
     async def get_call_with_parent_and_target(self, parent_id: str, target_id: str):
         # Note: repository expects (target_id, parent_id)
         return await self.repos.call_repo.find_call_by_target_parent(
