@@ -41,9 +41,9 @@ class Collector:
         self.jedi_manager = jedi_manager
 
         self.folder_processor = FolderProcessor(
-            project_node, repos.folder_repo)
+            project_node)
         self.file_processor = FileProcessor(
-            project_node, repos.file_repo, repos.folder_repo)
+            project_node)
 
         self.mro_resolver = MROResolver(jedi_manager)
         self.ast_processor = ASTProcessor(repos, self.mro_resolver)
@@ -63,19 +63,24 @@ class Collector:
         Returns folder changes for notification/logging.
         """
         with tracker.timer("collector.sync_structure"):
-            # 1. Sync Folders
-            with tracker.timer("collector.sync_folders"):
-                folder_changes = await self.folder_processor.process_batch(
-                    change_set, batch_size=batch_size
-                )
 
-            # 2. Sync Files (Shells)
-            with tracker.timer("collector.sync_files_shells"):
-                await self.file_processor.process_batch(
-                    change_set, scan_result, batch_size=batch_size
-                )
+            folder_plan = self.folder_processor.prepare_batch(
+                change_set
+            )
 
-            return folder_changes
+            file_plan = self.file_processor.prepare_batch(
+                change_set, scan_result
+            )
+
+            folder_plan.extend(file_plan)
+
+            await self.repos.folder_repo.flush_batch(
+                folder_plan.insert,
+                folder_plan.update,
+                folder_plan.delete,
+                folder_plan.move,
+                project_db_name=self.project_node.db_name,
+            )
 
     async def process_file(
         self, file_path: str, checksum: str, project_db_name: str, progress_tracker=None
@@ -141,9 +146,6 @@ class Collector:
                 return None
 
             # 4. Sync Content
-            # This handles fetching descendants, diffing, and batch DB ops
-            # (Create/Update/Delete/Relink). Use processed_content because
-            # line numbers in ast_nodes match it (IDs injected)
             with tracker.timer("collector.process_file.sync_content"):
                 await self.ast_processor.sync_content(
                     file_node, ast_nodes, project_db_name=project_db_name,   content=processed_content, progress_tracker=progress_tracker

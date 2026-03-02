@@ -16,6 +16,24 @@ class CodePositionSchema(DocumentTemplate):
     end_line_no: int
     end_col_offset: int
 
+    @classmethod
+    def _to_dict(cls, skip_checking=False):
+        result = {
+            "@id": "CodePositionSchema",
+            "@type": "Class",
+            "@key":
+            {
+                "@type": "Random"
+            },
+
+            "@subdocument": [],
+            "line_no": "xsd:integer",
+            "col_offset": "xsd:integer",
+            "end_line_no": "xsd:integer",
+            "end_col_offset": "xsd:integer"
+        }
+        return result
+
     @staticmethod
     def from_pydantic(code_position: CodePosition):
         return CodePositionSchema(

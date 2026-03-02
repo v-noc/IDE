@@ -18,13 +18,15 @@ from app.core.model.nodes import FileNode, FolderNode
 class TrackedPath:
     path: str
     id: str
+    parent_id: Optional[str] = None
 
 
 @dataclass
 class MoveEvent:
     id: str
     old: str
-    new: str
+    new_path: str
+    new_parent_id: Optional[str] = None
 
 
 @dataclass
@@ -226,11 +228,19 @@ class ChangeDetector:
         common_ids = db_ids & current_ids
 
         new_folders = [
-            TrackedPath(path=current_folder_path_by_id[item_id], id=item_id)
+            TrackedPath(
+                path=current_folder_path_by_id[item_id],
+                id=item_id,
+                parent_id=current_folder_parent_by_id.get(item_id),
+            )
             for item_id in new_ids
         ]
         deleted_folders = [
-            TrackedPath(path=db_folders_by_id[item_id].path, id=item_id)
+            TrackedPath(
+                path=db_folders_by_id[item_id].path,
+                id=item_id,
+                parent_id=db_folder_parent_by_id.get(item_id),
+            )
             for item_id in deleted_ids
         ]
 
@@ -247,14 +257,19 @@ class ChangeDetector:
                     MoveEvent(
                         id=item_id,
                         old=db_node.path,
-                        new=current_path,
+                        new_path=current_path,
+                        new_parent_id=current_parent,
                     )
                 )
                 continue
 
             if db_node.path != current_path:
                 modified_folders.append(
-                    TrackedPath(path=current_path, id=item_id)
+                    TrackedPath(
+                        path=current_path,
+                        id=item_id,
+                        parent_id=current_parent,
+                    )
                 )
 
         return (
@@ -284,11 +299,19 @@ class ChangeDetector:
         common_ids = db_ids & current_ids
 
         new_files = [
-            TrackedPath(path=current_file_path_by_id[item_id], id=item_id)
+            TrackedPath(
+                path=current_file_path_by_id[item_id],
+                id=item_id,
+                parent_id=current_file_parent_by_id.get(item_id),
+            )
             for item_id in new_ids
         ]
         deleted_files = [
-            TrackedPath(path=db_files_by_id[item_id].path, id=item_id)
+            TrackedPath(
+                path=db_files_by_id[item_id].path,
+                id=item_id,
+                parent_id=db_file_parent_by_id.get(item_id),
+            )
             for item_id in deleted_ids
         ]
 
@@ -306,7 +329,8 @@ class ChangeDetector:
                     MoveEvent(
                         id=item_id,
                         old=db_node.path,
-                        new=current_path,
+                        new_path=current_path,
+                        new_parent_id=current_parent,
                     )
                 )
                 continue
@@ -315,7 +339,11 @@ class ChangeDetector:
             hash_changed = current_hash is not None and db_node.hash != current_hash
             if path_changed or hash_changed:
                 modified_files.append(
-                    TrackedPath(path=current_path, id=item_id)
+                    TrackedPath(
+                        path=current_path,
+                        id=item_id,
+                        parent_id=current_parent,
+                    )
                 )
 
         return (
