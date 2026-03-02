@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 from typing import List, Optional
 
@@ -21,6 +22,7 @@ class CallFrameStack(BaseModel):
     children: List['CallFrameStack'] = []
 
     parent: Optional['CallFrameStack'] = None
+    call_count: int = 0
 
     def add_child(self, child: 'CallFrameStack') -> 'CallFrameStack':
         """Add a child node and set its parent"""
@@ -49,140 +51,163 @@ class CallHierarchyResolver:
         self.jedi_manager = jedi_manager
 
     def resolve_call_hierarchy(self, file_path: str, call_positions) -> CallFrameStack:
-        self.script = self.jedi_manager.get_script(file_path)
-        self.file_path = file_path
-        # ONE InferenceState for entire session - this is the expensive part
-        self.inference_state = self.script._inference_state
-
-        self.module_context = self.script._get_module().as_context()
-        self.jedi_parser = JediParser()
-
         self.call_frame_stack = CallFrameStack(
             target_qname="root", target_id="root", children=[])
+        try:
+            self.script = self.jedi_manager.get_script(file_path)
+            self.file_path = file_path
+            # ONE InferenceState for entire session - this is the expensive part
+            self.inference_state = self.script._inference_state
 
-        self.resolve_call_hierarchy_for_node(call_positions, self.module_context,
-                                             self.call_frame_stack)
+            self.module_context = self.script._get_module().as_context()
+            self.jedi_parser = JediParser()
+
+            self.resolve_call_hierarchy_for_node(call_positions, self.module_context,
+                                                 self.call_frame_stack)
+        except Exception:
+            logger.exception(
+                "Failed to resolve call hierarchy for %s; returning partial/empty stack",
+                file_path,
+            )
 
         return self.call_frame_stack
 
     def resolve_call_hierarchy_for_node(self, call_node: any, parent_context: any, call_frame_stack):
+        line = getattr(getattr(call_node, "position", None), "line", None)
+        col = getattr(call_node, "call_col_pos", None)
 
-        line = call_node.position.line
-        col = call_node.call_col_pos
-        pos = (line, col)
-        leaf = parent_context._value.tree_node.get_name_of_position(
-            (line, col))
+        try:
+            pos = (line, col)
+            leaf = parent_context._value.tree_node.get_name_of_position(
+                (line, col))
 
-        if leaf is None:
-            leaf = parent_context._value.tree_node.get_leaf_for_position(pos)
-            if leaf is None or leaf.type == 'string':
+            if leaf is None:
+                leaf = parent_context._value.tree_node.get_leaf_for_position(
+                    pos)
+                if leaf is None or leaf.type == 'string':
+                    return []
+                if leaf.end_pos == (line, col) and leaf.type == 'operator':
+                    next_ = leaf.get_next_leaf()
+                    if next_ and next_.start_pos == leaf.end_pos \
+                            and next_.type in ('number', 'string', 'keyword'):
+                        leaf = next_
+
+            call_context = parent_context.create_context(leaf)
+            callee_values = helpers.infer(
+                self.inference_state,
+                call_context,
+                leaf,
+            )
+
+            if not callee_values:
                 return []
-            if leaf.end_pos == (line, col) and leaf.type == 'operator':
-                next_ = leaf.get_next_leaf()
-                if next_.start_pos == leaf.end_pos \
-                        and next_.type in ('number', 'string', 'keyword'):
-                    leaf = next_
 
-        call_context = parent_context.create_context(leaf)
-        callee_values = helpers.infer(
-            self.inference_state,
-            call_context,
-            leaf,
-        )
+            bracket = leaf.get_next_leaf()
+            trailer = bracket.parent if bracket else None
 
-        if not callee_values:
-            print(f"no callee values", leaf)
-            return []
+            while trailer and trailer.type != "trailer":
+                trailer = trailer.parent
 
-        bracket = leaf.get_next_leaf()
-        trailer = bracket.parent if bracket else None
+            visited_qnames = set()
 
-        while trailer and trailer.type != "trailer":
-            trailer = trailer.parent
+            for callee in callee_values:
+                try:
+                    callee_for_args = callee
+                    if hasattr(callee, "_original_value"):
+                        callee_for_args = callee._original_value
 
-        visited_qnames = set()
+                    if not self._is_project_code(callee_for_args, self.inference_state):
+                        continue
 
-        for callee in callee_values:
-            callee_for_args = callee
-            if hasattr(callee, "_original_value"):
-                callee_for_args = callee._original_value
+                    qname = self._get_qname(callee_for_args)
 
-            if not self._is_project_code(callee_for_args, self.inference_state):
-                continue
+                    if qname is None:
+                        continue
 
-            qname = self._get_qname(callee_for_args)
+                    if qname in visited_qnames:
+                        continue
 
-            if qname is None:
-                continue
+                    visited_qnames.add(qname)
 
-            if qname in visited_qnames:
-                continue
+                    target_id = self._extract_id_from_docstring(
+                        callee_for_args)
 
-            visited_qnames.add(qname)
+                    if call_frame_stack.is_ancestor(qname):
+                        continue
+                    new_call_frame = CallFrameStack(
+                        target_qname=qname, target_id=f"{FunctionSchema.__name__}/{target_id}", children=[])
+                    current_call_frame = call_frame_stack.add_child(
+                        new_call_frame)
 
-            target_id = self._extract_id_from_docstring(callee_for_args)
-
-            if call_frame_stack.is_ancestor(qname):
-                continue
-            new_call_frame = CallFrameStack(
-                target_qname=qname, target_id=f"{FunctionSchema.__name__}/{target_id}", children=[])
-            current_call_frame = call_frame_stack.add_child(
-                new_call_frame)
-
-            arguments = None
-            if trailer:
-                arguments = self.create_args(
-                    callee_for_args,
-                    trailer,
-                    self.inference_state,
-                    call_context,
-                )
-
-            if callee_for_args.is_function():
-                if arguments:
-                    function_context = callee_for_args.as_context(
-                        arguments)
-                else:
-                    # No trailer found, fallback to anonymous context.
-                    function_context = callee_for_args.as_context()
-
-                function_node = getattr(callee_for_args, "tree_node", None)
-                if function_node is None:
-                    continue
-
-                self._analyze_function(
-                    function_node,
-                    function_context,
-                    current_call_frame
-                )
-            elif callee_for_args.api_type == "class":
-                inits = callee_for_args.py__getattribute__("__init__")
-                new_call_frame.target_id = f"{ClassSchema.__name__}/{target_id}"
-                created_instance = TreeInstance(
-                    self.inference_state,
-                    callee_for_args.parent_context,
-                    callee_for_args,
-                    arguments,
-                )
-                if inits:
-
-                    init_method = list(inits)[0]
-                    bound_method = BoundMethod(
-                        created_instance, callee_for_args, init_method
-                    )
-                    init_tree_node = getattr(
-                        init_method, "tree_node", None)
-                    # init_id = self._extract_id_from_docstring(init_method)
-
-                    if arguments:
-                        execution_context = bound_method.as_context(
-                            arguments
+                    arguments = None
+                    if trailer:
+                        arguments = self.create_args(
+                            callee_for_args,
+                            trailer,
+                            self.inference_state,
+                            call_context,
                         )
-                    else:
-                        execution_context = bound_method.as_context()
 
-                    self._analyze_function(
-                        init_tree_node, execution_context, current_call_frame)
+                    if callee_for_args.is_function():
+                        if arguments:
+                            function_context = callee_for_args.as_context(
+                                arguments)
+                        else:
+                            # No trailer found, fallback to anonymous context.
+                            function_context = callee_for_args.as_context()
+
+                        function_node = getattr(
+                            callee_for_args, "tree_node", None)
+                        if function_node is None:
+                            continue
+
+                        self._analyze_function(
+                            function_node,
+                            function_context,
+                            current_call_frame
+                        )
+                    elif callee_for_args.api_type == "class":
+                        new_call_frame.target_id = f"{ClassSchema.__name__}/{target_id}"
+                        inits = callee_for_args.py__getattribute__("__init__")
+                        created_instance = TreeInstance(
+                            self.inference_state,
+                            callee_for_args.parent_context,
+                            callee_for_args,
+                            arguments,
+                        )
+                        if inits:
+
+                            init_method = list(inits)[0]
+                            bound_method = BoundMethod(
+                                created_instance, callee_for_args, init_method
+                            )
+                            init_tree_node = getattr(
+                                init_method, "tree_node", None)
+                            # init_id = self._extract_id_from_docstring(init_method)
+
+                            if arguments:
+                                execution_context = bound_method.as_context(
+                                    arguments
+                                )
+                            else:
+                                execution_context = bound_method.as_context()
+
+                            self._analyze_function(
+                                init_tree_node, execution_context, current_call_frame)
+                except Exception:
+                    logger.exception(
+                        "Failed to process callee at %s:%s in %s; continuing",
+                        line,
+                        col,
+                        getattr(self, "file_path", "<unknown>"),
+                    )
+        except Exception:
+            logger.exception(
+                "Failed to resolve node at %s:%s in %s; continuing",
+                line,
+                col,
+                getattr(self, "file_path", "<unknown>"),
+            )
 
     def _analyze_function(self, function_node, function_context, call_frame_stack):
         call_nodes = []
@@ -199,11 +224,19 @@ class CallHierarchyResolver:
                     collect_call_node(child)
 
         for child in function_node.children:
-            collect_call_node(child)
+            try:
+                collect_call_node(child)
+            except Exception:
+                logger.exception(
+                    "Failed while collecting call nodes; continuing")
 
         for call_node in call_nodes:
-            self.resolve_call_hierarchy_for_node(
-                call_node, function_context, call_frame_stack)
+            try:
+                self.resolve_call_hierarchy_for_node(
+                    call_node, function_context, call_frame_stack)
+            except Exception:
+                logger.exception(
+                    "Failed while resolving nested call node; continuing")
 
     def _get_qname(self, node_value):
 
@@ -219,36 +252,39 @@ class CallHierarchyResolver:
 
     def _is_project_code(self, callee, inference_state):
         """Check if callee is defined in project code (not builtin/stdlib/external)."""
-        # 1. Skip C builtins (sys, os, etc.)
-        if callee.is_builtins_module():
-            print(f"is_builtins_module: {callee}")
+        try:
+            # 1. Skip C builtins (sys, os, etc.)
+            if callee.is_builtins_module():
+                return False
+
+            # 2. Get the module context and file path
+            module_context = callee.get_root_context()
+            module_path = module_context.py__file__()
+
+            if module_path is None:
+                return False  # Shouldn't happen if not builtin, but safety check
+
+            # 3. Compare to project path
+            project = inference_state.project
+            project_path = getattr(project, 'path', None) or getattr(
+                project, '_path', None)
+
+            if project_path:
+                # Normalize for cross-platform comparison
+                norm_module = os.path.normcase(os.path.abspath(module_path))
+                norm_project = os.path.normcase(os.path.abspath(project_path))
+
+                if norm_module.startswith(norm_project):
+                    return True
+
+            # 4. Optional: Explicitly exclude stdlib and site-packages
+            # (Useful if project path check fails or you want to be extra sure)
+            norm_path = os.path.normcase(module_path)
+        except Exception:
+            logger.exception(
+                "Failed to determine callee source path; defaulting to external")
             return False
 
-        # 2. Get the module context and file path
-        module_context = callee.get_root_context()
-        module_path = module_context.py__file__()
-
-        if module_path is None:
-            print(f"module_path is None", callee)
-            return False  # Shouldn't happen if not builtin, but safety check
-
-        # 3. Compare to project path
-        project = inference_state.project
-        project_path = getattr(project, 'path', None) or getattr(
-            project, '_path', None)
-
-        if project_path:
-            import os
-            # Normalize for cross-platform comparison
-            norm_module = os.path.normcase(os.path.abspath(module_path))
-            norm_project = os.path.normcase(os.path.abspath(project_path))
-
-            if norm_module.startswith(norm_project):
-                return True
-
-        # 4. Optional: Explicitly exclude stdlib and site-packages
-        # (Useful if project path check fails or you want to be extra sure)
-        norm_path = os.path.normcase(module_path)
         if 'site-packages' in norm_path:
             return False
         if 'lib/python' in norm_path and 'site-packages' not in norm_path:
@@ -256,7 +292,6 @@ class CallHierarchyResolver:
             return False
         if hasattr(module_context, 'is_stdlib') and module_context.is_stdlib():
             return False
-        print(f"module_context is not stdlib", module_context)
 
         return False  # Default to False (external) if uncertain
 

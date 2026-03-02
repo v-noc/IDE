@@ -69,7 +69,8 @@ class DiffCalculator:
 
         for target_id in added:
             new_call = new_target_to_call[target_id]
-            call_name = new_call.target_qname.split(".")[-1] if new_call.target_qname else target_id
+            call_name = new_call.target_qname.split(
+                ".")[-1] if new_call.target_qname else target_id
             created_node = CallNode(
                 id=f"{CallSchema.__name__}/{str(uuid.uuid4())}",
                 qname=f"{parent_id}::{target_id}",

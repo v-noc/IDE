@@ -228,23 +228,23 @@ class GraphBuilderOrchestrator:
         progress_tracker.start_phase("analyzing")
         # Total entities is set from discovery phase (functions_found + classes_found)
         # Total files for analysis is the number of collection results
-        progress_tracker.set_total_files(len(collection_results))
-        await progress_tracker.emit(force=True)
+        # progress_tracker.set_total_files(len(collection_results))
+        # await progress_tracker.emit(force=True)
 
-        try:
-            # Phase 2 refactoring is deferred.
-            # We pass None for call_sync_service as we removed SyncService.
-            await self.phase_processor.process_analysis_phase(
-                collection_results, progress_tracker
-            )
-            logger.info("Phase 2: Analysis completed")
-            print("Phase 2: Analysis completed", flush=True)
+        # try:
+        #     # Phase 2 refactoring is deferred.
+        #     # We pass None for call_sync_service as we removed SyncService.
+        #     # await self.phase_processor.process_analysis_phase(
+        #     #     collection_results, progress_tracker
+        #     # )
+        #     logger.info("Phase 2: Analysis completed")
+        #     print("Phase 2: Analysis completed", flush=True)
 
-        finally:
-            # Ensure cleanup happens even if there's an error
-            logger.debug("Phase 2 cleanup complete")
+        # finally:
+        #     # Ensure cleanup happens even if there's an error
+        #     logger.debug("Phase 2 cleanup complete")
 
-        logger.info("All phases completed successfully")
-        print("All phases completed successfully", flush=True)
+        # logger.info("All phases completed successfully")
+        # print("All phases completed successfully", flush=True)
 
         tracker.print_report()

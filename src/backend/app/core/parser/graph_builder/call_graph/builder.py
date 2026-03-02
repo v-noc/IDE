@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Set, Dict, List, Optional, Tuple
 from collections import deque
-
+import time
 from app.core.parser.ast.models import (
     BaseNode,
     ClassNode as ASTClassNode,
@@ -56,18 +56,43 @@ class CallChainBuilder:
 
         async def resolve_one(call: Any) -> CallFrameStack:
             async with self.semaphore:
-                return await asyncio.to_thread(
-                    self.call_hierarchy_resolver.resolve_call_hierarchy,
-                    str(file_path),
-                    call,
-                )
+                try:
+                    return await asyncio.to_thread(
+                        self.call_hierarchy_resolver.resolve_call_hierarchy,
+                        str(file_path),
+                        call,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Call hierarchy resolution failed for %s in %s; skipping this call",
+                        getattr(call, "position", None),
+                        file_path,
+                    )
+                    return CallFrameStack(
+                        target_qname="root",
+                        target_id="root",
+                        children=[],
+                    )
 
-        returned_stacks = await asyncio.gather(*[resolve_one(call) for call in calls])
+        returned_stacks = await asyncio.gather(
+            *[resolve_one(call) for call in calls],
+            return_exceptions=True,
+        )
+
         for returned_stack in returned_stacks:
+            if isinstance(returned_stack, Exception):
+                logger.exception(
+                    "Unexpected async gather error while resolving %s: %s",
+                    file_path,
+                    returned_stack,
+                )
+                continue
             self._merge_frame_stack(merged_stack, returned_stack)
 
         old_children = await self.call_service.get_children(node.id)
+
         results = await self.preprocess_call_hierarchy(merged_stack, old_children, node.id)
+
         return results
 
     def _merge_frame_stack(self, target: CallFrameStack, source: CallFrameStack):
@@ -93,17 +118,9 @@ class CallChainBuilder:
         root_parent_id: str,
     ) -> ScopeSyncResult:
         old_tree = TreeBuilder(old_children).build()
+
         return self.diff_calculator.calculate_diff(
             root_parent_id=root_parent_id,
             new_tree=call_frame_stack,
             old_tree=old_tree,
         )
-
-
-class TempNode:
-    id: str
-    qname: str
-
-    def __init__(self, id: str, qname: str):
-        self.id = id
-        self.qname = qname

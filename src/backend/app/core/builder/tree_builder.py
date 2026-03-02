@@ -45,6 +45,11 @@ GROUP_SCHEMA_TO_NODE_TYPE = {
     "StructureGroupNode": "structure_group",
 }
 
+# Parent type -> allowed child types (for schema validation)
+STRUCTURE_CHILDREN = (FolderTreeNode, FileTreeNode, GroupTreeNode)
+CODE_CHILDREN = (ClassTreeNode, FunctionTreeNode, CallTreeNode, GroupTreeNode)
+CALL_CHILDREN = (CallTreeNode, GroupTreeNode)
+
 
 class TreeBuilder:
     def __init__(self, flat_nodes: List[Any]):
@@ -73,6 +78,19 @@ class TreeBuilder:
         if isinstance(raw, (set, list, tuple)):
             return [str(x) for x in raw if x]
         return []
+
+    @staticmethod
+    def _is_valid_child(parent: AnyTreeNode, child: AnyTreeNode) -> bool:
+        """Check if child type is valid for parent's children schema."""
+        if isinstance(parent, (ProjectTreeNode, FolderTreeNode)):
+            return isinstance(child, STRUCTURE_CHILDREN)
+        if isinstance(parent, (FileTreeNode, ClassTreeNode, FunctionTreeNode)):
+            return isinstance(child, CODE_CHILDREN)
+        if isinstance(parent, CallTreeNode):
+            return isinstance(child, CALL_CHILDREN)
+        if isinstance(parent, GroupTreeNode):
+            return isinstance(child, (GroupTreeNode, FolderTreeNode, FileTreeNode, ClassTreeNode, FunctionTreeNode, CallTreeNode))
+        return True
 
     @staticmethod
     def _target_function_id(d: Dict[str, Any]) -> str | None:
@@ -133,7 +151,7 @@ class TreeBuilder:
                 continue
             for cid in cids:
                 child = self.nodes_map.get(cid)
-                if child:
+                if child and self._is_valid_child(parent, child):
                     parent.children.append(child)
                     referenced.add(cid)
 
