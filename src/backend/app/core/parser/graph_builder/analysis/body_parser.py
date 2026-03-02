@@ -160,37 +160,13 @@ class BodyParser:
         client.branch = new_branch
 
         async def _flush_buffers_locked():
-            if insert_buffer:
-                await self.call_chain_builder.call_service.create_batch(
-                    insert_buffer, branch_name=new_branch)
-                insert_buffer.clear()
 
             await self.call_chain_builder.call_service.flush_batch(
-                [], delete_buffer, move_buffer)
+                insert_buffer.copy(), delete_buffer.copy(), move_buffer.copy())
 
+            insert_buffer.clear()
             delete_buffer.clear()
             move_buffer.clear()
-            # if delete_buffer:
-            #     await self.call_chain_builder.call_service.batch_delete(delete_buffer.copy())
-            #     delete_buffer.clear()
-
-            # if insert_buffer:
-            #     grouped_inserts: Dict[Optional[str], List[Any]] = {}
-            #     for call_node, branch_name in insert_buffer:
-            #         grouped_inserts.setdefault(
-            #             branch_name, []).append(call_node)
-
-            #     for branch_name, calls in grouped_inserts.items():
-            #         await self.call_chain_builder.call_service.create_batch(
-            #             calls, branch_name=branch_name
-            #         )
-            #     insert_buffer.clear()
-
-            # if move_buffer:
-
-            #     await self.call_chain_builder.call_service.move_batch(move_buffer.copy(), branch_name=new_branch)
-
-            #     move_buffer.clear()
 
         async def _set_insert_batch(calls: List[Any]):
 
@@ -233,8 +209,7 @@ class BodyParser:
                 #     await self.call_chain_builder.call_service.delete(call_id)
 
             except Exception as e:
-                import traceback
-                traceback.print_exc()
+
                 print(f"Error processing node {node.qname}: {e}")
                 raise e
 
