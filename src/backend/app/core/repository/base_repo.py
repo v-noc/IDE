@@ -71,7 +71,7 @@ class BaseRepo(Generic[TNode, TSchema]):
 
             try:
                 result = await new_client.insert_document(schemas, commit_msg=commit_msg)
-                print(result)
+
             except Exception as exc:
                 print("error inserting document", exc)
                 return None

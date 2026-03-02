@@ -414,7 +414,8 @@ class CallNode(BaseNode):
         return CallNode(
             **base.model_dump(),
             qname=raw_dict["qname"],
-            target_function=raw_dict.get("target_function", "target_class"),
+            target_function=raw_dict.get(
+                "target_function", None) or raw_dict.get("target_class", None),
             children=children,
             children_by_type=by_type,
             documents=raw_dict.get("documents", set()) or set(),

@@ -1,4 +1,6 @@
 from typing import List, Literal, Optional, Tuple, Union
+
+from terminusdb_client.woqlquery.woql_query import Doc
 from app.db.async_terminus_client import WOQLQuery as WQ
 from app.core.model.nodes import CallNode
 from app.core.model.schemas.code_element_schema import CallSchema
@@ -48,7 +50,7 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
                 result = await new_client.query(query)
                 if len(result["bindings"]) == 0:
                     return None
-                print(result["bindings"])
+
                 return [parse_structure_child(row["parent_doc"]) for row in result["bindings"]]
             except Exception as exc:
                 print(exc)
@@ -170,21 +172,12 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
         # Build insert operations
         # Note: Convert Pydantic models to dicts compatible with WOQL
         for call_node in inserts:
-            pass
+
             # # or .dict() depending on your Pydantic version
-            # call_dict = CallSchema.from_pydantic(
-            #     call_node)._obj_to_dict()[0]
+            call_dict = CallSchema.from_pydantic(
+                call_node)._obj_to_dict()[0]
 
-            # # Ensure @id/@type are set correctly for Terminus
-            # call_dict.pop("@id")
-            # call_dict.pop("documents")
-            # # call_dict.pop("theme_config")
-            # call_dict.pop("call_children")
-            # call_dict.pop("call_group")
-            # # call_dict["@type"] = "CallSchema"
-
-            # queries.append(WQ().insert_document(
-            #     {**call_dict, "target_function": {"@id": call_node.target_function}, "created_at": {"@type": "xsd:dateTime", "@value": call_node.created_at.isoformat()}, "updated_at": {"@type": "xsd:dateTime", "@value": call_node.created_at.isoformat()}}, call_node.id))
+            queries.append(WQ().insert_document(Doc(**call_dict)))
 
         if not queries:
             return True

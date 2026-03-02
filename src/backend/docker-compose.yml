@@ -1,20 +1,19 @@
 version: "3.8"
 
 services:
-  arangodb:
-    image: arangodb:latest
+  terminusdb:
+    image: terminusdb/terminusdb-server:latest
+    container_name: terminusdb-server
+    pull_policy: always
     ports:
-      - "8529:8529"
+      - "6363:6363"
     environment:
-      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD}
-      - ARANGO_DB=${ARANGO_DB}
-      - ARANGO_USER=${ARANGO_USER}
-      - ARANGO_PASSWORD=${ARANGO_PASSWORD}
+      - TERMINUSDB_SERVER_PORT=6363
+      - TERMINUSDB_INSECURE_USER_HEADER=X-User-Forward
+      - TERMINUSDB_INSECURE_USER_HEADER_ENABLED=true
+      - TERMINUSDB_ADMIN_PASS=${TERMINUSDB_ADMIN_PASS:-root}
     volumes:
-      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
-      - arangodb_data:/var/lib/arangodb3
-      - arangodb_apps_data:/var/lib/arangodb3-apps
+      - terminusdb_storage:/app/terminusdb/storage
 
 volumes:
-  arangodb_data:
-  arangodb_apps_data:
+  terminusdb_storage:
