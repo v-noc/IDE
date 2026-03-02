@@ -70,7 +70,7 @@ const ProjectList = ({
                     <DropdownMenuItem
                       onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
-                        deleteProject(idPrefixRemover(project.id));
+                        deleteProject(project.id);
                       }}
                     >
                       <Trash className="h-4 w-4 mr-2" />
@@ -151,7 +151,7 @@ const ProjectList = ({
                   <DropdownMenuItem
                     onClick={(e: React.MouseEvent) => {
                       e.preventDefault();
-                      deleteProject(idPrefixRemover(project.id));
+                      deleteProject(project.id);
                     }}
                   >
                     <Trash className="h-4 w-4 mr-2" />

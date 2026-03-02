@@ -16,5 +16,5 @@ export const createProject = (newProject: { name: string; description: string; p
 
 
 export const deleteProject = (project_key: string) => {
-  return api(API_ROUTES.PROJECTS + project_key, { method: 'DELETE' })
+  return api(API_ROUTES.PROJECTS + `?project_id=${project_key}`, { method: 'DELETE' })
 }

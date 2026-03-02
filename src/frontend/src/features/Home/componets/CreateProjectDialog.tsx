@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { parse } from "toml";
 
 import { extractFieldErrors } from "@/utils/errorMessagextractor";
+import { idPrefixRemover } from "@/utils";
 
 interface CreateProjectDialogProps {
   trigger?: React.ReactNode;
@@ -64,8 +65,8 @@ const CreateProjectDialog = ({
     createProject(data, {
       onSuccess(data) {
         const key = data.id;
-        console.log("project ket", key);
-        setTimeout(() => navigate(`/project/${key}`));
+
+        setTimeout(() => navigate(`/project/${idPrefixRemover(key)}`));
       },
       onError: (error) => {
         const fieldErrors = extractFieldErrors(error);
