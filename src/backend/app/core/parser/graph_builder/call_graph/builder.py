@@ -1,6 +1,7 @@
 import asyncio
 import aiofiles
 import logging
+import os
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Set, Dict, List, Optional, Tuple
 from collections import deque
@@ -44,6 +45,7 @@ class CallChainBuilder:
         self.call_service = CallService(repos, project_node)
         self.call_hierarchy_resolver = CallHierarchyResolver(jedi_manager)
         self.diff_calculator = DiffCalculator()
+        self.semaphore = asyncio.Semaphore(1)
 
         self.max_depth = max_depth
 
@@ -51,17 +53,18 @@ class CallChainBuilder:
 
         merged_stack = CallFrameStack(
             target_qname="root", target_id="root", children=[])
-        for call in calls:
-            returned_stack = self.call_hierarchy_resolver.resolve_call_hierarchy(
-                str(file_path), call)
-            self._merge_frame_stack(merged_stack, returned_stack)
 
-        def print_frame_stack(frame_stack: CallFrameStack):
-            print(
-                f"target_qname: {frame_stack.target_qname} target_id: {frame_stack.target_id}")
-            for child in frame_stack.children:
-                print_frame_stack(child)
-        print_frame_stack(merged_stack)
+        async def resolve_one(call: Any) -> CallFrameStack:
+            async with self.semaphore:
+                return await asyncio.to_thread(
+                    self.call_hierarchy_resolver.resolve_call_hierarchy,
+                    str(file_path),
+                    call,
+                )
+
+        returned_stacks = await asyncio.gather(*[resolve_one(call) for call in calls])
+        for returned_stack in returned_stacks:
+            self._merge_frame_stack(merged_stack, returned_stack)
 
         old_children = await self.call_service.get_children(node.id)
         results = await self.preprocess_call_hierarchy(merged_stack, old_children, node.id)
