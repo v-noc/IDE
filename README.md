@@ -1,6 +1,6 @@
 # V-NOC: Graph Based IDE
 
-[![License: FSL-1.1-Apache-2.0](https://img.shields.io/badge/License-FSL--1.1--Apache--2.0-blue.svg)](https://fsl.software/)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Us-purple.svg)](https://discord.gg/J5nfPHqyBr)
 
 **Software development is a computational problem that we have mistakenly turned into a memory problem.**
