@@ -1,6 +1,8 @@
 from typing import Dict, List, Optional, Tuple, Union
 
-from app.core.model.nodes import FileNode
+from terminusdb_client.woqlquery.woql_query import Doc
+
+from app.core.model.nodes import ClassNode, FileNode, FunctionNode
 from app.core.model.schemas import CallGroupSchema, CallSchema, ClassSchema, CodeElementGroupSchema, FileSchema, FunctionSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
@@ -163,3 +165,80 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         if not result["bindings"]:
             return None
         return FileNode.from_raw_dict(result["bindings"][0]["parent_doc"])
+
+    async def flush_batch(self, insert: List[FunctionNode | ClassNode], update: List[FunctionNode | ClassNode], delete: List[str], move: List[Tuple[str, str, str]], project_db_name: str, branch_name: Optional[str] = None):
+        if not insert and not update and not delete and not move:
+            return True
+
+        queries = []
+
+        # build delete operations
+        for delete_id in delete:
+            field = "function_children"
+            if delete_id.startswith("ClassSchema"):
+                field = "class_children"
+            queries.append(WQ().woql_and(
+                WQ().opt(
+                    WQ().triple("v:parent", field, delete_id)
+                    .delete_triple("v:parent", field, delete_id)
+                ),
+                WQ().delete_document(delete_id)
+            ))
+
+        # build insert operations
+        for node in insert:
+
+            if isinstance(node, FunctionNode):
+                schema = FunctionSchema.from_pydantic(node)._obj_to_dict()[0]
+            elif isinstance(node, ClassNode):
+                schema = ClassSchema.from_pydantic(node)._obj_to_dict()[0]
+
+            else:
+                raise ValueError(f"Invalid node type: {type(node)}")
+
+            queries.append(WQ().insert_document(Doc(schema)))
+
+        # build move operations
+        for item_id, new_parent_id, child_type in move:
+            field = CODE_CHILD_TYPE_TO_FIELD.get(
+                child_type, "function_children")
+
+            is_new_item = False
+            for node in insert:
+                if node.id == item_id:
+                    is_new_item = True
+                    break
+            if is_new_item:
+                queries.append(WQ().add_triple(new_parent_id, field, item_id))
+            else:
+                queries.append(WQ().woql_and(
+                    WQ().opt(
+                        WQ().triple("v:old_parent", field, item_id)
+                        .delete_triple("v:old_parent", field, item_id)
+                    ),
+                    WQ().add_triple(new_parent_id, field, item_id)
+                ))
+
+        for node in update:
+
+            if isinstance(node, FunctionNode):
+                schema = FunctionSchema.from_pydantic(node)._obj_to_dict()[0]
+            elif isinstance(node, ClassNode):
+                schema = ClassSchema.from_pydantic(node)._obj_to_dict()[0]
+            else:
+                raise ValueError(f"Invalid node type: {type(node)}")
+            # queries.append(WQ().update_document(Doc(schema)))
+
+        if not queries:
+            return True
+
+        combined = WQ().woql_and(*queries)
+
+        async with self.session(project_db_name, branch_name=branch_name) as client:
+            try:
+                result = await client.query(combined, commit_msg=f"Batch: {len(insert)} inserts, {len(delete)} deletes, {len(move)} moves")
+                print(result)
+                return True
+            except Exception as exc:
+                print(f"Batch operation failed: {exc}")
+                return False

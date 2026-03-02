@@ -143,6 +143,13 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             return True
 
         queries = []
+        for call_node in inserts:
+
+            # # or .dict() depending on your Pydantic version
+            call_dict = CallSchema.from_pydantic(
+                call_node)._obj_to_dict()[0]
+
+            queries.append(WQ().insert_document(Doc(call_dict)))
 
         # Build delete operations (with parent cleanup)
         for call_id in deletes:
@@ -159,25 +166,26 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
         # Build move operations (remove from old parent, add to new)
         for item_id, new_parent_id, child_type in moves:
             field = CALL_CHILD_TYPE_TO_FIELD.get(child_type, "call_children")
-            queries.append(
-                WQ().woql_or(
-                    WQ().opt(
-                        WQ().triple("v:old_parent", field, item_id)
-                        .delete_triple("v:old_parent", field, item_id)
-                    ),
-                    WQ().add_triple(new_parent_id, field, item_id)
+            is_new_item = False
+            for node in inserts:
+                if node.id == item_id:
+                    is_new_item = True
+                    break
+            if is_new_item:
+                queries.append(WQ().add_triple(new_parent_id, field, item_id))
+            else:
+                queries.append(
+                    WQ().woql_and(
+                        WQ().opt(
+                            WQ().triple("v:old_parent", field, item_id)
+                            .delete_triple("v:old_parent", field, item_id)
+                        ),
+                        WQ().add_triple(new_parent_id, field, item_id)
+                    )
                 )
-            )
 
         # Build insert operations
         # Note: Convert Pydantic models to dicts compatible with WOQL
-        for call_node in inserts:
-
-            # # or .dict() depending on your Pydantic version
-            call_dict = CallSchema.from_pydantic(
-                call_node)._obj_to_dict()[0]
-
-            queries.append(WQ().insert_document(Doc(**call_dict)))
 
         if not queries:
             return True
