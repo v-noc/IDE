@@ -275,44 +275,14 @@ class ASTProcessor:
         # await client.create_branch(new_branch_id=new_branch)
         # client.branch = new_branch
 
-        if funcs_to_create:
-            await self.repos.function_repo.create(
-                funcs_to_create, project_db_name=project_db_name, branch_name=new_branch
-            )
-
-        if classes_to_create:
-            await self.repos.class_repo.create(
-                classes_to_create,
-                project_db_name=project_db_name,
-                branch_name=new_branch,
-            )
-
-        if funcs_to_update:
-            await self.repos.function_repo.update_batch(
-                funcs_to_update, project_db_name=project_db_name
-            )
-        if classes_to_update:
-            await self.repos.class_repo.update_batch(
-                classes_to_update, project_db_name=project_db_name
-            )
-
-        if moves_to_execute:
-            await self.repos.file_repo.move_batch(
-                moves_to_execute,
-                project_db_name=project_db_name,
-                branch_name=new_branch,
-            )
-
-        # await client.squash("Squash commit for " + file_path, branch_name=new_branch)
-        # await client.apply(before_version="main", after_version=new_branch)
-
-        if ids_to_delete:
-            await self.repos.function_repo.delete_batch(
-                ids_to_delete, project_db_name=project_db_name
-            )
-            logger.info(
-                f"Deleted {len(ids_to_delete)} stale nodes {ids_to_delete} in {file_path}"
-            )
+        await self.repos.file_repo.flush_batch(
+            funcs_to_create + classes_to_create,
+            funcs_to_update + classes_to_update,
+            ids_to_delete,
+            moves_to_execute,
+            project_db_name=project_db_name,
+            branch_name=new_branch,
+        )
 
     def _flatten_nodes(
         self,

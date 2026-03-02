@@ -163,7 +163,6 @@ async def test_function_collector(setup_project):
     )
     assert add_func is not None and build_func is not None
 
-    print(f"add_func.children---: {len(children)}")
     assert len(
         add_func.children) == 1, f"add_func should have 1 child, {len(children)}"
     build_call = find_node_by_qname(
