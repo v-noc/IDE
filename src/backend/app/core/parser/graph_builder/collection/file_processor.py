@@ -53,7 +53,8 @@ class FileProcessor:
 
         for move in change_set.moved_files:
             parent_id = move.new_parent_id
-            tp = TrackedPath(path=move.new, id=move.id, parent_id=parent_id)
+            tp = TrackedPath(path=move.new_path, id=move.id,
+                             parent_id=parent_id)
             self._add_file_move(tp, scan_result, plan)
 
         for tp in change_set.deleted_files:

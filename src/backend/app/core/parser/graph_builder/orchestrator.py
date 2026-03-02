@@ -208,7 +208,7 @@ class GraphBuilderOrchestrator:
             if tp.path
         ]
         files_to_process.extend(
-            [mv.new for mv in change_set.moved_files if mv.new]
+            [mv.new_path for mv in change_set.moved_files if mv.new_path]
         )
         progress_tracker.set_total_files(len(files_to_process))
         await progress_tracker.emit(force=True)

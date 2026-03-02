@@ -69,7 +69,7 @@ class PhaseProcessor:
             if tp.path
         ]
         files_to_process.extend(
-            [mv.new for mv in change_set.moved_files if mv.new])
+            [mv.new_path for mv in change_set.moved_files if mv.new_path])
 
         results = []
         removed_scope_ids = set()
