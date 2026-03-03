@@ -111,8 +111,7 @@ async def _resync_and_get_tree(project_node, repos, db):
 
     project_service = ProjectService(repos)
     children = await project_service.get_children(project_node.db_name)
-    for c in children:
-        print(f"c: {c.name} - {c.qname}")
+
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
@@ -214,14 +213,6 @@ async def test_function_sync_add_and_remove_inside_function(setup_project):
         add_func_after_add = find_node_by_qname_recursive(
             tree_after_add, "simple_function.main.factory.add"
         )
-
-        def print_tree(s, depth=0):
-            for c in s:
-                print(f"{' ' * depth}c: {c.name} - {c.qname}")
-                if c.children:
-                    print_tree(c.children, depth+1)
-
-        print_tree(tree_after_add)
 
         assert "sync_added_inside" in [
             getattr(c, "name", None) for c in add_func_after_add.children

@@ -135,15 +135,14 @@ class PhaseProcessor:
             if file_node:
                 results.append(file_node)
 
-        for node in structure_batch_plan.update:
-            print(f"update node:{node.name} {node.children}")
         await self.repos.file_repo.flush_batch(
             structure_batch_plan.insert,
-            structure_batch_plan.update,
+            [],
             structure_batch_plan.delete,
             structure_batch_plan.move,
             project_db_name=self.project_node.db_name,
         )
+        await self.repos.function_repo.update_batch(structure_batch_plan.update, project_db_name=self.project_node.db_name)
 
         return results
 
