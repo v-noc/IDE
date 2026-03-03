@@ -85,17 +85,13 @@ class PhaseProcessor:
                     progress_tracker.set_current_file(file_node.path)
                     await progress_tracker.emit()
                 try:
-                    import time
-                    start_time = time.time()
+
                     result = await asyncio.wait_for(
                         self.collector.process_file(
                             file_node, checksum, project_db_name=self.project_node.db_name, progress_tracker=progress_tracker),
                         timeout=self._file_timeout,
                     )
-                    end_time = time.time()
 
-                    print(
-                        f"Time taken to process file {file_node.path}: {end_time - start_time} seconds")
                     # Update file progress
                     if progress_tracker:
                         progress_tracker.increment_file_processed(
