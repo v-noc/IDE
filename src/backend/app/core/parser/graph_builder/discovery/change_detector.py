@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from app.core.parser.graph_builder.collection.file_tracker import FileTracker
-from app.core.parser.graph_builder.collection.folder_tracker import (
+from .file_tracker import FileTracker
+from .folder_tracker import (
     FolderTracker,
 )
 from app.core.repository import Repositories

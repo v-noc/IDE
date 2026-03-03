@@ -133,7 +133,7 @@ class FunctionSchema(BaseSchema):
     """
     The schema for the function document.
     """
-    qname: str
+    qname: Optional[str]
     function_children: Set["FunctionSchema"]
     class_children: Set["ClassSchema"]
     call_children: Set["CallSchema"]

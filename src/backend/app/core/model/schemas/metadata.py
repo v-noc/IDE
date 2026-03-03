@@ -37,6 +37,7 @@ class CodePositionSchema(DocumentTemplate):
     @staticmethod
     def from_pydantic(code_position: CodePosition):
         return CodePositionSchema(
+
             line_no=code_position.line_no,
             col_offset=code_position.col_offset,
             end_line_no=code_position.end_line_no,
@@ -44,6 +45,8 @@ class CodePositionSchema(DocumentTemplate):
         )
 
     def to_pydantic(self):
+        print(f" self id: {self._id}")
+        print('to pydantic borhter')
         return CodePosition(
             line_no=self.line_no,
             col_offset=self.col_offset,

@@ -216,6 +216,7 @@ async def test_class_sync_add_and_remove_inside_class(setup_project):
         )
         parent_after_add = _find_node_by_name_recursive(
             tree_after_add, "Parent")
+
         assert "SyncAddedInner" in [
             getattr(c, "name", None) for c in parent_after_add.children
         ], "New inner class not detected in 'Parent'"

@@ -16,6 +16,7 @@ from app.core.parser.ast.models import ClassNode as ASTClassNode
 from app.core.parser.ast.models import FunctionNode as ASTFunctionNode
 from app.core.parser.jedi_adapter.resolver import MROResolver
 from app.core.repository import Repositories
+from app.core.parser.graph_builder.collection.structure_batch import StructureBatchPlan
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class ASTProcessor:
         Synchronize AST nodes as descendants of the given file node.
         Handles Creation, Updates, and Deletions of child nodes.
         """
+
         # 1. Fetch existing nodes from database
         existing_map = await self._build_existing_map(file_node, project_db_name)
 
@@ -52,13 +54,8 @@ class ASTProcessor:
         )
 
         # 3. Determine what operations need to be performed
-        sync_ops = self._determine_sync_operations(
+        return self._determine_sync_operations(
             desired_nodes_data, existing_map)
-
-        # 4. Execute batch operations
-        await self._execute_batch_operations(sync_ops, file_node.path, project_db_name)
-
-        return sync_ops["current_nodes"]
 
     async def _build_existing_map(
         self, file_node: FileNode, project_db_name: str
@@ -82,13 +79,15 @@ class ASTProcessor:
         try:
 
             for node in existing_tree:
+
                 for child in node.children:
-                    child_to_parent.get(node.id, set()).add(child)
+                    child_to_parent[child] = node.id
 
             for node in existing_tree:
+
                 existing_map[node.id] = {
                     "node": node,
-                    "parent_id": child_to_parent.get(node.id, None),
+                    "parent_id": child_to_parent.get(node.id, file_node.id),
                 }
         except Exception as e:
             import traceback
@@ -142,6 +141,7 @@ class ASTProcessor:
         # Update fields that come from AST parsing
         existing_node.name = new_node.name
         existing_node.qname = new_node.qname
+        new_node.code_position.id = existing_node.code_position.id
         existing_node.code_position = new_node.code_position
 
         # Update ClassNode-specific fields
@@ -180,6 +180,7 @@ class ASTProcessor:
             processed_ids.add(node_id)
 
             existing_entry = existing_map.get(node_id)
+
             existing_node = existing_entry["node"] if existing_entry else None
             existing_parent_id = existing_entry["parent_id"] if existing_entry else None
 
@@ -217,6 +218,7 @@ class ASTProcessor:
                 )
 
                 if needs_update:
+
                     # Update existing node fields instead of replacing
                     self._update_existing_node(existing_node, new_node)
 
@@ -245,44 +247,13 @@ class ASTProcessor:
         ids_to_delete = [
             sid for sid in existing_map if sid not in processed_ids]
 
-        return {
-            "funcs_to_create": funcs_to_create,
-            "classes_to_create": classes_to_create,
-            "funcs_to_update": funcs_to_update,
-            "classes_to_update": classes_to_update,
-            "moves_to_execute": moves_to_execute,
-            "ids_to_delete": ids_to_delete,
-            "current_nodes": current_nodes,
-        }
-
-    async def _execute_batch_operations(
-        self, sync_ops: Dict[str, Any], file_path: str, project_db_name: str
-    ) -> None:
-        """
-        Execute all batch operations (create, update, move, delete).
-        """
-        funcs_to_create = sync_ops["funcs_to_create"]
-        classes_to_create = sync_ops["classes_to_create"]
-        funcs_to_update = sync_ops["funcs_to_update"]
-        classes_to_update = sync_ops["classes_to_update"]
-        moves_to_execute = sync_ops["moves_to_execute"]
-        ids_to_delete = sync_ops["ids_to_delete"]
-
-        # client = self.repos.client.clone()
-        # await client.set_db(project_db_name)
-        new_branch = f"main"
-
-        # await client.create_branch(new_branch_id=new_branch)
-        # client.branch = new_branch
-
-        await self.repos.file_repo.flush_batch(
-            funcs_to_create + classes_to_create,
-            funcs_to_update + classes_to_update,
-            ids_to_delete,
-            moves_to_execute,
-            project_db_name=project_db_name,
-            branch_name=new_branch,
+        structure_batch_plan = StructureBatchPlan(
+            insert=funcs_to_create + classes_to_create,
+            update=funcs_to_update + classes_to_update,
+            delete=ids_to_delete,
+            move=moves_to_execute,
         )
+        return structure_batch_plan
 
     def _flatten_nodes(
         self,

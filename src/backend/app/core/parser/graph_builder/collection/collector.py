@@ -83,7 +83,7 @@ class Collector:
             )
 
     async def process_file(
-        self, file_path: str, checksum: str, project_db_name: str, progress_tracker=None
+        self, file_node: FileNode, checksum: str, project_db_name: str, progress_tracker=None
     ) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 2 collection (Content/AST).
@@ -95,32 +95,17 @@ class Collector:
         - folder_changes: Empty list (kept for signature compatibility)
         """
         with tracker.timer("collector.process_file_total"):
-            abs_path = Path(file_path)
+            abs_path = Path(file_node.path)
             try:
                 # Check if file is inside project path
                 abs_path.relative_to(self.project_path)
             except ValueError:
                 logger.error(
                     "File %s is not inside project path %s",
-                    file_path,
+                    file_node.path,
                     self.project_path,
                 )
                 return None
-
-            # 1. Retrieve File Node
-            with tracker.timer("collector.process_file.get_node"):
-                file_node = await self.repos.file_repo.get_by_path(
-                    str(abs_path), project_db_name=project_db_name
-                )
-            if not file_node:
-                logger.error(
-                    f"File node not found for {file_path} after "
-                    f"structure sync"
-                )
-                return None
-            else:
-
-                file_node = file_node[0]
 
             # 2. Parse Content & Scan AST
             try:
@@ -129,7 +114,7 @@ class Collector:
                 ) as f:
                     content = await f.read()
             except Exception as e:
-                logger.error(f"Failed to read file {file_path}: {e}")
+                logger.error(f"Failed to read file {file_node.path}: {e}")
                 return None
 
             # 3. Scan AST
@@ -142,17 +127,11 @@ class Collector:
                     )
             except Exception as e:
                 logger.error(
-                    f"Failed to scan AST for {file_path}: {e}")
+                    f"Failed to scan AST for {file_node.path}: {e}")
                 return None
 
             # 4. Sync Content
             with tracker.timer("collector.process_file.sync_content"):
-                await self.ast_processor.sync_content(
+                return await self.ast_processor.sync_content(
                     file_node, ast_nodes, project_db_name=project_db_name,   content=processed_content, progress_tracker=progress_tracker
                 )
-
-            return CollectionResult(
-                file_node=file_node,
-                removed_scope_ids=[],  # Deletions handled internally
-                folder_changes=[],
-            )

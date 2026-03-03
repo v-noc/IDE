@@ -3,7 +3,8 @@ from pydantic import BaseModel, Field
 
 
 class CodePosition(BaseModel):
-
+    id: Optional[str] = Field(alias="@id",
+                              default=None, description="The ID of the code position.")
     line_no: int
     col_offset: int
     end_line_no: int

@@ -1,9 +1,10 @@
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Union
 
 from terminusdb_client.woqlquery.woql_query import Doc
 
 from app.core.model.nodes import ClassNode, FileNode, FunctionNode
-from app.core.model.schemas import CallGroupSchema, CallSchema, ClassSchema, CodeElementGroupSchema, FileSchema, FunctionSchema
+from app.core.model.schemas import CallGroupSchema, CallSchema, ClassSchema, CodeElementGroupSchema, CodePositionSchema, FileSchema, FunctionSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
     CODE_CHILD_TYPE_TO_FIELD,
@@ -172,20 +173,6 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
 
         queries = []
 
-        # build delete operations
-        for delete_id in delete:
-            field = "function_children"
-            if delete_id.startswith("ClassSchema"):
-                field = "class_children"
-            queries.append(WQ().woql_and(
-                WQ().opt(
-                    WQ().triple("v:parent", field, delete_id)
-                    .delete_triple("v:parent", field, delete_id)
-                ),
-                WQ().delete_document(delete_id)
-            ))
-
-        # build insert operations
         for node in insert:
 
             if isinstance(node, FunctionNode):
@@ -198,7 +185,55 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
 
             queries.append(WQ().insert_document(Doc(schema)))
 
-        # build move operations
+        # build delete operations
+        for delete_id in delete:
+            field = "function_children"
+            if delete_id.startswith("ClassSchema"):
+                field = "class_children"
+            queries.append(WQ().woql_and(
+                WQ().opt(
+                    WQ().triple("v:parent", field, delete_id)
+                    .delete_triple("v:parent", field, delete_id)
+                ),
+                WQ().delete_document(delete_id)
+            ))
+            # build insert operations
+
+        # for node in update:
+
+        #     inserter = []
+        #     # move = []
+        #     if isinstance(node, FunctionNode):
+        #         node.code_position.line_no = 100
+        #         node.updated_at = datetime.now().isoformat()
+        #         node.description = node.name + ".update"
+        #         schema = FunctionSchema.from_pydantic(node)._obj_to_dict()[0]
+
+        #         child = schema.pop("function_children")
+        #         schema["function_children"] = []
+        #         schema.pop("@id")
+        #         for c in node.children:
+        #             if c.startswith("FunctionSchema"):
+        #                 print(f"c: {c}")
+        #                 child.append(c)
+
+        #     elif isinstance(node, ClassNode):
+        #         schema = ClassSchema.from_pydantic(node)._obj_to_dict()[0]
+        #     else:
+        #         raise ValueError(f"Invalid node type: {type(node)}")
+
+        #     # for c in inserter:
+        #     #     queries.append(WQ().insert_document(
+        #     #         Doc(FunctionSchema.from_pydantic(c)._obj_to_dict()[0])))
+
+        #     q = WQ().woql_and(
+        #         WQ().eq("v:node", node.id).update_document(Doc(schema),
+        #                                                    "v:node"))
+
+        #     queries.append(q)
+        #     move = []
+
+            # build move operations
         for item_id, new_parent_id, child_type in move:
             field = CODE_CHILD_TYPE_TO_FIELD.get(
                 child_type, "function_children")
@@ -218,16 +253,6 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
                     ),
                     WQ().add_triple(new_parent_id, field, item_id)
                 ))
-
-        for node in update:
-
-            if isinstance(node, FunctionNode):
-                schema = FunctionSchema.from_pydantic(node)._obj_to_dict()[0]
-            elif isinstance(node, ClassNode):
-                schema = ClassSchema.from_pydantic(node)._obj_to_dict()[0]
-            else:
-                raise ValueError(f"Invalid node type: {type(node)}")
-            # queries.append(WQ().update_document(Doc(schema)))
 
         if not queries:
             return True

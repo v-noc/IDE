@@ -365,6 +365,7 @@ class FunctionNode(BaseNode):
             ),
         )
         by_type = _children_by_type(raw_dict, _CODE_ELEMENT_CHILDREN_KEYS)
+
         return FunctionNode(
             **base.model_dump(),
             qname=raw_dict["qname"],
