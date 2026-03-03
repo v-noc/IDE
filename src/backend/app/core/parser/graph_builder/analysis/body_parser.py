@@ -2,7 +2,7 @@ import logging
 import asyncio
 import aiofiles
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Tuple, Any
 
 from app.core.parser.ast.models import (
     BaseNode,
@@ -38,12 +38,94 @@ class BodyParser:
         self.progress_tracker = progress_tracker
         self.batch_size = batch_size
 
+        # Global batch buffers (shared across all files)
+        self._insert_buffer: List[Any] = []
+        self._move_buffer: List[Tuple[str, str, str]] = []
+        self._delete_buffer: List[str] = []
+        self._batch_lock = asyncio.Lock()
+
         # Initialize the NEW Builder here
         self.call_chain_builder = CallChainBuilder(
             project_node=project_node,
             repos=repos,
             jedi_manager=jedi_manager
         )
+
+    def _should_flush(self) -> bool:
+        """True if any buffer has reached batch_size."""
+        return (
+            len(self._insert_buffer)+len(self._move_buffer) +
+            len(self._delete_buffer) >= self.batch_size
+
+        )
+
+    async def _flush_buffers(self) -> None:
+        """Flush all buffered inserts, deletes, and moves to the database."""
+        async with self._batch_lock:
+            if not self._insert_buffer and not self._delete_buffer and not self._move_buffer:
+                return
+            inserts = self._insert_buffer.copy()
+            deletes = self._delete_buffer.copy()
+            moves = self._move_buffer.copy()
+            self._insert_buffer.clear()
+            self._delete_buffer.clear()
+            self._move_buffer.clear()
+        await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
+
+    async def _add_insert_batch(self, calls: List[Any]) -> None:
+        if not calls:
+            return
+        async with self._batch_lock:
+            self._insert_buffer.extend(calls)
+            if self._should_flush():
+                inserts = self._insert_buffer.copy()
+                deletes = self._delete_buffer.copy()
+                moves = self._move_buffer.copy()
+                self._insert_buffer.clear()
+                self._delete_buffer.clear()
+                self._move_buffer.clear()
+            else:
+                inserts = deletes = moves = []
+        if inserts or deletes or moves:
+            await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
+
+    async def _add_move_batch(self, moves_in: List[Tuple[str, str, str]]) -> None:
+        if not moves_in:
+            return
+        async with self._batch_lock:
+            self._move_buffer.extend(moves_in)
+            if self._should_flush():
+                inserts = self._insert_buffer.copy()
+                deletes = self._delete_buffer.copy()
+                moves = self._move_buffer.copy()
+                self._insert_buffer.clear()
+                self._delete_buffer.clear()
+                self._move_buffer.clear()
+            else:
+                inserts = deletes = moves = []
+        if inserts or deletes or moves:
+            await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
+
+    async def _add_delete_batch(self, call_ids: List[str]) -> None:
+        if not call_ids:
+            return
+        async with self._batch_lock:
+            self._delete_buffer.extend(call_ids)
+            if self._should_flush():
+                inserts = self._insert_buffer.copy()
+                deletes = self._delete_buffer.copy()
+                moves = self._move_buffer.copy()
+                self._insert_buffer.clear()
+                self._delete_buffer.clear()
+                self._move_buffer.clear()
+            else:
+                inserts = deletes = moves = []
+        if inserts or deletes or moves:
+            await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
+
+    async def flush_buffers(self) -> None:
+        """Flush any remaining buffered operations. Call after all files are processed."""
+        await self._flush_buffers()
 
     async def process_ast(self, file_node: FileNode):
         """
@@ -148,52 +230,6 @@ class BodyParser:
             nodes, current_scope, node_map, file_path, source
         )
 
-        client = self.repos.client.clone()
-        await client.set_db(self.project_node.db_name)
-
-        insert_buffer: List[Tuple[Any, Optional[str]]] = []
-        move_buffer: List[Tuple[str, str, str]] = []
-        delete_buffer: List[str] = []
-        batch_lock = asyncio.Lock()
-        new_branch = f"main"
-        # await client.create_branch(new_branch_id=new_branch)
-        client.branch = new_branch
-
-        async def _flush_buffers_locked():
-
-            await self.call_chain_builder.call_service.flush_batch(
-                insert_buffer.copy(), delete_buffer.copy(), move_buffer.copy())
-
-            insert_buffer.clear()
-            delete_buffer.clear()
-            move_buffer.clear()
-
-        async def _set_insert_batch(calls: List[Any]):
-
-            if not calls:
-                return
-            async with batch_lock:
-                insert_buffer.extend(calls)
-
-                if len(insert_buffer) >= self.batch_size:
-                    await _flush_buffers_locked()
-
-        async def _set_move_batch(moves: List[Tuple[str, str, str]]):
-            if not moves:
-                return
-            async with batch_lock:
-                move_buffer.extend(moves)
-                if len(move_buffer) >= self.batch_size:
-                    await _flush_buffers_locked()
-
-        async def _set_delete_batch(call_ids: List[str]):
-            if not call_ids:
-                return
-            async with batch_lock:
-                delete_buffer.extend(call_ids)
-                if len(delete_buffer) >= self.batch_size:
-                    await _flush_buffers_locked()
-
         async def _process_one(node: any, fp: Path, src: str, calls: List[Any]):
             if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
                 self.progress_tracker.set_current_function(node.qname)
@@ -201,35 +237,25 @@ class BodyParser:
             try:
                 results = await self.call_chain_builder.resolve_call_hierarchy(fp, node, calls)
 
-                await _set_insert_batch(results.calls_to_create)
-                await _set_move_batch(results.moves_to_execute)
-                await _set_delete_batch(results.call_ids_to_remove)
-
-                # for call_id in results.call_ids_to_remove:
-                #     await self.call_chain_builder.call_service.delete(call_id)
+                await self._add_insert_batch(results.calls_to_create)
+                await self._add_move_batch(results.moves_to_execute)
+                await self._add_delete_batch(results.call_ids_to_remove)
 
             except Exception as e:
-
                 print(f"Error processing node {node.qname}: {e}")
                 raise e
 
             if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
                 self.progress_tracker.increment_entity_processed()
                 self.progress_tracker.clear_current_function()
-                # await self.progress_tracker.emit()
 
         semaphore = asyncio.Semaphore(3)
 
         async def bounded_process(n, fp, s, c):
             async with semaphore:
                 return await _process_one(n, fp, s, c)
+
         await asyncio.gather(*[bounded_process(n, fp, s, c) for n, fp, s, c in items], return_exceptions=True)
 
-        async with batch_lock:
-            await _flush_buffers_locked()
-
-        # await client.squash("Squash commit for " + current_scope.qname, branch_name=new_branch)
-
-        # result = await client.apply(before_version="main", after_version=new_branch, branch="main")
-        # print(f"Apply result: {result}")
-        # await client.delete_branch(new_branch)
+        # NOTE: Per-file flush removed. PhaseProcessor calls body_parser.flush_buffers()
+        # after all files are processed to send one final batch.

@@ -156,15 +156,16 @@ class PhaseProcessor:
 
         Orchestrates the BodyParser which uses the CallChainBuilder.
         """
+        body_parser = BodyParser(
+            self.project_node,
+            self.repos,
+            self.jedi_manager,
+            batch_size=self._batch_size,
+            progress_tracker=progress_tracker,
+        )
+
         async def _process_single_file_analysis(file_node: FileNode):
             """Process a single file's AST analysis."""
-            body_parser = BodyParser(
-                self.project_node,
-                self.repos,
-                self.jedi_manager,
-                batch_size=self._batch_size,
-                progress_tracker=progress_tracker,
-            )
 
             with tracker.timer("phase2.analyze_file"):
                 async with self._file_semaphore:
@@ -221,3 +222,6 @@ class PhaseProcessor:
 
         for task in tasks:
             task.result()
+
+        # Flush all buffered call operations (inserts, deletes, moves) in one final batch
+        await body_parser.flush_buffers()
