@@ -82,7 +82,7 @@ const updateGroup = async (
   updateData: { name?: string; description?: string },
   context: GroupApiContext,
 ) => {
-  return api(withGroupQuery(`${API_ROUTES.GROUPS}${groupId}`, context), {
+  return api(withGroupQuery(API_ROUTES.GROUPS, context, { group_id: groupId }), {
     method: "PATCH",
     body: updateData,
     headers: withOptionalBranch(context.branchName),
@@ -122,11 +122,17 @@ const addChildToGroup = async (
   itemType: GroupApiItemType,
   context: GroupApiContext,
 ) => {
-  return api(withGroupQuery(`${API_ROUTES.GROUPS}${groupId}/children`, context), {
-    method: "POST",
-    body: { child_id: childId, item_type: itemType },
-    headers: withOptionalBranch(context.branchName),
-  });
+  return api(
+    withGroupQuery(`${API_ROUTES.GROUPS}children`, context, {
+      group_id: groupId,
+      child_id: childId,
+    }),
+    {
+      method: "POST",
+      body: { item_type: itemType },
+      headers: withOptionalBranch(context.branchName),
+    },
+  );
 };
 
 const removeChildFromGroup = async (
@@ -137,12 +143,14 @@ const removeChildFromGroup = async (
   context: GroupApiContext,
 ) => {
   return api(
-    withGroupQuery(`${API_ROUTES.GROUPS}${groupId}/children/${childId}`, context, {
+    withGroupQuery(`${API_ROUTES.GROUPS}children`, context, {
+      group_id: groupId,
+      child_id: childId,
       item_type: itemType,
       new_parent_id: newParentId,
     }),
     {
-    method: "DELETE",
+      method: "DELETE",
       headers: withOptionalBranch(context.branchName),
     },
   );
@@ -195,7 +203,7 @@ export const useGroupUpdate = ({
 };
 
 const deleteGroup = async (groupId: string, context: GroupApiContext) => {
-  return api(withGroupQuery(`${API_ROUTES.GROUPS}${groupId}`, context), {
+  return api(withGroupQuery(API_ROUTES.GROUPS, context, { group_id: groupId }), {
     method: "DELETE",
     headers: withOptionalBranch(context.branchName),
   });

@@ -55,7 +55,7 @@ class GroupService():
         repo = self.current_repo(group_type)
         return await repo.get_children(group_id, self.project.db_name, branch_name=branch_name)
 
-    async def move_item(self, new_parent_id: str, item_id: str, item_type: str, group_type: GroupType, branch_name: Optional[str] = None):
+    async def move_item(self, new_parent_id: Optional[str], item_id: str, item_type: str, group_type: GroupType, branch_name: Optional[str] = None):
         repo = self.current_repo(group_type)
         return await repo.move_item(new_parent_id, item_id, item_type, self.project.db_name, branch_name=branch_name)
 
@@ -63,7 +63,7 @@ class GroupService():
         repo = self.current_repo(group_type)
         return await repo.move_batch(moves, self.project.db_name, branch_name=branch_name)
 
-    async def create(self, name: str, description: str, parent_id: Optional[str], children: List[Tuple[str, str]], group_type: GroupType, branch_name: Optional[str] = None):
+    async def create(self, name: str, description: str, parent_id: Optional[str], children: List[Tuple[str, str]], group_type: GroupType,  branch_name: Optional[str] = None):
         """Create group and move children in a single transaction. If creation fails, no items are moved."""
         repo = self.current_repo(group_type)
         node = self.current_node(group_type)
@@ -122,7 +122,7 @@ class GroupService():
         group_id: str,
         child_id: str,
         item_type: str,
-        new_parent_id: str,
+        new_parent_id: Optional[str],
         group_type: GroupType,
         branch_name: Optional[str] = None,
     ):

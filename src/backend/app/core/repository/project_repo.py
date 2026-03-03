@@ -76,7 +76,9 @@ class ProjectRepo():
 
     async def get_by_id(self, project_id: str):
         try:
-            return await self.client.get_document(project_id)
+            result = await self.client.get_document(project_id)
+
+            return result
         except DatabaseError as e:
             print(e, " ", project_id)
             if e.error_obj.get("api:error", {}).get("@type", "") == "api:DocumentNotFound":

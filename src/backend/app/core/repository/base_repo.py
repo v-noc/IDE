@@ -304,22 +304,25 @@ class BaseRepo(Generic[TNode, TSchema]):
             return None
 
         current_time = datetime.now(timezone.utc)
-        query = WQ().woql_and(
-            WQ().opt(
-                WQ()
-                .triple("v:parent", field_name, item_id)
-                .delete_triple("v:parent", field_name, item_id)
-                .update_triple("v:parent", "updated_at", current_time)
-            ),
-            WQ().add_triple(new_parent_id, field_name, item_id).opt(
-                WQ().triple("v:parent", "updated_at", current_time).
-                update_triple("v: parent", "updated_at", current_time),
-            )
-        )
+        query = [WQ().opt(
+            WQ()
+            .triple("v:parent", field_name, item_id)
+            .delete_triple("v:parent", field_name, item_id)
+            .update_triple("v:parent", "updated_at", current_time)
+        )]
+
+        if new_parent_id:
+            query.append(WQ().add_triple(new_parent_id, field_name, item_id).opt(
+                WQ().add_triple(new_parent_id, field_name, item_id).opt(
+                    WQ().triple("v:parent", "updated_at", current_time).
+                    update_triple("v: parent", "updated_at", current_time),
+                )
+            ))
+        combined = WQ().woql_and(*query)
 
         async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
-                await new_client.query(query, commit_msg=f"Moving item {item_id} to {new_parent_id}")
+                await new_client.query(combined, commit_msg=f"Moving item {item_id} to {new_parent_id}")
             except Exception as exc:
                 print(exc)
                 return False

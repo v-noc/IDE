@@ -8,6 +8,7 @@ from pathlib import Path
 from app.db.client import get_terminus_client
 from app.core.services.project_service import ProjectService
 from app.db.async_terminus_client import AsyncClient as TerminusClient
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
 
 @pytest_asyncio.fixture()
@@ -38,6 +39,29 @@ def sample_project_path(tmp_path):
     project_path = tmp_path / "sample_project"
     shutil.copytree(source_path, project_path)
     return str(project_path)
+
+
+@pytest_asyncio.fixture
+async def built_sample_project(sample_project_path, create_repos, terminusdb_client):
+    """Creates a project and runs GraphBuilder to populate structure (no API)."""
+    project_service = ProjectService(create_repos)
+    print(f"Creating sample project at: {create_repos.client.db}")
+    project_node = await project_service.create(
+        "sample_project",
+        "A sample project for E2E tests",
+        sample_project_path,
+    )
+
+    clone_db = terminusdb_client.clone()
+    orchestrator = GraphBuilderOrchestrator(
+        project_node=project_node,
+        db=clone_db,
+        ignore_file_name=".gitignore",
+    )
+    await orchestrator.resync()
+    yield project_node, create_repos
+
+    await project_service.delete(project_node.id)
 
 
 @pytest_asyncio.fixture

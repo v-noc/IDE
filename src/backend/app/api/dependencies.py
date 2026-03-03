@@ -27,10 +27,13 @@ async def get_group_service(
     project_service: ProjectService = Depends(get_project_service),
     project_id: str = Query(..., description="The ID of the project"),
 ) -> GroupService:
+
     project = await project_service.get(project_id)
     if not project:
+        print(f"Project not found for id: {project_id}")
         raise HTTPException(status_code=404, detail="Project not found")
     project_node = ProjectNode.from_raw_dict(project)
+
     repos = Repositories(db)
     return GroupService(repos, project_node)
 
