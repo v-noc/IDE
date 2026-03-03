@@ -17,9 +17,12 @@ const SCHEMA_PREFIX_TO_GROUP_API_TYPE: Record<string, GroupApiType> = {
   CallGroupSchema: "call_group",
 };
 
+const API_GROUP_TYPES: GroupApiType[] = ["structure_group", "code_element_group", "call_group"];
+
 export function mapFrontendGroupKindToApiType(
   groupKind?: GroupNodeTree["group_type"],
 ): GroupApiType | null {
+  if (API_GROUP_TYPES.includes(groupKind as GroupApiType)) return groupKind as GroupApiType;
   if (groupKind === "folder_file") return "structure_group";
   if (groupKind === "code") return "code_element_group";
   if (groupKind === "call") return "call_group";

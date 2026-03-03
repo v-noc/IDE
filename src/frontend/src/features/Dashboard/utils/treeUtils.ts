@@ -69,14 +69,14 @@ export function collectAncestorKeys(root: ProjectNodeTree, targetKey: string): s
 /**
  * Determines whether a child node should be rendered in the tree.
  * - Exclude "call" nodes
- * - Exclude "group" nodes with group_type === "call"
+ * - Exclude "group" nodes with group_type === "call_group"
  */
 export function shouldRenderChild(node: ContainerNodeTree): boolean {
   if (node.node_type === 'call') return false;
 
   if (node.node_type === 'group') {
     const groupType = (node as { group_type?: string }).group_type;
-    return groupType !== 'call';
+    return groupType !== 'call_group';
   }
 
   return true;

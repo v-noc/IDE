@@ -84,7 +84,15 @@ export interface ProjectNode extends ContainerNode {
 
 export interface GroupNode extends ContainerNode {
   node_type: "group"
-  group_type: "call" | "code" | "folder_file" | "empty"
+  /** API types from backend; legacy: call|code|folder_file */
+  group_type:
+    | "structure_group"
+    | "code_element_group"
+    | "call_group"
+    | "empty"
+    | "call"
+    | "code"
+    | "folder_file"
 }
 
 // Tree

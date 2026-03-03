@@ -56,10 +56,14 @@ function NodeRow({
   checked,
   onCheckedChange,
 }: {
-  node: { name: string; node_type: NodeType; icon?: string };
+  node: { name: string; node_type: NodeType; group_type?: string; icon?: string };
   checked: boolean;
   onCheckedChange: (next: boolean) => void;
 }) {
+  const displayType =
+    node.node_type === "group" && node.group_type
+      ? node.group_type.replace(/_/g, " ")
+      : node.node_type;
   return (
     <div className="flex items-center gap-2 py-1 px-2 rounded-md hover:bg-muted/60">
       <Checkbox
@@ -71,13 +75,13 @@ function NodeRow({
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">{node.name}</div>
           <div className="text-xs text-muted-foreground truncate">
-            {node.node_type}
+            {displayType}
           </div>
         </div>
       </div>
       <div className="ml-auto">
         <Badge variant="secondary" className="text-xs capitalize">
-          {node.node_type}
+          {displayType}
         </Badge>
       </div>
     </div>

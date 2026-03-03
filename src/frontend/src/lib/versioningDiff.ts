@@ -89,11 +89,16 @@ function normalizeDiffNodeBody(value: Record<string, unknown>): Record<string, u
     toFrontendNodeType(value["@type"]);
   const target =
     normalizeTarget(value.target) ?? normalizeTarget(value.target_function);
+  const groupType =
+    typeof value.group_type === "string" && value.group_type
+      ? value.group_type
+      : undefined;
 
   return {
     ...value,
     ...(id ? { id, "@id": id } : {}),
     ...(nodeType ? { node_type: nodeType } : {}),
+    ...(groupType ? { group_type: groupType } : {}),
     ...(target ? { target } : {}),
   };
 }

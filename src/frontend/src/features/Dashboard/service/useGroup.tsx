@@ -36,12 +36,14 @@ const withOptionalBranch = (branchName?: string) =>
   branchName ? { "X-Vnoc-Branch": branchName } : undefined;
 
 const createGroup = async (
-  parentNodeId: string,
   createGroupPayload: CreateGroupRequest,
   context: GroupApiContext,
+  parentNodeId?: string,
 ) => {
   return api(
-    withGroupQuery(API_ROUTES.GROUPS, context, { parent_node_id: parentNodeId }),
+    withGroupQuery(API_ROUTES.GROUPS, context, {
+      parent_node_id: parentNodeId,
+    }),
     {
       method: "POST",
       body: createGroupPayload,
@@ -64,13 +66,21 @@ export const useCreateGroup = ({
   branchName?: string;
 }) => {
   const queryClient = useQueryClient();
+  let newParentId = undefined;
+  if (parentNodeId && parentNodeId.startsWith("Project") == false) {
+    newParentId = parentNodeId;
+  }
   return useMutation({
     mutationFn: (createGroupPayload: CreateGroupRequest) =>
-      createGroup(parentNodeId, createGroupPayload, {
-        projectId,
-        groupType,
-        branchName,
-      }),
+      createGroup(
+        createGroupPayload,
+        {
+          projectId,
+          groupType,
+          branchName,
+        },
+        newParentId,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projectTree", projectKey] });
     },
@@ -82,11 +92,14 @@ const updateGroup = async (
   updateData: { name?: string; description?: string },
   context: GroupApiContext,
 ) => {
-  return api(withGroupQuery(API_ROUTES.GROUPS, context, { group_id: groupId }), {
-    method: "PATCH",
-    body: updateData,
-    headers: withOptionalBranch(context.branchName),
-  });
+  return api(
+    withGroupQuery(API_ROUTES.GROUPS, context, { group_id: groupId }),
+    {
+      method: "PATCH",
+      body: updateData,
+      headers: withOptionalBranch(context.branchName),
+    },
+  );
 };
 
 export const useUpdateGroup = ({
@@ -173,7 +186,13 @@ export const useGroupUpdate = ({
 }) => {
   const queryClient = useQueryClient();
   const addChildToGroupMutation = useMutation({
-    mutationFn: ({ childId, itemType }: { childId: string; itemType: GroupApiItemType }) =>
+    mutationFn: ({
+      childId,
+      itemType,
+    }: {
+      childId: string;
+      itemType: GroupApiItemType;
+    }) =>
       addChildToGroup(groupId, childId, itemType, {
         projectId,
         groupType,
@@ -185,7 +204,13 @@ export const useGroupUpdate = ({
   });
 
   const removeChildFromGroupMutation = useMutation({
-    mutationFn: ({ childId, itemType }: { childId: string; itemType: GroupApiItemType }) =>
+    mutationFn: ({
+      childId,
+      itemType,
+    }: {
+      childId: string;
+      itemType: GroupApiItemType;
+    }) =>
       removeChildFromGroup(groupId, childId, itemType, newParentId, {
         projectId,
         groupType,
@@ -203,10 +228,13 @@ export const useGroupUpdate = ({
 };
 
 const deleteGroup = async (groupId: string, context: GroupApiContext) => {
-  return api(withGroupQuery(API_ROUTES.GROUPS, context, { group_id: groupId }), {
-    method: "DELETE",
-    headers: withOptionalBranch(context.branchName),
-  });
+  return api(
+    withGroupQuery(API_ROUTES.GROUPS, context, { group_id: groupId }),
+    {
+      method: "DELETE",
+      headers: withOptionalBranch(context.branchName),
+    },
+  );
 };
 
 export const useDeleteGroup = ({

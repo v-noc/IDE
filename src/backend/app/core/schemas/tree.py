@@ -52,6 +52,8 @@ class ProjectTreeNode(ProjectNode):
 class GroupTreeNode(BaseGroupNode):
     node_type: str = Field(
         default="group", description="The type of the node.")
+    group_type: str = Field(
+        default="empty", description="The type of the group.")
     children: List[
         "GroupTreeNode | FolderTreeNode | FileTreeNode | ClassTreeNode | FunctionTreeNode | CallTreeNode"
     ] = Field(default_factory=list, description="Group children.")

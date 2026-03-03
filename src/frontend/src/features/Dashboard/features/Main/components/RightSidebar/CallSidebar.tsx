@@ -29,7 +29,8 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
         (node) =>
           node.node_type == "call" ||
           (node.node_type == "group" &&
-            (node as GroupNode).group_type == "call"),
+            ((node as GroupNode).group_type == "call_group" ||
+              (node as GroupNode).group_type == "call")),
       );
     }
     if (focusStack.length > 0) {
@@ -37,7 +38,8 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
         (node) =>
           node.node_type == "call" ||
           (node.node_type == "group" &&
-            (node as GroupNode).group_type == "call"),
+            ((node as GroupNode).group_type == "call_group" ||
+              (node as GroupNode).group_type == "call")),
       );
     }
 
@@ -67,7 +69,7 @@ const CallSidebar = ({ hideHeader }: CallSidebarProps) => {
               childFilter={(node) =>
                 node.node_type === "call" ||
                 (node.node_type == "group" &&
-                  (node as unknown as GroupNode).group_type == "call")
+                  (node as unknown as GroupNode).group_type == "call_group")
               }
               onSelect={(n) =>
                 setSecondarySelectedNode(activeTabId, n as AnyNodeTree)
