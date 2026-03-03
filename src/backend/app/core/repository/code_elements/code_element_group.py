@@ -1,3 +1,4 @@
+from terminusdb_client.woqlquery.woql_query import Doc
 from app.core.repository.base_repo import WQ, BaseRepo
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import CodeElementGroupNode
@@ -113,6 +114,51 @@ class CodeElementGroupRepo(BaseRepo[CodeElementGroupNode, CodeElementGroupSchema
             try:
                 await new_client.query(query, commit_msg=f"Deleting code_element_group {code_element_group_id}")
 
+            except Exception as exc:
+                print(exc)
+                return False
+        return True
+
+    async def create_and_move_items(
+        self,
+        code_element_group: CodeElementGroupNode,
+        items: List[Tuple[str, str]],
+        project_db_name: str,
+        branch_name: Optional[str] = None,
+        parent_id: Optional[str] = None,
+    ) -> bool:
+        """Create group and move items in a single transaction. If any step fails, none are applied."""
+        queries = []
+
+        schema = CodeElementGroupSchema.from_pydantic(
+            code_element_group)._obj_to_dict()[0]
+        queries.append(WQ().insert_document(Doc(schema)))
+
+        if parent_id:
+            queries.append(
+                WQ().add_triple(parent_id, "code_element_group", code_element_group.id)
+            )
+
+        for item in items:
+            item_field = CODE_CHILD_TYPE_TO_FIELD.get(item[1])
+            if not item_field:
+                raise ValueError(f"Invalid code element child type: {item[1]}")
+            queries.append(WQ().woql_and(
+                WQ().opt(
+                    WQ().triple("v:parent", item_field, item[0])
+                    .delete_triple("v:parent", item_field, item[0])
+                ),
+                WQ().add_triple(code_element_group.id, item_field, item[0])
+            ))
+
+        combined = WQ().woql_and(*queries)
+
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
+            try:
+                await new_client.query(
+                    combined,
+                    commit_msg=f"Creating and moving items to code_element group {code_element_group.id}",
+                )
             except Exception as exc:
                 print(exc)
                 return False

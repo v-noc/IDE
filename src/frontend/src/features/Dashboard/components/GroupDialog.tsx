@@ -14,12 +14,17 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import type { AnyNodeTree, GroupNodeTree, NodeType } from "@/types/project";
-import { useMemo, useState, useEffect, useEffectEvent } from "react";
+import { useMemo, useState } from "react";
 import {
   useCreateGroup,
   useUpdateGroup,
   useGroupUpdate,
 } from "../service/useGroup";
+import {
+  mapNodeToGroupApiType,
+  mapNodeToGroupItemType,
+  type GroupApiItemType,
+} from "../service/groupApiUtils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -51,7 +56,7 @@ function NodeRow({
   checked,
   onCheckedChange,
 }: {
-  node: { _key: string; name: string; node_type: NodeType; icon?: string };
+  node: { name: string; node_type: NodeType; icon?: string };
   checked: boolean;
   onCheckedChange: (next: boolean) => void;
 }) {
@@ -91,28 +96,12 @@ const GroupDialog = ({
 }: GroupDialogProps) => {
   const isCreate = mode === "create";
   const title = isCreate ? "Create Group" : "Manage Group";
+  const initialChildrenState = isCreate
+    ? initialChildren
+    : ((group?.children || []) as ChildCandidate[]);
 
-  const { mutate: createGroup, isPending: isCreating } = useCreateGroup(
-    parent_node_id || "",
-    project_key,
-  );
-  const { mutate: updateGroup, isPending: isUpdating } = useUpdateGroup(
-    group?.id || "",
-    project_key,
-  );
-  const { addChildToGroupMutation, removeChildFromGroupMutation } =
-    useGroupUpdate(group?.id || "", project_key);
-
-  const form = useForm<GroupFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: group?.name || "",
-      description: group?.description || "",
-    },
-  });
-
-  // Local state for children selection in CREATE mode OR incremental selection in MANAGE mode
-  const [currentChildren, setCurrentChildren] = useState<ChildCandidate[]>([]);
+  const [currentChildren, setCurrentChildren] =
+    useState<ChildCandidate[]>(initialChildrenState);
   const [childrenSelected, setChildrenSelected] = useState<
     Record<string, boolean>
   >({});
@@ -122,33 +111,27 @@ const GroupDialog = ({
   const [leftFilter, setLeftFilter] = useState("");
   const [rightFilter, setRightFilter] = useState("");
 
-  // 1. THE "WHAT": The Effect Event (Non-Reactive)
-  // This function always sees the latest props/state but DOES NOT trigger re-runs.
-  const onDialogInit = useEffectEvent((isCreate: boolean, group: any) => {
-    if (isCreate) {
-      setCurrentChildren(initialChildren);
-      form.reset({ name: "", description: "" });
-    } else if (group) {
-      setCurrentChildren((group.children || []) as ChildCandidate[]);
-      form.reset({ name: group.name, description: group.description || "" });
-    }
-
-    // Clear filters and selections
-    setChildrenSelected({});
-    setSiblingsSelected({});
-    setLeftFilter("");
-    setRightFilter("");
+  const form = useForm<GroupFormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: group?.name || "",
+      description: group?.description || "",
+    },
   });
 
-  // 2. THE "WHEN": The Effect (Reactive)
-  // This only triggers when the fundamental "source of truth" changes.
-  useEffect(() => {
-    if (isOpen) {
-      // We call the event here.
-      // We don't need 'form' or 'initialChildren' in the dependency array anymore!
-      onDialogInit(isCreate, group);
+  const firstSelectedNode = useMemo(() => {
+    if (isCreate) {
+      return currentChildren[0] || initialChildren[0] || null;
     }
-  }, [isOpen, isCreate, group?.id]); // Only react to the ID, not the whole object
+    return (group as AnyNodeTree | undefined) || currentChildren[0] || null;
+  }, [isCreate, currentChildren, initialChildren, group]);
+
+  const inferredGroupType = useMemo(
+    () => mapNodeToGroupApiType(firstSelectedNode),
+    [firstSelectedNode],
+  );
+
+  const effectiveGroupType = inferredGroupType || "structure_group";
 
   const availableSiblings = useMemo(() => {
     const childKeys = new Set(currentChildren.map((c) => c.id));
@@ -185,6 +168,29 @@ const GroupDialog = ({
 
   const hasAddSelection = selectedSiblingIds.length > 0;
   const hasRemoveSelection = selectedChildrenIds.length > 0;
+  const canUseGroupApi = Boolean(inferredGroupType);
+
+  const mutationConfig = {
+    projectId: project_key,
+    projectKey: project_key,
+    groupType: effectiveGroupType,
+  } as const;
+
+  const { mutate: createGroup, isPending: isCreating } = useCreateGroup({
+    parentNodeId: parent_node_id || "",
+    ...mutationConfig,
+  });
+  const { mutate: updateGroup, isPending: isUpdating } = useUpdateGroup({
+    groupId: group?.id || "",
+    ...mutationConfig,
+  });
+  const { addChildToGroupMutation, removeChildFromGroupMutation } =
+    useGroupUpdate({
+      groupId: group?.id || "",
+      newParentId: parent_node_id || "",
+      ...mutationConfig,
+    });
+
   const isMutatingSettings = isCreating || isUpdating;
   const isMutatingChildren =
     addChildToGroupMutation.isPending || removeChildFromGroupMutation.isPending;
@@ -198,13 +204,21 @@ const GroupDialog = ({
       setCurrentChildren((prev) => [...prev, ...selectedNodes]);
       setSiblingsSelected({});
     } else {
+      if (!canUseGroupApi) return;
       await Promise.all(
-        selectedSiblingIds.map((id) => addChildToGroupMutation.mutateAsync(id)),
+        selectedSiblingIds.map(async (id) => {
+          const node = availableSiblings.find((item) => item.id === id);
+          if (!node) return;
+          const itemType = mapNodeToGroupItemType(node);
+          if (!itemType) return;
+          await addChildToGroupMutation.mutateAsync({
+            childId: id,
+            itemType,
+          });
+          setCurrentChildren((prev) => [...prev, node]);
+        }),
       );
       setSiblingsSelected({});
-      // Note: currentChildren will update via query invalidation if the parent re-renders,
-      // but to feel "immediate" without a full tree refresh waiting, we could optimistically update.
-      // For now, relying on the fact that 'group' prop will change when query invalidates.
     }
   };
 
@@ -214,10 +228,19 @@ const GroupDialog = ({
       setCurrentChildren((prev) => prev.filter((c) => !childrenSelected[c.id]));
       setChildrenSelected({});
     } else {
+      if (!canUseGroupApi || !parent_node_id) return;
       await Promise.all(
-        selectedChildrenIds.map((id) =>
-          removeChildFromGroupMutation.mutateAsync(id),
-        ),
+        selectedChildrenIds.map(async (id) => {
+          const node = currentChildren.find((item) => item.id === id);
+          if (!node) return;
+          const itemType: GroupApiItemType | null = mapNodeToGroupItemType(node);
+          if (!itemType) return;
+          await removeChildFromGroupMutation.mutateAsync({
+            childId: id,
+            itemType,
+          });
+          setCurrentChildren((prev) => prev.filter((item) => item.id !== id));
+        }),
       );
       setChildrenSelected({});
     }
@@ -225,14 +248,24 @@ const GroupDialog = ({
 
   const onSubmit = (values: GroupFormValues) => {
     if (isCreate) {
+      if (!canUseGroupApi) return;
       createGroup(
         {
           ...values,
-          children_ids: currentChildren.map((c) => c.id),
+          children: currentChildren
+            .map((c) => {
+              const itemType = mapNodeToGroupItemType(c);
+              if (!itemType) return null;
+              return { id: c.id, type: itemType };
+            })
+            .filter((item): item is { id: string; type: GroupApiItemType } =>
+              Boolean(item),
+            ),
         },
         { onSuccess: onClose },
       );
     } else {
+      if (!canUseGroupApi) return;
       updateGroup(values, { onSuccess: onClose });
     }
   };
@@ -242,18 +275,16 @@ const GroupDialog = ({
     form.watch("name") !== group?.name ||
     form.watch("description") !== (group?.description || "");
 
-  // Update current children if group children changes (for manage mode immediate feel)
-  useEffect(() => {
-    if (!isCreate && group?.children) {
-      setCurrentChildren(group.children as ChildCandidate[]);
-    }
-  }, [group?.children, isCreate]);
+  if (!isOpen) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-full max-w-3xl sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <div className="text-xs text-muted-foreground">
+            Group type: {inferredGroupType || "unresolved"}
+          </div>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -368,14 +399,14 @@ const GroupDialog = ({
                 type="button"
                 variant="secondary"
                 onClick={handleRemoveSelection}
-                disabled={!hasRemoveSelection || isMutatingChildren}
+                disabled={!hasRemoveSelection || isMutatingChildren || !canUseGroupApi}
               >
                 Remove from children
               </Button>
               <Button
                 type="button"
                 onClick={handleAddSelection}
-                disabled={!hasAddSelection || isMutatingChildren}
+                disabled={!hasAddSelection || isMutatingChildren || !canUseGroupApi}
               >
                 Add to children
               </Button>
@@ -391,7 +422,7 @@ const GroupDialog = ({
               </Button>
               <Button
                 type="submit"
-                disabled={!hasInfoChanges || isMutatingSettings}
+                disabled={!hasInfoChanges || isMutatingSettings || !canUseGroupApi}
               >
                 {isCreating
                   ? "Creating..."

@@ -6,7 +6,7 @@ from .v1 import code_routes
 from .v1 import document_routes
 from .v1.versioning import router as versioning_router
 # from .v1 import call_routes
-# from .v1 import group_routes
+from .v1 import group_routes
 
 router = APIRouter()
 
@@ -38,4 +38,4 @@ router.include_router(versioning_router, prefix="/versioning", tags=["versioning
 
 # router.include_router(call_routes.router, prefix="/calls", tags=["calls"])
 
-# router.include_router(group_routes.router, prefix="/groups", tags=["groups"])
+router.include_router(group_routes.router, prefix="/groups", tags=["groups"])

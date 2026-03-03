@@ -62,6 +62,7 @@ export function SidebarDialogs() {
         group={targetNode as unknown as GroupNodeTree}
         siblings={siblings}
         project_key={projectData?.id ?? ""}
+        parent_node_id={parentNode?.id ?? ""}
       />
 
       <PromptBuilder

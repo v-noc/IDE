@@ -1,81 +1,190 @@
 import { api } from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { GroupApiItemType, GroupApiType } from "./groupApiUtils";
 
 type CreateGroupRequest = {
   name: string;
   description: string;
-  children_ids: string[];
+  children: Array<{ id: string; type: GroupApiItemType }>;
 };
+
+type GroupApiContext = {
+  projectId: string;
+  groupType: GroupApiType;
+  branchName?: string;
+};
+
+const withGroupQuery = (
+  basePath: string,
+  { projectId, groupType }: GroupApiContext,
+  extra: Record<string, string | undefined> = {},
+) => {
+  const params = new URLSearchParams({
+    project_id: projectId,
+    group_type: groupType,
+  });
+
+  Object.entries(extra).forEach(([key, value]) => {
+    if (value) params.set(key, value);
+  });
+
+  return `${basePath}?${params.toString()}`;
+};
+
+const withOptionalBranch = (branchName?: string) =>
+  branchName ? { "X-Vnoc-Branch": branchName } : undefined;
 
 const createGroup = async (
-  parent_node_id: string,
-  create_group: CreateGroupRequest
+  parentNodeId: string,
+  createGroupPayload: CreateGroupRequest,
+  context: GroupApiContext,
 ) => {
-  return api(`${API_ROUTES.GROUPS}${parent_node_id}`, {
-    method: "POST",
-    body: create_group,
-  });
+  return api(
+    withGroupQuery(API_ROUTES.GROUPS, context, { parent_node_id: parentNodeId }),
+    {
+      method: "POST",
+      body: createGroupPayload,
+      headers: withOptionalBranch(context.branchName),
+    },
+  );
 };
 
-export const useCreateGroup = (parent_node_id: string, project_key: string) => {
+export const useCreateGroup = ({
+  parentNodeId,
+  projectKey,
+  projectId,
+  groupType,
+  branchName,
+}: {
+  parentNodeId: string;
+  projectKey: string;
+  projectId: string;
+  groupType: GroupApiType;
+  branchName?: string;
+}) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (create_group: CreateGroupRequest) =>
-      createGroup(parent_node_id, create_group),
+    mutationFn: (createGroupPayload: CreateGroupRequest) =>
+      createGroup(parentNodeId, createGroupPayload, {
+        projectId,
+        groupType,
+        branchName,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+      queryClient.invalidateQueries({ queryKey: ["projectTree", projectKey] });
     },
   });
 };
 
 const updateGroup = async (
-  group_id: string,
-  update_data: { name?: string; description?: string }
+  groupId: string,
+  updateData: { name?: string; description?: string },
+  context: GroupApiContext,
 ) => {
-  return api(`${API_ROUTES.GROUPS}${group_id}`, {
+  return api(withGroupQuery(`${API_ROUTES.GROUPS}${groupId}`, context), {
     method: "PATCH",
-    body: update_data,
+    body: updateData,
+    headers: withOptionalBranch(context.branchName),
   });
 };
 
-export const useUpdateGroup = (group_id: string, project_key: string) => {
+export const useUpdateGroup = ({
+  groupId,
+  projectKey,
+  projectId,
+  groupType,
+  branchName,
+}: {
+  groupId: string;
+  projectKey: string;
+  projectId: string;
+  groupType: GroupApiType;
+  branchName?: string;
+}) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (update_data: { name?: string; description?: string }) =>
-      updateGroup(group_id, update_data),
+    mutationFn: (updateData: { name?: string; description?: string }) =>
+      updateGroup(groupId, updateData, {
+        projectId,
+        groupType,
+        branchName,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+      queryClient.invalidateQueries({ queryKey: ["projectTree", projectKey] });
     },
   });
 };
 
-const addChildToGroup = async (group_id: string, child_id: string) => {
-  return api(`${API_ROUTES.GROUPS}${group_id}/children`, {
+const addChildToGroup = async (
+  groupId: string,
+  childId: string,
+  itemType: GroupApiItemType,
+  context: GroupApiContext,
+) => {
+  return api(withGroupQuery(`${API_ROUTES.GROUPS}${groupId}/children`, context), {
     method: "POST",
-    body: { child_id },
+    body: { child_id: childId, item_type: itemType },
+    headers: withOptionalBranch(context.branchName),
   });
 };
 
-const removeChildFromGroup = async (group_id: string, child_id: string) => {
-  return api(`${API_ROUTES.GROUPS}${group_id}/children/${child_id}`, {
+const removeChildFromGroup = async (
+  groupId: string,
+  childId: string,
+  itemType: GroupApiItemType,
+  newParentId: string,
+  context: GroupApiContext,
+) => {
+  return api(
+    withGroupQuery(`${API_ROUTES.GROUPS}${groupId}/children/${childId}`, context, {
+      item_type: itemType,
+      new_parent_id: newParentId,
+    }),
+    {
     method: "DELETE",
-  });
+      headers: withOptionalBranch(context.branchName),
+    },
+  );
 };
 
-export const useGroupUpdate = (group_id: string, project_key: string) => {
+export const useGroupUpdate = ({
+  groupId,
+  projectKey,
+  projectId,
+  groupType,
+  newParentId,
+  branchName,
+}: {
+  groupId: string;
+  projectKey: string;
+  projectId: string;
+  groupType: GroupApiType;
+  newParentId: string;
+  branchName?: string;
+}) => {
   const queryClient = useQueryClient();
   const addChildToGroupMutation = useMutation({
-    mutationFn: (child_id: string) => addChildToGroup(group_id, child_id),
+    mutationFn: ({ childId, itemType }: { childId: string; itemType: GroupApiItemType }) =>
+      addChildToGroup(groupId, childId, itemType, {
+        projectId,
+        groupType,
+        branchName,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+      queryClient.invalidateQueries({ queryKey: ["projectTree", projectKey] });
     },
   });
 
   const removeChildFromGroupMutation = useMutation({
-    mutationFn: (child_id: string) => removeChildFromGroup(group_id, child_id),
+    mutationFn: ({ childId, itemType }: { childId: string; itemType: GroupApiItemType }) =>
+      removeChildFromGroup(groupId, childId, itemType, newParentId, {
+        projectId,
+        groupType,
+        branchName,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+      queryClient.invalidateQueries({ queryKey: ["projectTree", projectKey] });
     },
   });
 
@@ -85,18 +194,36 @@ export const useGroupUpdate = (group_id: string, project_key: string) => {
   };
 };
 
-const deleteGroup = async (group_id: string) => {
-  return api(`${API_ROUTES.GROUPS}${group_id}`, {
+const deleteGroup = async (groupId: string, context: GroupApiContext) => {
+  return api(withGroupQuery(`${API_ROUTES.GROUPS}${groupId}`, context), {
     method: "DELETE",
+    headers: withOptionalBranch(context.branchName),
   });
 };
 
-export const useDeleteGroup = (group_id: string, project_key: string) => {
+export const useDeleteGroup = ({
+  groupId,
+  projectKey,
+  projectId,
+  groupType,
+  branchName,
+}: {
+  groupId: string;
+  projectKey: string;
+  projectId: string;
+  groupType: GroupApiType;
+  branchName?: string;
+}) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => deleteGroup(group_id),
+    mutationFn: () =>
+      deleteGroup(groupId, {
+        projectId,
+        groupType,
+        branchName,
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projectTree", project_key] });
+      queryClient.invalidateQueries({ queryKey: ["projectTree", projectKey] });
     },
   });
 };

@@ -1,8 +1,7 @@
 import uuid
-from _pytest.nodes import Node
 from app.core.repository import Repositories
 
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Tuple
 
 from enum import Enum
 from app.core.repository.base_repo import BaseRepo
@@ -65,6 +64,7 @@ class GroupService():
         return await repo.move_batch(moves, self.project.db_name, branch_name=branch_name)
 
     async def create(self, name: str, description: str, parent_id: Optional[str], children: List[Tuple[str, str]], group_type: GroupType, branch_name: Optional[str] = None):
+        """Create group and move children in a single transaction. If creation fails, no items are moved."""
         repo = self.current_repo(group_type)
         node = self.current_node(group_type)
         schema = self.current_schema(group_type)
@@ -74,18 +74,59 @@ class GroupService():
             description=description
         )
 
-        await repo.create(group, self.project.db_name, branch_name=branch_name)
-
-        moves = []
-        for child in children:
-            moves.append((child[0], group.id, child[1]))
-        if parent_id:
-            await repo.move_item(parent_id, group.id, group_type.value, self.project.db_name, branch_name=branch_name)
-        if moves:
-            print(f" moves {moves}")
-            await repo.move_batch(moves, self.project.db_name, branch_name=branch_name)
+        success = await repo.create_and_move_items(
+            group,
+            items=children,
+            project_db_name=self.project.db_name,
+            branch_name=branch_name,
+            parent_id=parent_id,
+        )
+        if not success:
+            return None
 
         return group
+
+    async def update_basic_info(
+        self,
+        group_id: str,
+        group_type: GroupType,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        icon: Optional[str] = None,
+        branch_name: Optional[str] = None,
+    ):
+        repo = self.current_repo(group_type)
+        node_class = self.current_node(group_type)
+        existing_raw = await repo.get_by_id(group_id, self.project.db_name, raw=True)
+        if not existing_raw:
+            return None
+        node = node_class.from_raw_dict(existing_raw)
+        if name is not None:
+            node.name = name
+        if description is not None:
+            node.description = description
+        return await repo.update(node, self.project.db_name, branch_name=branch_name)
+
+    async def add_child_to_group(
+        self,
+        group_id: str,
+        child_id: str,
+        item_type: str,
+        group_type: GroupType,
+        branch_name: Optional[str] = None,
+    ):
+        return await self.move_item(group_id, child_id, item_type, group_type, branch_name=branch_name)
+
+    async def remove_child_from_group(
+        self,
+        group_id: str,
+        child_id: str,
+        item_type: str,
+        new_parent_id: str,
+        group_type: GroupType,
+        branch_name: Optional[str] = None,
+    ):
+        return await self.move_item(new_parent_id, child_id, item_type, group_type, branch_name=branch_name)
 
     async def delete(self, group_id: str, group_type: GroupType, branch_name: Optional[str] = None):
         repo = self.current_repo(group_type)

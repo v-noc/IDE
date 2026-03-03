@@ -45,6 +45,7 @@ class CallChainBuilder:
         self.call_service = CallService(repos, project_node)
 
         self.diff_calculator = DiffCalculator()
+        # Limit b/c of jedi inference cache
         self.semaphore = asyncio.Semaphore(1)
 
         self.max_depth = max_depth

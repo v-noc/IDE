@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useProjectStore from '../store/useProjectStore';
 import { containsGroup, flattenGroups } from '../utils/treeUtils';
@@ -11,20 +11,19 @@ import type { ProjectNodeTree } from '@/types/project';
 export function useGroupFlattening() {
   const [searchParams] = useSearchParams();
   const { projectData, setProjectData } = useProjectStore();
+  const disableGroup = useMemo(() => {
+    const disable = searchParams.get('disable');
+    return disable?.split(',').includes('group') ?? false;
+  }, [searchParams]);
 
   useEffect(() => {
     if (!projectData) return;
-
-    const disable = searchParams.get('disable');
-    const disableGroup = disable?.split(',').includes('group');
-
     if (!disableGroup || !containsGroup(projectData)) return;
 
     const flattened = flattenGroups(projectData);
     const newRoot = flattened[0] as ProjectNodeTree;
-    console.log("newRoot", newRoot);
     if (newRoot?.node_type === 'project') {
       setProjectData(newRoot);
     }
-  }, [projectData, searchParams, setProjectData]);
+  }, [projectData, disableGroup, setProjectData]);
 }

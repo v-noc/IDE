@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
 import { useAddCall, useRemoveCall } from '@/features/Dashboard/service/useCall';
 import { useDeleteGroup } from '@/features/Dashboard/service/useGroup';
+import { mapNodeToGroupApiType } from '@/features/Dashboard/service/groupApiUtils';
 import type { AnyNodeTree, ContainerNodeTree, CallNodeTree } from '@/types/project';
 
 /**
@@ -14,7 +15,13 @@ export function useTreeNodeActions(node: ContainerNodeTree) {
   // Lazy initialization - only create mutations when called
   const addCall = useAddCall(node?.id ?? '', projectKey);
   const removeCall = useRemoveCall(projectKey);
-  const deleteGroup = useDeleteGroup(node?.id ?? '', projectKey);
+  const resolvedGroupType = mapNodeToGroupApiType(node as unknown as AnyNodeTree) ?? 'structure_group';
+  const deleteGroup = useDeleteGroup({
+    groupId: node?.id ?? '',
+    projectId: projectKey,
+    projectKey,
+    groupType: resolvedGroupType,
+  });
 
   const handleAddCall = useCallback((targetNode: AnyNodeTree) => {
     addCall.mutate({
