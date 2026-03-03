@@ -1,3 +1,4 @@
+import builtins
 import logging
 import os
 import re
@@ -14,6 +15,13 @@ from pydantic import BaseModel
 from app.core.model.nodes import CodePosition
 from app.core.model.schemas import ClassSchema, FunctionSchema
 logger = logging.getLogger(__name__)
+
+
+# Cache builtin names once at module level
+BUILTIN_NAMES = {
+    name for name in dir(builtins)
+    if not name.startswith('_') and callable(getattr(builtins, name))
+}
 
 
 class CallFrameStack(BaseModel):
@@ -54,7 +62,8 @@ class CallHierarchyResolver:
         self.call_frame_stack = CallFrameStack(
             target_qname="root", target_id="root", children=[])
         try:
-            self.script = self.jedi_manager.get_script(file_path)
+            jedi_manager = JediProjectManager(self.jedi_manager.project_path)
+            self.script = jedi_manager.get_script(file_path)
             self.file_path = file_path
             # ONE InferenceState for entire session - this is the expensive part
             self.inference_state = self.script._inference_state
@@ -91,6 +100,9 @@ class CallHierarchyResolver:
                     if next_ and next_.start_pos == leaf.end_pos \
                             and next_.type in ('number', 'string', 'keyword'):
                         leaf = next_
+
+            if leaf.type == 'name' and leaf.value in BUILTIN_NAMES:
+                return []
 
             call_context = parent_context.create_context(leaf)
             callee_values = helpers.infer(
@@ -131,7 +143,8 @@ class CallHierarchyResolver:
 
                     target_id = self._extract_id_from_docstring(
                         callee_for_args)
-
+                    if target_id is None:
+                        continue
                     if call_frame_stack.is_ancestor(qname):
                         continue
                     new_call_frame = CallFrameStack(
@@ -207,6 +220,7 @@ class CallHierarchyResolver:
                 line,
                 col,
                 getattr(self, "file_path", "<unknown>"),
+
             )
 
     def _analyze_function(self, function_node, function_context, call_frame_stack):
@@ -320,3 +334,5 @@ class CallHierarchyResolver:
             match = re.search(r"ID:\s*([^\s]+)", docstring)
             if match:
                 return match.group(1).strip()
+
+        return None

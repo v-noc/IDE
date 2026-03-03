@@ -144,7 +144,7 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         nodes = await super().get_by_qnames(qnames, project_db_name)
         return {n.qname: n for n in nodes}
 
-    async def get_parent_file(self, item_id: str, project_db_name: str):
+    async def get_parent_file(self, item_id: str, project_db_name: str, branch_name: Optional[str] = None):
         field_name = build_path_field_name(
             [], CODE_ELEMENT_FIELDS, is_inverse=True)
 
@@ -155,7 +155,7 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
             WQ().read_document("v:parent", "v:parent_doc"),
         )
 
-        async with self.session(project_db_name) as new_client:
+        async with self.session(project_db_name, branch_name=branch_name) as new_client:
             try:
                 result = await new_client.query(query)
 

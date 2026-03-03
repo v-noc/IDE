@@ -160,7 +160,7 @@ class PhaseProcessor:
             self.project_node,
             self.repos,
             self.jedi_manager,
-            batch_size=self._batch_size,
+            batch_size=5000,
             progress_tracker=progress_tracker,
         )
 
@@ -180,10 +180,6 @@ class PhaseProcessor:
                             progress_tracker.set_current_file(
                                 file_node.path)
                             await progress_tracker.emit()
-
-                        # NOTE: Do NOT delete descendant calls here.
-                        # The BodyParser -> CallChainBuilder -> ScopeProcessor
-                        # will handle "Diffing" (Create/Keep/Delete) per function scope.
 
                         # Process AST
                         with tracker.timer("phase2.process_ast"):

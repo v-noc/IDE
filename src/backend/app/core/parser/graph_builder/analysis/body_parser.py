@@ -72,56 +72,35 @@ class BodyParser:
             self._move_buffer.clear()
         await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
 
-    async def _add_insert_batch(self, calls: List[Any]) -> None:
-        if not calls:
+    async def _add_batch(
+        self,
+        inserts: List[Any] = None,
+        moves: List[Tuple[str, str, str]] = None,
+        deletes: List[str] = None,
+    ) -> None:
+        """Add inserts, moves, and deletes to buffers; flush if batch size reached."""
+        inserts = inserts or []
+        moves = moves or []
+        deletes = deletes or []
+        if not inserts and not moves and not deletes:
             return
         async with self._batch_lock:
-            self._insert_buffer.extend(calls)
+            self._insert_buffer.extend(inserts)
+            self._move_buffer.extend(moves)
+            self._delete_buffer.extend(deletes)
             if self._should_flush():
-                inserts = self._insert_buffer.copy()
-                deletes = self._delete_buffer.copy()
-                moves = self._move_buffer.copy()
+                to_insert = self._insert_buffer.copy()
+                to_delete = self._delete_buffer.copy()
+                to_move = self._move_buffer.copy()
                 self._insert_buffer.clear()
                 self._delete_buffer.clear()
                 self._move_buffer.clear()
             else:
-                inserts = deletes = moves = []
-        if inserts or deletes or moves:
-            await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
-
-    async def _add_move_batch(self, moves_in: List[Tuple[str, str, str]]) -> None:
-        if not moves_in:
-            return
-        async with self._batch_lock:
-            self._move_buffer.extend(moves_in)
-            if self._should_flush():
-                inserts = self._insert_buffer.copy()
-                deletes = self._delete_buffer.copy()
-                moves = self._move_buffer.copy()
-                self._insert_buffer.clear()
-                self._delete_buffer.clear()
-                self._move_buffer.clear()
-            else:
-                inserts = deletes = moves = []
-        if inserts or deletes or moves:
-            await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
-
-    async def _add_delete_batch(self, call_ids: List[str]) -> None:
-        if not call_ids:
-            return
-        async with self._batch_lock:
-            self._delete_buffer.extend(call_ids)
-            if self._should_flush():
-                inserts = self._insert_buffer.copy()
-                deletes = self._delete_buffer.copy()
-                moves = self._move_buffer.copy()
-                self._insert_buffer.clear()
-                self._delete_buffer.clear()
-                self._move_buffer.clear()
-            else:
-                inserts = deletes = moves = []
-        if inserts or deletes or moves:
-            await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
+                to_insert = to_delete = to_move = []
+        if to_insert or to_delete or to_move:
+            await self.call_chain_builder.call_service.flush_batch(
+                to_insert, to_delete, to_move
+            )
 
     async def flush_buffers(self) -> None:
         """Flush any remaining buffered operations. Call after all files are processed."""
@@ -237,9 +216,11 @@ class BodyParser:
             try:
                 results = await self.call_chain_builder.resolve_call_hierarchy(fp, node, calls)
 
-                await self._add_insert_batch(results.calls_to_create)
-                await self._add_move_batch(results.moves_to_execute)
-                await self._add_delete_batch(results.call_ids_to_remove)
+                await self._add_batch(
+                    inserts=results.calls_to_create,
+                    moves=results.moves_to_execute,
+                    deletes=results.call_ids_to_remove,
+                )
 
             except Exception as e:
                 print(f"Error processing node {node.qname}: {e}")

@@ -40,10 +40,10 @@ class CallChainBuilder:
         self.project_node = project_node
         self.project_path = Path(project_node.path)
         self.repos = repos
-
+        self.jedi_manager = jedi_manager
         # Helper services
         self.call_service = CallService(repos, project_node)
-        self.call_hierarchy_resolver = CallHierarchyResolver(jedi_manager)
+
         self.diff_calculator = DiffCalculator()
         self.semaphore = asyncio.Semaphore(1)
 
@@ -57,6 +57,8 @@ class CallChainBuilder:
         async def resolve_one(call: Any) -> CallFrameStack:
             async with self.semaphore:
                 try:
+                    self.call_hierarchy_resolver = CallHierarchyResolver(
+                        self.jedi_manager)
                     return await asyncio.to_thread(
                         self.call_hierarchy_resolver.resolve_call_hierarchy,
                         str(file_path),

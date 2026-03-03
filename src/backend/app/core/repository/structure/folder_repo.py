@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple, Union
 
 from terminusdb_client.woqlquery.woql_query import Doc
@@ -6,6 +7,7 @@ from app.core.model.nodes import FileNode, FolderNode
 from app.core.model.schemas import FileSchema, FolderSchema, StructureGroupSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
+    CODE_SET_FIELDS_TO_PRESERVE,
     STRUCTURE_FIELDS,
     build_path_field_name,
     parse_structure_child,
@@ -33,13 +35,23 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
         super().__init__(client, FolderNode, FolderSchema)
 
     @staticmethod
-    def _merge_update_fields(
+    def _merge_folder_update_fields(
         existing_raw: dict,
         _folder: FolderNode,
         folder_schema: FolderSchema,
     ):
         BaseRepo.merge_set_fields(
             folder_schema, existing_raw, STRUCTURE_SET_FIELDS_TO_PRESERVE
+        )
+
+    @staticmethod
+    def _merge_file_update_fields(
+        existing_raw: dict,
+        _file: FileNode,
+        file_schema: FileSchema,
+    ):
+        BaseRepo.merge_set_fields(
+            file_schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE
         )
 
     async def create(
@@ -78,20 +90,59 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
             folder,
             project_db_name=project_db_name,
             commit_msg=f"Updating folder {folder.id}",
-            update_schema=self._merge_update_fields,
+            update_schema=self._merge_folder_update_fields,
         )
 
     async def update_batch(
         self,
-        folders: List[FolderNode],
+        nodes: List[Union[FolderNode, FileNode]],
         project_db_name: str,
     ):
-        return await self.update_nodes(
-            folders,
-            project_db_name=project_db_name,
-            commit_msg=f"Updating folders {len(folders)}",
-            update_schema=self._merge_update_fields,
-        )
+        """
+        Update both folders and files in a single request.
+        Preserves set fields (children, documents) from existing documents.
+        """
+        if not nodes:
+            return True
+
+        item_ids = [n.id for n in nodes]
+        async with self.session(project_db_name) as new_client:
+            try:
+                items_raw = await new_client.get_documents(item_ids)
+            except Exception as exc:
+                print(exc)
+                return False
+
+        id_to_raw: Dict[str, dict] = {raw["@id"]: raw for raw in items_raw}
+        if len(id_to_raw) != len(nodes):
+            missing = set(item_ids) - set(id_to_raw.keys())
+            print(f"Error: documents not found for update: {missing}")
+            return False
+
+        schemas: List[Union[FolderSchema, FileSchema]] = []
+        for node in nodes:
+            existing_raw = id_to_raw.get(node.id)
+            if not existing_raw:
+                continue
+            if isinstance(node, FolderNode):
+                schema = FolderSchema.from_pydantic(node)
+                self._merge_folder_update_fields(existing_raw, node, schema)
+            else:
+                schema = FileSchema.from_pydantic(node)
+                self._merge_file_update_fields(existing_raw, node, schema)
+            schema.updated_at = datetime.now(timezone.utc)
+            schemas.append(schema)
+
+        async with self.session(project_db_name) as new_client:
+            try:
+                await new_client.update_document(
+                    schemas,
+                    commit_msg=f"Updating structure: {len(schemas)} items (folders + files)",
+                )
+            except Exception as exc:
+                print(exc)
+                return False
+        return True
 
     async def get_children(
         self,

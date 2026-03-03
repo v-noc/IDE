@@ -76,11 +76,13 @@ class Collector:
 
             await self.repos.folder_repo.flush_batch(
                 folder_plan.insert,
-                folder_plan.update,
+                [],
                 folder_plan.delete,
                 folder_plan.move,
                 project_db_name=self.project_node.db_name,
             )
+
+            await self.repos.folder_repo.update_batch(folder_plan.update, project_db_name=self.project_node.db_name)
 
     async def process_file(
         self, file_node: FileNode, checksum: str, project_db_name: str, progress_tracker=None
