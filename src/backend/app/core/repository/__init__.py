@@ -8,8 +8,7 @@ from app.core.repository.structure.structure_group import StructureGroupRepo
 from .project_repo import ProjectRepo
 from .structure.folder_repo import FolderRepo
 from .structure.file_repo import FileRepo
-from .code_elements.function_repo import FunctionRepo
-from .code_elements.class_repo import ClassRepo
+from .structure.structure_repo import StructureRepo
 from .code_elements.call_repo import CallRepo
 from .log_repo import LogRepository
 from .document_repo import DocumentRepo
@@ -27,8 +26,7 @@ class Repositories:
         self.project_repo = ProjectRepo(client)
         self.folder_repo = FolderRepo(client)
         self.file_repo = FileRepo(client)
-        self.function_repo = FunctionRepo(client)
-        self.class_repo = ClassRepo(client)
+        self.structure_repo = StructureRepo(client)
         self.call_repo = CallRepo(client)
         self.code_element_repo = CodeElementRepo(client)
 

@@ -78,9 +78,11 @@ class BaseRepo(Generic[TNode, TSchema]):
             return items_raw
         return [self._to_node(item_raw) for item_raw in items_raw]
 
-    async def get_all(self) -> list[TNode]:
+    async def get_all(self, doc_type: str | None = None) -> list[TNode]:
+        if doc_type is None:
+            doc_type = self.schema_class.__name__
         try:
-            items_raw = await self.client.get_all_documents(doc_type=self.schema_class.__name__)
+            items_raw = await self.client.get_all_documents(doc_type=doc_type)
         except Exception as exc:
             print(exc)
             return []

@@ -1,25 +1,29 @@
-from app.core.services.class_service import ClassService
+
 from app.core.model.properties import CodePosition
 import pytest
 
 from app.core.services.code_element_service import CodeElementService
+from app.core.model.nodes import ClassNode
 
 
 @pytest.mark.asyncio
 async def test_create_class(project_uow):
-    class_service = ClassService(project_uow)
+    class_service = CodeElementService(project_uow)
     position = CodePosition(
         line_no=1,
         col_offset=0,
         end_line_no=1,
         end_col_offset=0
     )
+    class_node = ClassNode(
+        id="class",
+        name="Test Class",
+        qname="test_project.test_class",
+        description="This is a test class",
+        code_position=position
+    )
     new_class = await class_service.create(
-        "class",
-        "Test Class",
-        "test_project.test_class",
-        "This is a test class",
-        position
+        class_node
     )
     assert new_class is not None
     assert new_class.name == "Test Class"
@@ -28,8 +32,8 @@ async def test_create_class(project_uow):
 
 
 @pytest.mark.asyncio
-async def test_get_class(project_uow, create_class):
-    class_service = ClassService(project_uow)
+async def test_get_class(project_uow, create_class, ):
+    class_service = CodeElementService(project_uow)
     new_class = await class_service.get(create_class.id)
     assert new_class is not None
     assert new_class.name == "Test Class"

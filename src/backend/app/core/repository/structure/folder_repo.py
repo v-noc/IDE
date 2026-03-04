@@ -233,12 +233,12 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
                 raise ValueError(f"Invalid node type: {type(node)}")
             queries.append(WQ().insert_document(Doc(schema)))
 
-        for node in update:
-            queries.append(WQ().woql_and(
-                WQ().update_triple(node.id, "qname", WQ().string(node.qname)),
-                WQ().update_triple(node.id, "path", WQ().string(node.path)),
+        # for node in update:
+        #     queries.append(WQ().woql_and(
+        #         WQ().update_triple(node.id, "qname", WQ().string(node.qname)),
+        #         WQ().update_triple(node.id, "path", WQ().string(node.path)),
 
-            ))
+        #     ))
 
         for item_id, new_parent_id, child_type in move:
             field = STRUCTURE_CHILD_TYPE_TO_FIELD.get(child_type)

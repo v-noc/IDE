@@ -8,14 +8,12 @@ from app.core.model.properties import CodePosition
 
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
-from app.core.services.class_service import ClassService
-from app.core.services.file_service import FileService
-from app.core.services.folder_service import FolderService
-from app.core.services.function_service import FunctionService
+
 from app.core.services.project_service import ProjectService
 from app.core.services.call_service import CallService
 from app.core.services.code_element_service import CodeElementService
-from app.core.model.nodes import ClassNode, FunctionNode
+from app.core.model.nodes import ClassNode, FileNode, FolderNode, FunctionNode
+from app.core.services.structure_service import StructureService
 
 
 PROJECT_PATH = Path(__file__).resolve().parent / "sample_project"
@@ -27,7 +25,7 @@ DEFAULT_POSITION = CodePosition(
 )
 
 
-async def _create_function(function_service: FunctionService, id: str, name: str, qname: str):
+async def _create_function(code_element_service: CodeElementService, id: str, name: str, qname: str):
     function_node = FunctionNode(
         id=id,
         name=name,
@@ -35,7 +33,7 @@ async def _create_function(function_service: FunctionService, id: str, name: str
         description=f"This is {name.lower()}",
         code_position=DEFAULT_POSITION,
     )
-    return await function_service.create(function_node)
+    return await code_element_service.create(function_node)
 
 
 async def _create_class(code_element_service: CodeElementService, id: str, name: str, qname: str):
@@ -90,13 +88,20 @@ async def project_uow_for_sample(terminusdb_client, create_sample_project):
 
 
 @pytest_asyncio.fixture
-async def folder_service(project_uow):
-    return FolderService(project_uow)
+async def structure_service(project_uow):
+    return StructureService(project_uow)
 
 
 @pytest_asyncio.fixture
-async def create_folder(folder_service):
-    folder = await folder_service.create(
+async def create_folder(structure_service):
+    folder_node = FolderNode(
+        id="folder",
+        name="Test Folder",
+        qname="test_project.test_folder",
+        description="This is a test folder",
+        path="test_folder"
+    )
+    folder = await structure_service.create(
         "folder",
         "Test Folder",
         "test_project.test_folder",
@@ -104,13 +109,12 @@ async def create_folder(folder_service):
         "test_folder"
     )
     yield folder
-    await folder_service.delete(folder.id)
+    await structure_service.delete(folder.id)
 
 
 @pytest_asyncio.fixture
-async def create_file2(project_uow):
-    file_service = FileService(project_uow)
-    file = await file_service.create(
+async def create_file2(structure_service):
+    file_node = FileNode(
         id="file2",
         name="Test File",
         qname="test_project.test_file",
@@ -118,14 +122,16 @@ async def create_file2(project_uow):
         path="test_file",
         hash="hash"
     )
+    file = await structure_service.create(
+        file_node
+    )
     yield file
-    await file_service.delete(file.id)
+    await structure_service.delete(file.id)
 
 
 @pytest_asyncio.fixture
-async def create_file(project_uow):
-    file_service = FileService(project_uow)
-    file = await file_service.create(
+async def create_file(structure_service):
+    file_node = FileNode(
         id="file",
         name="Test File",
         qname="test_project.test_file",
@@ -133,18 +139,11 @@ async def create_file(project_uow):
         path="test_file",
         hash="hash"
     )
+    file = await structure_service.create(
+        file_node
+    )
     yield file
-    await file_service.delete(file.id)
-
-
-@pytest.fixture
-def function_service(project_uow):
-    return FunctionService(project_uow)
-
-
-@pytest.fixture
-def class_service(project_uow):
-    return ClassService(project_uow)
+    await structure_service.delete(file.id)
 
 
 @pytest.fixture

@@ -1,5 +1,5 @@
 from app.core.services.file_service import FileService
-from app.core.services.function_service import FunctionService
+from app.core.services.code_element_service import CodeElementService
 import pytest
 
 from app.core.model.nodes import FileNode
@@ -57,7 +57,7 @@ async def test_add_function_to_file(project_uow, create_file, create_function):
 @pytest.mark.asyncio
 async def test_nested_functions(project_uow, create_file, create_function, create_function2):
     file_service = FileService(project_uow)
-    function_service = FunctionService(project_uow)
+    function_service = CodeElementService(project_uow)
 
     await file_service.add_function(create_file.id, create_function.id)
     await function_service.add_function(
