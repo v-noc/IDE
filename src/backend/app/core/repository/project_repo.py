@@ -129,13 +129,11 @@ class ProjectRepo():
             updated_at=old_project["updated_at"],
         )
 
-    async def get_children(self, project_db_name: str, exclude_types: list[str] = []):
-        if self.client.db != project_db_name:
-            await self.client.set_db(project_db_name)
-
+    async def get_children(self, exclude_types: list[str] = []):
         inlcude_type = [FileSchema.__name__, FolderSchema.__name__, FunctionSchema.__name__, ClassSchema.__name__,
                         CallSchema.__name__, CodeElementGroupSchema.__name__, CallGroupSchema.__name__, StructureGroupSchema.__name__]
         filtered_types = set(inlcude_type) - set(exclude_types)
+
         try:
             query = WQ().select("v:doc").woql_and(
                 WQ().triple("v:uri", "rdf:type", "v:type"),
@@ -156,6 +154,3 @@ class ProjectRepo():
         except Exception as e:
             print(e)
             return []
-        finally:
-            if self.client.db != project_db_name:
-                await self.client.set_db(project_db_name)

@@ -5,7 +5,6 @@ from app.core.model.nodes import StructureGroupNode
 from app.core.model.schemas import StructureGroupSchema
 from app.core.repository.structure.folder_repo import STRUCTURE_CHILD_TYPE_TO_FIELD, STRUCTURE_SET_FIELDS_TO_PRESERVE
 from typing import List, Optional, Tuple
-from typing import Literal
 
 
 class StructureGroupRepo(BaseRepo[StructureGroupNode, StructureGroupSchema]):
@@ -17,52 +16,35 @@ class StructureGroupRepo(BaseRepo[StructureGroupNode, StructureGroupSchema]):
         BaseRepo.merge_set_fields(
             schema, existing_raw, STRUCTURE_SET_FIELDS_TO_PRESERVE)
 
-    async def create(self, structure_group: StructureGroupNode, project_db_name: str, branch_name: Optional[str] = None):
+    async def create(self, structure_group: StructureGroupNode):
         return await self.create_nodes(
             structure_group,
-            project_db_name,
             singular_name="structure_group",
             plural_name="structure_groups",
-            branch_name=branch_name,
         )
 
-    async def move_item(self,
-                        new_parent_id: str,
-                        item_id: str,
-                        child_type: str,
-                        project_db_name: str,
-                        branch_name: Optional[str] = None):
+    async def move_item(self, new_parent_id: str, item_id: str, child_type: str):
         return await self.move_item_by_type(
             new_parent_id,
             item_id,
             child_type,
             child_type_to_field=STRUCTURE_CHILD_TYPE_TO_FIELD,
-            project_db_name=project_db_name,
-            branch_name=branch_name,
         )
 
-    async def move_batch(self, moves: List[Tuple[str, str, str]], project_db_name: str, branch_name: Optional[str] = None):
+    async def move_batch(self, moves: List[Tuple[str, str, str]]):
         return await self.move_batch_by_type(
             moves,
             child_type_to_field=STRUCTURE_CHILD_TYPE_TO_FIELD,
-            project_db_name=project_db_name,
-            branch_name=branch_name,
         )
 
-    async def update(self, structure_group: StructureGroupNode, project_db_name: str, branch_name: Optional[str] = None):
+    async def update(self, structure_group: StructureGroupNode):
         return await self.update_node(
             structure_group,
-            project_db_name,
             commit_msg=f"Updating structure_group {structure_group.id}",
             update_schema=self._merge_update_fields,
-            branch_name=branch_name,
         )
 
-    async def delete(
-            self,
-            structure_group_id: str,
-            project_db_name: str,
-            branch_name: Optional[str] = None):
+    async def delete(self, structure_group_id: str):
         query = WQ().woql_and(
             WQ().opt(
                 WQ().woql_and(
@@ -99,21 +81,17 @@ class StructureGroupRepo(BaseRepo[StructureGroupNode, StructureGroupSchema]):
             ),
             WQ().delete_document(structure_group_id),
         )
-        async with self.session(project_db_name, branch_name=branch_name) as new_client:
-            try:
-                await new_client.query(query, commit_msg=f"Deleting structure_group {structure_group_id}")
-
-            except Exception as exc:
-                print(exc)
-                return False
+        try:
+            await self.client.query(query, commit_msg=f"Deleting structure_group {structure_group_id}")
+        except Exception as exc:
+            print(exc)
+            return False
         return True
 
     async def create_and_move_items(
         self,
         structure_group: StructureGroupNode,
         items: List[Tuple[str, str]],
-        project_db_name: str,
-        branch_name: Optional[str] = None,
         parent_id: Optional[str] = None,
     ) -> bool:
         """Create group and move items in a single transaction. If any step fails, none are applied."""
@@ -142,13 +120,12 @@ class StructureGroupRepo(BaseRepo[StructureGroupNode, StructureGroupSchema]):
 
         combined = WQ().woql_and(*queries)
 
-        async with self.session(project_db_name, branch_name=branch_name) as new_client:
-            try:
-                await new_client.query(
-                    combined,
-                    commit_msg=f"Creating and moving items to structure group {structure_group.id}",
-                )
-            except Exception as exc:
-                print(exc)
-                return False
+        try:
+            await self.client.query(
+                combined,
+                commit_msg=f"Creating and moving items to structure group {structure_group.id}",
+            )
+        except Exception as exc:
+            print(exc)
+            return False
         return True

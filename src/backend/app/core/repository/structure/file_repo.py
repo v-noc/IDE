@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from terminusdb_client.woqlquery.woql_query import Doc
 
@@ -34,24 +34,18 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
     async def create(
         self,
         file: Union[FileNode, List[FileNode]],
-        project_db_name: str,
-        branch_name: Optional[str] = None,
     ):
         return await self.create_nodes(
             file,
-            project_db_name,
             singular_name="file",
             plural_name="files",
-            branch_name=branch_name,
         )
 
     async def get_children(
         self,
         file_id: str,
         exclude_types: list[str],
-        project_db_name: str,
     ):
-
         field_name = build_path_field_name([], CODE_ELEMENT_FIELDS)
         field_to_schema_type = {
             FunctionSchema.__name__,
@@ -60,45 +54,40 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
             CodeElementGroupSchema.__name__,
             CallGroupSchema.__name__,
         }
-        filtered_types = set(field_to_schema_type) - set(exclude_types)
+        filtered_types = list(set(field_to_schema_type) - set(exclude_types))
         return await self.get_children_by_path(
             file_id,
             field_name,
             parse_code_element_child,
-            project_db_name,
             filtered_types=filtered_types,
             allowed_path_fields=CODE_ELEMENT_FIELDS,
         )
 
-    async def delete(self, file_id: str, project_db_name: str):
+    async def delete(self, file_id: str):
         return await self.delete_with_parent_cleanup(
             file_id,
             parent_field="file_children",
-            project_db_name=project_db_name,
             commit_msg=f"Deleting file {file_id}",
         )
 
-    async def delete_batch(self, file_ids: List[str], project_db_name: str):
+    async def delete_batch(self, file_ids: List[str]):
         return await self.delete_batch_with_parent_cleanup(
             file_ids,
             parent_field="file_children",
             binding_var="v:file_id",
-            project_db_name=project_db_name,
             commit_msg=f"Deleting files {', '.join(file_ids[:5])}",
         )
 
-    async def update(self, file: FileNode, project_db_name: str):
+    async def update(self, file: FileNode):
         return await self.update_node(
             file,
-            project_db_name=project_db_name,
             commit_msg=f"Updating file {file.id}",
             update_schema=self._merge_update_fields,
         )
 
-    async def update_batch(self, files: List[FileNode], project_db_name: str):
+    async def update_batch(self, files: List[FileNode]):
         return await self.update_nodes(
             files,
-            project_db_name=project_db_name,
             commit_msg=f"Updating files {len(files)}",
             update_schema=self._merge_update_fields,
         )
@@ -108,43 +97,35 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
         new_parent_id: str,
         item_id: str,
         child_type: str,
-        project_db_name: str,
     ):
         return await self.move_item_by_type(
             new_parent_id,
             item_id,
             child_type,
             child_type_to_field=CODE_CHILD_TYPE_TO_FIELD,
-            project_db_name=project_db_name,
         )
 
     async def move_batch(
         self,
         moves: List[Tuple[str, str, str]],
-        project_db_name: str,
-        branch_name: Optional[str] = None,
     ):
         return await self.move_batch_by_type(
             moves,
             child_type_to_field=CODE_CHILD_TYPE_TO_FIELD,
-            project_db_name=project_db_name,
-            branch_name=branch_name,
         )
 
-    async def get_all_files(self, project_db_name: str):
-        return await self.get_all(project_db_name)
+    async def get_all_files(self):
+        return await self.get_all()
 
-    async def get_by_path(self, path: str, project_db_name: str):
-        return await self.find("path", [path], project_db_name)
+    async def get_by_path(self, path: str):
+        return await self.find("path", [path])
 
-    async def get_by_qnames(
-        self, qnames: List[str], project_db_name: str
-    ) -> Dict[str, FileNode]:
+    async def get_by_qnames(self, qnames: List[str]) -> Dict[str, FileNode]:
         """Return a dict mapping qname -> FileNode for the given qnames."""
-        nodes = await super().get_by_qnames(qnames, project_db_name)
+        nodes = await super().get_by_qnames(qnames)
         return {n.qname: n for n in nodes}
 
-    async def get_parent_file(self, item_id: str, project_db_name: str, branch_name: Optional[str] = None):
+    async def get_parent_file(self, item_id: str):
         field_name = build_path_field_name(
             [], CODE_ELEMENT_FIELDS, is_inverse=True)
 
@@ -155,19 +136,17 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
             WQ().read_document("v:parent", "v:parent_doc"),
         )
 
-        async with self.session(project_db_name, branch_name=branch_name) as new_client:
-            try:
-                result = await new_client.query(query)
-
-            except Exception as exc:
-                print(exc)
-                return None
+        try:
+            result = await self.client.query(query)
+        except Exception as exc:
+            print(exc)
+            return None
 
         if not result["bindings"]:
             return None
         return FileNode.from_raw_dict(result["bindings"][0]["parent_doc"])
 
-    async def flush_batch(self, insert: List[FunctionNode | ClassNode], update: List[FunctionNode | ClassNode], delete: List[str], move: List[Tuple[str, str, str]], project_db_name: str, branch_name: Optional[str] = None):
+    async def flush_batch(self, insert: List[FunctionNode | ClassNode], update: List[FunctionNode | ClassNode], delete: List[str], move: List[Tuple[str, str, str]]):
         if not insert and not update and not delete and not move:
             return True
 
@@ -259,11 +238,10 @@ class FileRepo(BaseRepo[FileNode, FileSchema]):
 
         combined = WQ().woql_and(*queries)
 
-        async with self.session(project_db_name, branch_name=branch_name) as client:
-            try:
-                result = await client.query(combined, commit_msg=f"Batch: {len(insert)} inserts, {len(delete)} deletes, {len(move)} moves")
-                print(result)
-                return True
-            except Exception as exc:
-                print(f"Batch operation failed: {exc}")
-                return False
+        try:
+            result = await self.client.query(combined, commit_msg=f"Batch: {len(insert)} inserts, {len(delete)} deletes, {len(move)} moves")
+            print(result)
+            return True
+        except Exception as exc:
+            print(f"Batch operation failed: {exc}")
+            return False

@@ -57,38 +57,33 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
     async def create(
         self,
         new_folder: Union[FolderNode, List[FolderNode]],
-        project_db_name: str,
         raw: bool = False,
     ):
         return await self.create_nodes(
             new_folder,
-            project_db_name,
             singular_name="folder",
             plural_name="folders",
             raw=raw,
         )
 
-    async def delete(self, folder_id: str, project_db_name: str):
+    async def delete(self, folder_id: str):
         return await self.delete_with_parent_cleanup(
             folder_id,
             parent_field="folder_children",
-            project_db_name=project_db_name,
             commit_msg=f"Deleting folder {folder_id}",
         )
 
-    async def delete_batch(self, folder_ids: List[str], project_db_name: str):
+    async def delete_batch(self, folder_ids: List[str]):
         return await self.delete_batch_with_parent_cleanup(
             folder_ids,
             parent_field="folder_children",
             binding_var="v:folder_id",
-            project_db_name=project_db_name,
             commit_msg=f"Deleting folders {', '.join(folder_ids)}",
         )
 
-    async def update(self, folder: FolderNode, project_db_name: str):
+    async def update(self, folder: FolderNode):
         return await self.update_node(
             folder,
-            project_db_name=project_db_name,
             commit_msg=f"Updating folder {folder.id}",
             update_schema=self._merge_folder_update_fields,
         )
@@ -96,7 +91,6 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
     async def update_batch(
         self,
         nodes: List[Union[FolderNode, FileNode]],
-        project_db_name: str,
     ):
         """
         Update both folders and files in a single request.
@@ -106,12 +100,11 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
             return True
 
         item_ids = [n.id for n in nodes]
-        async with self.session(project_db_name) as new_client:
-            try:
-                items_raw = await new_client.get_documents(item_ids)
-            except Exception as exc:
-                print(exc)
-                return False
+        try:
+            items_raw = await self.client.get_documents(item_ids)
+        except Exception as exc:
+            print(exc)
+            return False
 
         id_to_raw: Dict[str, dict] = {raw["@id"]: raw for raw in items_raw}
         if len(id_to_raw) != len(nodes):
@@ -133,22 +126,20 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
             schema.updated_at = datetime.now(timezone.utc)
             schemas.append(schema)
 
-        async with self.session(project_db_name) as new_client:
-            try:
-                await new_client.update_document(
-                    schemas,
-                    commit_msg=f"Updating structure: {len(schemas)} items (folders + files)",
-                )
-            except Exception as exc:
-                print(exc)
-                return False
+        try:
+            await self.client.update_document(
+                schemas,
+                commit_msg=f"Updating structure: {len(schemas)} items (folders + files)",
+            )
+        except Exception as exc:
+            print(exc)
+            return False
         return True
 
     async def get_children(
         self,
         folder_id: str,
         exclude_types: list[str],
-        project_db_name: str,
     ):
         field_name = build_path_field_name([], STRUCTURE_FIELDS)
         field_to_schema_type = {
@@ -162,8 +153,7 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
             folder_id,
             field_name,
             parse_structure_child,
-            project_db_name,
-            filtered_types=filtered_types,
+            filtered_types=list(filtered_types),
             allowed_path_fields=STRUCTURE_FIELDS,
         )
 
@@ -171,7 +161,6 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
         self,
         item_id: str,
         child_type: str,
-        project_db_name: str,
     ):
         field_name = STRUCTURE_CHILD_TYPE_TO_FIELD.get(child_type)
         if not field_name:
@@ -187,12 +176,11 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
                 .read_document("v:parent", "v:parent_doc")
             )
         )
-        async with self.session(project_db_name):
-            try:
-                result = await self.client.query(query)
-            except Exception as exc:
-                print(exc)
-                return None
+        try:
+            result = await self.client.query(query)
+        except Exception as exc:
+            print(exc)
+            return None
         return [row["parent_doc"] for row in result["bindings"]]
 
     async def move_item(
@@ -200,38 +188,32 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
         new_parent_id: str,
         item_id: str,
         child_type: str,
-        project_db_name: str,
     ):
         return await self.move_item_by_type(
             new_parent_id,
             item_id,
             child_type,
             child_type_to_field=STRUCTURE_CHILD_TYPE_TO_FIELD,
-            project_db_name=project_db_name,
         )
 
     async def move_batch(
         self,
         moves: List[Tuple[str, str, str]],
-        project_db_name: str,
     ):
         return await self.move_batch_by_type(
             moves,
             child_type_to_field=STRUCTURE_CHILD_TYPE_TO_FIELD,
-            project_db_name=project_db_name,
         )
 
-    async def get_all_folders(self, project_db_name: str):
-        return await self.get_all(project_db_name)
+    async def get_all_folders(self):
+        return await self.get_all()
 
-    async def get_by_qnames(
-        self, qnames: List[str], project_db_name: str
-    ) -> Dict[str, FolderNode]:
+    async def get_by_qnames(self, qnames: List[str]) -> Dict[str, FolderNode]:
         """Return a dict mapping qname -> FolderNode for the given qnames."""
-        nodes = await super().get_by_qnames(qnames, project_db_name)
+        nodes = await super().get_by_qnames(qnames)
         return {n.qname: n for n in nodes}
 
-    async def flush_batch(self, insert: List[FolderNode | FileNode], update: List[FolderNode | FileNode], delete: List[str], move: List[Tuple[str, str, str]], project_db_name: str, branch_name: Optional[str] = None):
+    async def flush_batch(self, insert: List[FolderNode | FileNode], update: List[FolderNode | FileNode], delete: List[str], move: List[Tuple[str, str, str]]):
         if not insert and not update and not delete and not move:
             return True
 
@@ -281,11 +263,10 @@ class FolderRepo(BaseRepo[FolderNode, FolderSchema]):
 
         combined = WQ().woql_and(*queries)
 
-        async with self.session(project_db_name, branch_name=branch_name) as client:
-            try:
-                result = await client.query(combined, commit_msg=f"Batch: {len(insert)} inserts, {len(delete)} deletes, {len(move)} moves")
-                print(result)
-                return True
-            except Exception as exc:
-                print(f"Batch operation failed: {exc}")
-                return False
+        try:
+            result = await self.client.query(combined, commit_msg=f"Batch: {len(insert)} inserts, {len(delete)} deletes, {len(move)} moves")
+            print(result)
+            return True
+        except Exception as exc:
+            print(f"Batch operation failed: {exc}")
+            return False
