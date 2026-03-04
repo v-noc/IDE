@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -62,6 +62,7 @@ async def create_project(
         )
         uow = ProjectUoW(db, project_node, RequestDbContext(
             branch="main", ref=None))
+
         orchestrator = GraphBuilderOrchestrator(
             project_node=project_node,
             uow=uow
@@ -81,7 +82,8 @@ async def create_project(
         logger.exception(f"Failed to build project graph: {exc}")
         raise
 
-    children = await project_service.get_children(project_node.db_name)
+    project_service.uow = uow
+    children = await project_service.get_children()
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -154,10 +156,11 @@ async def delete_project(
         )
 
 
-@router.put("/{project_id}", response_model=ProjectNode)
+@router.put("/", response_model=ProjectNode)
 async def update_project(
-    project_id: str,
-    project: UpdateProjectRequest,
+    project_id: str = Query(...,
+                            description="The ID of the project to update"),
+    project: UpdateProjectRequest = Body(...),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectNode:
     project_node = await project_service.get(project_id)
@@ -166,6 +169,7 @@ async def update_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
         )
+    project_node = ProjectNode.from_raw_dict(project_node)
     if project.name is not None:
         project_node.name = project.name
     if project.description is not None:

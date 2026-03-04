@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends,  HTTPException, status, Body
 from pydantic import BaseModel, Field
 from datetime import datetime
 from app.api.dependencies import get_project_uow, ProjectUoW
-from backend.app.db import scoped_client
+from app.db.scoped_client import scoped_client
 from app.db.context import DbTarget
+
 
 router = APIRouter()
 

@@ -45,7 +45,7 @@ def find_child(node, name):
 @pytest.mark.asyncio
 async def test_get_code_for_function(client, sample_project_path):
     # Create project from E2E sample
-    print(f"sample_project_path: {sample_project_path}")
+
     response = await client.post(
         "/api/v1/projects/",
         json={
@@ -79,7 +79,6 @@ async def test_get_code_for_function(client, sample_project_path):
     r_func = await client.get(f"/api/v1/code-elements/read-code/?node_id={func_key}&project_id={project_key}")
     assert r_func.status_code == 200
     payload = r_func.json()
-    print(f"payload: {payload}")
 
     assert payload["name"] == "create_child"
     assert isinstance(payload.get("code"), str)

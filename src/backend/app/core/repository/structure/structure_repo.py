@@ -12,7 +12,6 @@ from app.core.model.schemas import (
 from app.core.repository.base_repo import BaseRepo
 from app.db.async_terminus_client import AsyncClient
 
-from app.core.repository.structure.folder_repo import STRUCTURE_CHILD_TYPE_TO_FIELD
 from terminusdb_client.woqlquery.woql_query import Doc, WOQLQuery as WQ
 from app.core.repository.utils import (
     CODE_CHILD_TYPE_TO_FIELD,
@@ -28,7 +27,11 @@ STRUCTURE_SET_FIELDS_TO_PRESERVE = [
     "structure_group",
     "documents",
 ]
-
+STRUCTURE_CHILD_TYPE_TO_FIELD = {
+    "folder": "folder_children",
+    "file": "file_children",
+    "structure_group": "structure_group",
+}
 StructureNode = Union[FolderNode, FileNode, StructureGroupNode]
 StructureSchema = Union[FolderSchema, FileSchema, StructureGroupSchema]
 
@@ -181,6 +184,10 @@ class StructureRepo(BaseRepo[StructureNode, StructureSchema]):
         if not result["bindings"]:
             return None
         return FileNode.from_raw_dict(result["bindings"][0]["parent_doc"])
+
+    async def get_by_qnames(self, qnames: list[str], doc_type: str | None = None) -> list[StructureNode]:
+        nodes = await super().get_by_qnames(qnames, doc_type)
+        return {n.qname: n for n in nodes}
 
     async def flush_batch(self, insert: List[FolderNode | FileNode], update: List[FolderNode | FileNode], delete: List[str], move: List[Tuple[str, str, str]]):
         if not insert and not update and not delete and not move:

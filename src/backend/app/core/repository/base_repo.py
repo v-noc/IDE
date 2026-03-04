@@ -364,10 +364,12 @@ class BaseRepo(Generic[TNode, TSchema]):
                 nodes.append(node)
         return nodes
 
-    async def get_by_qnames(self, qnames: list[str]) -> list[TNode]:
+    async def get_by_qnames(self, qnames: list[str], doc_type: str | None = None) -> list[TNode]:
         """Return nodes whose qname is in the given list."""
         if not qnames:
             return []
+        if doc_type is None:
+            doc_type = self.schema_class.__name__
         query = (
             WQ()
             .select("v:item_doc")
@@ -375,7 +377,7 @@ class BaseRepo(Generic[TNode, TSchema]):
                 WQ().member("v:qname", [WQ().string(x) for x in qnames]),
                 WQ().triple("v:item", "qname", "v:qname"),
                 WQ().triple("v:item", "rdf:type",
-                            f"@schema:{self.schema_class.__name__}"),
+                            f"@schema:{doc_type}"),
                 WQ().read_document("v:item", "v:item_doc"),
             )
         )

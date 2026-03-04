@@ -3,7 +3,7 @@ from app.core.repository.base_repo import WQ, BaseRepo
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import StructureGroupNode
 from app.core.model.schemas import StructureGroupSchema
-from app.core.repository.structure.folder_repo import STRUCTURE_CHILD_TYPE_TO_FIELD, STRUCTURE_SET_FIELDS_TO_PRESERVE
+from app.core.repository.structure.structure_repo import STRUCTURE_CHILD_TYPE_TO_FIELD, STRUCTURE_SET_FIELDS_TO_PRESERVE
 from typing import List, Optional, Tuple
 
 

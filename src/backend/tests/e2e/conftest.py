@@ -65,10 +65,10 @@ async def built_sample_project(sample_project_path, create_repos, terminusdb_cli
 
 
 @pytest_asyncio.fixture
-async def sample_project_node(create_repos):
+async def sample_project_node(empty_project_uow):
     """Returns the sample project node for E2E tests."""
 
-    project_service = ProjectService(create_repos)
+    project_service = ProjectService(empty_project_uow)
     return await project_service.create(
         "sample_project",
         "A sample project for E2E tests",

@@ -2,7 +2,7 @@ from typing import Optional
 from fastapi import Depends, Header, Query, HTTPException
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
-
+from app.core.services.code_element_service import CodeElementService
 
 from app.core.services.call_service import CallService
 from app.core.services.log_service import LogService
@@ -13,19 +13,11 @@ from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
 from app.db.context import RequestDbContext, ProjectUoW
 
-# app/api/dependencies/project_uow.py
-from contextlib import asynccontextmanager
-from fastapi import Depends
-
-from app.core.model.nodes import ProjectNode
-from app.core.repository import Repositories
-
-
 def get_project_service(
     db: AsyncClient = Depends(get_terminus_client),
 ) -> ProjectService:
-    repos = Repositories(db.clone())
-    return ProjectService(repos)
+    pow = ProjectUoW(db.clone(), None, RequestDbContext())
+    return ProjectService(pow)
 
 
 async def get_request_db_context(
@@ -44,16 +36,15 @@ async def get_project_node(
     return ProjectNode.from_raw_dict(project)
 
 
-@asynccontextmanager
 async def get_project_uow(
     base: AsyncClient = Depends(get_terminus_client),
     project: ProjectNode = Depends(get_project_node),
     ctx: RequestDbContext = Depends(get_request_db_context),
 ):
+    """Async generator dependency. FastAPI enters it and passes the yielded ProjectUoW."""
     try:
         yield ProjectUoW(base, project, ctx)
     finally:
-        # clone shares base session; typically no close here
         pass
 
 
@@ -75,6 +66,12 @@ def get_log_service(
 ) -> LogService:
 
     return LogService(uow)
+
+
+async def get_code_element_service(
+    uow: ProjectUoW = Depends(get_project_uow)
+) -> CodeElementService:
+    return CodeElementService(uow)
 
 
 def get_document_service(uow: ProjectUoW = Depends(get_project_uow)) -> DocumentService:

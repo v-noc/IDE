@@ -2,6 +2,8 @@ import pytest
 
 from app.core.schemas.tree import FolderTreeNode
 from app.core.schemas.tree import FileTreeNode
+from app.db.context import ProjectUoW, RequestDbContext
+from app.core.model.nodes import ProjectNode
 
 
 def strip_dynamic_keys(data):
@@ -130,7 +132,7 @@ async def test_get_project(client, sample_project_node):
 @pytest.mark.asyncio
 async def test_update_project(client, sample_project_node):
     response = await client.put(
-        f"/api/v1/projects/{sample_project_node.key}",
+        f"/api/v1/projects/?project_id={sample_project_node.id}",
         json={
             "name": "test_project_updated",
         },
@@ -142,7 +144,7 @@ async def test_update_project(client, sample_project_node):
 
 
 @pytest.mark.asyncio
-async def test_delete_project(client, sample_project_path, create_repos):
+async def test_delete_project(client, sample_project_path, terminusdb_client):
     # 1. Create a project to ensure it has children to be deleted
     response = await client.post(
         "/api/v1/projects/",
@@ -158,8 +160,12 @@ async def test_delete_project(client, sample_project_path, create_repos):
     project_db_name = project_data["db_name"]
 
     # 2. Verify that some child files exist in the database
-    file_repo = create_repos.file_repo
-    qnames_to_nodes = await file_repo.get_by_qnames(["sample_project.main", "sample_project.core.model.child"], project_db_name)
+    project_node = ProjectNode.from_raw_dict(
+        {**project_data, "@id": project_key})
+    uow = ProjectUoW(terminusdb_client, project_node, RequestDbContext(
+        branch="main", ref=None))
+    file_repo = uow.get_project_repos().structure_repo
+    qnames_to_nodes = await file_repo.get_by_qnames(["sample_project.main", "sample_project.core.model.child"], "FileSchema")
 
     main_py_node = qnames_to_nodes["sample_project.main"]
     child_py_node = qnames_to_nodes["sample_project.core.model.child"]
@@ -177,7 +183,7 @@ async def test_delete_project(client, sample_project_path, create_repos):
 
     # 5. Verify that the child files are also gone from the database
     try:
-        qnames_to_nodes2 = await file_repo.get_by_qnames(["sample_project.main", "sample_project.core.model.child"], project_db_name)
+        qnames_to_nodes2 = await file_repo.get_by_qnames(["sample_project.main", "sample_project.core.model.child"], "FileSchema")
 
         main_py_node_after_delete = qnames_to_nodes2.get("sample_project.main")
         child_py_node_after_delete = qnames_to_nodes2.get(

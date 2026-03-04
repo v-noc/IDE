@@ -7,16 +7,14 @@ from app.core.sandbox.code_run import CodeResponse, CodeRunner
 
 from app.api.dependencies import (
     ProjectUoW,
-    get_function_service,
-    get_file_service,
-    get_class_service,
+    get_code_element_service,
     get_project_uow,
 )
 from app.core.watcher.service import WatcherService, get_watcher_service
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
 from app.core.socket.manager import get_socket_manager
-from app.core.services import FunctionService, FileService, ClassService
+from app.core.services import CodeElementService
 
 
 router = APIRouter()
@@ -36,15 +34,14 @@ async def write_code(
                          description="The ID of the node to write code to"),
 
     code_block: str = Body(..., embed=True, alias="code"),
-    function_service: FunctionService = Depends(get_function_service),
-    file_service: FileService = Depends(get_file_service),
-    class_service: ClassService = Depends(get_class_service),
+    code_element_service: CodeElementService = Depends(
+        get_code_element_service),
     watcher_service: WatcherService = Depends(get_watcher_service),
     project_uow: ProjectUoW = Depends(get_project_uow),
 ) -> Dict[str, Any]:
     """
     Writes a block of code to the location of a given code element.
-    Accepts document key (not full _id). Routes to function/file/class service by node_id prefix.
+    Accepts code element ID.
     """
 
     # Get project node and stop watcher before writing (to prevent event bubbling)
@@ -56,14 +53,8 @@ async def write_code(
             pass
 
     # Route to appropriate service by node_id prefix (same as get_code)
-    if node_id.startswith("FunctionSchema/"):
-        result = await function_service.write_code(node_id, code_block)
-    elif node_id.startswith("FileSchema/"):
-        result = await file_service.write_code(node_id, code_block)
-    elif node_id.startswith("ClassSchema/"):
-        result = await class_service.write_code(node_id, code_block)
-    else:
-        raise HTTPException(status_code=400, detail="Invalid node ID")
+
+    result = await code_element_service.write_code(node_id, code_block)
 
     if not result["success"]:
         raise HTTPException(status_code=500, detail=result.get("error"))
@@ -102,25 +93,15 @@ async def write_code(
 @router.get("/read-code/")
 async def get_code(
     node_id: str = Query(..., description="The ID of the element to get"),
-    function_service: FunctionService = Depends(get_function_service),
-    file_service: FileService = Depends(get_file_service),
-    class_service: ClassService = Depends(get_class_service),
+    code_element_service: CodeElementService = Depends(
+        get_code_element_service),
 ) -> Dict[str, Any]:
     """
     Retrieves the code for a given element.
     Accepts document key (not full _id).
     """
 
-    if node_id.startswith("FunctionSchema/"):
-        code_details = await function_service.get_code(node_id)
-
-    elif node_id.startswith("FileSchema/"):
-        code_details = await file_service.get_code(node_id)
-    elif node_id.startswith("ClassSchema/"):
-        code_details = await class_service.get_code(node_id)
-    else:
-        raise HTTPException(
-            status_code=400, detail="Invalid node ID")
+    code_details = await code_element_service.get_code(node_id)
 
     if code_details is None:
         raise HTTPException(

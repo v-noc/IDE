@@ -29,6 +29,7 @@ class ProjectService():
         return await self.meta_repos.project_repo.get_all()
 
     async def get_children(self, exclude_types: list[str] = [], depth: int | str = 50):
+        self.project_repos = self.uow.get_project_repos()
         return await self.project_repos.project_repo.get_children(
             exclude_types,
         )
