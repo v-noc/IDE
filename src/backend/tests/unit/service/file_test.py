@@ -6,8 +6,8 @@ from app.core.model.nodes import FileNode
 
 
 @pytest.mark.asyncio
-async def test_create_file(create_repos, create_project):
-    file_service = FileService(create_repos, create_project)
+async def test_create_file(project_uow):
+    file_service = FileService(project_uow)
     file = await file_service.create(
         "file",
         "Test File",
@@ -23,8 +23,8 @@ async def test_create_file(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_get_file(create_repos, create_file, create_project):
-    file_service = FileService(create_repos, create_project)
+async def test_get_file(project_uow, create_file):
+    file_service = FileService(project_uow)
     file = await file_service.get(create_file.id)
     assert file is not None
     assert file.name == "Test File"
@@ -33,8 +33,8 @@ async def test_get_file(create_repos, create_file, create_project):
 
 
 @pytest.mark.asyncio
-async def test_update_file(create_repos, create_file, create_project):
-    file_service = FileService(create_repos, create_project)
+async def test_update_file(project_uow, create_file):
+    file_service = FileService(project_uow)
     create_file.name = "Updated File"
     create_file.description = "This is an updated file"
 
@@ -45,8 +45,8 @@ async def test_update_file(create_repos, create_file, create_project):
 
 
 @pytest.mark.asyncio
-async def test_add_function_to_file(create_repos, create_file, create_function, create_project):
-    file_service = FileService(create_repos, create_project)
+async def test_add_function_to_file(project_uow, create_file, create_function):
+    file_service = FileService(project_uow)
     await file_service.add_function(create_file.id, create_function.id)
     functions = await file_service.get_children(create_file.id)
     assert len(functions) == 1
@@ -55,9 +55,9 @@ async def test_add_function_to_file(create_repos, create_file, create_function, 
 
 
 @pytest.mark.asyncio
-async def test_nested_functions(create_repos, create_project, create_file, create_function, create_function2):
-    file_service = FileService(create_repos, create_project)
-    function_service = FunctionService(create_repos, create_project)
+async def test_nested_functions(project_uow, create_file, create_function, create_function2):
+    file_service = FileService(project_uow)
+    function_service = FunctionService(project_uow)
 
     await file_service.add_function(create_file.id, create_function.id)
     await function_service.add_function(
@@ -70,8 +70,8 @@ async def test_nested_functions(create_repos, create_project, create_file, creat
 
 
 @pytest.mark.asyncio
-async def test_add_class_to_file(create_repos, create_file, create_class, create_project):
-    file_service = FileService(create_repos, create_project)
+async def test_add_class_to_file(project_uow, create_file, create_class):
+    file_service = FileService(project_uow)
     await file_service.add_class(create_file.id, create_class.id)
     classes = await file_service.get_children(create_file.id)
     assert len(classes) == 1
@@ -80,8 +80,8 @@ async def test_add_class_to_file(create_repos, create_file, create_class, create
 
 
 @pytest.mark.asyncio
-async def test_get_all_files(create_repos, create_file, create_folder, create_project):
-    file_service = FileService(create_repos, create_project)
+async def test_get_all_files(project_uow, create_file, create_folder):
+    file_service = FileService(project_uow)
     files = await file_service.get_all_files()
 
     assert len(files) == 1
@@ -91,8 +91,8 @@ async def test_get_all_files(create_repos, create_file, create_folder, create_pr
 
 
 @pytest.mark.asyncio
-async def test_batch_create_files(create_repos, create_project):
-    file_service = FileService(create_repos, create_project)
+async def test_batch_create_files(project_uow):
+    file_service = FileService(project_uow)
     await file_service.create_batch([
         FileNode(
             id="file_1",
@@ -117,8 +117,8 @@ async def test_batch_create_files(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_batch_update_files(create_repos, create_project):
-    file_service = FileService(create_repos, create_project)
+async def test_batch_update_files(project_uow):
+    file_service = FileService(project_uow)
     await file_service.create_batch([
         FileNode(
             id="file_1",
@@ -152,8 +152,8 @@ async def test_batch_update_files(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_batch_move_files(create_repos, create_project, create_file, create_function, create_class):
-    file_service = FileService(create_repos, create_project)
+async def test_batch_move_files(project_uow, create_file, create_function, create_class):
+    file_service = FileService(project_uow)
 
     await file_service.move_batch([(create_function.id, create_file.id, "function"), (create_class.id, create_file.id, "class")])
     files = await file_service.get_children(create_file.id)
@@ -164,9 +164,9 @@ async def test_batch_move_files(create_repos, create_project, create_file, creat
 
 
 @pytest.mark.asyncio
-async def test_get_parent_file(create_repos, create_project, create_file, create_function, create_class):
+async def test_get_parent_file(project_uow, create_file, create_function, create_class):
 
-    file_service = FileService(create_repos, create_project)
+    file_service = FileService(project_uow)
 
     await file_service.move_batch([(create_function.id, create_file.id, "function"), (create_class.id, create_function.id, "class")])
     parent_file = await file_service.get_parent_file(create_class.id)

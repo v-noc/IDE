@@ -11,9 +11,9 @@ from app.core.model.schemas import StructureGroupSchema
 
 
 @pytest.mark.asyncio
-async def test_group_creation(create_repos, create_project,  create_file, create_file2, create_folder):
-    group_service = GroupService(create_repos, create_project)
-    folder_service = FolderService(create_repos, create_project)
+async def test_group_creation(create_repos, project_uow, create_project, create_file, create_file2, create_folder):
+    group_service = GroupService(project_uow)
+    folder_service = FolderService(project_uow)
     project_service = ProjectService(create_repos)
 
     await folder_service.move_batch([(create_file.id, create_folder.id, "file")])

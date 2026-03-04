@@ -8,8 +8,8 @@ from app.core.schemas.tree import CallTreeNode
 
 
 @pytest.mark.asyncio
-async def test_create_call(create_repos, create_function, create_project):
-    call_service = CallService(create_repos, create_project)
+async def test_create_call(project_uow, create_function):
+    call_service = CallService(project_uow)
 
     new_call = await call_service.create(
         "Test Call",
@@ -97,7 +97,7 @@ async def test_add_call_to_call(create_call, create_call2, call_service):
 
 
 @pytest.mark.asyncio
-async def test_find_upward_call_chain(create_sample_project, create_repos):
+async def test_find_upward_call_chain(create_sample_project, create_repos, project_uow_for_sample):
     project = create_sample_project
     from app.core.builder.tree_builder import TreeBuilder
     from app.core.services.project_service import ProjectService
@@ -119,7 +119,7 @@ async def test_find_upward_call_chain(create_sample_project, create_repos):
     build_call = _find_node(tree, "build", CallTreeNode.__name__)
     assert build_call is not None
 
-    call_service = CallService(create_repos, project)
+    call_service = CallService(project_uow_for_sample)
     chain_info = await call_service.get_call_parent_chain(build_call.id)
 
     assert chain_info is not None

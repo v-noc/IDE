@@ -78,20 +78,17 @@ async def create_sample_project(terminusdb_client, create_repos, tmp_path):
 
 
 @pytest_asyncio.fixture
-async def create_project(create_repos):
-    project_service = ProjectService(create_repos)
-    project = await project_service.create(
-        "Test Project",
-        "This is a test project",
-        "test_project"
-    )
-    yield project
-    await project_service.delete(project.id)
+async def project_uow_for_sample(terminusdb_client, create_sample_project):
+    """ProjectUoW for tests that use create_sample_project (with orchestrator)."""
+    from app.db.context import ProjectUoW, RequestDbContext
+
+    ctx = RequestDbContext()
+    return ProjectUoW(terminusdb_client, create_sample_project, ctx)
 
 
 @pytest_asyncio.fixture
-async def folder_service(create_repos, create_project):
-    return FolderService(create_repos, create_project)
+async def folder_service(project_uow):
+    return FolderService(project_uow)
 
 
 @pytest_asyncio.fixture
@@ -108,8 +105,8 @@ async def create_folder(folder_service):
 
 
 @pytest_asyncio.fixture
-async def create_file2(create_repos, create_project):
-    file_service = FileService(create_repos, create_project)
+async def create_file2(project_uow):
+    file_service = FileService(project_uow)
     file = await file_service.create(
         id="file2",
         name="Test File",
@@ -123,8 +120,8 @@ async def create_file2(create_repos, create_project):
 
 
 @pytest_asyncio.fixture
-async def create_file(create_repos, create_project):
-    file_service = FileService(create_repos, create_project)
+async def create_file(project_uow):
+    file_service = FileService(project_uow)
     file = await file_service.create(
         id="file",
         name="Test File",
@@ -138,18 +135,18 @@ async def create_file(create_repos, create_project):
 
 
 @pytest.fixture
-def function_service(create_repos, create_project):
-    return FunctionService(create_repos, create_project)
+def function_service(project_uow):
+    return FunctionService(project_uow)
 
 
 @pytest.fixture
-def class_service(create_repos, create_project):
-    return ClassService(create_repos, create_project)
+def class_service(project_uow):
+    return ClassService(project_uow)
 
 
 @pytest.fixture
-def call_service(create_repos, create_project):
-    return CallService(create_repos, create_project)
+def call_service(project_uow):
+    return CallService(project_uow)
 
 
 @pytest_asyncio.fixture

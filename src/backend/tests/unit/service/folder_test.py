@@ -7,8 +7,8 @@ from app.core.model.schemas import FileSchema, FolderSchema
 
 
 @pytest.mark.asyncio
-async def test_create_folder(create_repos, create_project):
-    folder_service = FolderService(create_repos, create_project)
+async def test_create_folder(project_uow):
+    folder_service = FolderService(project_uow)
     folder = await folder_service.create(
         "folder",
         "Test Folder",
@@ -24,8 +24,8 @@ async def test_create_folder(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_get_folder(create_repos, create_folder, create_project):
-    folder_service = FolderService(create_repos, create_project)
+async def test_get_folder(project_uow, create_folder):
+    folder_service = FolderService(project_uow)
     folder = await folder_service.get(create_folder.id)
     assert folder is not None
     assert folder.name == "Test Folder"
@@ -34,8 +34,8 @@ async def test_get_folder(create_repos, create_folder, create_project):
 
 
 @pytest.mark.asyncio
-async def test_update_folder(create_repos, create_folder, create_project):
-    folder_service = FolderService(create_repos, create_project)
+async def test_update_folder(project_uow, create_folder):
+    folder_service = FolderService(project_uow)
     create_folder.name = "Updated Folder"
     create_folder.description = "This is an updated folder"
 
@@ -48,8 +48,8 @@ async def test_update_folder(create_repos, create_folder, create_project):
 
 
 @pytest.mark.asyncio
-async def test_add_folder_to_folder(create_repos, create_folder, create_project, create_file):
-    folder_service = FolderService(create_repos, create_project)
+async def test_add_folder_to_folder(project_uow, create_folder, create_file):
+    folder_service = FolderService(project_uow)
     second_folder = await folder_service.create(
         "second_folder",
         "Second Folder",
@@ -66,8 +66,8 @@ async def test_add_folder_to_folder(create_repos, create_folder, create_project,
 
 
 @pytest.mark.asyncio
-async def test_get_all_folders(create_repos, create_folder, create_file, create_project):
-    folder_service = FolderService(create_repos, create_project)
+async def test_get_all_folders(project_uow, create_folder, create_file):
+    folder_service = FolderService(project_uow)
     folders = await folder_service.get_all_folders()
     assert len(folders) == 1
     assert folders[0].name == "Test Folder"
@@ -76,8 +76,8 @@ async def test_get_all_folders(create_repos, create_folder, create_file, create_
 
 
 @pytest.mark.asyncio
-async def test_batch_create_folders(create_repos, create_project):
-    folder_service = FolderService(create_repos, create_project)
+async def test_batch_create_folders(project_uow):
+    folder_service = FolderService(project_uow)
     await folder_service.create_batch([
         FolderNode(
             id="folder_1",
@@ -106,8 +106,8 @@ async def test_batch_create_folders(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_batch_update_folders(create_repos, create_project):
-    folder_service = FolderService(create_repos, create_project)
+async def test_batch_update_folders(project_uow):
+    folder_service = FolderService(project_uow)
 
     await folder_service.create_batch([
         FolderNode(
@@ -140,8 +140,8 @@ async def test_batch_update_folders(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_batch_move_folders(create_repos, create_project, create_folder, create_file):
-    folder_service = FolderService(create_repos, create_project)
+async def test_batch_move_folders(project_uow, create_folder, create_file):
+    folder_service = FolderService(project_uow)
 
     await folder_service.create_batch([
         FolderNode(

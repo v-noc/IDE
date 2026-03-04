@@ -11,10 +11,9 @@ from app.core.model.schemas import CodeElementGroupSchema
 
 
 @pytest.mark.asyncio
-async def test_group_creation(create_repos, create_project, create_function, create_function2, create_file, create_class):
-
-    group_service = GroupService(create_repos, create_project)
-    file_service = FileService(create_repos, create_project)
+async def test_group_creation(project_uow, create_function, create_function2, create_file, create_class):
+    group_service = GroupService(project_uow)
+    file_service = FileService(project_uow)
 
     await file_service.move_batch([(create_function.id, create_file.id,  "function"),
                                    (create_class.id, create_file.id, "class"), (create_function2.id, create_class.id, "function")])
@@ -59,9 +58,9 @@ async def test_group_creation(create_repos, create_project, create_function, cre
 
 
 @pytest.mark.asyncio
-async def test_group_move_batch(create_repos, create_project, create_function, create_function2, create_file, create_class):
-    group_service = GroupService(create_repos, create_project)
-    file_service = FileService(create_repos, create_project)
+async def test_group_move_batch(project_uow, create_function, create_function2, create_file, create_class):
+    group_service = GroupService(project_uow)
+    file_service = FileService(project_uow)
 
     await file_service.move_batch([(create_function.id, create_file.id,  "function"),
                                    (create_class.id, create_file.id, "class"), (create_function2.id, create_class.id, "function")])

@@ -18,7 +18,7 @@ async def client(terminusdb_client: TerminusClient) -> AsyncClient:
     dependency overridden to use the test database.
     """
 
-    def override_get_db():
+    async def override_get_db():
         return terminusdb_client
 
     app.dependency_overrides[get_terminus_client] = override_get_db

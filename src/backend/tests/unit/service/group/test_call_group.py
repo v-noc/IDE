@@ -12,16 +12,15 @@ from app.core.model.schemas import CallGroupSchema
 
 @pytest.mark.asyncio
 async def test_call_group_creation(
-    create_repos,
-    create_project,
+    project_uow,
     create_function,
     create_function2,
     create_call,
     create_call2,
 ):
-    group_service = GroupService(create_repos, create_project)
-    function_service = FunctionService(create_repos, create_project)
-    call_service = CallService(create_repos, create_project)
+    group_service = GroupService(project_uow)
+    function_service = FunctionService(project_uow)
+    call_service = CallService(project_uow)
 
     await function_service.add_call(create_function.id, create_call.id)
     await function_service.add_call(create_function.id, create_call2.id)
@@ -81,15 +80,15 @@ async def test_call_group_creation(
 
 @pytest.mark.asyncio
 async def test_call_group_move_batch(
-    create_repos,
+    project_uow,
     create_project,
     create_function,
     create_function2,
     create_call,
     create_call2,
 ):
-    group_service = GroupService(create_repos, create_project)
-    function_service = FunctionService(create_repos, create_project)
+    group_service = GroupService(project_uow)
+    function_service = FunctionService(project_uow)
 
     await function_service.add_call(create_function.id, create_call.id)
     await function_service.add_call(create_function.id, create_call2.id)
@@ -122,12 +121,11 @@ async def test_call_group_move_batch(
     assert tree[0].children[0].id == created_group.id
     assert len(tree[0].children[0].children) == 2
 
-    await create_repos.function_repo.move_batch(
+    await project_uow.get_project_repos().function_repo.move_batch(
         [
             (create_call.id, create_function.id, "call"),
             (create_call2.id, create_function.id, "call"),
         ],
-        create_project.db_name,
     )
 
     children = await function_service.get_children(create_function.id)
