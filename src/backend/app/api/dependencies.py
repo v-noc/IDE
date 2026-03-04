@@ -13,6 +13,14 @@ from app.core.services.document_service import DocumentService
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
+from app.db.context import RequestDbContext, ProjectUoW
+
+# app/api/dependencies/project_uow.py
+from contextlib import asynccontextmanager
+from fastapi import Depends
+
+from app.core.model.nodes import ProjectNode
+from app.core.repository import Repositories
 
 
 def get_project_service(
@@ -22,89 +30,72 @@ def get_project_service(
     return ProjectService(repos)
 
 
-async def get_group_service(
-    db: AsyncClient = Depends(get_terminus_client),
-    project_service: ProjectService = Depends(get_project_service),
+async def get_request_db_context(
+    branch: str = Header("main", alias="X-Vnoc-Branch"),
+    ref: Optional[str] = Query(
+        None, description="Specific commit/ref to query"),
+) -> RequestDbContext:
+    return RequestDbContext(branch=branch, ref=ref)
+
+
+async def get_project_node(
     project_id: str = Query(..., description="The ID of the project"),
-) -> GroupService:
-
+    project_service: ProjectService = Depends(get_project_service),
+) -> ProjectNode:
     project = await project_service.get(project_id)
-    if not project:
-        print(f"Project not found for id: {project_id}")
-        raise HTTPException(status_code=404, detail="Project not found")
-    project_node = ProjectNode.from_raw_dict(project)
-
-    repos = Repositories(db)
-    return GroupService(repos, project_node)
+    return ProjectNode.from_raw_dict(project)
 
 
-async def get_db_context(
-    x_vnoc_branch: Optional[str] = Header("main", alias="X-Vnoc-Branch"),
-    ref: Optional[str] = Query(None, description="Specific commit ID to query")
+@asynccontextmanager
+async def get_project_uow(
+    base: AsyncClient = Depends(get_terminus_client),
+    project: ProjectNode = Depends(get_project_node),
+    ctx: RequestDbContext = Depends(get_request_db_context),
 ):
-    return {
-        "branch": x_vnoc_branch,
-        "commit": ref
-    }
+    try:
+        yield ProjectUoW(base, project, ctx)
+    finally:
+        # clone shares base session; typically no close here
+        pass
 
 
-async def get_file_service(
-    db: AsyncClient = Depends(get_terminus_client),
-    project_service: ProjectService = Depends(get_project_service),
-    project_id: str = Query(..., description="The ID of the project to get"),
+def get_group_service(
+    uow: ProjectUoW = Depends(get_project_uow)
+) -> GroupService:
+    return GroupService(uow)
+
+
+def get_file_service(
+    uow: ProjectUoW = Depends(get_project_uow)
 ) -> FileService:
-    project = await project_service.get(project_id)
-    repos = Repositories(db)
-    project = ProjectNode.from_raw_dict(project)
-    return FileService(repos, project)
+    return FileService(uow)
 
 
-async def get_class_service(
-    db: AsyncClient = Depends(get_terminus_client),
-    project_service: ProjectService = Depends(get_project_service),
-    project_id: str = Query(..., description="The ID of the project to get"),
+def get_class_service(
+    uow: ProjectUoW = Depends(get_project_uow)
 ) -> ClassService:
-    project = await project_service.get(project_id)
-    repos = Repositories(db)
-    project = ProjectNode.from_raw_dict(project)
-    return ClassService(repos, project)
+    return ClassService(uow)
 
 
-async def get_function_service(
-    project_service: ProjectService = Depends(get_project_service),
-    project_id: str = Query(..., description="The ID of the project to get"),
-    db: AsyncClient = Depends(get_terminus_client),
+def get_function_service(
+    uow: ProjectUoW = Depends(get_project_uow)
 ) -> FunctionService:
-
-    project = await project_service.get(project_id)
-    project = ProjectNode.from_raw_dict(project)
-    repos = Repositories(db)
-    return FunctionService(repos, project)
+    return FunctionService(uow)
 
 
 def get_call_service(
-    db: AsyncClient = Depends(get_terminus_client),
+    uow: ProjectUoW = Depends(get_project_uow)
 ) -> CallService:
-    repos = Repositories(db)
-    return CallService(repos)
+
+    return CallService(uow)
 
 
 def get_log_service(
-    db: AsyncClient = Depends(get_terminus_client),
+    uow: ProjectUoW = Depends(get_project_uow)
 ) -> LogService:
-    repos = Repositories(db)
-    return LogService(repos)
+
+    return LogService(uow)
 
 
-async def get_document_service(
-    db: AsyncClient = Depends(get_terminus_client),
-    project_service: ProjectService = Depends(get_project_service),
-    project_id: str = Query(..., description="The ID of the project to get"),
-) -> DocumentService:
-
-    project = await project_service.get(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    project = ProjectNode.from_raw_dict(project)
-    repos = Repositories(db)
-    return DocumentService(repos, project)
+def get_document_service(uow: ProjectUoW = Depends(get_project_uow)) -> DocumentService:
+    return DocumentService(uow)

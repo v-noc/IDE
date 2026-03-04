@@ -3,9 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from typing import Optional
 
 from app.core.services.document_service import DocumentService
-from app.core.repository import Repositories
-from app.db.client import get_terminus_client
-from arangoasync.database import AsyncDatabase
 from app.core.model import DocumentNode
 from pydantic import BaseModel, Field
 from typing import List

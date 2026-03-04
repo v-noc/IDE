@@ -5,16 +5,15 @@ import os
 
 from app.core.sandbox.code_run import CodeResponse, CodeRunner
 
-from app.db.client import get_terminus_client, AsyncClient
 from app.api.dependencies import (
-    get_project_service,
+    ProjectUoW,
     get_function_service,
     get_file_service,
     get_class_service,
+    get_project_uow,
 )
 from app.core.watcher.service import WatcherService, get_watcher_service
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.services.project_service import ProjectService
 
 from app.core.socket.manager import get_socket_manager
 from app.core.services import FunctionService, FileService, ClassService
@@ -33,15 +32,15 @@ class RunCode(BaseModel):
 
 @router.post("/write-code")
 async def write_code(
-    node_id: str = Query(..., description="The ID of the node to write code to"),
-    project_id: str = Query(..., description="The ID of the project"),
+    node_id: str = Query(...,
+                         description="The ID of the node to write code to"),
+
     code_block: str = Body(..., embed=True, alias="code"),
-    project_service: ProjectService = Depends(get_project_service),
     function_service: FunctionService = Depends(get_function_service),
     file_service: FileService = Depends(get_file_service),
     class_service: ClassService = Depends(get_class_service),
     watcher_service: WatcherService = Depends(get_watcher_service),
-    db: AsyncClient = Depends(get_terminus_client),
+    project_uow: ProjectUoW = Depends(get_project_uow),
 ) -> Dict[str, Any]:
     """
     Writes a block of code to the location of a given code element.
@@ -49,7 +48,7 @@ async def write_code(
     """
 
     # Get project node and stop watcher before writing (to prevent event bubbling)
-    project_node = await project_service.get(project_id)
+    project_node = project_uow.project
     if project_node:
         try:
             watcher_service.stop_watching(project_node.id)
@@ -74,7 +73,7 @@ async def write_code(
         try:
             orchestrator = GraphBuilderOrchestrator(
                 project_node=project_node,
-                db=db,
+                uow=project_uow,
             )
             await orchestrator.resync()
         except Exception:
@@ -103,7 +102,6 @@ async def write_code(
 @router.get("/read-code/")
 async def get_code(
     node_id: str = Query(..., description="The ID of the element to get"),
-
     function_service: FunctionService = Depends(get_function_service),
     file_service: FileService = Depends(get_file_service),
     class_service: ClassService = Depends(get_class_service),
@@ -131,15 +129,15 @@ async def get_code(
     return code_details
 
 
-@router.post("/{project_id}/run-code")
+@router.post("/run-code")
 async def run_code(
-    project_id: str,
+
     run_code: RunCode,
-    project_service: ProjectService = Depends(get_project_service),
+    project_uow: ProjectUoW = Depends(get_project_uow),
 ) -> CodeResponse:
     """Execute provided code using the project's absolute root path and
     return stdout/stderr."""
-    project_node = await project_service.get(project_id)
+    project_node = project_uow.project
     if project_node is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

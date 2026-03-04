@@ -8,13 +8,14 @@ from app.core.builder.tree_builder import TreeBuilder
 from app.db.client import get_terminus_client
 
 from app.core.services.project_service import ProjectService
-from app.api.dependencies import get_project_service
+from app.api.dependencies import ProjectUoW, get_project_service
 from pathlib import Path
 from app.core.watcher.service import WatcherService, get_watcher_service
 from loguru import logger
 import time
 from app.core.model.nodes import ProjectNode
 from app.db.async_terminus_client import AsyncClient
+from app.db.context import RequestDbContext
 
 
 class CreateProjectRequest(BaseModel):
@@ -59,12 +60,11 @@ async def create_project(
             description=project.description or "",
             path=project.path,
         )
-
-        clone_db = db.clone()
+        uow = ProjectUoW(db, project_node, RequestDbContext(
+            branch="main", ref=None))
         orchestrator = GraphBuilderOrchestrator(
             project_node=project_node,
-            db=clone_db,
-
+            uow=uow
         )
         await orchestrator.resync()
 

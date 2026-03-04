@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status, Body
+from fastapi import APIRouter, Depends,  HTTPException, status, Body
 from pydantic import BaseModel, Field
 from datetime import datetime
-from app.db.client import get_terminus_client
-from app.db.async_terminus_client import AsyncClient
-from app.api.dependencies import get_db_context, get_project_service
-from app.core.services.project_service import ProjectService
+from app.api.dependencies import get_project_uow, ProjectUoW
+from backend.app.db import scoped_client
+from app.db.context import DbTarget
 
 router = APIRouter()
 
@@ -23,63 +22,51 @@ class BranchResponse(BaseModel):
 
 @router.get("/")
 async def get_branches(
-    project_id: str = Query(..., description="The ID of the project"),
-    db: AsyncClient = Depends(get_terminus_client),
-    get_db_context: dict = Depends(get_db_context),
-    project_service: ProjectService = Depends(get_project_service),
+    project_uow: ProjectUoW = Depends(get_project_uow),
 ):
     """Get all branches for a project."""
-    project = await project_service.get(project_id)
+    project = project_uow.project
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    clone = db.clone()
-    clone.db = project["db_name"]
-    branch_name = get_db_context["branch"]
-    if branch_name:
-        clone.branch = branch_name
-    branches = await clone.get_all_branches()
-    return [BranchResponse.from_result(branch) for branch in branches]
+
+    target = DbTarget(db=project.db_name,
+                      branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
+    with scoped_client(project_uow.client, target) as session:
+        branches = await session.get_all_branches()
+        return [BranchResponse.from_result(branch) for branch in branches]
 
 
 @router.post("/")
 async def create_branch(
-    project_id: str = Query(..., description="The ID of the project"),
     request: CreateBranchRequest = Body(..., description="The request body"),
-    db: AsyncClient = Depends(get_terminus_client),
-    project_service: ProjectService = Depends(get_project_service),
+    project_uow: ProjectUoW = Depends(get_project_uow),
 ):
     """Create a new branch for a project."""
-    project = await project_service.get(project_id)
+    project = project_uow.project
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    clone = db.clone()
-    clone.db = project["db_name"]
-    branch_name = get_db_context["branch"]
-    if branch_name:
-        clone.branch = branch_name
-    await clone.create_branch(request.name)
-    return {"ok": True}
+    target = DbTarget(db=project.db_name,
+                      branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
+    with scoped_client(project_uow.client, target) as session:
+        await session.create_branch(request.name)
+        return {"ok": True}
 
 
 @router.delete("/{name}")
 async def delete_branch(
     name: str,
-    project_id: str = Query(..., description="The ID of the project"),
-    db: AsyncClient = Depends(get_terminus_client),
-    project_service: ProjectService = Depends(get_project_service),
+    project_uow: ProjectUoW = Depends(get_project_uow),
 ):
     """Delete a branch for a project."""
-    project = await project_service.get(project_id)
+    project = project_uow.project
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
-    clone = db.clone()
-    clone.db = project["db_name"]
-    branch_name = get_db_context["branch"]
-    if branch_name:
-        clone.branch = branch_name
-    await clone.delete_branch(name)
-    return {"ok": True}
+    target = DbTarget(db=project.db_name,
+                      branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
+    with scoped_client(project_uow.client, target) as session:
+        await session.delete_branch(name)
+        return {"ok": True}

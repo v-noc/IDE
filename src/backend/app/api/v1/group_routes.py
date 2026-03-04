@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from typing import List, Optional, Tuple
 from fastapi import Depends
@@ -50,7 +50,7 @@ async def create_group(
         None, description="The ID of the parent node to create the group under"),
     group_type: str = Query(
         ..., description="Group type: structure_group, code_element_group, or call_group"),
-    x_vnoc_branch: Optional[str] = Header(None, alias="X-Vnoc-Branch"),
+
 ):
     gt = _parse_group_type(group_type)
 
@@ -62,7 +62,7 @@ async def create_group(
         parent_node_id,
         children=children,
         group_type=gt,
-        branch_name=x_vnoc_branch,
+
     )
     if result is None:
         raise HTTPException(
@@ -79,7 +79,7 @@ async def update_group(
     group_id: str = Query(..., description="The ID of the group to update"),
     group_type: str = Query(
         ..., description="Group type: structure_group, code_element_group, or call_group"),
-    x_vnoc_branch: Optional[str] = Header(None, alias="X-Vnoc-Branch"),
+
 ):
     gt = _parse_group_type(group_type)
     return await group_service.update_basic_info(
@@ -87,8 +87,7 @@ async def update_group(
         group_type=gt,
         name=update_data.name,
         description=update_data.description,
-        icon=None,
-        branch_name=x_vnoc_branch,
+        icon=None
     )
 
 
@@ -98,10 +97,10 @@ async def delete_group(
     group_id: str = Query(..., description="The ID of the group to delete"),
     group_type: str = Query(
         ..., description="Group type: structure_group, code_element_group, or call_group"),
-    x_vnoc_branch: Optional[str] = Header(None, alias="X-Vnoc-Branch"),
+
 ):
     gt = _parse_group_type(group_type)
-    await group_service.delete(group_id, group_type=gt, branch_name=x_vnoc_branch)
+    await group_service.delete(group_id, group_type=gt)
 
 
 @router.post("/children")
@@ -113,7 +112,6 @@ async def add_child(
     child_id: str = Query(..., description="The ID of the child to add"),
     group_type: str = Query(
         ..., description="Group type: structure_group, code_element_group, or call_group"),
-    x_vnoc_branch: Optional[str] = Header(None, alias="X-Vnoc-Branch"),
 ):
     gt = _parse_group_type(group_type)
     return await group_service.add_child_to_group(
@@ -121,7 +119,6 @@ async def add_child(
         child_id,
         add_child_req.item_type,
         group_type=gt,
-        branch_name=x_vnoc_branch,
     )
 
 
@@ -137,7 +134,6 @@ async def remove_child(
                            description="The type of the child being removed"),
     new_parent_id: Optional[str] = Query(None,
                                          description="The ID of the parent to move the child to"),
-    x_vnoc_branch: Optional[str] = Header(None, alias="X-Vnoc-Branch"),
 ):
     gt = _parse_group_type(group_type)
     await group_service.remove_child_from_group(
@@ -146,5 +142,4 @@ async def remove_child(
         item_type=item_type,
         new_parent_id=new_parent_id,
         group_type=gt,
-        branch_name=x_vnoc_branch,
     )
