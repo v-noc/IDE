@@ -1,10 +1,11 @@
-
 import pytest_asyncio
 
 from app.db.client import migrate_base
 from app.db.async_terminus_client import AsyncClient
 from app.config.settings import get_settings
-
+from app.core.repository import Repositories
+from app.db.context import ProjectUoW, RequestDbContext
+from app.core.services.project_service import ProjectService
 
 TEST_DB_NAME = "test_db"
 
@@ -63,14 +64,56 @@ async def client(terminusdb_client: AsyncClient) -> AsyncClient:
     return terminusdb_client
 
 
+@pytest_asyncio.fixture(scope="function")
+async def arangodb_client(terminusdb_client: AsyncClient) -> AsyncClient:
+    """Alias for terminusdb_client - backward compatibility for tests still using old name."""
+    return terminusdb_client
+
+
 @pytest_asyncio.fixture
-async def create_repos(terminusdb_client):
-    """Return Repositories wired to the test database.
+async def create_repos(terminusdb_client) -> Repositories:
+    """Return meta-level Repositories wired to the test database.
 
-    NOTE: Repositories is currently built for ArangoDB. Until it is migrated
-    to TerminusDB, tests that use create_repos will fail when they call
-    ArangoDB-specific APIs (e.g. aql.execute, get_collection).
+    Use for ProjectService and other meta-level operations (create project,
+    get project, delete project). For project-scoped operations (files,
+    folders, functions, etc.), use project_uow instead.
     """
-    from app.core.repository import Repositories
-
     return Repositories(terminusdb_client.clone())
+
+
+@pytest_asyncio.fixture
+async def create_project(terminusdb_client):
+    ctx = RequestDbContext()
+    project_uow = ProjectUoW(terminusdb_client, None, ctx)
+    project_service = ProjectService(project_uow)
+    project = await project_service.create(
+        "Test Project",
+        "This is a test project",
+        "test_project"
+    )
+    yield project
+    await project_service.delete(project.id)
+
+
+@pytest_asyncio.fixture
+async def project_uow(terminusdb_client, create_project):
+    """Return ProjectUoW for project-scoped services.
+
+    Use with services that require ProjectUoW: GroupService, FileService,
+    FolderService, ClassService, FunctionService, CallService.
+    """
+
+    ctx = RequestDbContext()
+    return ProjectUoW(terminusdb_client, create_project, ctx)
+
+
+@pytest_asyncio.fixture
+async def empty_project_uow(terminusdb_client):
+    """Return ProjectUoW for project-scoped services.
+
+    Use with services that require ProjectUoW: GroupService, FileService,
+    FolderService, ClassService, FunctionService, CallService.
+    """
+
+    ctx = RequestDbContext()
+    return ProjectUoW(terminusdb_client, None, ctx)

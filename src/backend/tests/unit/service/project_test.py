@@ -13,11 +13,11 @@ from app.core.model.schemas import FileSchema
 
 
 @pytest.mark.asyncio
-async def test_create_project(create_repos):
+async def test_create_project(empty_project_uow):
     print("creating project test")
 
     project_service = ProjectService(
-        create_repos
+        empty_project_uow
     )
 
     created_project = await project_service.create(
@@ -35,11 +35,11 @@ async def test_create_project(create_repos):
 
 
 @pytest.mark.asyncio
-async def test_get_project(create_repos, create_project):
+async def test_get_project(project_uow):
     print("getting project test")
 
     project_service = ProjectService(
-        create_repos
+        project_uow
     )
 
     projects = await project_service.get_all()
@@ -48,10 +48,10 @@ async def test_get_project(create_repos, create_project):
 
 
 @pytest.mark.asyncio
-async def test_update_project(create_project, create_repos):
+async def test_update_project(create_project, project_uow):
 
     project_service = ProjectService(
-        create_repos
+        project_uow
     )
 
     create_project.name = "Updated Project"
@@ -69,15 +69,15 @@ async def test_update_project(create_project, create_repos):
 
 
 @pytest.mark.asyncio
-async def test_delete_project(create_project, create_repos):
+async def test_delete_project(project_uow):
     project_service = ProjectService(
-        create_repos
+        project_uow
     )
 
     projects = await project_service.get_all()
 
     await project_service.delete(
-        create_project.id
+        project_uow.project.id
     )
 
     projects = await project_service.get_all()
@@ -86,10 +86,10 @@ async def test_delete_project(create_project, create_repos):
 
 
 @pytest.mark.asyncio
-async def test_get_children(create_project, create_repos, create_file, create_folder, create_function, create_class, create_call):
-    project_service = ProjectService(create_repos)
+async def test_get_children(create_project, project_uow, create_file, create_folder, create_function, create_class, create_call):
+    project_service = ProjectService(project_uow)
 
-    children = await project_service.get_children(create_project.db_name, [FileSchema.__name__])
+    children = await project_service.get_children([FileSchema.__name__])
     # print(children)
 
     assert len(children) == 4
