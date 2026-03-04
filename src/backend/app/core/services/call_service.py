@@ -1,16 +1,15 @@
 
 from datetime import datetime, timezone
 import uuid
-from typing import Literal, List, Optional, Tuple
-from app.core.repository import Repositories
+from typing import Literal, List, Tuple
 from app.core.model.nodes import CallNode
-from app.core.model.nodes import ProjectNode
+from app.db.context import ProjectUoW
 
 
 class CallService():
-    def __init__(self, repos: Repositories, project: ProjectNode):
-        self.repos = repos
-        self.project = project
+    def __init__(self, uow: ProjectUoW):
+        self.uow = uow
+        self.repos = self.uow.get_project_repos()
 
     async def create(
         self,
@@ -30,39 +29,37 @@ class CallService():
             updated_at=datetime.now(timezone.utc),
         )
 
-        new_call = await self.repos.call_repo.create(call, self.project.db_name)
+        new_call = await self.repos.call_repo.create(call)
 
         return new_call
 
-    async def create_batch(self, calls: List[CallNode], branch_name: Optional[str] = None):
-        return await self.repos.call_repo.create(calls, self.project.db_name, branch_name=branch_name)
+    async def create_batch(self, calls: List[CallNode]):
+        return await self.repos.call_repo.create(calls)
 
     async def get(self, call_id: str):
-        return await self.repos.call_repo.get_by_id(call_id, self.project.db_name)
+        return await self.repos.call_repo.get_by_id(call_id)
 
     async def update(self, call: CallNode):
-        return await self.repos.call_repo.update(call, self.project.db_name)
+        return await self.repos.call_repo.update(call)
 
     async def delete(self, call_id: str):
-        return await self.repos.call_repo.delete(call_id, self.project.db_name)
+        return await self.repos.call_repo.delete(call_id)
 
-    async def move_batch(self, moves: List[Tuple[str, str, str]], branch_name: Optional[str] = None):
-        return await self.repos.call_repo.move_batch(moves, self.project.db_name, branch_name=branch_name)
+    async def move_batch(self, moves: List[Tuple[str, str, str]]):
+        return await self.repos.call_repo.move_batch(moves)
 
     async def batch_delete(self, call_ids: List[str]):
-        return await self.repos.call_repo.batch_delete_calls(call_ids, self.project.db_name)
+        return await self.repos.call_repo.batch_delete_calls(call_ids)
 
-    async def add_call(self, parent_call_id: str, call_id: str, branch_name: Optional[str] = None):
+    async def add_call(self, parent_call_id: str, call_id: str):
         return await self.repos.call_repo.move_item(
             parent_call_id,
             call_id,
             "call",
-            self.project.db_name,
-            branch_name=branch_name
         )
 
     async def get_children(self, call_id: str, child_type: list[Literal["call", "call_group"]] = []):
-        return await self.repos.call_repo.get_children(call_id, child_type, self.project.db_name)
+        return await self.repos.call_repo.get_children(call_id, child_type)
 
     async def get_direct_call_children(self, call_site_id: str, child_type: str):
         """
@@ -72,7 +69,7 @@ class CallService():
         ignoring groups and deeper descendants.
         """
         children = await self.repos.call_repo.get_direct_children(
-            call_site_id, child_type, self.project.db_name
+            call_site_id, child_type
         )
 
         return children
@@ -107,7 +104,7 @@ class CallService():
         }
 
     async def flush_batch(self, inserts: List[CallNode], deletes: List[str], moves: List[Tuple[str, str, str]]):
-        return await self.repos.call_repo._flush_batch_combined(inserts, deletes, moves, self.project.db_name)
+        return await self.repos.call_repo._flush_batch_combined(inserts, deletes, moves)
 
     async def get_call_with_parent_and_target(self, parent_id: str, target_id: str):
         # Note: repository expects (target_id, parent_id)
@@ -117,4 +114,4 @@ class CallService():
         )
 
     async def get_call_parent_chain(self, call_id: str):
-        return await self.repos.call_repo.get_call_chain(call_id, self.project.db_name)
+        return await self.repos.call_repo.get_call_chain(call_id)

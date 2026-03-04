@@ -2,16 +2,17 @@ import aiofiles
 
 from datetime import datetime, timezone
 from typing import Literal, Optional
-from app.core.repository import Repositories
-from app.core.model.nodes import FunctionNode, ProjectNode
+from app.core.model.nodes import FunctionNode
 from app.core.model.properties import CodePosition
 from app.core.utils.code_utils import build_abs_file_path, extract_code_from_file
 
+from app.db.context import ProjectUoW
+
 
 class FunctionService():
-    def __init__(self, repos: Repositories, project: ProjectNode):
-        self.repos = repos
-        self.project = project
+    def __init__(self, uow: ProjectUoW):
+        self.uow = uow
+        self.repos = self.uow.get_project_repos()
 
     async def create(self, id: str, name: str, qname: str, description: str, position: CodePosition):
         function = FunctionNode(
@@ -24,16 +25,16 @@ class FunctionService():
             updated_at=datetime.now(timezone.utc),
         )
 
-        return await self.repos.function_repo.create(function, self.project.db_name)
+        return await self.repos.function_repo.create(function)
 
     async def get(self, function_id: str):
-        return await self.repos.function_repo.get_by_id(function_id, self.project.db_name)
+        return await self.repos.function_repo.get_by_id(function_id)
 
     async def update(self, function: FunctionNode):
-        return await self.repos.function_repo.update(function, self.project.db_name)
+        return await self.repos.function_repo.update(function)
 
     async def delete(self, function_key: str):
-        return await self.repos.function_repo.delete(function_key, self.project.db_name)
+        return await self.repos.function_repo.delete(function_key)
 
     async def add_child(
         self,
@@ -42,7 +43,7 @@ class FunctionService():
         item_type: Literal["function", "class", "call", "code_element_group", "call_group"],
     ):
         return await self.repos.function_repo.move_item(
-            parent_function_id, item_id, item_type, self.project.db_name
+            parent_function_id, item_id, item_type
         )
 
     async def add_function(self, parent_function_id: str, function_id: str):
@@ -61,14 +62,14 @@ class FunctionService():
         item_type: Literal["function", "class", "call", "code_element_group", "call_group"],
     ):
         return await self.repos.function_repo.move_item(
-            new_parent_id, item_id, item_type, self.project.db_name
+            new_parent_id, item_id, item_type
         )
 
     async def get_children(
         self, function_id: str, child_type: Optional[list[str]] = None
     ):
         return await self.repos.function_repo.get_children(
-            function_id, child_type or [], self.project.db_name
+            function_id, child_type or []
         )
 
     async def get_code(self, function_id: str):
@@ -78,13 +79,13 @@ class FunctionService():
             return None
 
         parent_file = await self.repos.file_repo.get_parent_file(
-            function_id, self.project.db_name
+            function_id
         )
 
         if not parent_file:
             return None
 
-        abs_path = build_abs_file_path(self.project.path, parent_file.path)
+        abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
         code = await extract_code_from_file(abs_path, function.code_position)
 
         result = {
@@ -105,12 +106,12 @@ class FunctionService():
             return {"success": False, "error": "Function not found"}
 
         parent_file = await self.repos.file_repo.get_parent_file(
-            function_id, self.project.db_name
+            function_id
         )
         if not parent_file:
             return {"success": False, "error": "Enclosing file not found"}
 
-        abs_path = build_abs_file_path(self.project.path, parent_file.path)
+        abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
         position = function.code_position
 
         try:
@@ -123,7 +124,8 @@ class FunctionService():
             start_col = max(0, position.col_offset)
             end_col = position.end_col_offset
 
-            prefix = lines[start_line][:start_col] if 0 <= start_line < len(lines) else ""
+            prefix = lines[start_line][:start_col] if 0 <= start_line < len(
+                lines) else ""
             new_lines = [
                 (prefix + l if i > 0 else (prefix + l))
                 for i, l in enumerate(code_block.splitlines(True))

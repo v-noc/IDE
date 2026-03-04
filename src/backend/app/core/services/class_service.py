@@ -3,17 +3,16 @@ import aiofiles
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from app.core.repository import Repositories
 from app.core.model.nodes import ClassNode
 from app.core.model.properties import CodePosition
-from app.core.model.nodes import ProjectNode
 from app.core.utils.code_utils import build_abs_file_path, extract_code_from_file
+from app.db.context import ProjectUoW
 
 
 class ClassService():
-    def __init__(self, repos: Repositories, project: ProjectNode):
-        self.repos = repos
-        self.project = project
+    def __init__(self, uow: ProjectUoW):
+        self.uow = uow
+        self.repos = self.uow.get_project_repos()
 
     async def create(
         self,
@@ -23,7 +22,6 @@ class ClassService():
         description: str,
         position: CodePosition,
         base_classes: Optional[set] = None,
-        branch_name: Optional[str] = None,
     ):
         class_node = ClassNode(
             id=id,
@@ -36,22 +34,16 @@ class ClassService():
             updated_at=datetime.now(timezone.utc),
         )
 
-        return await self.repos.class_repo.create(class_node, self.project.db_name, branch_name=branch_name)
+        return await self.repos.class_repo.create(class_node)
 
-    async def get(self, class_id: str, branch_name: Optional[str] = None):
-        return await self.repos.class_repo.get_by_id(
-            class_id, self.project.db_name, branch_name=branch_name
-        )
+    async def get(self, class_id: str):
+        return await self.repos.class_repo.get_by_id(class_id)
 
-    async def update(self, class_node: ClassNode, branch_name: Optional[str] = None):
-        return await self.repos.class_repo.update(
-            class_node, self.project.db_name, branch_name=branch_name
-        )
+    async def update(self, class_node: ClassNode):
+        return await self.repos.class_repo.update(class_node)
 
-    async def delete(self, class_id: str, branch_name: Optional[str] = None):
-        return await self.repos.class_repo.delete(
-            class_id, self.project.db_name, branch_name=branch_name
-        )
+    async def delete(self, class_id: str):
+        return await self.repos.class_repo.delete(class_id)
 
     async def add_child(
         self,
@@ -60,20 +52,19 @@ class ClassService():
         item_type: Literal[
             "function", "class", "call", "code_element_group", "call_group"
         ],
-        branch_name: Optional[str] = None,
     ):
         return await self.repos.class_repo.move_item(
-            parent_class_id, item_id, item_type, self.project.db_name, branch_name=branch_name
+            parent_class_id, item_id, item_type
         )
 
-    async def add_function(self, parent_class_id: str, function_id: str, branch_name: Optional[str] = None):
-        return await self.add_child(parent_class_id, function_id, "function", branch_name=branch_name)
+    async def add_function(self, parent_class_id: str, function_id: str):
+        return await self.add_child(parent_class_id, function_id, "function")
 
-    async def add_call(self, parent_class_id: str, call_id: str, branch_name: Optional[str] = None):
-        return await self.add_child(parent_class_id, call_id, "call", branch_name=branch_name)
+    async def add_call(self, parent_class_id: str, call_id: str):
+        return await self.add_child(parent_class_id, call_id, "call")
 
-    async def add_class(self, parent_class_id: str, class_id: str, branch_name: Optional[str] = None):
-        return await self.add_child(parent_class_id, class_id, "class", branch_name=branch_name)
+    async def add_class(self, parent_class_id: str, class_id: str):
+        return await self.add_child(parent_class_id, class_id, "class")
 
     async def move_item(
         self,
@@ -82,31 +73,30 @@ class ClassService():
         item_type: Literal[
             "function", "class", "call", "code_element_group", "call_group"
         ],
-        branch_name: Optional[str] = None,
     ):
         return await self.repos.class_repo.move_item(
-            new_parent_id, item_id, item_type, self.project.db_name, branch_name=branch_name
+            new_parent_id, item_id, item_type
         )
 
     async def get_children(
-        self, class_id: str, child_type: Optional[list[str]] = None, branch_name: Optional[str] = None
+        self, class_id: str, child_type: Optional[list[str]] = None
     ):
         return await self.repos.class_repo.get_children(
-            class_id, child_type or [], self.project.db_name, branch_name=branch_name
+            class_id, child_type or []
         )
 
-    async def get_code(self, class_id: str, branch_name: Optional[str] = None):
+    async def get_code(self, class_id: str):
         class_node = await self.get(class_id)
         if not class_node:
             return None
 
         parent_file = await self.repos.file_repo.get_parent_file(
-            class_id, self.project.db_name, branch_name=branch_name
+            class_id
         )
         if not parent_file:
             return None
 
-        abs_path = build_abs_file_path(self.project.path, parent_file.path)
+        abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
         code = await extract_code_from_file(abs_path, class_node.code_position)
 
         result = {
@@ -121,20 +111,20 @@ class ClassService():
         return result
 
     async def write_code(
-        self, class_id: str, code_block: str, branch_name: Optional[str] = None
+        self, class_id: str, code_block: str
     ) -> dict:
         """Write code for a class at its position. Returns {success: bool, error?: str}."""
-        class_node = await self.get(class_id, branch_name=branch_name)
+        class_node = await self.get(class_id)
         if not class_node:
             return {"success": False, "error": "Class not found"}
 
         parent_file = await self.repos.file_repo.get_parent_file(
-            class_id, self.project.db_name
+            class_id
         )
         if not parent_file:
             return {"success": False, "error": "Enclosing file not found"}
 
-        abs_path = build_abs_file_path(self.project.path, parent_file.path)
+        abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
         position = class_node.code_position
 
         try:
@@ -147,7 +137,8 @@ class ClassService():
             start_col = max(0, position.col_offset)
             end_col = position.end_col_offset
 
-            prefix = lines[start_line][:start_col] if 0 <= start_line < len(lines) else ""
+            prefix = lines[start_line][:start_col] if 0 <= start_line < len(
+                lines) else ""
             new_lines = [
                 (prefix + l if i > 0 else (prefix + l))
                 for i, l in enumerate(code_block.splitlines(True))

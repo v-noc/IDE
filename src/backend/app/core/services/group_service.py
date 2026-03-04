@@ -1,13 +1,11 @@
 import uuid
-from app.core.repository import Repositories
-
 from typing import List, Optional, Tuple
 
 from enum import Enum
 from app.core.repository.base_repo import BaseRepo
-from app.core.model.nodes import ProjectNode
 from app.core.model import StructureGroupNode, CodeElementGroupNode, CallGroupNode
 from app.core.model.schemas import StructureGroupSchema, CodeElementGroupSchema, CallGroupSchema
+from app.db.context import ProjectUoW
 
 
 class GroupType(Enum):
@@ -17,9 +15,9 @@ class GroupType(Enum):
 
 
 class GroupService():
-    def __init__(self, repos: Repositories, project: ProjectNode):
-        self.repos = repos
-        self.project = project
+    def __init__(self, uow: ProjectUoW):
+        self.uow = uow
+        self.repos = self.uow.get_project_repos()
 
     def current_repo(self, group_type: GroupType) -> BaseRepo:
         if group_type == GroupType.STRUCTURE:
@@ -51,19 +49,19 @@ class GroupService():
         else:
             raise ValueError(f"Invalid group type: {group_type}")
 
-    async def get_children(self, group_id: str, group_type: GroupType, branch_name: Optional[str] = None):
+    async def get_children(self, group_id: str, group_type: GroupType):
         repo = self.current_repo(group_type)
-        return await repo.get_children(group_id, self.project.db_name, branch_name=branch_name)
+        return await repo.get_children(group_id)
 
-    async def move_item(self, new_parent_id: Optional[str], item_id: str, item_type: str, group_type: GroupType, branch_name: Optional[str] = None):
+    async def move_item(self, new_parent_id: Optional[str], item_id: str, item_type: str, group_type: GroupType):
         repo = self.current_repo(group_type)
-        return await repo.move_item(new_parent_id, item_id, item_type, self.project.db_name, branch_name=branch_name)
+        return await repo.move_item(new_parent_id, item_id, item_type)
 
-    async def move_batch(self, moves: List[Tuple[str, str, str]], group_type: GroupType, branch_name: Optional[str] = None):
+    async def move_batch(self, moves: List[Tuple[str, str, str]], group_type: GroupType):
         repo = self.current_repo(group_type)
-        return await repo.move_batch(moves, self.project.db_name, branch_name=branch_name)
+        return await repo.move_batch(moves)
 
-    async def create(self, name: str, description: str, parent_id: Optional[str], children: List[Tuple[str, str]], group_type: GroupType,  branch_name: Optional[str] = None):
+    async def create(self, name: str, description: str, parent_id: Optional[str], children: List[Tuple[str, str]], group_type: GroupType):
         """Create group and move children in a single transaction. If creation fails, no items are moved."""
         repo = self.current_repo(group_type)
         node = self.current_node(group_type)
@@ -77,8 +75,6 @@ class GroupService():
         success = await repo.create_and_move_items(
             group,
             items=children,
-            project_db_name=self.project.db_name,
-            branch_name=branch_name,
             parent_id=parent_id,
         )
         if not success:
@@ -93,11 +89,10 @@ class GroupService():
         name: Optional[str] = None,
         description: Optional[str] = None,
         icon: Optional[str] = None,
-        branch_name: Optional[str] = None,
     ):
         repo = self.current_repo(group_type)
         node_class = self.current_node(group_type)
-        existing_raw = await repo.get_by_id(group_id, self.project.db_name, raw=True)
+        existing_raw = await repo.get_by_id(group_id, raw=True)
         if not existing_raw:
             return None
         node = node_class.from_raw_dict(existing_raw)
@@ -105,7 +100,7 @@ class GroupService():
             node.name = name
         if description is not None:
             node.description = description
-        return await repo.update(node, self.project.db_name, branch_name=branch_name)
+        return await repo.update(node)
 
     async def add_child_to_group(
         self,
@@ -113,9 +108,8 @@ class GroupService():
         child_id: str,
         item_type: str,
         group_type: GroupType,
-        branch_name: Optional[str] = None,
     ):
-        return await self.move_item(group_id, child_id, item_type, group_type, branch_name=branch_name)
+        return await self.move_item(group_id, child_id, item_type, group_type)
 
     async def remove_child_from_group(
         self,
@@ -124,10 +118,9 @@ class GroupService():
         item_type: str,
         new_parent_id: Optional[str],
         group_type: GroupType,
-        branch_name: Optional[str] = None,
     ):
-        return await self.move_item(new_parent_id, child_id, item_type, group_type, branch_name=branch_name)
+        return await self.move_item(new_parent_id, child_id, item_type, group_type)
 
-    async def delete(self, group_id: str, group_type: GroupType, branch_name: Optional[str] = None):
+    async def delete(self, group_id: str, group_type: GroupType):
         repo = self.current_repo(group_type)
-        return await repo.delete(group_id, project_db_name=self.project.db_name, branch_name=branch_name)
+        return await repo.delete(group_id)

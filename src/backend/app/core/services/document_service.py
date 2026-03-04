@@ -1,36 +1,34 @@
 import uuid
-from app.core.repository import Repositories
 from app.core.model.nodes import DocumentNode
-from app.core.model.nodes import ProjectNode
-from typing import List, Optional
+from typing import List
+
+from app.db.context import ProjectUoW
 
 
 class DocumentService:
-    def __init__(self, repos: Repositories, project: ProjectNode):
-        self.repos = repos
-        self.project = project
+    def __init__(self, uow: ProjectUoW):
+        self.uow = uow
 
-    async def get(self, document_id, is_root: bool = False, branch_name: Optional[str] = None):
+    async def get(self, document_id, is_root: bool = False):
         if is_root:
-            return await self.repos.document_repo.get_by_id(document_id, self.repos.client.db, branch_name=branch_name)
+            return await self.uow.get_meta_repos().document_repo.get_by_id(document_id)
         else:
-            return await self.repos.document_repo.get_by_id(document_id, self.project.db_name, branch_name=branch_name)
+            return await self.uow.get_project_repos().document_repo.get_by_id(document_id)
 
     async def get_nodes_by_parent_node(self, node_id: str) -> List[DocumentNode]:
         if node_id.startswith("ProjectSchema/"):
-            return await self.repos.document_repo.get_by_parent_node(node_id, self.repos.client.db)
+            return await self.uow.get_meta_repos().document_repo.get_by_parent_node(node_id)
         else:
-            return await self.repos.document_repo.get_by_parent_node(node_id, self.project.db_name)
+            return await self.uow.get_project_repos().document_repo.get_by_parent_node(node_id)
 
     async def create(self,
                      name: str,
                      description: str,
                      node_id: str,
-                     branch_name: Optional[str] = None,
                      ):
-        db_name = self.project.db_name
+        repos = self.uow.get_project_repos()
         if node_id.startswith("ProjectSchema/"):
-            db_name = self.repos.client.db
+            repos = self.uow.get_meta_repos()
 
         document = DocumentNode(
             id=f"DocumentSchema/{str(uuid.uuid4())}",
@@ -39,26 +37,23 @@ class DocumentService:
             data="",
         )
 
-        # node = await self.repos.nodes.get_by_key(node_id)
-        # if not node:
-        #     raise ValueError(f"Node {node_id} not found")
-
-        created = await self.repos.document_repo.create_nodes(document, db_name, singular_name="document", plural_name="documents", branch_name=branch_name)
+        created = await repos.document_repo.create_nodes(document, singular_name="document", plural_name="documents")
 
         if created:
             print("adding to parent node", document.id, node_id)
-            await self.repos.document_repo.add_to_parent_node(document.id, node_id, db_name, branch_name=branch_name)
+            await repos.document_repo.add_to_parent_node(document.id, node_id)
 
         return created
 
-    async def update(self, document: DocumentNode, is_root: bool = False, branch_name: Optional[str] = None):
-        db_name = self.project.db_name
+    async def update(self, document: DocumentNode, is_root: bool = False):
+        repos = self.uow.get_project_repos()
         if is_root:
-            db_name = self.repos.client.db
-        return await self.repos.document_repo.update(document, db_name, branch_name=branch_name)
+            repos = self.uow.get_meta_repos()
 
-    async def delete(self, document_id: str, is_root: bool = False, branch_name: Optional[str] = None):
-        db_name = self.project.db_name
+        return await repos.document_repo.update(document)
+
+    async def delete(self, document_id: str, is_root: bool = False):
+        repos = self.uow.get_project_repos()
         if is_root:
-            db_name = self.repos.client.db
-        return await self.repos.document_repo.delete(document_id, db_name, branch_name=branch_name)
+            repos = self.uow.get_meta_repos()
+        return await repos.document_repo.delete(document_id)
