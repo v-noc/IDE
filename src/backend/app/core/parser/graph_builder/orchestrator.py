@@ -22,6 +22,7 @@ from app.core.parser.graph_builder.performance import tracker
 from app.core.parser.graph_builder.progress import ProgressTracker
 from app.core.repository import Repositories
 from app.core.socket.manager import get_socket_manager
+from app.api.dependencies import ProjectUoW
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class GraphBuilderOrchestrator:
     def __init__(
         self,
         project_node: ProjectNode,
-        db: Optional[AsyncClient] = None,
+        uow: ProjectUoW,
         # scope_manager: Optional[ScopeManager] = None, # Removed
         ignore_file_name: str = ".gitignore",
         max_concurrent_files: int = 50,
@@ -50,17 +51,17 @@ class GraphBuilderOrchestrator:
         self.project_node = project_node
         self.project_path = project_node.path
         self.project_root = Path(self.project_path)
-        self.db = db
+        self.uow = uow
         self.max_concurrent_files = max_concurrent_files
         self.batch_size = batch_size
         self._file_semaphore = asyncio.Semaphore(max_concurrent_files)
 
         # Initialize Repositories (Required)
-        if not db:
+        if not self.uow:
             raise ValueError(
                 "Database connection is required for GraphBuilderOrchestrator")
 
-        self.repos = Repositories(db)
+        self.repos = self.uow.get_project_repos()
 
         # Initialize Jedi Adapter
         from app.core.parser.jedi_adapter.manager import JediProjectManager
@@ -112,12 +113,10 @@ class GraphBuilderOrchestrator:
 
         self.phase_processor.project_node = self.project_node
         project_id = self.project_node.id
-        print(f"project_id {project_id}")
 
         # Initialize progress tracker
         socket_manager = get_socket_manager()
         progress_tracker = ProgressTracker(project_id, socket_manager)
-        await self.db.set_db(self.project_node.db_name)
 
         try:
             # 1. Scan Disk
@@ -137,7 +136,7 @@ class GraphBuilderOrchestrator:
 
             # 2. Detect Changes
             change_set = await self.change_detector.detect_changes(
-                scan_result, self.project_node.db_name
+                scan_result
             )
             logger.info(f"Detected changes: {change_set}")
 
@@ -185,17 +184,11 @@ class GraphBuilderOrchestrator:
         Phase 1: Collection - Build scope hierarchy
         Phase 2: Analysis - Parse AST and build call chains
         """
-        folder_changes = []
 
-        # Reset per-run caches and perform ID-first structure synchronization
-        # (folders + file shells).
         self.collector.reset_session()
-        folder_result = await self.collector.sync_structure(
+        await self.collector.sync_structure(
             change_set, scan_result, batch_size=self.batch_size
         )
-
-        if folder_result:
-            folder_changes.extend(folder_result)
 
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")

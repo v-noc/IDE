@@ -30,7 +30,7 @@ class ASTProcessor:
         self,
         file_node: FileNode,
         nodes: List[BaseNode],
-        project_db_name: str,
+
         content: Optional[str] = None,
         progress_tracker=None,
     ) -> List[any]:
@@ -40,7 +40,7 @@ class ASTProcessor:
         """
 
         # 1. Fetch existing nodes from database
-        existing_map = await self._build_existing_map(file_node, project_db_name)
+        existing_map = await self._build_existing_map(file_node)
 
         # 2. Flatten AST & Prepare desired nodes
         desired_nodes_data = []
@@ -58,7 +58,7 @@ class ASTProcessor:
             desired_nodes_data, existing_map)
 
     async def _build_existing_map(
-        self, file_node: FileNode, project_db_name: str
+        self, file_node: FileNode
     ) -> Dict[str, Dict[str, Any]]:
         """
         Build a map of existing nodes from the containment tree.
@@ -71,7 +71,6 @@ class ASTProcessor:
                 CodeElementGroupSchema.__name__,
                 CallGroupSchema.__name__,
             ],
-            project_db_name=project_db_name,
         )
 
         existing_map = {}

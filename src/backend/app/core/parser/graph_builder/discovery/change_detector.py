@@ -353,7 +353,7 @@ class ChangeDetector:
             moved,
         )
 
-    async def detect_changes(self, scan_result: ScanResult, project_db_name: str) -> ChangeSet:
+    async def detect_changes(self, scan_result: ScanResult) -> ChangeSet:
         """
         Compare current filesystem state with DB state using stable IDs.
         """
@@ -362,8 +362,8 @@ class ChangeDetector:
 
         # 1) Fetch DB state in parallel
         db_file_snapshots, db_folder_snapshots = await asyncio.gather(
-            self.repos.file_repo.get_all_files(project_db_name),
-            self.repos.folder_repo.get_all_folders(project_db_name),
+            self.repos.file_repo.get_all_files(),
+            self.repos.folder_repo.get_all_folders(),
         )
 
         # 2) Extract stable IDs for all currently scanned paths.

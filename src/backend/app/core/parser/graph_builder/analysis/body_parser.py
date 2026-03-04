@@ -121,7 +121,6 @@ class BodyParser:
             exclude_types=[CallSchema.__name__,
                            CodeElementGroupSchema.__name__,
                            CallGroupSchema.__name__,],
-            project_db_name=self.project_node.db_name
         )
 
         node_map: Dict[str, any] = {file_node.qname: file_node}

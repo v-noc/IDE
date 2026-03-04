@@ -88,7 +88,7 @@ class PhaseProcessor:
 
                     result = await asyncio.wait_for(
                         self.collector.process_file(
-                            file_node, checksum, project_db_name=self.project_node.db_name, progress_tracker=progress_tracker),
+                            file_node, checksum, progress_tracker=progress_tracker),
                         timeout=self._file_timeout,
                     )
 
@@ -115,7 +115,7 @@ class PhaseProcessor:
                         await progress_tracker.emit()
                     return None, None
 
-        file_nodes = await self.repos.file_repo.get_by_ids(files_to_process, project_db_name=self.project_node.db_name)
+        file_nodes = await self.repos.file_repo.get_by_ids(files_to_process)
         async with asyncio.TaskGroup() as tg:
             tasks = [
                 tg.create_task(_process_single_file(node))
@@ -136,9 +136,9 @@ class PhaseProcessor:
             [],
             structure_batch_plan.delete,
             structure_batch_plan.move,
-            project_db_name=self.project_node.db_name,
+
         )
-        await self.repos.function_repo.update_batch(structure_batch_plan.update, project_db_name=self.project_node.db_name)
+        await self.repos.function_repo.update_batch(structure_batch_plan.update)
 
         return results
 

@@ -79,13 +79,13 @@ class Collector:
                 [],
                 folder_plan.delete,
                 folder_plan.move,
-                project_db_name=self.project_node.db_name,
+
             )
 
-            await self.repos.folder_repo.update_batch(folder_plan.update, project_db_name=self.project_node.db_name)
+            await self.repos.folder_repo.update_batch(folder_plan.update)
 
     async def process_file(
-        self, file_node: FileNode, checksum: str, project_db_name: str, progress_tracker=None
+        self, file_node: FileNode, checksum: str, progress_tracker=None
     ) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 2 collection (Content/AST).
@@ -135,5 +135,5 @@ class Collector:
             # 4. Sync Content
             with tracker.timer("collector.process_file.sync_content"):
                 return await self.ast_processor.sync_content(
-                    file_node, ast_nodes, project_db_name=project_db_name,   content=processed_content, progress_tracker=progress_tracker
+                    file_node, ast_nodes,   content=processed_content, progress_tracker=progress_tracker
                 )
