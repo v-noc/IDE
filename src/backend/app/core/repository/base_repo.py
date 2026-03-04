@@ -233,8 +233,10 @@ class BaseRepo(Generic[TNode, TSchema]):
                 query_step.read_document("v:child", "v:child_doc")
             )
         )
+
         try:
             result = await self.client.query(query)
+
         except Exception as exc:
             print(exc)
             return []

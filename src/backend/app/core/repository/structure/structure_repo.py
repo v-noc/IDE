@@ -1,12 +1,27 @@
 from typing import Any, List, Tuple, Union
 from app.core.model.nodes import FolderNode, FileNode, StructureGroupNode
-from app.core.model.schemas import FolderSchema, FileSchema, StructureGroupSchema
+from app.core.model.schemas import (
+    FolderSchema,
+    FileSchema,
+    StructureGroupSchema,
+    FunctionSchema,
+    ClassSchema,
+    CallSchema,
+    CodeElementGroupSchema,
+    CallGroupSchema)
 from app.core.repository.base_repo import BaseRepo
 from app.db.async_terminus_client import AsyncClient
-from app.core.repository.utils import CODE_SET_FIELDS_TO_PRESERVE, CODE_CHILD_TYPE_TO_FIELD
+
 from app.core.repository.structure.folder_repo import STRUCTURE_CHILD_TYPE_TO_FIELD
 from terminusdb_client.woqlquery.woql_query import Doc, WOQLQuery as WQ
-
+from app.core.repository.utils import (
+    CODE_CHILD_TYPE_TO_FIELD,
+    CODE_ELEMENT_FIELDS,
+    CODE_SET_FIELDS_TO_PRESERVE,
+    STRUCTURE_FIELDS,
+    build_path_field_name,
+    parse_structure_child,
+)
 STRUCTURE_SET_FIELDS_TO_PRESERVE = [
     "folder_children",
     "file_children",
@@ -21,6 +36,15 @@ StructureSchema = Union[FolderSchema, FileSchema, StructureGroupSchema]
 class StructureRepo(BaseRepo[StructureNode, StructureSchema]):
     def __init__(self, client: AsyncClient):
         super().__init__(client, StructureNode, StructureSchema)
+
+    @staticmethod
+    def _merge_update_fields(existing_raw: dict, _node: StructureNode, schema: StructureSchema):
+        if isinstance(_node, FolderNode):
+            return StructureRepo._merge_folder_update_fields(existing_raw, _node, schema)
+        elif isinstance(_node, FileNode):
+            return StructureRepo._merge_file_update_fields(existing_raw, _node, schema)
+        else:
+            raise ValueError(f"Invalid node type: {type(_node)}")
 
     @staticmethod
     def _merge_folder_update_fields(existing_raw: dict, _node: FolderNode, schema: FolderSchema):
@@ -52,7 +76,7 @@ class StructureRepo(BaseRepo[StructureNode, StructureSchema]):
         else:
             raise ValueError(f"Invalid node type: {type(node)}")
 
-    async def create(self, structure: StructureNode):
+    async def create(self, structure: StructureNode | List[StructureNode]):
         return await self.create_nodes(
             structure,
             singular_name="structure",
@@ -74,20 +98,17 @@ class StructureRepo(BaseRepo[StructureNode, StructureSchema]):
         )
 
     async def move_item(self, new_parent_id: str, item_id: str, child_type: str):
+        STRUCTURE_CHILD_TYPE_TO_FIELD.update(CODE_CHILD_TYPE_TO_FIELD)
         return await self.move_item_by_type(
             new_parent_id,
             item_id,
             child_type,
-            child_type_to_field={
-                *STRUCTURE_CHILD_TYPE_TO_FIELD, *CODE_CHILD_TYPE_TO_FIELD},
+            child_type_to_field=STRUCTURE_CHILD_TYPE_TO_FIELD,
         )
 
     async def move_batch(self, moves: List[Tuple[str, str, str]]):
-        return await self.move_batch_by_type(
-            moves,
-            child_type_to_field={
-                *STRUCTURE_CHILD_TYPE_TO_FIELD, *CODE_CHILD_TYPE_TO_FIELD},
-        )
+        STRUCTURE_CHILD_TYPE_TO_FIELD.update(CODE_CHILD_TYPE_TO_FIELD)
+        return await self.move_batch_by_type(moves, STRUCTURE_CHILD_TYPE_TO_FIELD)
 
     async def update_batch(self, structures: List[StructureNode]):
         if not structures:
@@ -115,6 +136,51 @@ class StructureRepo(BaseRepo[StructureNode, StructureSchema]):
         if not schemas:
             return True
         return await self.client.update_document(schemas, commit_msg=f"Updating {len(schemas)} structures")
+
+    async def get_children(self, parent_id: str,  exclude_types: list[str],):
+
+        field_name = build_path_field_name(
+            [], STRUCTURE_FIELDS+CODE_ELEMENT_FIELDS)
+        field_to_schema_type = {
+            FolderSchema.__name__,
+            FileSchema.__name__,
+            StructureGroupSchema.__name__,
+            FunctionSchema.__name__,
+            ClassSchema.__name__,
+            CallSchema.__name__,
+            CodeElementGroupSchema.__name__,
+            CallGroupSchema.__name__,
+        }
+        filtered_types = set(field_to_schema_type) - set(exclude_types)
+
+        return await self.get_children_by_path(
+            parent_id,
+            field_name,
+            parse_structure_child,
+            filtered_types=list(filtered_types),
+            allowed_path_fields=STRUCTURE_FIELDS+CODE_ELEMENT_FIELDS,
+        )
+
+    async def get_parent_file(self, item_id: str):
+        field_name = build_path_field_name(
+            [], CODE_ELEMENT_FIELDS, is_inverse=True)
+
+        query = WQ().select("v:parent_doc").woql_and(
+            WQ().eq("v:item", item_id),
+            WQ().path("v:item", f"{field_name}*", "v:parent"),
+            WQ().isa("v:parent", f"@schema:{FileSchema.__name__}"),
+            WQ().read_document("v:parent", "v:parent_doc"),
+        )
+
+        try:
+            result = await self.client.query(query)
+        except Exception as exc:
+            print(exc)
+            return None
+
+        if not result["bindings"]:
+            return None
+        return FileNode.from_raw_dict(result["bindings"][0]["parent_doc"])
 
     async def flush_batch(self, insert: List[FolderNode | FileNode], update: List[FolderNode | FileNode], delete: List[str], move: List[Tuple[str, str, str]]):
         if not insert and not update and not delete and not move:

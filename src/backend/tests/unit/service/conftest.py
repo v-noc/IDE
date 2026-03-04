@@ -102,11 +102,7 @@ async def create_folder(structure_service):
         path="test_folder"
     )
     folder = await structure_service.create(
-        "folder",
-        "Test Folder",
-        "test_project.test_folder",
-        "This is a test folder",
-        "test_folder"
+        folder_node
     )
     yield folder
     await structure_service.delete(folder.id)
