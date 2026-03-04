@@ -115,7 +115,7 @@ class PhaseProcessor:
                         await progress_tracker.emit()
                     return None, None
 
-        file_nodes = await self.repos.file_repo.get_by_ids(files_to_process)
+        file_nodes = await self.repos.structure_repo.get_by_ids(files_to_process)
         async with asyncio.TaskGroup() as tg:
             tasks = [
                 tg.create_task(_process_single_file(node))

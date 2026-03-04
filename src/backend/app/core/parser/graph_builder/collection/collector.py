@@ -74,7 +74,7 @@ class Collector:
 
             folder_plan.extend(file_plan)
 
-            await self.repos.folder_repo.flush_batch(
+            await self.repos.structure_repo.flush_batch(
                 folder_plan.insert,
                 [],
                 folder_plan.delete,
@@ -82,7 +82,7 @@ class Collector:
 
             )
 
-            await self.repos.folder_repo.update_batch(folder_plan.update)
+            await self.repos.structure_repo.update_batch(folder_plan.update)
 
     async def process_file(
         self, file_node: FileNode, checksum: str, progress_tracker=None

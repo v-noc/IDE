@@ -3,7 +3,6 @@ from fastapi import Depends, Header, Query, HTTPException
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
 
-from app.core.services.file_service import FileService
 
 from app.core.services.call_service import CallService
 from app.core.services.log_service import LogService
@@ -62,12 +61,6 @@ def get_group_service(
     uow: ProjectUoW = Depends(get_project_uow)
 ) -> GroupService:
     return GroupService(uow)
-
-
-def get_file_service(
-    uow: ProjectUoW = Depends(get_project_uow)
-) -> FileService:
-    return FileService(uow)
 
 
 def get_call_service(

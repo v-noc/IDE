@@ -64,7 +64,7 @@ class ASTProcessor:
         Build a map of existing nodes from the containment tree.
         Returns a dict mapping node_id to {"node": Node, "parent_id": str}
         """
-        existing_tree = await self.repos.file_repo.get_children(
+        existing_tree = await self.repos.structure_repo.get_children(
             file_node.id,
             exclude_types=[
                 CallSchema.__name__,

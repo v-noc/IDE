@@ -116,7 +116,7 @@ class BodyParser:
             file_path = self.project_path / file_path
 
         # 1. Prefetch DB nodes (Optimization)
-        existing_tree = await self.repos.file_repo.get_children(
+        existing_tree = await self.repos.structure_repo.get_children(
             file_node.id,
             exclude_types=[CallSchema.__name__,
                            CodeElementGroupSchema.__name__,

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
+from app.core.model.schemas import FileSchema, FolderSchema
+
 from .file_tracker import FileTracker
 from .folder_tracker import (
     FolderTracker,
@@ -362,8 +364,8 @@ class ChangeDetector:
 
         # 1) Fetch DB state in parallel
         db_file_snapshots, db_folder_snapshots = await asyncio.gather(
-            self.repos.file_repo.get_all_files(),
-            self.repos.folder_repo.get_all_folders(),
+            self.repos.structure_repo.get_all(doc_type=FileSchema.__name__),
+            self.repos.structure_repo.get_all(doc_type=FolderSchema.__name__),
         )
 
         # 2) Extract stable IDs for all currently scanned paths.

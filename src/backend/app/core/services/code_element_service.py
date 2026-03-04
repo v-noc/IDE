@@ -38,7 +38,7 @@ class CodeElementService():
         if not code_element:
             return None
 
-        parent_file = await self.repos.file_repo.get_parent_file(
+        parent_file = await self.repos.structure_repo.get_parent_file(
             code_element_id
         )
 
@@ -65,7 +65,7 @@ class CodeElementService():
         if not code_element:
             return {"success": False, "error": "Code element not found"}
 
-        parent_file = await self.repos.file_repo.get_parent_file(
+        parent_file = await self.repos.structure_repo.get_parent_file(
             code_element_id
         )
         if not parent_file:
