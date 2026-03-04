@@ -70,7 +70,7 @@ class BodyParser:
             self._insert_buffer.clear()
             self._delete_buffer.clear()
             self._move_buffer.clear()
-        await self.call_chain_builder.call_service.flush_batch(inserts, deletes, moves)
+        await self.repos.call_repo._flush_batch_combined(inserts, deletes, moves)
 
     async def _add_batch(
         self,
@@ -98,7 +98,7 @@ class BodyParser:
             else:
                 to_insert = to_delete = to_move = []
         if to_insert or to_delete or to_move:
-            await self.call_chain_builder.call_service.flush_batch(
+            await self.repos.call_repo._flush_batch_combined(
                 to_insert, to_delete, to_move
             )
 
@@ -121,6 +121,7 @@ class BodyParser:
             exclude_types=[CallSchema.__name__,
                            CodeElementGroupSchema.__name__,
                            CallGroupSchema.__name__,],
+
         )
 
         node_map: Dict[str, any] = {file_node.qname: file_node}

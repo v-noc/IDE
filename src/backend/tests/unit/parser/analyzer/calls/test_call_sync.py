@@ -42,31 +42,33 @@ def _write_file(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-async def _build_and_get_tree(project_node, create_repos, db):
+async def _build_and_get_tree(project_uow):
+
     orchestrator = GraphBuilderOrchestrator(
-        project_node,
-        db=db,
+        project_uow.project,
+        uow=project_uow,
+
     )
     await orchestrator.resync()
 
-    project_service = ProjectService(create_repos)
+    project_service = ProjectService(project_uow)
 
-    children = await project_service.get_children(project_node.db_name)
+    children = await project_service.get_children()
 
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
-async def _resync_and_get_tree(project_node, repos, db):
+async def _resync_and_get_tree(project_uow):
     orchestrator = GraphBuilderOrchestrator(
-        project_node,
-        db=db,
+        project_uow.project,
+        uow=project_uow,
     )
     await orchestrator.resync()
 
-    project_service = ProjectService(repos)
+    project_service = ProjectService(project_uow)
 
-    children = await project_service.get_children(project_node.db_name)
+    children = await project_service.get_children()
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
@@ -131,24 +133,23 @@ def _has_nested_call_with_name(node: AnyTreeNode, name_pred: str) -> bool:
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, terminusdb_client):
+async def setup_project(tmp_path, empty_project_uow, terminusdb_client):
     project_path = tmp_path / "simple_calls"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
-    create_repos = Repositories(terminusdb_client)
-    project_service = ProjectService(create_repos)
+    project_service = ProjectService(empty_project_uow)
     project_node = await project_service.create(
         PROJECT_NAME, "Test Project", str(project_path)
     )
-
-    yield project_node, create_repos, terminusdb_client, project_path
+    empty_project_uow.project = project_node
+    yield project_node, empty_project_uow, terminusdb_client, project_path
     await project_service.delete(project_node.id)
     shutil.rmtree(project_path)
 
 
 @pytest.mark.asyncio
 async def test_call_sync_add_and_remove(setup_project):
-    project_node, create_repos, terminusdb_client, project_path = setup_project
+    project_node, project_uow, terminusdb_client, project_path = setup_project
     target_file = project_path / "main.py"
 
     # Prepare initial file content (ensures idempotency for local runs)
@@ -167,7 +168,7 @@ async def test_call_sync_add_and_remove(setup_project):
     _write_file(target_file, initial_code)
 
     # 1) Build once
-    tree = await _build_and_get_tree(project_node, create_repos, terminusdb_client)
+    tree = await _build_and_get_tree(project_uow)
 
     file_node = _get_file_node(tree)
 
@@ -180,7 +181,7 @@ async def test_call_sync_add_and_remove(setup_project):
     try:
         _append_reader_call(target_file)
         tree_after_add = await _resync_and_get_tree(
-            project_node, create_repos, terminusdb_client
+            project_uow
         )
         file_after_add = _get_file_node(tree_after_add)
 
@@ -253,7 +254,6 @@ async def test_call_sync_add_and_remove(setup_project):
 
         # Record the created nested call node id/key so we can assert it gets
 
-        repos = Repositories(terminusdb_client)
         file_reader_call_qname = filereader_read_call_qname
 
         # file_reader_call_node = await repos.call_repo.find_one(
@@ -270,7 +270,7 @@ async def test_call_sync_add_and_remove(setup_project):
         _write_file(target_file, updated)
 
         tree_after_remove = await _resync_and_get_tree(
-            project_node, create_repos, terminusdb_client
+            project_uow
         )
         file_after_remove = _get_file_node(tree_after_remove)
 
@@ -338,4 +338,4 @@ async def test_call_sync_add_and_remove(setup_project):
     finally:
         # Restore original file content and resync
         _write_file(target_file, original)
-        await _resync_and_get_tree(project_node, create_repos, terminusdb_client)
+        await _resync_and_get_tree(project_uow)

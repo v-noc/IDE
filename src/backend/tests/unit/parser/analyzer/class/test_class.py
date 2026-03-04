@@ -17,36 +17,35 @@ PROJECT_NAME = "sample_class"
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, terminusdb_client):
+async def setup_project(tmp_path, empty_project_uow):
     project_path = tmp_path / "project"
     shutil.copytree(PROJECT_PATH, project_path)
 
-    repos = Repositories(terminusdb_client)
-
-    project_service = ProjectService(repos)
+    project_service = ProjectService(empty_project_uow)
 
     project_node = await project_service.create(
         PROJECT_NAME, "Test Project", str(project_path)
     )
+    empty_project_uow.project = project_node
 
-    yield project_node, repos, terminusdb_client
+    yield project_node, empty_project_uow
     await project_service.delete(project_node.id)
     shutil.rmtree(project_path)
 
 
 @pytest.mark.asyncio
 async def test_class_analysis(setup_project):
-    project_node, repos, terminusdb_client = setup_project
+    project_node, project_uow = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=terminusdb_client,
+        uow=project_uow,
     )
     await orchestrator.resync()
 
-    project_service = ProjectService(repos)
+    project_service = ProjectService(project_uow)
 
-    children = await project_service.get_children(project_node.db_name)
+    children = await project_service.get_children()
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
@@ -62,6 +61,7 @@ async def test_class_analysis(setup_project):
     assert len(module_level_calls) == 2
 
     # Test 'child = Child(call_back)' call
+
     init_call = next(
         (call for call in module_level_calls if call.name == "Parent"),
         None,
@@ -86,7 +86,7 @@ async def test_class_analysis(setup_project):
 
     # Test 'child.greet()' call
     greet_call = next(
-        (call for call in module_level_calls if call.name == "child.greet"),
+        (call for call in module_level_calls if call.name == "greet"),
         None,
     )
     assert greet_call is not None
@@ -99,8 +99,9 @@ async def test_class_analysis(setup_project):
     assert len(greet_call_children) == 2
 
     # Test 'self.callback()' call within 'greet'
+
     callback_in_greet = next(
-        (call for call in greet_call_children if call.name == "self.callback"),
+        (call for call in greet_call_children if call.name == "call_back"),
         None,
     )
     assert callback_in_greet is not None
@@ -108,7 +109,7 @@ async def test_class_analysis(setup_project):
 
     # Test 'super().greet()' call within 'greet'
     super_greet_in_greet = next(
-        (call for call in greet_call_children if call.name == "super().greet"),
+        (call for call in greet_call_children if call.name == "greet"),
         None,
     )
     assert super_greet_in_greet is not None

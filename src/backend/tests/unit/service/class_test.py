@@ -2,6 +2,8 @@ from app.core.services.class_service import ClassService
 from app.core.model.properties import CodePosition
 import pytest
 
+from app.core.services.code_element_service import CodeElementService
+
 
 @pytest.mark.asyncio
 async def test_create_class(project_uow):
@@ -37,7 +39,7 @@ async def test_get_class(project_uow, create_class):
 
 @pytest.mark.asyncio
 async def test_update_class(project_uow, create_class):
-    class_service = ClassService(project_uow)
+    class_service = CodeElementService(project_uow)
     create_class.name = "Updated Class"
     create_class.description = "This is an updated class"
     new_class = await class_service.update(create_class)
@@ -48,7 +50,7 @@ async def test_update_class(project_uow, create_class):
 
 @pytest.mark.asyncio
 async def test_delete_class(project_uow, create_class):
-    class_service = ClassService(project_uow)
+    class_service = CodeElementService(project_uow)
     # delete() expects a key, not a full id ("nodes/<key>")
     await class_service.delete(create_class.id)
     new_class = await class_service.get(create_class.id)
@@ -57,8 +59,8 @@ async def test_delete_class(project_uow, create_class):
 
 @pytest.mark.asyncio
 async def test_add_function_to_class(project_uow, create_class, create_function):
-    class_service = ClassService(project_uow)
-    await class_service.add_function(create_class.id, create_function.id)
+    class_service = CodeElementService(project_uow)
+    await class_service.add_child(create_class.id, create_function.id, "function")
     functions = await class_service.get_children(create_class.id)
     assert len(functions) == 1
 
@@ -67,8 +69,8 @@ async def test_add_function_to_class(project_uow, create_class, create_function)
 
 @pytest.mark.asyncio
 async def test_add_class_to_class(project_uow, create_class, create_class2):
-    class_service = ClassService(project_uow)
-    await class_service.add_class(create_class.id, create_class2.id)
+    class_service = CodeElementService(project_uow)
+    await class_service.add_child(create_class.id, create_class2.id, "class")
     classes = await class_service.get_children(create_class.id)
     assert len(classes) == 1
 
@@ -77,8 +79,8 @@ async def test_add_class_to_class(project_uow, create_class, create_class2):
 
 @pytest.mark.asyncio
 async def test_add_call_to_class(project_uow, create_class, create_call):
-    class_service = ClassService(project_uow)
-    await class_service.add_call(create_class.id, create_call.id)
+    class_service = CodeElementService(project_uow)
+    await class_service.add_child(create_class.id, create_call.id, "call")
     calls = await class_service.get_children(create_class.id)
     assert len(calls) == 1
 

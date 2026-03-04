@@ -6,11 +6,9 @@ import pytest
 import pytest_asyncio
 
 from app.core.builder.tree_builder import TreeBuilder
-from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.repository import Repositories
 from app.core.schemas.tree import AnyTreeNode
-from app.core.services.function_service import FunctionService
+from app.core.services.code_element_service import CodeElementService
 from app.core.services.project_service import ProjectService
 
 FIXTURE_PROJECT = Path(__file__).parent / "simple_function"
@@ -18,19 +16,19 @@ PROJECT_NAME = "simple_function"
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, terminusdb_client):
+async def setup_project(tmp_path, empty_project_uow):
     project_path = tmp_path / "project"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
-    repos = Repositories(terminusdb_client)
-
-    project_service = ProjectService(repos)
+    project_service = ProjectService(empty_project_uow)
 
     project_node = await project_service.create(
         PROJECT_NAME, "Test Project", str(project_path)
     )
 
-    yield project_node, repos, terminusdb_client
+    empty_project_uow.project = project_node
+
+    yield project_node, empty_project_uow
     await project_service.delete(project_node.id)
     shutil.rmtree(project_path)
 
@@ -55,17 +53,17 @@ def find_node_by_qname(nodes: List[AnyTreeNode], qname: str):
 
 @pytest.mark.asyncio
 async def test_function_get_code(setup_project):
-    project_node, repos, terminus_client = setup_project
+    project_node, project_uow = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=terminus_client,
+        uow=project_uow,
     )
     await orchestrator.resync()
 
-    proj_service = ProjectService(repos)
+    proj_service = ProjectService(project_uow)
 
-    children = await proj_service.get_children(project_node.db_name)
+    children = await proj_service.get_children()
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -77,7 +75,7 @@ async def test_function_get_code(setup_project):
     factory_func = find_node_by_qname(file_node.children, factory_qname)
     assert factory_func is not None, "No 'factory' function node found"
 
-    func_service = FunctionService(repos, project_node)
+    func_service = CodeElementService(project_uow)
     snippet = await func_service.get_code(factory_func.id)
 
     assert snippet is not None, "get_code returned None"
@@ -96,18 +94,18 @@ async def test_function_get_code(setup_project):
 
 @pytest.mark.asyncio
 async def test_function_collector(setup_project):
-    project_node, repos, terminus_client = setup_project
+    project_node, project_uow = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=terminus_client,
+        uow=project_uow,
     )
 
     await orchestrator.resync()
 
-    project_service = ProjectService(repos)
+    project_service = ProjectService(project_uow)
 
-    children = await project_service.get_children(project_node.db_name)
+    children = await project_service.get_children()
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()

@@ -274,7 +274,9 @@ class BaseRepo(Generic[TNode, TSchema]):
         combined = WQ().woql_and(*query)
 
         try:
-            await self.client.query(combined, commit_msg=f"Moving item {item_id} to {new_parent_id}")
+            result = await self.client.query(combined, commit_msg=f"Moving item {item_id} to {new_parent_id}")
+            print(result)
+            return result
         except Exception as exc:
             print(exc)
             return False

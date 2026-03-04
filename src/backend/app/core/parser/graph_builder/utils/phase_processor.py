@@ -131,14 +131,14 @@ class PhaseProcessor:
             if file_node:
                 results.append(file_node)
 
-        await self.repos.file_repo.flush_batch(
+        await self.repos.code_element_repo.flush_batch(
             structure_batch_plan.insert,
             [],
             structure_batch_plan.delete,
             structure_batch_plan.move,
 
         )
-        await self.repos.function_repo.update_batch(structure_batch_plan.update)
+        await self.repos.code_element_repo.update_batch(structure_batch_plan.update)
 
         return results
 

@@ -8,7 +8,7 @@ from app.core.services.file_service import FileService
 
 
 @pytest.mark.asyncio
-async def test_create_document(create_sample_project, terminusdb_client):
+async def test_create_document(project_uow, create_sample_project, terminusdb_client):
     project = create_sample_project
     repos = Repositories(terminusdb_client)
     proj_service = ProjectService(repos)

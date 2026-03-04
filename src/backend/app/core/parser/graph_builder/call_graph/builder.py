@@ -42,7 +42,6 @@ class CallChainBuilder:
         self.repos = repos
         self.jedi_manager = jedi_manager
         # Helper services
-        self.call_service = CallService(repos, project_node)
 
         self.diff_calculator = DiffCalculator()
         # Limit b/c of jedi inference cache
@@ -92,7 +91,7 @@ class CallChainBuilder:
                 continue
             self._merge_frame_stack(merged_stack, returned_stack)
 
-        old_children = await self.call_service.get_children(node.id)
+        old_children = await self.repos.call_repo.get_children(node.id, [])
 
         results = await self.preprocess_call_hierarchy(merged_stack, old_children, node.id)
 

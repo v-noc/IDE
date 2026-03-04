@@ -13,6 +13,7 @@ from .code_elements.class_repo import ClassRepo
 from .code_elements.call_repo import CallRepo
 from .log_repo import LogRepository
 from .document_repo import DocumentRepo
+from .code_elements.code_element_repo import CodeElementRepo
 
 
 class Repositories:
@@ -29,6 +30,7 @@ class Repositories:
         self.function_repo = FunctionRepo(client)
         self.class_repo = ClassRepo(client)
         self.call_repo = CallRepo(client)
+        self.code_element_repo = CodeElementRepo(client)
 
         self.structure_group_repo = StructureGroupRepo(client)
         self.code_element_group_repo = CodeElementGroupRepo(client)

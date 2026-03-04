@@ -6,9 +6,7 @@ import pytest
 import pytest_asyncio
 
 from app.core.builder.tree_builder import TreeBuilder
-from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.repository import Repositories
 from app.core.schemas.tree import AnyTreeNode
 from app.core.services.project_service import ProjectService
 
@@ -34,19 +32,18 @@ def _find_node_by_name_recursive(
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, terminusdb_client):
+async def setup_project(tmp_path, empty_project_uow):
     project_path = tmp_path / "project"
     shutil.copytree(SAMPLES_PATH, project_path)
 
-    repos = Repositories(terminusdb_client)
-
-    project_service = ProjectService(repos)
+    project_service = ProjectService(empty_project_uow)
 
     project_node = await project_service.create(
         PROJECT_NAME, "Test Project", str(project_path)
     )
+    empty_project_uow.project = project_node
 
-    yield project_node, repos, terminusdb_client, project_path
+    yield project_node, empty_project_uow, project_path
     await project_service.delete(project_node.id)
     shutil.rmtree(project_path)
 
@@ -81,44 +78,44 @@ def _remove_sync_block(content: str, start_str: str, end_str: str) -> str:
     return content[:start] + content[end_line:]
 
 
-async def _build_and_get_tree(project_node, repos, db):
+async def _build_and_get_tree(project_node, pow):
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=db,
+        pow
     )
     await orchestrator.resync()
 
-    project_service = ProjectService(repos)
+    project_service = ProjectService(pow)
     # project = await project_service.get(project_node.id)
     # assert project is not None, "Project not found after build"
 
-    children = await project_service.get_children(project_node.db_name)
+    children = await project_service.get_children()
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
-async def _resync_and_get_tree(project_node, repos, db):
+async def _resync_and_get_tree(project_node, pow):
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=db,
+        uow=pow,
     )
     await orchestrator.resync()
 
-    project_service = ProjectService(repos)
+    project_service = ProjectService(pow)
 
-    children = await project_service.get_children(project_node.db_name)
+    children = await project_service.get_children()
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
 @pytest.mark.asyncio
 async def test_class_sync_add_and_remove(setup_project):
-    project_node, repos, terminusdb_client, project_path = setup_project
+    project_node, project_uow, project_path = setup_project
     target_file = project_path / "main.py"
 
     # 1) Build once
     tree = await _build_and_get_tree(
-        project_node, repos, terminusdb_client
+        project_node, project_uow
     )
     assert tree, "No tree nodes built"
 
@@ -134,7 +131,7 @@ async def test_class_sync_add_and_remove(setup_project):
 
         # 3) Resync and verify class is present
         tree_after_add = await _resync_and_get_tree(
-            project_node, repos, terminusdb_client
+            project_node, project_uow
         )
         file_node_after_add = tree_after_add[0]
         names_after_add = [
@@ -153,7 +150,7 @@ async def test_class_sync_add_and_remove(setup_project):
         _write_file(target_file, updated)
 
         tree_after_remove = await _resync_and_get_tree(
-            project_node, repos, terminusdb_client
+            project_node, project_uow
         )
         file_node_after_remove = tree_after_remove[0]
         names_after_remove = [
@@ -168,18 +165,18 @@ async def test_class_sync_add_and_remove(setup_project):
         _write_file(target_file, original)
         # Final resync to leave DB in original state
         await _resync_and_get_tree(
-            project_node, repos, terminusdb_client
+            project_node, project_uow
         )
 
 
 @pytest.mark.asyncio
 async def test_class_sync_add_and_remove_inside_class(setup_project):
-    project_node, repos, arangodb_client, project_path = setup_project
+    project_node, project_uow, project_path = setup_project
     target_file = project_path / "main.py"
 
     # 1) Build once to ensure project is in the DB
     tree = await _build_and_get_tree(
-        project_node, repos, arangodb_client
+        project_node, project_uow
     )
     assert tree, "No tree nodes built"
 
@@ -212,7 +209,7 @@ async def test_class_sync_add_and_remove_inside_class(setup_project):
         _insert_block(target_file)
 
         tree_after_add = await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, project_uow
         )
         parent_after_add = _find_node_by_name_recursive(
             tree_after_add, "Parent")
@@ -231,7 +228,7 @@ async def test_class_sync_add_and_remove_inside_class(setup_project):
         _write_file(target_file, content_without_block)
 
         tree_after_remove = await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, project_uow
         )
         parent_after_remove = _find_node_by_name_recursive(
             tree_after_remove, "Parent")
@@ -243,5 +240,5 @@ async def test_class_sync_add_and_remove_inside_class(setup_project):
         # 5) Restore original content and resync
         _write_file(target_file, original_content)
         await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, project_uow
         )

@@ -14,7 +14,8 @@ from app.core.services.folder_service import FolderService
 from app.core.services.function_service import FunctionService
 from app.core.services.project_service import ProjectService
 from app.core.services.call_service import CallService
-from app.core.model.nodes import ProjectNode
+from app.core.services.code_element_service import CodeElementService
+from app.core.model.nodes import ClassNode, FunctionNode
 
 
 PROJECT_PATH = Path(__file__).resolve().parent / "sample_project"
@@ -27,23 +28,25 @@ DEFAULT_POSITION = CodePosition(
 
 
 async def _create_function(function_service: FunctionService, id: str, name: str, qname: str):
-    return await function_service.create(
-        id,
-        name,
-        qname,
-        f"This is {name.lower()}",
-        DEFAULT_POSITION,
+    function_node = FunctionNode(
+        id=id,
+        name=name,
+        qname=qname,
+        description=f"This is {name.lower()}",
+        code_position=DEFAULT_POSITION,
     )
+    return await function_service.create(function_node)
 
 
-async def _create_class(class_service: ClassService, id: str, name: str, qname: str):
-    return await class_service.create(
-        id,
-        name,
-        qname,
-        f"This is {name.lower()}",
-        DEFAULT_POSITION,
+async def _create_class(code_element_service: CodeElementService, id: str, name: str, qname: str):
+    class_node = ClassNode(
+        id=id,
+        name=name,
+        qname=qname,
+        description=f"This is {name.lower()}",
+        code_position=DEFAULT_POSITION,
     )
+    return await code_element_service.create(class_node)
 
 
 async def _create_call(call_service: CallService, name: str, qname: str, target_id: str):
@@ -145,69 +148,75 @@ def class_service(project_uow):
 
 
 @pytest.fixture
+def code_element_service(project_uow):
+    return CodeElementService(project_uow)
+
+
+@pytest.fixture
 def call_service(project_uow):
     return CallService(project_uow)
 
 
 @pytest_asyncio.fixture
-async def create_function(function_service):
+async def create_function(code_element_service):
     function = await _create_function(
-        function_service,
-        "function",
+        code_element_service,
+        "FunctionSchema/function",
         "Test Function",
         "test_project.test_function",
+
     )
     yield function
-    await function_service.delete(function.id)
+    await code_element_service.delete(function.id)
 
 
 @pytest_asyncio.fixture
-async def create_function2(function_service):
+async def create_function2(code_element_service):
     function = await _create_function(
-        function_service,
-        "function2",
+        code_element_service,
+        "FunctionSchema/function2",
         "Test Function 2",
         "test_project.test_function2",
     )
     yield function
-    await function_service.delete(function.id)
+    await code_element_service.delete(function.id)
 
 
 @pytest_asyncio.fixture
-async def create_function3(function_service):
+async def create_function3(code_element_service):
     function3 = await _create_function(
-        function_service,
-        "function3",
+        code_element_service,
+        "FunctionSchema/function3",
         "Test Function 3",
         "test_project.test_function3",
     )
     yield function3
-    await function_service.delete(function3.id)
+    await code_element_service.delete(function3.id)
 
 
 @pytest_asyncio.fixture
-async def create_class(class_service):
+async def create_class(code_element_service):
 
     class1 = await _create_class(
-        class_service,
-        "class",
+        code_element_service,
+        "ClassSchema/class",
         "Test Class",
         "test_project.test_class",
     )
     yield class1
-    await class_service.delete(class1.id)
+    await code_element_service.delete(class1.id)
 
 
 @pytest_asyncio.fixture
-async def create_class2(class_service):
+async def create_class2(code_element_service):
     class2 = await _create_class(
-        class_service,
-        "class2",
+        code_element_service,
+        "ClassSchema/class2",
         "Test Class 2",
         "test_project.test_class2",
     )
     yield class2
-    await class_service.delete(class2.id)
+    await code_element_service.delete(class2.id)
 
 
 @pytest_asyncio.fixture
