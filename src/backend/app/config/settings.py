@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     TERMINUS_KEY: str
     TERMINUS_TEAM: str
     TERMINUS_DB: str
+
     LOG_LEVEL: str = "INFO"
 
     model_config = SettingsConfigDict(

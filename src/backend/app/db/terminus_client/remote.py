@@ -17,9 +17,17 @@ class RemoteMixin:
         remote_branch: Optional[str] = None,
         message: Optional[str] = None,
         author: Optional[str] = None,
+        remote_auth: Optional[dict] = None,
     ) -> dict:
         """Pull updates from a remote repository to the current database."""
         self._check_connection()
+        headers = self._default_headers.copy()
+        if self._remote_auth_dict or remote_auth:
+            headers["Authorization-Remote"] = (
+                self._generate_remote_header(remote_auth)
+                if remote_auth
+                else self._remote_auth()
+            )
         if remote_branch is None:
             remote_branch = self.branch
         if author is None:
@@ -38,7 +46,7 @@ class RemoteMixin:
 
         result = await self._session.post(
             self._pull_url(),
-            headers=self._default_headers,
+            headers=headers,
             json=rc_args,
             auth=self._auth(),
         )
@@ -52,10 +60,17 @@ class RemoteMixin:
     ) -> dict:
         """Fetch the branch from a remote repo."""
         self._check_connection()
+        headers = self._default_headers.copy()
+        if self._remote_auth_dict or remote_auth:
+            headers["Authorization-Remote"] = (
+                self._generate_remote_header(remote_auth)
+                if remote_auth
+                else self._remote_auth()
+            )
 
         result = await self._session.post(
             self._fetch_url(remote_id),
-            headers=self._default_headers,
+            headers=headers,
             auth=self._auth(),
         )
 
