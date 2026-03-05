@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 import shutil
 from app.core.model.properties import CodePosition
-
+from app.db.context import ProjectUoW, RequestDbContext
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
 
@@ -60,28 +60,32 @@ async def _create_call(call_service: CallService, name: str, qname: str, target_
 async def create_sample_project(terminusdb_client, create_repos, tmp_path):
     project_path = tmp_path / "project"
     shutil.copytree(PROJECT_PATH, project_path)
-    project_service = ProjectService(create_repos)
+    ctx = RequestDbContext()
+    project_uow = ProjectUoW(terminusdb_client, None, ctx)
+    project_service = ProjectService(project_uow)
+
     project_node = await project_service.create(
         "Protector",
         "Protector is a tool for protecting your code.",
         project_path.as_posix(),
     )
 
+    project_uow = ProjectUoW(terminusdb_client, project_node, ctx)
+
     orchestrator = GraphBuilderOrchestrator(
-        project_node=project_node,
-        db=terminusdb_client,
+        project_node,
+        project_uow,
         ignore_file_name=None,
     )
     await orchestrator.resync()
 
-    yield project_node
+    yield project_node, project_uow
     await project_service.delete(project_node.id)
 
 
 @pytest_asyncio.fixture
 async def project_uow_for_sample(terminusdb_client, create_sample_project):
     """ProjectUoW for tests that use create_sample_project (with orchestrator)."""
-    from app.db.context import ProjectUoW, RequestDbContext
 
     ctx = RequestDbContext()
     return ProjectUoW(terminusdb_client, create_sample_project, ctx)

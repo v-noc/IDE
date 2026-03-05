@@ -3,12 +3,12 @@ import uuid
 import pytest
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
-from app.core.services.function_service import FunctionService
 from app.core.services.log_service import LogService
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
 from app.core.model.schemas import FunctionSchema, LogSchema
 from app.api.json_rpc.schemas import RegisterLogsParams, LogEventType, LogLevelName
+from app.db.context import ProjectUoW
 
 
 def _find_function_by_name(tree_nodes, name: str):
@@ -23,24 +23,24 @@ def _find_function_by_name(tree_nodes, name: str):
     return None
 
 
-async def _build_tree_and_get_functions(repos: Repositories, project: ProjectNode):
-    proj_service = ProjectService(repos)
-    children = await proj_service.get_children(project.db_name)
+async def _build_tree_and_get_functions(project_uow: ProjectUoW):
+    proj_service = ProjectService(project_uow)
+    children = await proj_service.get_children()
     tree = TreeBuilder(children).build()
     return tree
 
 
 @pytest.mark.asyncio
-async def test_create_log_without_parent(create_sample_project, terminusdb_client):
-    project = create_sample_project
-    repos = Repositories(terminusdb_client)
-    tree = await _build_tree_and_get_functions(repos, project)
+async def test_create_log_without_parent(create_sample_project):
+    project, project_uow = create_sample_project
+
+    tree = await _build_tree_and_get_functions(project_uow)
 
     # Use 'factory' function from sample project
     factory_fn = _find_function_by_name(tree, 'factory')
     assert factory_fn is not None
 
-    service = LogService(repos, project)
+    service = LogService(project_uow)
 
     params = RegisterLogsParams(
         id=str(uuid.uuid4()),
@@ -58,23 +58,24 @@ async def test_create_log_without_parent(create_sample_project, terminusdb_clien
 
     await service.create_batch([params])
     created = await service.get_function_log(factory_fn.id)
-    assert created is not None
+
+    assert created is not []
+    assert created[0].origin_function == factory_fn.id
 
     # parent = await service.get_parent_log(created.id)
     # assert parent is None
 
 
 @pytest.mark.asyncio
-async def test_create_log_with_parent(create_sample_project, terminusdb_client):
-    project = create_sample_project
-    repos = Repositories(terminusdb_client)
-    tree = await _build_tree_and_get_functions(repos, project)
+async def test_create_log_with_parent(create_sample_project):
+    project, project_uow = create_sample_project
+    tree = await _build_tree_and_get_functions(project_uow)
 
     factory_fn = _find_function_by_name(tree, 'factory')
     add_fn = _find_function_by_name(tree, 'add')
     assert factory_fn is not None and add_fn is not None
 
-    service = LogService(repos, project)
+    service = LogService(project_uow)
 
     # Create parent ENTER log on parent function
     parent_params = RegisterLogsParams(

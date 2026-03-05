@@ -1,6 +1,8 @@
 
 
 from typing import List, Tuple, Optional
+
+from terminusdb_client.woqlquery.woql_query import Doc
 from app.db.async_terminus_client import AsyncClient
 from app.core.repository.base_repo import BaseRepo
 from app.core.model.logs import LogNode
@@ -52,6 +54,7 @@ class LogRepository():
                 .read_document("v:parent", "v:parent_doc")
             )
             result = await self.client.query(query)
+
             if len(result["bindings"]) == 0:
                 return None
             return LogNode.from_raw_dict(result["bindings"][0]["parent_doc"])
@@ -66,11 +69,12 @@ class LogRepository():
         queries = []
 
         for log in inserts:
+
             queries.append(WQ().insert_document(
-                LogSchema.from_pydantic(log)._obj_to_dict()[0]))
+                Doc(LogSchema.from_pydantic(log)._obj_to_dict(True)[0])))
 
         for move in moves:
-            queries.append(WQ().add_triple(move[0], "children_logs", move[1]))
+            queries.append(WQ().add_triple(move[1], "children_logs", move[0]))
         try:
             return await self.client.query(WQ().woql_and(*queries), commit_msg=f"Flushing {len(inserts)} logs and {len(moves)} moves")
         except Exception as exc:

@@ -53,12 +53,11 @@ class LogService:
             ))
 
             if p.parent_log_id:
-                log_edges.append([
+                log_edges.append((
                     f"{LogSchema.__name__}/{p.id}",
-                    f"{LogSchema.__name__}/{p.parent_log_id}", "log"
-                ])
-
-        # 2. Bulk Insert Logs (One DB Call)
+                    f"{LogSchema.__name__}/{p.parent_log_id}",
+                    "log"
+                ))
 
         result = await self.uow.get_project_repos().log_repo.flush_batch_logs(log_docs, log_edges)
         if not result:

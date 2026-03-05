@@ -30,7 +30,7 @@ class LogSchema(DocumentTemplate):
     The schema for the log document.
     """
     event_type: LogEventType
-    origin_function: FunctionSchema
+    origin_function: Optional[FunctionSchema]
     timestamp: datetime
     message: str
     level_name: LogLevelName
