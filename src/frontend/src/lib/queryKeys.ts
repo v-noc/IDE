@@ -11,7 +11,7 @@ const queryKeys = {
   },
   logs: {
     all: ['logs'] as const,
-    tree: (nodeId: string) => [...queryKeys.logs.all, 'tree', nodeId] as const,
+    tree: (functionId: string, projectId: string) => [...queryKeys.logs.all, 'tree', functionId, projectId] as const,
   },
   nodes: {
     all: ['nodes'] as const,
@@ -23,8 +23,16 @@ const queryKeys = {
   },
   documents: {
     all: ['documents'] as const,
-    list: (nodeKey: string) => [...queryKeys.documents.all, 'list', nodeKey] as const,
+    list: (nodeKey: string, projectKey?: string) => [...queryKeys.documents.all, 'list', nodeKey, projectKey ?? ''] as const,
     detail: (docId: string) => [...queryKeys.documents.all, 'detail', docId] as const,
+  },
+  versioning: {
+    all: ['versioning'] as const,
+    branches: (projectId: string) => [...queryKeys.versioning.all, 'branches', projectId] as const,
+    commits: (projectId: string, nodeId: string, start?: number, count?: number) =>
+      [...queryKeys.versioning.all, 'commits', projectId, nodeId, start ?? 0, count ?? 10] as const,
+    diff: (projectId: string, afterCommitId: string, beforeCommitId: string) =>
+      [...queryKeys.versioning.all, 'diff', projectId, afterCommitId, beforeCommitId] as const,
   },
 } as const;
 

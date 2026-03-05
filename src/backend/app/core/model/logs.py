@@ -1,12 +1,45 @@
+import json
 from datetime import datetime
-from typing import Any, Dict, Optional, Literal
+from enum import Enum
+from typing import Any, Dict, Optional, Literal, Set
 
-from pydantic import Field
-
-from .base import ArangoBase
+from pydantic import Field, BaseModel
 
 
-class LogNode(ArangoBase):
+def _parse_json_field(val: Any) -> Any:
+    """Parse JSON string from DB; payload/result/error stored as JSON strings."""
+    if val is None:
+        return None
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except json.JSONDecodeError:
+            return val
+    return val
+
+
+class LogEventType(str, Enum):
+    ENTER = "enter"
+    EXIT = "exit"
+    ERROR = "error"
+    LOG = "log"
+
+
+class LogLevelName(str, Enum):
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    DEBUG = "DEBUG"
+    TRACE = "TRACE"
+    FATAL = "FATAL"
+    CRITICAL = "CRITICAL"
+    NOTSET = "NOTSET"
+
+
+class LogNode(BaseModel):
+    id: str = Field(
+        ..., description="Log ID"
+    )
     timestamp: datetime = Field(
         ..., description="Event timestamp (UTC ISO 8601)"
     )
@@ -16,7 +49,7 @@ class LogNode(ArangoBase):
     message: str = Field(
         ..., description="Event message"
     )
-    level_name: Optional[str] = Field(
+    level_name: Optional[LogLevelName] = Field(
         default=None, description="Log level name (info, warning, error)"
     )
     duration_ms: Optional[float] = Field(
@@ -35,3 +68,42 @@ class LogNode(ArangoBase):
     error: Optional[Dict[str, Any]] = Field(
         default=None, description="Error details for 'error' events"
     )
+    origin_function: str = Field(
+        ..., description="Origin function"
+    )
+    children_logs: Set[str] = Field(
+        default_factory=set, description="Children logs"
+    )
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        return LogNode(
+            id=raw_dict["@id"],
+            timestamp=raw_dict.get("timestamp"),
+            event_type=LogEventType(raw_dict.get("event_type")),
+            message=raw_dict.get("message"),
+            level_name=LogLevelName(raw_dict.get("level_name")),
+            duration_ms=raw_dict.get("duration_ms"),
+            chain_id=raw_dict.get("chain_id"),
+            payload=_parse_json_field(raw_dict.get("payload")),
+            result=_parse_json_field(raw_dict.get("result")),
+            error=_parse_json_field(raw_dict.get("error")),
+            origin_function=raw_dict.get("origin_function"),
+            children_logs=raw_dict.get("children_logs", set()),
+        )
+
+    def to_raw_dict(self):
+        return {
+            "@id": self.id,
+            "timestamp": self.timestamp,
+            "event_type": self.event_type,
+            "message": self.message,
+            "level_name": self.level_name,
+            "duration_ms": self.duration_ms,
+            "chain_id": self.chain_id,
+            "payload": self.payload,
+            "result": self.result,
+            "error": self.error,
+            "origin_function": self.origin_function,
+            "children_logs": set(self.children_logs),
+        }

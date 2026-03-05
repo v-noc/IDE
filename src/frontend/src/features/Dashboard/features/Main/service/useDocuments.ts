@@ -3,8 +3,8 @@ import { api } from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 
 export interface DocumentType {
-  _id: string; // backend returns _id; service maps to this property
-  _key: string;
+
+  id: string;
   name: string;
   description: string;
   data: string;
@@ -27,10 +27,10 @@ export interface UpdateDocumentRequest {
 
 // Backend shape we receive from API
 interface BackendDocumentRaw {
-  _id?: string;
+
   id?: string;
-  _key?: string;
-  key?: string;
+
+
   name: string;
   description: string;
   data: string;
@@ -46,8 +46,8 @@ const getDocuments = async (nodeId: string): Promise<DocumentType[]> => {
   const list = response as unknown as BackendDocumentRaw[];
   // Map backend _id -> id for convenience
   return list.map((d) => ({
-    _id: d._id ?? d.id!,
-    _key: d._key ?? d.key!,
+    id: d.id!,
+
     name: d.name,
     description: d.description,
     data: d.data,
@@ -65,8 +65,7 @@ const createDocument = async (
   });
   const d = response as unknown as BackendDocumentRaw;
   return {
-    _id: d._id ?? d.id!,
-    _key: d._key ?? d.key!,
+    id: d.id!,
     name: d.name,
     description: d.description,
     data: d.data,
@@ -91,8 +90,7 @@ const updateDocument = async (
   });
   const d = response as unknown as BackendDocumentRaw;
   return {
-    _id: d._id ?? d.id!,
-    _key: d._key ?? d.key!,
+    id: d.id!,
     name: d.name,
     description: d.description,
     data: d.data,
@@ -140,7 +138,7 @@ export const useUpdateDocument = (nodeId: string) => {
 
           let hasChanges = false;
           const updatedDocs = oldData.map((doc) => {
-            if (doc._key !== updatedDocument._key) {
+            if (doc.id !== updatedDocument.id) {
               return doc; // Return same reference for unchanged docs
             }
 

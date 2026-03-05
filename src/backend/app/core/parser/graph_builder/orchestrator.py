@@ -3,8 +3,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 import asyncio
-from arangoasync.database import AsyncDatabase
 
+from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.collection.collector import Collector
 from app.core.parser.graph_builder.discovery.change_detector import (
@@ -22,6 +22,7 @@ from app.core.parser.graph_builder.performance import tracker
 from app.core.parser.graph_builder.progress import ProgressTracker
 from app.core.repository import Repositories
 from app.core.socket.manager import get_socket_manager
+from app.api.dependencies import ProjectUoW
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class GraphBuilderOrchestrator:
     def __init__(
         self,
         project_node: ProjectNode,
-        db: Optional[AsyncDatabase] = None,
+        uow: ProjectUoW,
         # scope_manager: Optional[ScopeManager] = None, # Removed
         ignore_file_name: str = ".gitignore",
         max_concurrent_files: int = 50,
@@ -50,17 +51,17 @@ class GraphBuilderOrchestrator:
         self.project_node = project_node
         self.project_path = project_node.path
         self.project_root = Path(self.project_path)
-        self.db = db
+        self.uow = uow
         self.max_concurrent_files = max_concurrent_files
         self.batch_size = batch_size
         self._file_semaphore = asyncio.Semaphore(max_concurrent_files)
 
         # Initialize Repositories (Required)
-        if not db:
+        if not self.uow:
             raise ValueError(
                 "Database connection is required for GraphBuilderOrchestrator")
 
-        self.repos = Repositories(db)
+        self.repos = self.uow.get_project_repos()
 
         # Initialize Jedi Adapter
         from app.core.parser.jedi_adapter.manager import JediProjectManager
@@ -110,12 +111,8 @@ class GraphBuilderOrchestrator:
 
         tracker.reset()
 
-        # Ensure project root exists once (create if new, otherwise reuse).
-        await self.collector.ensure_project_root()
-        self.project_node = self.collector.project_node
         self.phase_processor.project_node = self.project_node
         project_id = self.project_node.id
-        print(f"project_id {project_id}")
 
         # Initialize progress tracker
         socket_manager = get_socket_manager()
@@ -125,21 +122,21 @@ class GraphBuilderOrchestrator:
             # 1. Scan Disk
             progress_tracker.start_phase("scanning")
             await progress_tracker.emit(force=True)
-            
+
             scan_result = self.file_scanner.scan()
             logger.info(
                 "Scanned %d files across %d folders on disk",
                 len(scan_result.files),
                 len(scan_result.folders),
             )
-            
+
             # Set total files after scanning
             progress_tracker.set_total_files(len(scan_result.files))
             await progress_tracker.emit(force=True)
 
             # 2. Detect Changes
             change_set = await self.change_detector.detect_changes(
-                scan_result, project_id
+                scan_result
             )
             logger.info(f"Detected changes: {change_set}")
 
@@ -153,10 +150,10 @@ class GraphBuilderOrchestrator:
 
             # 3. Process Changes (Phase 1 & 2)
             await self._process_changes(change_set, scan_result, progress_tracker)
-            
+
             # Mark as complete
             await progress_tracker.complete()
-            
+
         except Exception as e:
             logger.error(f"Error during resync: {e}", exc_info=True)
             progress_tracker.set_error(str(e))
@@ -187,21 +184,16 @@ class GraphBuilderOrchestrator:
         Phase 1: Collection - Build scope hierarchy
         Phase 2: Analysis - Parse AST and build call chains
         """
-        folder_changes = []
 
-        # Reset per-run caches and perform ID-first structure synchronization
-        # (folders + file shells).
         self.collector.reset_session()
-        folder_result = await self.collector.sync_structure(
+        await self.collector.sync_structure(
             change_set, scan_result, batch_size=self.batch_size
         )
-        if folder_result:
-            folder_changes.extend(folder_result)
 
         # Phase 1: Collection (Structure)
         logger.info("Starting Phase 1: Collection")
         progress_tracker.start_phase("collecting")
-        
+
         # Calculate files to process for collection phase
         files_to_process = [
             tp.path
@@ -209,17 +201,17 @@ class GraphBuilderOrchestrator:
             if tp.path
         ]
         files_to_process.extend(
-            [mv.new for mv in change_set.moved_files if mv.new]
+            [mv.new_path for mv in change_set.moved_files if mv.new_path]
         )
         progress_tracker.set_total_files(len(files_to_process))
         await progress_tracker.emit(force=True)
-        
+
         collection_results = (
             await self.phase_processor.process_collection_phase(
                 change_set, scan_result, progress_tracker
             )
         )
-        
+
         # Emit final collection phase progress with discovered entities
         await progress_tracker.emit(force=True)
 
@@ -231,7 +223,7 @@ class GraphBuilderOrchestrator:
         # Total files for analysis is the number of collection results
         progress_tracker.set_total_files(len(collection_results))
         await progress_tracker.emit(force=True)
-        
+
         try:
             # Phase 2 refactoring is deferred.
             # We pass None for call_sync_service as we removed SyncService.

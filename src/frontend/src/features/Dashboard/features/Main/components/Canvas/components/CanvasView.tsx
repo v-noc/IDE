@@ -23,6 +23,7 @@ import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
@@ -46,21 +47,27 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   void _projectId;
 
   const selectedNode = useProjectStore(
-    useShallow((s) => s.selectedNode[tabId])
+    useShallow((s) => s.selectedNode[tabId]),
   );
   const secondarySelectedNode = useProjectStore(
-    useShallow((s) => s.secondarySelectedNode[tabId])
+    useShallow((s) => s.secondarySelectedNode[tabId]),
   );
   const expandedNodeIds = useProjectStore(
-    useShallow((s) => s.expandedNodeIds[tabId] ?? [])
+    useShallow((s) => s.expandedNodeIds[tabId] ?? []),
   );
   const toggleNodeExpansion = useProjectStore(
-    useShallow((s) => s.toggleNodeExpansion)
+    useShallow((s) => s.toggleNodeExpansion),
   );
   const projectData = useProjectStore(useShallow((s) => s.projectData));
   const handleNodeSelection = useTabStore(
-    useShallow((s) => s.handleNodeSelection)
+    useShallow((s) => s.handleNodeSelection),
   );
+
+  const nodeDiffs = useVersioningStore(useShallow((s) => s.nodeDiffs));
+  const parentChildDiffs = useVersioningStore(
+    useShallow((s) => s.parentChildDiffs),
+  );
+  const diffNodesMap = useVersioningStore(useShallow((s) => s.diffNodesMap));
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -72,63 +79,44 @@ const CanvasView: React.FC<CanvasViewProps> = ({
       ROOT_X: -420,
       ROOT_Y: 0,
     }),
-    []
+    [],
   );
-
 
   const effectiveSelectedNode = secondarySelectedNode
     ? secondarySelectedNode
     : centerNode;
+
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
     centerNode: centerNode,
     selectedNode: effectiveSelectedNode as SimpleTreeNode,
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
-
+    parentChildDiffs,
+    nodeDiffs,
+    diffNodesMap,
+    projectData,
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  useEffect(() => {
-    setNodes((currentNodes) => {
-      // 1. Create a map of existing nodes for quick lookup
-      const currentNodeMap = new Map(currentNodes.map((n) => [n.id, n]));
-  
-      // 2. Map the new layout onto the current state
-      return initialNodes.map((newNode) => {
-        const existingNode = currentNodeMap.get(newNode.id);
-  
-        if (existingNode) {
-          // Only update the properties that the layout changed (position, data)
-          // This preserves the internal object reference if nothing changed
-          return {
-            ...existingNode,
-            position: newNode.position,
-            data: {
-              ...existingNode.data,
-              ...newNode.data, // Sync expanded/expandable state
-            },
-          };
-        }
-  
-        // 3. If it doesn't exist, it's a brand new node being added (expanded)
-        return newNode;
-      });
-    });
+  const syncDiffOverlay = useEffectEvent(() => {
+    setNodes(initialNodes);
     setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
+  });
+
+  useEffect(() => {
+    syncDiffOverlay();
+  }, [initialNodes, initialEdges, parentChildDiffs, nodeDiffs, diffNodesMap]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 
   const centerOnTarget = useEffectEvent(() => {
-
-    const nodeId = centerNode?._key
+    const nodeId = centerNode?.id;
     if (!nodeId || nodes.length === 0 || !reactFlowInstanceRef.current) {
       return;
     }
-
 
     const rfNode = nodes.find((n) => n.id === nodeId);
 
@@ -141,7 +129,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
           {
             zoom: 1,
             duration: 300,
-          }
+          },
         );
         lastCenteredTargetIdRef.current = nodeId;
       }
@@ -152,13 +140,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   });
 
   useEffect(() => {
-
     if (centerNode) {
       centerOnTarget();
     } else {
       lastCenteredTargetIdRef.current = null;
     }
-  }, [centerNode]);
+  }, [centerNode, centerOnTarget]);
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstanceRef.current = instance;
@@ -176,12 +163,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
             {
               zoom: 1,
               duration: 300,
-            }
+            },
           );
         }
       }
     },
-    [projectData]
+    [projectData],
   );
 
   const onNodeClick = useCallback(
@@ -190,14 +177,14 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
       if (projectData && nodeKey) {
         const foundNode = findNodeByKey(projectData, nodeKey);
-        if (foundNode?._key && foundNode?._key !== centerNode?._key) {
-          handleNodeSelection(tabId, foundNode, "secondary")
+        if (foundNode?.id && foundNode?.id !== centerNode?.id) {
+          handleNodeSelection(tabId, foundNode, "secondary");
         } else {
           handleNodeSelection(tabId, foundNode, "primary");
         }
       }
     },
-    [projectData, handleNodeSelection, tabId, centerNode]
+    [projectData, handleNodeSelection, tabId, centerNode],
   );
 
   return (

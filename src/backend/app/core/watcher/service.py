@@ -4,13 +4,13 @@ import logging
 import asyncio
 from typing import Dict, Optional
 from threading import Lock
-from arangoasync.database import AsyncDatabase
 from fastapi import Depends, Request
 
 from app.core.model.nodes import ProjectNode
 from app.core.watcher.project_watcher import ProjectWatcher
 from app.core.socket.manager import get_socket_manager
-from app.db.client import get_db
+from app.db.client import get_terminus_client
+from app.db.async_terminus_client import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class WatcherService:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, db: AsyncDatabase | None = None):
+    def __init__(self, db: Optional[AsyncClient] = None):
         if not hasattr(self, 'initialized'):
             self.watchers: Dict[str, ProjectWatcher] = {}
             self.db = db
@@ -38,14 +38,15 @@ class WatcherService:
         """Set the main event loop for async operations from sync threads."""
         self.main_event_loop = loop
 
-    def set_db(self, db: AsyncDatabase):
-        if self.db is None:
+    def set_db(self, db: AsyncClient):
+        if db is not None:
             self.db = db
 
     def start_watching(self, project_node: ProjectNode):
         project_id = project_node.id
 
         # Helper to run async socket events from the sync thread
+
         def emit_sync_event(event_type: str, data: dict):
             try:
                 # Try to use the main event loop if available
@@ -135,7 +136,7 @@ class WatcherService:
                 # Note: We create a fresh one to ensure clean state
                 orchestrator = GraphBuilderOrchestrator(
                     project_node=project_node,
-                    db=self.db
+                    db=self.db.clone()
                 )
 
                 # Perform the sync (orchestrator is async; run in main loop)
@@ -180,7 +181,7 @@ class WatcherService:
                 self.resume_watching(project_id)
 
         # Initialize and start
-        watcher = ProjectWatcher(project_node.path, resync_project)
+        watcher = ProjectWatcher(project_node.local_path, resync_project)
         watcher.start()
         self.watchers[project_id] = watcher
         print(f"Started watching project {project_id}")
@@ -212,11 +213,12 @@ class WatcherService:
 
 
 def get_watcher_service(
-    request: Request, db: AsyncDatabase = Depends(get_db)
+    request: Request, db: AsyncClient = Depends(get_terminus_client)
 ) -> WatcherService:
     service = getattr(request.app.state, "watcher_service", None)
     if service is None:
-        service = WatcherService()
+        service = WatcherService(db)
         request.app.state.watcher_service = service
-    service.set_db(db)
+    else:
+        service.set_db(db)
     return service

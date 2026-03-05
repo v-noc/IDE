@@ -3,13 +3,15 @@ from parso.python.tree import Class, Function, Name, PythonNode
 from typing import List, Optional, Union
 from .models import ClassNode, FunctionNode, CallNode, NodePosition, BaseNode
 import re
+from app.core.model.schemas import FunctionSchema, ClassSchema
 
 
 class JediParser:
-    def __init__(self, content: str):
-        self.content = content
-        # Use parso to parse the content. We assume Python 3.
-        self.module = parso.parse(content)
+    def __init__(self, content: Optional[str] = None):
+        if content is not None:
+            self.content = content
+            # Use parso to parse the content. We assume Python 3.
+            self.module = parso.parse(content)
 
     def _get_position(self, node) -> NodePosition:
         start_pos = node.start_pos
@@ -64,7 +66,6 @@ class JediParser:
         return None
 
     def _scan_children(self, scope_node) -> List[BaseNode]:
-        children = []
 
         nodes = []
 
@@ -123,7 +124,7 @@ class JediParser:
 
     def _visit_class(self, node: Class) -> ClassNode:
         return ClassNode(
-            id=self._extract_id(node),
+            id=f"{ClassSchema.__name__}/{self._extract_id(node)}",
             name=node.name.value,
             position=self._get_position(node),
             children=self._scan_children(node)
@@ -139,7 +140,7 @@ class JediParser:
             position = self._get_position(node.parent)
 
         return FunctionNode(
-            id=self._extract_id(target_node),
+            id=f"{FunctionSchema.__name__}/{self._extract_id(target_node)}",
             name=node.name.value,
             position=position,
             children=self._scan_children(target_node)
@@ -154,18 +155,6 @@ class JediParser:
         return ""
 
     def _visit_call(self, node) -> List[CallNode]:
-        # node is an atom_expr.
-        # children[0] is the atom (Name) or another atom_expr.
-        # We want the code up to the call trailer.
-        # Simplified: just get the code of the atom part.
-
-        # If it's `a.b()`, children are [atom(a), trailer(.b), trailer(())]
-        # Wait, `a.b` is an atom_expr? No.
-        # `a.b` is `atom_expr(atom(a), trailer(.b))`
-        # `a.b()` is `atom_expr(atom(a), trailer(.b), trailer(())`
-
-        # We want the name to be `a.b`.
-        # We can reconstruct it from children excluding the last trailer (the call parens).
 
         call_nodes: List[CallNode] = []
         prefix_children = []

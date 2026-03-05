@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { parse } from "toml";
 
 import { extractFieldErrors } from "@/utils/errorMessagextractor";
+import { idPrefixRemover } from "@/utils";
 
 interface CreateProjectDialogProps {
   trigger?: React.ReactNode;
@@ -63,9 +64,9 @@ const CreateProjectDialog = ({
   const onSubmit = (data: FormValues) => {
     createProject(data, {
       onSuccess(data) {
-        const key = data._key;
-        console.log("project ket", key);
-        setTimeout(() => navigate(`/project/${key}`));
+        const key = data.id;
+
+        setTimeout(() => navigate(`/project/${idPrefixRemover(key)}`));
       },
       onError: (error) => {
         const fieldErrors = extractFieldErrors(error);
@@ -109,7 +110,7 @@ const CreateProjectDialog = ({
       if (tomlFile) {
         // Find the actual File object from the files array
         const tomlFileObject = allFiles.find(
-          (file) => file.name === "v-noc.toml"
+          (file) => file.name === "v-noc.toml",
         );
         if (tomlFileObject) {
           const tomlContent = await new Promise<string>((resolve, reject) => {
@@ -193,7 +194,7 @@ const CreateProjectDialog = ({
           <div className="flex justify-end gap-3">
             <Button
               variant="outline"
-            // onClick={() => setIsImportDialogOpen(false)}
+              // onClick={() => setIsImportDialogOpen(false)}
             >
               Cancel
             </Button>

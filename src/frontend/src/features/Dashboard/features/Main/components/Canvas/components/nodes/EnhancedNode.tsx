@@ -34,74 +34,110 @@ export interface EnhancedNodeData {
   onCodeToggle?: () => void;
   nodeId?: string;
   nodeType?: string;
-  target?: { _key: string };
+  target?: { id: string };
   focused?: boolean;
   selected?: boolean;
   manuallyCreated?: boolean;
+  isInjected?: boolean;
   [key: string]: unknown;
 }
 
-const EnhancedNode = memo(
-  function EnhancedNode({ data,selected }: { data: EnhancedNodeData,selected: boolean }) {
-    const nodeCode = useNodeCode({
-      nodeId: data.nodeId ?? "",
-      targetKey: data.target?._key,
-      nodeType: data.nodeType,
-    });
+const EnhancedNode = memo(function EnhancedNode({
+  data,
+  selected,
+}: {
+  data: EnhancedNodeData;
+  selected: boolean;
+}) {
+  const nodeCode = useNodeCode({
+    nodeId: data.nodeId ?? "",
+    targetKey: data.target?.id,
+    nodeType: data.nodeType,
+  });
 
-    
-    const activeTabId = useTabStore((s) => s.activeTabId);
+  const activeTabId = useTabStore((s) => s.activeTabId);
 
-    const statusStyles = useMemo(() => {
-      const status = data.metadata?.status;
-      if (!status || status === "idle") return {};
+  const { statusStyles, contentStyles } = useMemo(() => {
+    const status = data.metadata?.status;
+    const diffStatus = data.diffStatus;
+
+    let sStyles: React.CSSProperties = {};
+    let cStyles: React.CSSProperties = {};
+
+    // Base colors for diff statuses
+    const diffBorderColors: Record<string, string> = {
+      added: "#22c55e", // green-500
+      updated: "#3b82f6", // blue-500
+      removed: "#dc262676", // red-600 (more vibrant)
+    };
+
+    if (diffStatus && diffBorderColors[diffStatus as string]) {
+      sStyles.borderColor = diffBorderColors[diffStatus as string];
+      sStyles.borderWidth = "3px";
+
+      if (diffStatus === "added" && data.isInjected) {
+        sStyles.opacity = 0.6;
+      }
+
+      if (diffStatus === "removed") {
+        sStyles.opacity = 0.6;
+        cStyles.filter = "grayscale(100%) brightness(2)"; // Brighten to make white text pop on red
+        sStyles.backgroundColor = "#dc2626"; // red-600
+        sStyles.color = "#ffffff";
+        sStyles.pointerEvents = "none";
+      }
+    }
+
+    if (status && status !== "idle") {
       const colors: Record<string, string> = {
         error: "#ef4444",
         warning: "#f59e0b",
         success: "#10b981",
       };
-      return {
-        borderColor: colors[status],
-        boxShadow: `0 0 10px ${colors[status]}55`,
-      };
-    }, [data.metadata?.status]);
+      if (!sStyles.borderColor) {
+        sStyles.borderColor = colors[status];
+      }
+      sStyles.boxShadow = `0 0 10px ${colors[status]}55`;
+    }
 
-    const {
-      onAction
-    } = useNodeHandlers(data.nodeId ?? "", activeTabId);
+    return { statusStyles: sStyles, contentStyles: cStyles };
+  }, [data.metadata?.status, data.diffStatus]);
 
-    const handleCodeToggle = () => {
-      nodeCode.toggleCode();
-      data.onCodeToggle?.();
-    };
+  const { onAction } = useNodeHandlers(data.nodeId ?? "", activeTabId);
 
-    return (
-      <div
-        className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${ selected
-            ? "ring-4 ring-amber-400 ring-offset-1"
-            : ""
-          }`}
-        style={{
-          backgroundColor: data.bgColor,
-          color: data.textColor,
-          borderColor:  selected
-              ? "#f59e0b"
-              : data.borderColor,
-          ...statusStyles,
-        }}
+  const handleCodeToggle = () => {
+    nodeCode.toggleCode();
+    data.onCodeToggle?.();
+  };
+
+  return (
+    <div
+      className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
+        }`}
+      style={{
+        backgroundColor: statusStyles.backgroundColor || data.bgColor,
+        color: statusStyles.color || data.textColor,
+        borderColor: selected
+          ? "#f59e0b"
+          : statusStyles.borderColor || data.borderColor,
+        ...statusStyles,
+      }}
+    >
+      <NodeContextMenu
+        nodeId={data.nodeId ?? ""}
+        nodeType={data.nodeType ?? ""}
+        manuallyCreated={data.manuallyCreated}
+        onAction={onAction}
       >
-        <NodeContextMenu
-          nodeId={data.nodeId ?? ""}
-          nodeType={data.nodeType ?? ""}
-          manuallyCreated={data.manuallyCreated}
-          onAction={onAction}
-        >
+        <div style={contentStyles}>
           <NodeHeader
             name={data.name}
             icon={data.mainIcon}
-            iconColor={data.iconColor}
-            borderColor={data.borderColor}
-            textColor={data.textColor}
+            iconColor={(statusStyles.color as string) || data.iconColor}
+            borderColor={
+              (statusStyles.borderColor as string) || data.borderColor
+            }
+            textColor={(statusStyles.color as string) || data.textColor}
             expandable={data.expandable}
             expanded={data.expanded}
             onToggle={data.onToggle}
@@ -109,44 +145,47 @@ const EnhancedNode = memo(
             showCode={nodeCode.showCode}
             onCodeToggle={handleCodeToggle}
             status={data.metadata?.status}
+            diffStatus={data.diffStatus as any}
           />
-        </NodeContextMenu>
 
-        {nodeCode.showCode && nodeCode.hasCode ? (
-          <NodeCodeView
-            code={nodeCode.code}
-            fileName={nodeCode.fileName}
-            language={nodeCode.language}
-            onChange={nodeCode.setCode}
-            onSave={nodeCode.handleSave}
-            hasChanges={nodeCode.hasChanges}
-            isSaving={nodeCode.isSaving}
-            isLoading={nodeCode.isLoading}
-            borderColor={data.borderColor}
-            iconColor={data.iconColor}
+          {nodeCode.showCode && nodeCode.hasCode ? (
+            <NodeCodeView
+              code={nodeCode.code}
+              fileName={nodeCode.fileName}
+              language={nodeCode.language}
+              onChange={nodeCode.setCode}
+              onSave={nodeCode.handleSave}
+              hasChanges={nodeCode.hasChanges}
+              isSaving={nodeCode.isSaving}
+              isLoading={nodeCode.isLoading}
+              borderColor={
+                (statusStyles.borderColor as string) || data.borderColor
+              }
+              iconColor={(statusStyles.color as string) || data.iconColor}
+            />
+          ) : (
+            <NodeDescription
+              description={data.metadata?.description}
+              textColor={data.textColor}
+            />
+          )}
+
+          <NodeFooter
+            createdAt={data.metadata?.createdAt}
+            updatedAt={data.metadata?.updatedAt}
+            textColor={(statusStyles.color as string) || data.textColor}
+            borderColor={
+              (statusStyles.borderColor as string) || data.borderColor
+            }
+            iconColor={(statusStyles.color as string) || data.iconColor}
           />
-        ) : (
-          <NodeDescription description={data.metadata?.description} textColor={data.textColor} />
-        )}
+        </div>
+      </NodeContextMenu>
 
-        <NodeFooter
-          createdAt={data.metadata?.createdAt}
-          updatedAt={data.metadata?.updatedAt}
-          textColor={data.textColor}
-          borderColor={data.borderColor}
-          iconColor={data.iconColor}
-        />
-
-        <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-        <Handle
-          type="source"
-          position={Position.Right}
-          style={{ opacity: 0 }}
-        />
-      </div>
-    );
-  }
-  
-);
+      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
+    </div>
+  );
+});
 
 export default EnhancedNode;

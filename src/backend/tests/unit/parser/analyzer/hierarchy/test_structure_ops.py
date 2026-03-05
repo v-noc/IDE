@@ -49,35 +49,35 @@ async def test_hierarchy_and_ignore(setup_structure_project):
     # Check that files exist in tree
     main_file = find_node_by_qname(tree, f"{project_name}.main")
     assert main_file is not None, "main.py not found in tree"
-    assert main_file.node_type == "file"
+    assert main_file.__class__.__name__ == "FileTreeNode", "main should be a file"
 
     core_folder = find_node_by_qname(tree, f"{project_name}.core")
     assert core_folder is not None, "core folder not found in tree"
-    assert core_folder.node_type == "folder"
+    assert core_folder.__class__.__name__ == "FolderTreeNode", "core should be a folder"
 
     core_user = find_node_by_qname(tree, f"{project_name}.core.user")
     assert core_user is not None, "core/user.py not found in tree"
-    assert core_user.node_type == "file"
+    assert core_user.__class__.__name__ == "FileTreeNode", "core/user should be a file"
 
     core_post = find_node_by_qname(tree, f"{project_name}.core.post")
     assert core_post is not None, "core/post.py not found in tree"
-    assert core_post.node_type == "file"
+    assert core_post.__class__.__name__ == "FileTreeNode", "core/post should be a file"
 
     core_data = find_node_by_qname(tree, f"{project_name}.core.data")
     assert core_data is not None, "core/data folder not found in tree"
-    assert core_data.node_type == "folder"
+    assert core_data.__class__.__name__ == "FolderTreeNode", "core/data should be a folder"
 
     core_data_user = find_node_by_qname(tree, f"{project_name}.core.data.user")
     assert core_data_user is not None, "core/data/user.py not found in tree"
-    assert core_data_user.node_type == "file"
+    assert core_data_user.__class__.__name__ == "FileTreeNode", "core/data/user should be a file"
 
     app_folder = find_node_by_qname(tree, f"{project_name}.app")
     assert app_folder is not None, "app folder not found in tree"
-    assert app_folder.node_type == "folder"
+    assert app_folder.__class__.__name__ == "FolderTreeNode", "app should be a folder"
 
     app_api = find_node_by_qname(tree, f"{project_name}.app.api")
     assert app_api is not None, "app/api.py not found in tree"
-    assert app_api.node_type == "file"
+    assert app_api.__class__.__name__ == "FileTreeNode", "app/api should be a file"
 
 
 @pytest.mark.asyncio

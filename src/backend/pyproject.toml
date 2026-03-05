@@ -27,13 +27,17 @@ dependencies = [
   "pytest-asyncio>=1.1.0",
   "aiofiles>=25.1.0",
   "asgi-lifespan>=2.1.0",
+  "terminusdb-client>=10.2.6",
+  "respx>=0.22.0",
+  "trio>=0.32.0",
+  "python-slugify>=8.0.4",
 ]
 
 [project.optional-dependencies]
 test = ["pytest", "httpx", "pytest-asyncio"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "../vn_logger"]
 testpaths = ["tests/unit", "tests/e2e"]
 python_files = ["test_*.py", "*_test.py"]
 asyncio_mode = "strict"

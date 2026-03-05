@@ -1,79 +1,433 @@
-import datetime
-from .base import BaseNode
 from .properties import CodePosition, ThemeConfig
-from typing import List, Optional, Literal
-from pydantic import Field
+
+from datetime import datetime, timezone
+from typing import Optional, Set
+from pydantic import BaseModel, Field
 
 
-class ContainerNode(BaseNode):
-    node_type: str = "container"
-    theme_config: Optional[ThemeConfig] = Field(
-        default=None, description="Container theme configuration."
+def _merge_children(raw_dict: dict, keys: tuple[str, ...]) -> set:
+    """Merge multiple child keys from raw_dict into a single set."""
+    result: set = set()
+    for key in keys:
+        result.update(raw_dict.get(key, set()) or set())
+    return result
+
+
+def _children_by_type(raw_dict: dict, key_to_field: tuple[tuple[str, str], ...]) -> dict[str, set]:
+    """Extract children by type from raw_dict for schema persistence."""
+    return {
+        field: set(raw_dict.get(key, set()) or set())
+        for key, field in key_to_field
+    }
+
+
+# Keys for schema persistence (raw_dict key -> schema field name)
+_FOLDER_CHILDREN_KEYS = (
+    ("folder_children", "folder_children"),
+    ("file_children", "file_children"),
+    ("structure_group", "structure_group"),
+)
+_CODE_ELEMENT_CHILDREN_KEYS = (
+    ("class_children", "class_children"),
+    ("function_children", "function_children"),
+    ("code_element_group", "code_element_group"),
+
+)
+_CALL_CHILDREN_KEYS = (
+    ("call_children", "call_children"),
+    ("call_group", "call_group"),
+)
+
+
+_FILE_CHILDREN_KEYS = (_CODE_ELEMENT_CHILDREN_KEYS + _CALL_CHILDREN_KEYS)
+
+
+class BaseNode(BaseModel):
+    id: Optional[str] = Field(..., description="The ID of the node.")
+    name: str = Field(..., description="The name of the node.")
+    description: str = Field(..., description="The description of the node.")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),
+                                 description="The creation time of the node.")
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),
+                                 description="The update time of the node.")
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        return BaseNode(
+            id=raw_dict["@id"],
+            name=raw_dict["name"],
+            description=raw_dict["description"],
+            created_at=raw_dict["created_at"],
+            updated_at=raw_dict["updated_at"],
+        )
+
+
+class DocumentNode(BaseNode):
+    data: str = Field(..., description="The data of the document.")
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        return DocumentNode(
+            **base.model_dump(),
+            data=raw_dict["data"],
+        )
+
+
+class ProjectNode(BaseNode):
+    local_path: str = Field(..., description="The local path of the project.")
+    remote_path: Optional[str] = Field(default=None,
+                                       description="The remote path of the project.", )
+    db_name: str = Field(..., description="The name of the database.")
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        return ProjectNode(
+            **base.model_dump(),
+            local_path=raw_dict["local_path"],
+            remote_path=raw_dict.get("remote_path", None),
+            db_name=raw_dict["db_name"],
+        )
+
+    @property
+    def path(self) -> str:
+        """Alias for local_path for compatibility with orchestrator and consumers."""
+        return self.local_path
+
+
+class BaseGroupNode(BaseNode):
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the group."
     )
-    icon: Optional[str] = Field(default=None, description="Container icon.")
-    current_version: int = Field(default=0,
-                                 description="The current version of the node.")
-
-    documents: List[str] = Field(
-        default_factory=list, description="Documents held by the container."
-    )
-
-    # Soft delete fields
-    status: Literal["active", "orphaned", "deleted"] = Field(
-        default="active",
-        description="Node lifecycle status"
-    )
-    # status_changed_at: Optional[datetime] = Field(
-    #     default=None,
-    #     description="When status last changed"
-    # )
-    orphan_reason: Optional[str] = Field(
+    children_by_type: Optional[dict[str, set]] = Field(
         default=None,
-        description="Why node became orphaned"
+        description="Split by type for schema persistence.",
+    )
+    documents: Set[str] = Field(
+        default_factory=set, description="The documents of the group."
+    )
+    theme_config: Optional[ThemeConfig] = Field(
+        default=None, description="The theme config of the group.")
+
+
+class CodeElementGroupNode(BaseGroupNode):
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        by_type = _children_by_type(raw_dict, _CODE_ELEMENT_CHILDREN_KEYS)
+        return CodeElementGroupNode(
+            **base.model_dump(),
+            children=_merge_children(
+                raw_dict,
+                ("class_children", "function_children"),
+            ),
+            children_by_type=by_type,
+            documents=raw_dict.get("documents", set()) or set(),
+            theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("class_children", "function_children", "code_element_group"), set()
+        )
+
+
+class CallGroupNode(BaseGroupNode):
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        by_type = _children_by_type(raw_dict, _CALL_CHILDREN_KEYS)
+        return CallGroupNode(
+            **base.model_dump(),
+            children=_merge_children(
+                raw_dict,
+                ("call_children", "call_group"),
+            ),
+            children_by_type=by_type,
+            documents=raw_dict.get("documents", set()) or set(),
+            theme_config=raw_dict.get("theme_config"),
+        )
+
+    def children_by_type(self) -> dict[str, set]:
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("call_children", "call_group"), set()
+        )
+
+
+class StructureGroupNode(BaseGroupNode):
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        by_type = _children_by_type(raw_dict, _FOLDER_CHILDREN_KEYS)
+        return StructureGroupNode(
+            **base.model_dump(),
+            children=_merge_children(
+                raw_dict,
+                ("folder_children", "file_children", "structure_group"),
+            ),
+            children_by_type=by_type,
+            documents=raw_dict.get("documents", set()) or set(),
+            theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("folder_children", "file_children", "structure_group"), set()
+        )
+
+
+class FolderNode(BaseNode):
+    path: str = Field(..., description="The path of the folder.")
+    qname: str = Field(..., description="The qname of the folder.")
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the folder."
+    )
+    documents: Set[str] = Field(
+        default_factory=set, description="The documents of the folder."
+    )
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence (folder_children, file_children, structure_group).",
+    )
+    theme_config: Optional[ThemeConfig] = Field(
+        default=None, description="The theme config of the folder.")
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        by_type = _children_by_type(raw_dict, _FOLDER_CHILDREN_KEYS)
+        return FolderNode(
+            **base.model_dump(),
+            qname=raw_dict["qname"],
+            path=raw_dict["path"],
+            children=_merge_children(
+                raw_dict,
+                ("folder_children", "file_children", "structure_group"),
+            ),
+            documents=raw_dict.get("documents", set()) or set(),
+            children_by_type=by_type,
+            theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        """Return children split by type for schema persistence."""
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("folder_children", "file_children", "structure_group"), set()
+        )
+
+
+class FileNode(BaseNode):
+    path: str = Field(..., description="The path of the file.")
+    qname: str = Field(..., description="The qname of the file.")
+    documents: Set[str] = Field(
+        default_factory=set, description="The documents of the file."
+    )
+    theme_config: Optional[ThemeConfig] = Field(
+        default=None, description="The theme config of the file.")
+    hash: str = Field(..., description="The hash of the file.")
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence.",
+    )
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the file."
     )
 
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        children = _merge_children(
+            raw_dict,
+            ("class_children", "function_children",
+             "code_element_group", "call_children", "call_group"),
+        )
 
-class GroupNode(ContainerNode):
-    node_type: Literal["group"] = "group"
-    group_type: Literal[
-        "call",  # call group
-        "code",  # function/ class,
-        "empty",
-        "folder_file",  # folder/ file
-    ] = Field(description="The type of group.", default="empty")
+        by_type = _children_by_type(raw_dict, _FILE_CHILDREN_KEYS)
+        return FileNode(
+            **base.model_dump(),
+            qname=raw_dict["qname"],
+            path=raw_dict["path"],
+
+            hash=raw_dict["hash"],
+            children=children,
+            documents=raw_dict.get("documents", set()) or set(),
+            children_by_type=by_type,
+            theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        """Return children split by type for schema persistence."""
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("class_children", "function_children",
+             "code_element_group", "call_children", "call_group"),
+            set(),
+        )
 
 
-class FunctionNode(ContainerNode):
-    node_type: Literal["function"] = "function"
-    position: CodePosition = Field(..., description="Function position.")
-
-
-class ClassNode(ContainerNode):
-    node_type: Literal["class"] = "class"
-    implements: List[str] = Field(
-        default_factory=list, description="Class implements.")
-    position: CodePosition = Field(..., description="Function position")
-
-
-class CallNode(ContainerNode):
-    node_type: Literal["call"] = "call"
-    position: CodePosition = Field(..., description="Function position")
-    manually_created: bool = Field(
-        default=False, description="Whether the call was manually created."
+class ClassNode(BaseNode):
+    qname: str = Field(..., description="The qname of the class.")
+    code_position: CodePosition = Field(...,
+                                        description="The code position of the class.")
+    documents: Set[str] = Field(
+        default_factory=set, description="The documents of the class."
     )
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence.",
+    )
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the class."
+    )
+    base_classes: Set[str] = Field(
+        default_factory=set, description="The base classes of the class.")
+    theme_config: Optional[ThemeConfig] = Field(
+        default=None, description="The theme config of the class.")
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        children = _merge_children(
+            raw_dict,
+            (
+                "class_children",
+                "function_children",
+                "code_element_group",
+                "call_children",
+                "call_group",
+            ),
+        )
+        by_type = _children_by_type(raw_dict, _CODE_ELEMENT_CHILDREN_KEYS)
+        return ClassNode(
+            **base.model_dump(),
+            qname=raw_dict["qname"],
+            code_position=raw_dict["code_position"],
+            children=children,
+            base_classes=raw_dict.get("base_classes", set()) or set(),
+            children_by_type=by_type,
+            documents=raw_dict.get("documents", set()) or set(),
+            theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        """Return children split by type for schema persistence."""
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("class_children", "function_children",
+             "code_element_group", "call_children", "call_group"),
+            set(),
+        )
 
 
-class FileNode(ContainerNode):
-    node_type: Literal["file"] = "file"
-    path: str = Field(..., description="File path.")
-    hash: str = Field(..., description="File hash.")
+class FunctionNode(BaseNode):
+    qname: str = Field(..., description="The qname of the function.")
+    code_position: CodePosition = Field(...,
+                                        description="The code position of the function.")
+
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence.",
+    )
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the function."
+    )
+    documents: Set[str] = Field(
+        default_factory=set, description="The documents of the function."
+    )
+    theme_config: Optional[ThemeConfig] = Field(
+        default=None, description="The theme config of the function.")
+
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        children = _merge_children(
+            raw_dict,
+            (
+                "class_children",
+                "function_children",
+                "code_element_group",
+                "call_children",
+                "call_group",
+            ),
+        )
+        by_type = _children_by_type(raw_dict, _CODE_ELEMENT_CHILDREN_KEYS)
+
+        return FunctionNode(
+            **base.model_dump(),
+            qname=raw_dict["qname"],
+            code_position=raw_dict["code_position"],
+            children=children,
+            children_by_type=by_type,
+            documents=raw_dict.get("documents", set()) or set(),
+            theme_config=raw_dict.get("theme_config"),
+        )
+
+    def get_children_by_type(self) -> dict[str, set]:
+        """Return children split by type for schema persistence."""
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("class_children", "function_children",
+             "code_element_group", "call_children", "call_group"),
+            set(),
+        )
 
 
-class FolderNode(ContainerNode):
-    node_type: Literal["folder"] = "folder"
-    path: str = Field(..., description="Folder path.")
+class CallNode(BaseNode):
+    qname: str = Field(..., description="The qname of the call.")
+    target_function: str = Field(
+        ..., description="The target function of the call.")
+    children_by_type: Optional[dict[str, set]] = Field(
+        default=None,
+        description="Split by type for schema persistence.",
+    )
+    children: Set[str] = Field(
+        default_factory=set, description="The children of the call."
+    )
+    documents: Set[str] = Field(
+        default_factory=set, description="The documents of the call."
+    )
+    theme_config: Optional[ThemeConfig] = Field(
+        default=None, description="The theme config of the call.")
 
+    @staticmethod
+    def from_raw_dict(raw_dict):
+        base = BaseNode.from_raw_dict(raw_dict)
+        children = _merge_children(
+            raw_dict,
+            ("call_children", "call_group"),
+        )
+        by_type = _children_by_type(raw_dict, _CALL_CHILDREN_KEYS)
+        return CallNode(
+            **base.model_dump(),
+            qname=raw_dict["qname"],
+            target_function=raw_dict.get(
+                "target_function", None) or raw_dict.get("target_class", None),
+            children=children,
+            children_by_type=by_type,
+            documents=raw_dict.get("documents", set()) or set(),
+            theme_config=raw_dict.get("theme_config"),
+        )
 
-class ProjectNode(ContainerNode):
-    node_type: Literal["project"] = "project"
-    path: str = Field(..., description="Folder path")
+    def get_children_by_type(self) -> dict[str, set]:
+        """Return children split by type for schema persistence."""
+        if self.children_by_type is not None:
+            return self.children_by_type
+        return dict.fromkeys(
+            ("call_children", "call_group"),
+            set(),
+        )

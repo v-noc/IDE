@@ -7,6 +7,7 @@ const API_ROUTES = {
     DOCUMENTS: '/documents/',
     GROUPS: '/groups/',
     CALLS: '/calls/',
+    VERSIONING: '/versioning',
 };
 
 export default API_ROUTES; 

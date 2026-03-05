@@ -8,6 +8,7 @@ interface DocSidebarProps {
   documents: DocumentData[];
   selectedDocumentId: string | null;
   nodeId: string;
+  projectId: string;
   onSelectDocument: (id: string) => void;
   onClose?: () => void;
   /**
@@ -32,11 +33,12 @@ export function DocSidebar({
   documents,
   selectedDocumentId,
   nodeId,
+  projectId,
   onSelectDocument,
   onClose,
   onDocumentChange,
 }: DocSidebarProps) {
-  const selectedDocument = documents.find((d) => d._key === selectedDocumentId);
+  const selectedDocument = documents.find((d) => d.id === selectedDocumentId);
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -46,19 +48,19 @@ export function DocSidebar({
           <div className="flex p-1 gap-1">
             {documents.map((doc) => (
               <button
-                key={doc._key}
-                onClick={() => onSelectDocument(doc._key)}
+                key={doc.id}
+                onClick={() => onSelectDocument(doc.id)}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all cursor-pointer whitespace-nowrap",
-                  selectedDocumentId === doc._key
+                  selectedDocumentId === doc.id
                     ? "bg-white border border-border shadow-sm font-semibold text-foreground ring-1 ring-black/5"
-                    : "hover:bg-white/50 text-muted-foreground border border-transparent hover:text-foreground"
+                    : "hover:bg-white/50 text-muted-foreground border border-transparent hover:text-foreground",
                 )}
               >
                 <span className="truncate max-w-[120px]">
                   {doc.name || "Untitled"}
                 </span>
-                {selectedDocumentId === doc._key && (
+                {selectedDocumentId === doc.id && (
                   <ChevronDown className="h-3 w-3 opacity-50" />
                 )}
               </button>
@@ -81,9 +83,10 @@ export function DocSidebar({
       {/* Editor below */}
       <div className="flex-1 overflow-hidden py-2">
         <DocumentEditor
-          key={selectedDocument?._key || "new"}
+          key={selectedDocument?.id || "new"}
           document={selectedDocument || null}
           nodeId={nodeId}
+          projectId={projectId}
           autoSave={true}
           onChange={onDocumentChange}
           containerClassName="px-2 py-2"

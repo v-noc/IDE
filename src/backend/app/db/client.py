@@ -1,49 +1,70 @@
+"""
+TerminusDB async client module.
 
-from arangoasync import ArangoClient
-from arangoasync.auth import Auth
-from arangoasync.database import AsyncDatabase
+Provides a singleton AsyncClient instance with proper lifecycle
+management for use with FastAPI.
+"""
 
+from .async_terminus_client import AsyncClient
 from ..config.settings import get_settings
+from app.core.model.schemas import DocumentSchema, ProjectSchema, BaseSchema, TerminusBase, ThemeConfigSchema
+from app.db.woqlschema import *
 
-# NOTE: python-arango-async uses an async context manager to initialize
-# underlying resources. Returning a database handle from inside an `async with`
-# block would immediately close the client and invalidate the handle.
-_client: ArangoClient | None = None
-_db: AsyncDatabase | None = None
+_client: AsyncClient | None = None
 
 
-async def get_db_async_client() -> AsyncDatabase:
-    """Return a cached AsyncDatabase connection (python-arango-async)."""
-    global _client, _db
-    if _db is not None:
-        return _db
+async def migrate_base(client):
+    schema_obj = WOQLSchema(
+        title="V-NOC Schema",
+        description="V-NOC code analysis graph schema",
+        authors=["V-NOC Team"],
+    )
+    schema_obj.add_obj(TerminusBase.__name__, TerminusBase)
+    schema_obj.add_obj(BaseSchema.__name__, BaseSchema)
+    schema_obj.add_obj(DocumentSchema.__name__, DocumentSchema)
+    schema_obj.add_obj(ThemeConfigSchema.__name__, ThemeConfigSchema)
+    schema_obj.add_obj(ProjectSchema.__name__, ProjectSchema)
+    await schema_obj.commit(client, "Add ProjectSchema to schema", full_replace=True)
 
+
+async def _build_client() -> AsyncClient:
     settings = get_settings()
-    _client = ArangoClient(hosts=settings.ARANGO_HOST)
-    # Manually enter the async context once and keep it alive for the process.
-    await _client.__aenter__()
+    client = AsyncClient(settings.TERMINUS_HOST)
+    try:
+        await client.connect(
+            db=settings.TERMINUS_DB,
+            user=settings.TERMINUS_USER,
+            key=settings.TERMINUS_KEY,
+            team=settings.TERMINUS_TEAM,
+        )
+    except Exception:
+        await client.create_database(
+            dbid=settings.TERMINUS_DB,
+            team=settings.TERMINUS_TEAM,
+            label=settings.TERMINUS_DB,
+            description="V-NOC code analysis graph",
+        )
+        await client.connect(
+            db=settings.TERMINUS_DB,
+            user=settings.TERMINUS_USER,
+            key=settings.TERMINUS_KEY,
+            team=settings.TERMINUS_TEAM,
+        )
+    await migrate_base(client)
+    return client
 
-    auth = Auth(username=settings.ARANGO_USER,
-                password=settings.ARANGO_PASSWORD)
-    _db = await _client.db(settings.ARANGO_DB, auth=auth)
-    return _db
+
+async def get_terminus_client() -> AsyncClient:
+    global _client
+    if _client is None:
+        _client = await _build_client()
+    return _client
 
 
-async def get_db() -> AsyncDatabase:
-    """
-    FastAPI dependency: returns the process-wide cached AsyncDatabase.
-
-    Kept as `get_db` for compatibility with existing imports.
-    """
-    return await get_db_async_client()
-
-
-def close_db_client() -> None:
-    """Close the global Arango client (best-effort)."""
-    global _client, _db
+async def close_db_client() -> None:
+    global _client
     try:
         if _client is not None:
-            _client.close()
+            await _client.close()
     finally:
         _client = None
-        _db = None

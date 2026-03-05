@@ -16,7 +16,7 @@ export function useNodeStyle(node: ContainerNodeTree) {
 
     // For call nodes, use target's style
     if (node.target && projectData) {
-      const targetNode = findNodeByKey(projectData, node.target._key);
+      const targetNode = findNodeByKey(projectData, node.target.id);
       if (targetNode) {
         effectiveNode = targetNode;
       }

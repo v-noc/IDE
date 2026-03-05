@@ -16,20 +16,20 @@ interface TreePaneProps {
 const nodeToTreeItem = (
   node: AnyNodeTree,
   checked: Record<string, boolean>,
-  onToggleChecked: (key: string) => void
+  onToggleChecked: (key: string) => void,
 ): TreeDataItem => {
   return {
-    id: node._key,
+    id: node.id,
     name: node.name,
     subtitle: node.description ? node.description.substring(0, 50) : undefined,
     children: (node.children ?? []).map((c) =>
-      nodeToTreeItem(c as AnyNodeTree, checked, onToggleChecked)
+      nodeToTreeItem(c as AnyNodeTree, checked, onToggleChecked),
     ),
     actions: (
       <Checkbox
-        checked={!!checked[node._key]}
+        checked={!!checked[node.id]}
         onCheckedChange={() => {
-          onToggleChecked(node._key);
+          onToggleChecked(node.id);
         }}
         onClick={(e) => e.stopPropagation()}
       />
@@ -46,13 +46,13 @@ export const TreePane: React.FC<TreePaneProps> = ({
 }) => {
   const treeData = useMemo(
     () => nodeToTreeItem(root as AnyNodeTree, checked, onToggleChecked),
-    [root, checked, onToggleChecked]
+    [root, checked, onToggleChecked],
   );
 
   return (
     <TreeView
       data={treeData}
-      initialSelectedItemId={selectedNodeKey ?? root._key}
+      initialSelectedItemId={selectedNodeKey ?? root.id}
       onSelectChange={(item) => item && onSelect(item.id)}
       expandAll={false}
       className="h-full overflow-y-auto"

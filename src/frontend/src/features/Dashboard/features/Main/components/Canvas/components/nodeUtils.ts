@@ -3,12 +3,12 @@ import type { NodeMetadata } from "./nodes/EnhancedNode";
 
 
 export interface SimpleTreeNode {
-  _key: string;
+  id: string;
   name: string;
   icon?: string;
   node_type: AnyNodeTree["node_type"];
   children?: AnyNodeTree[];
-  target?: { _key: string, node_type: AnyNodeTree["node_type"], description?: string };
+  target?: { id: string, node_type: AnyNodeTree["node_type"], description?: string };
   metadata?: Partial<NodeMetadata>;
   created_at?: string;
   updated_at?: string;

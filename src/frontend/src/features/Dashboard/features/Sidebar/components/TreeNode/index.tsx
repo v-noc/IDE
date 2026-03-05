@@ -22,16 +22,13 @@ export const TreeNode = ({
   const { isOpen, isSelected, isActive, hasChildren } = useTreeNodeState(
     node,
     childFilter,
-    tabId
+    tabId,
   );
 
-  const {
-    handleToggle,
-    handleSelectNode,
-    onAction
-  } = useNodeHandlers(node._key, tabId);
-
-
+  const { handleToggle, handleSelectNode, onAction } = useNodeHandlers(
+    node.id,
+    tabId,
+  );
 
   if (!node) return null;
 
@@ -39,11 +36,9 @@ export const TreeNode = ({
     ? () => onSelect(node)
     : handleSelectNode;
 
-
-
   return (
     <NodeContextMenu
-      nodeId={node._key}
+      nodeId={node.id}
       nodeType={node.node_type}
       manuallyCreated={(node as any).manually_created}
       onAction={onAction}

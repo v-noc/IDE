@@ -1,9 +1,11 @@
-.PHONY: help install-backend run-backend install-frontend run-frontend install
+.PHONY: help install-backend run-backend install-frontend run-frontend install start-db stop-db
 
 help:
 	@echo "Commands:"
 	@echo "  install          : Install all dependencies for backend and frontend."
 	@echo "  install-backend  : Install backend dependencies."
+	@echo "  start-db         : Start TerminusDB (Docker) on http://localhost:6363."
+	@echo "  stop-db          : Stop TerminusDB."
 	@echo "  run-backend      : Start backend development server on http://localhost:8000."
 	@echo "  run-rpc          : Start JSON-RPC server on http://localhost:8050/api/v1/jsonrpc."
 	@echo "  run-servers      : Start backend and JSON-RPC servers."
@@ -20,12 +22,12 @@ install-backend:
 	@uv pip install -r src/backend/requirements.txt --python .venv/bin/python
 
 start-db:
-	@echo ">>> Starting ArangoDB..."
-	@docker-compose -f src/backend/docker-compose.yml --env-file src/backend/.env up -d
+	@echo ">>> Starting TerminusDB..."
+	@docker compose -f src/backend/docker-compose.yml --env-file src/backend/.env up -d
 
 stop-db:
-	@echo ">>> Stopping ArangoDB..."
-	@docker-compose -f src/backend/docker-compose.yml --env-file src/backend/.env down
+	@echo ">>> Stopping TerminusDB..."
+	@docker compose -f src/backend/docker-compose.yml --env-file src/backend/.env down
 
 run-backend: start-db
 	@echo ">>> Starting backend development server..."

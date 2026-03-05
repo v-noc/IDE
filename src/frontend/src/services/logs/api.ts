@@ -22,6 +22,6 @@ export interface LogTreeNode extends LogNode {
 }
 
 export const logsApi = {
-  getLogTree: (nodeId: string): Promise<LogTreeNode[]> =>
-    api(`${API_ROUTES.LOGS}${nodeId}/tree`),
+  getLogTree: (functionId: string, projectId: string): Promise<LogTreeNode[]> =>
+    api(`${API_ROUTES.LOGS}/log-tree?function_id=${functionId}&project_id=${projectId}`),
 };

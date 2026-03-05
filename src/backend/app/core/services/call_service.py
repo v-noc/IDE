@@ -1,87 +1,78 @@
-from app.core.services.container_service import ContainerService
-from app.core.repository import Repositories
+
+from datetime import datetime, timezone
+import uuid
+from typing import Literal, List, Tuple
 from app.core.model.nodes import CallNode
-from app.core.model.properties import CodePosition
-from app.core.model.edges import TargetsEdge
-from typing import Optional
+from app.db.context import ProjectUoW
 
 
-class CallService(ContainerService):
-    def __init__(self, repos: Repositories):
-        self.repos = repos
+class CallService():
+    def __init__(self, uow: ProjectUoW):
+        self.uow = uow
+        self.repos = self.uow.get_project_repos()
 
     async def create(
         self,
         name: str,
         qname: str,
         description: str,
-        position: CodePosition,
         target_id: str,
-        manually_created: bool = False,
-        current_version: Optional[int] = None,
+
     ):
         call = CallNode(
+            id=f"CallSchema/{str(uuid.uuid4())}",
             name=name,
             qname=qname,
             description=description,
-            position=position,
-            manually_created=manually_created,
-            current_version=current_version if current_version is not None else 0,
+            target_function=target_id,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
 
         new_call = await self.repos.call_repo.create(call)
-        target = TargetsEdge(
-            from_id=new_call.id,
-            to_id=target_id,
-        )
-        await self.repos.targets_edges.create(target)
+
         return new_call
+
+    async def create_batch(self, calls: List[CallNode]):
+        return await self.repos.call_repo.create(calls)
 
     async def get(self, call_id: str):
         return await self.repos.call_repo.get_by_id(call_id)
 
     async def update(self, call: CallNode):
-        return await self.repos.call_repo.update(call.key, call)
+        return await self.repos.call_repo.update(call)
 
-    async def delete(self, call_key: str):
-        call_id = f"nodes/{call_key}"
+    async def delete(self, call_id: str):
+        return await self.repos.call_repo.delete(call_id)
 
-        descendants = await self.repos.call_repo.get_containment_tree(
-            call_id, depth="*")
+    async def move_batch(self, moves: List[Tuple[str, str, str]]):
+        return await self.repos.call_repo.move_batch(moves)
 
-        descendant_keys = [item["vertex"]["_key"] for item in descendants]
-
-        for key in reversed(descendant_keys):
-            await self.repos.nodes.delete(key)
-
-        return await self.repos.call_repo.delete(call_key)
+    async def batch_delete(self, call_ids: List[str]):
+        return await self.repos.call_repo.batch_delete_calls(call_ids)
 
     async def add_call(self, parent_call_id: str, call_id: str):
-        return await self.add_child(
+        return await self.repos.call_repo.move_item(
             parent_call_id,
             call_id,
-            "call_to_call",
+            "call",
         )
 
-    async def get_children(self, call_id: str):
-        return await self.repos.call_repo.get_containment_tree(call_id)
+    async def get_children(self, call_id: str, child_type: list[Literal["call", "call_group"]] = []):
+        return await self.repos.call_repo.get_children(call_id, child_type)
 
-    async def get_direct_call_children(self, parent_id: str):
+    async def get_direct_call_children(self, call_site_id: str, child_type: str):
         """
         Get direct call-node children of a given parent (call/group/container).
 
         This only returns vertices whose node_type == \"call\" at depth 1,
         ignoring groups and deeper descendants.
         """
-        children = await self.repos.call_repo.get_containment_tree(
-            parent_id, depth=1
+        children = await self.repos.call_repo.get_direct_children(
+            call_site_id, child_type
         )
-        direct_calls = []
-        for item in children:
-            vertex = item.get("vertex", {})
-            if vertex.get("node_type") == "call":
-                direct_calls.append(item)
-        return direct_calls
+
+        return children
 
     async def get_code(self, call_id: str):
         call = await self.repos.call_repo.get_by_id(call_id)
@@ -112,6 +103,9 @@ class CallService(ContainerService):
             "code": code,
         }
 
+    async def flush_batch(self, inserts: List[CallNode], deletes: List[str], moves: List[Tuple[str, str, str]]):
+        return await self.repos.call_repo._flush_batch_combined(inserts, deletes, moves)
+
     async def get_call_with_parent_and_target(self, parent_id: str, target_id: str):
         # Note: repository expects (target_id, parent_id)
         return await self.repos.call_repo.find_call_by_target_parent(
@@ -120,4 +114,4 @@ class CallService(ContainerService):
         )
 
     async def get_call_parent_chain(self, call_id: str):
-        return await self.repos.call_repo.find_upward_call_chain(call_id)
+        return await self.repos.call_repo.get_call_chain(call_id)

@@ -41,42 +41,12 @@ class Collector:
         self.jedi_manager = jedi_manager
 
         self.folder_processor = FolderProcessor(
-            project_node, repos.folder_repo)
+            project_node)
         self.file_processor = FileProcessor(
-            project_node, repos.file_repo, repos.folder_repo)
+            project_node)
 
         self.mro_resolver = MROResolver(jedi_manager)
         self.ast_processor = ASTProcessor(repos, self.mro_resolver)
-
-    async def ensure_project_root(self) -> None:
-        """
-        Ensure the project root exists in the DB and can be reused by processors.
-
-        Simplified contract:
-        - If `project_node` has no key/id: treat as new -> create once.
-        - If it has key and/or id: treat as existing -> do not update, just reuse.
-        - Normalize key<->id locally if only one is present.
-        """
-        # Normalize key/id if we have exactly one of them.
-        if self.project_node.id and not self.project_node.key:
-            self.project_node.key = (
-                self.project_node.id.split("/")[-1]
-                if "/" in self.project_node.id
-                else self.project_node.id
-            )
-        if self.project_node.key and not self.project_node.id:
-            # ProjectRepo uses the "nodes" collection.
-            self.project_node.id = f"nodes/{self.project_node.key}"
-
-        # Create if new (no identity).
-        if not self.project_node.key and not self.project_node.id:
-            self.project_node = await self.repos.project_repo.create(
-                self.project_node
-            )
-
-        # Update folder_processor and file_processor with the persisted project_node
-        self.folder_processor.project_node = self.project_node
-        self.file_processor.project_node = self.project_node
 
     def reset_session(self) -> None:
         """Reset builder caches between orchestrator runs."""
@@ -93,25 +63,29 @@ class Collector:
         Returns folder changes for notification/logging.
         """
         with tracker.timer("collector.sync_structure"):
-            # Ensure project_root is persisted before processing
-            await self.ensure_project_root()
 
-            # 1. Sync Folders
-            with tracker.timer("collector.sync_folders"):
-                folder_changes = await self.folder_processor.process_batch(
-                    change_set, batch_size=batch_size
-                )
+            folder_plan = self.folder_processor.prepare_batch(
+                change_set
+            )
 
-            # 2. Sync Files (Shells)
-            with tracker.timer("collector.sync_files_shells"):
-                await self.file_processor.process_batch(
-                    change_set, scan_result, batch_size=batch_size
-                )
+            file_plan = self.file_processor.prepare_batch(
+                change_set, scan_result
+            )
 
-            return folder_changes
+            folder_plan.extend(file_plan)
+
+            await self.repos.structure_repo.flush_batch(
+                folder_plan.insert,
+                [],
+                folder_plan.delete,
+                folder_plan.move,
+
+            )
+
+            await self.repos.structure_repo.update_batch(folder_plan.update)
 
     async def process_file(
-        self, file_path: str, checksum: str, progress_tracker=None
+        self, file_node: FileNode, checksum: str, progress_tracker=None
     ) -> Optional[CollectionResult]:
         """
         Process a single file for Phase 2 collection (Content/AST).
@@ -123,27 +97,15 @@ class Collector:
         - folder_changes: Empty list (kept for signature compatibility)
         """
         with tracker.timer("collector.process_file_total"):
-            abs_path = Path(file_path)
+            abs_path = Path(file_node.path)
             try:
                 # Check if file is inside project path
                 abs_path.relative_to(self.project_path)
             except ValueError:
                 logger.error(
                     "File %s is not inside project path %s",
-                    file_path,
+                    file_node.path,
                     self.project_path,
-                )
-                return None
-
-            # 1. Retrieve File Node
-            with tracker.timer("collector.process_file.get_node"):
-                file_node = await self.repos.file_repo.find_one(
-                    {"path": str(abs_path)}
-                )
-            if not file_node:
-                logger.error(
-                    f"File node not found for {file_path} after "
-                    f"structure sync"
                 )
                 return None
 
@@ -154,7 +116,7 @@ class Collector:
                 ) as f:
                     content = await f.read()
             except Exception as e:
-                logger.error(f"Failed to read file {file_path}: {e}")
+                logger.error(f"Failed to read file {file_node.path}: {e}")
                 return None
 
             # 3. Scan AST
@@ -167,49 +129,11 @@ class Collector:
                     )
             except Exception as e:
                 logger.error(
-                    f"Failed to scan AST for {file_path}: {e}")
+                    f"Failed to scan AST for {file_node.path}: {e}")
                 return None
 
             # 4. Sync Content
-            # This handles fetching descendants, diffing, and batch DB ops
-            # (Create/Update/Delete/Relink). Use processed_content because
-            # line numbers in ast_nodes match it (IDs injected)
             with tracker.timer("collector.process_file.sync_content"):
-                await self.ast_processor.sync_content(
-                    file_node, ast_nodes, processed_content, progress_tracker
+                return await self.ast_processor.sync_content(
+                    file_node, ast_nodes,   content=processed_content, progress_tracker=progress_tracker
                 )
-
-            return CollectionResult(
-                file_node=file_node,
-                removed_scope_ids=[],  # Deletions handled internally
-                folder_changes=[],
-            )
-
-    async def process_folder(
-        self, folder_path: str
-    ) -> Optional[List[FolderChange]]:
-        """Ensure folder hierarchy exists for a folder change event."""
-        # Ensure project_root is persisted before processing
-        await self.ensure_project_root()
-
-        abs_path = Path(folder_path)
-        try:
-            rel_path = abs_path.relative_to(self.project_path)
-        except ValueError:
-            logger.error(
-                "Folder %s is not inside project path %s",
-                folder_path,
-                self.project_path,
-            )
-            return []
-        build_result = await self.folder_processor.ensure_folder(rel_path)
-        if not build_result:
-            return []
-        return build_result.folder_changes
-
-    async def process_folder_changes_batch(
-        self, change_set: ChangeSet, batch_size: int = 100
-    ) -> List[FolderChange]:
-        return await self.folder_processor.process_batch(
-            change_set, batch_size
-        )

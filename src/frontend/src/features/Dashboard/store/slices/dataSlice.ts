@@ -31,7 +31,7 @@ export const createDataSlice: StateCreator<
         const stack = state.focusStack[tabId];
         if (stack && stack.length > 0) {
           const remapped = stack
-            .map((n) => findNodeByKey(data, n._key))
+            .map((n) => findNodeByKey(data, n.id))
             .filter((n): n is AnyNodeTree => n != null);
           state.focusStack[tabId] = remapped;
           state.focusedNode[tabId] = remapped[remapped.length - 1] ?? null;
@@ -42,7 +42,7 @@ export const createDataSlice: StateCreator<
       Object.keys(state.selectedNode).forEach((tabId) => {
         const selected = state.selectedNode[tabId];
         if (selected) {
-          state.selectedNode[tabId] = findNodeByKey(data, selected._key) ?? null;
+          state.selectedNode[tabId] = findNodeByKey(data, selected.id) ?? null;
         }
       });
     } else {

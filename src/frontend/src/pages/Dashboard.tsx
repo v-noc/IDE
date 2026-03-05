@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
 
 import { useShallow } from "zustand/react/shallow";
 import { SidebarDialogs } from "@/features/Dashboard/components/SidebarDialogs";
+import VersioningPanel from "@/features/Dashboard/features/Versioning/components/VersioningPanel";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import AgentOverlay from "@/features/Dashboard/features/Agent";
 
 /**
  * Dashboard Page - Entry point for the IDE dashboard.
@@ -29,6 +32,7 @@ const Dashboard = () => {
   const handleNodeSelection = useTabStore((s) => s.handleNodeSelection);
 
   const tabStack = useTabStore(useShallow(selectTabStack));
+  const isVersioningOpen = useVersioningStore((s) => s.isOpen);
 
   // Socket and Data Sync hooks
   useSocketSync();
@@ -53,19 +57,23 @@ const Dashboard = () => {
               <div
                 key={tab.id}
                 className={cn(
-                  "h-full w-full",
-                  tab.id !== activeTabId && "hidden"
+                  "relative h-full w-full",
+                  tab.id !== activeTabId && "hidden",
                 )}
               >
                 <Workspace tabId={tab.id} />
+                <AgentOverlay />
               </div>
             ))}
           </RightSidebar>
         }
         navbar={<Navbar projectId={projectId} />}
         leftSidebar={<SideBar />}
+        rightSidebar={
+          isVersioningOpen ? <VersioningPanel tabId={activeTabId} /> : undefined
+        }
       />
-           <SidebarDialogs />
+      <SidebarDialogs />
     </ResizablePanelGroup>
   );
 };

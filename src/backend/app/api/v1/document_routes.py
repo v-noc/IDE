@@ -1,18 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from app.api.dependencies import get_document_service
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from typing import Optional
 
 from app.core.services.document_service import DocumentService
-from app.core.repository import Repositories
-from app.db.client import get_db
-from arangoasync.database import AsyncDatabase
-from app.core.model.documents import DocumentNode
+from app.core.model import DocumentNode
 from pydantic import BaseModel, Field
 from typing import List
 
 router = APIRouter()
-
-
-from app.api.dependencies import get_document_service
 
 
 class CreateDocumentRequest(BaseModel):
@@ -22,6 +17,7 @@ class CreateDocumentRequest(BaseModel):
 
 
 class UpdateDocumentRequest(BaseModel):
+    node_id: str = Field(..., min_length=1)
     name: Optional[str] = Field(None, min_length=1)
     description: Optional[str] = Field(None, min_length=1)
     data: Optional[str] = None
@@ -37,11 +33,13 @@ async def create_document(
     document_service: DocumentService = Depends(get_document_service),
 ):
     try:
-        return await document_service.create(
+        response = await document_service.create(
             name=request.name,
             description=request.description,
             node_id=request.node_id,
         )
+
+        return response
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -49,18 +47,22 @@ async def create_document(
         )
 
 
-@router.put("/{document_key}", response_model=DocumentNode)
+@router.put("/", response_model=DocumentNode)
 async def update_document(
-    document_key: str,
-    request: UpdateDocumentRequest,
+    document_id: str = Query(...,
+                             description="The ID of the document to update"),
     document_service: DocumentService = Depends(get_document_service),
+    request: UpdateDocumentRequest = Body(...),
 ):
-    existing = await document_service.get(document_key)
+    is_root = False
+    if request.node_id.startswith("ProjectSchema/"):
+        is_root = True
+    existing = await document_service.get(document_id, is_root=is_root)
 
     if not existing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document {document_key} not found",
+            detail=f"Document {document_id} not found",
         )
 
     if request.name is not None:
@@ -70,12 +72,15 @@ async def update_document(
     if request.data is not None:
         existing.data = request.data
 
-    return await document_service.update(existing)
+    response = await document_service.update(existing, is_root=is_root)
+
+    return response
 
 
-@router.delete("/{document_key}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
-    document_key: str,
+    document_id: str = Query(...,
+                             description="The ID of the document to delete"),
     node_id: str = Query(
         ...,
         min_length=1,
@@ -84,7 +89,10 @@ async def delete_document(
     document_service: DocumentService = Depends(get_document_service),
 ):
     try:
-        await document_service.delete(document_key, node_id)
+        is_root = False
+        if node_id.startswith("ProjectSchema/"):
+            is_root = True
+        await document_service.delete(document_id, is_root=is_root)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -93,13 +101,16 @@ async def delete_document(
     return None
 
 
-@router.get("/{node_id}", response_model=List[DocumentNode])
+@router.get("/", response_model=List[DocumentNode])
 async def get_documents_for_node(
-    node_id: str,
+    node_id: str = Query(...,
+                         description="The ID of the node to get documents for"),
     document_service: DocumentService = Depends(get_document_service),
 ):
+    print(f"node_id: {node_id}")
     try:
         documents = await document_service.get_nodes_by_parent_node(node_id)
+        print(f"documents: {documents}")
         return documents
     except ValueError as e:
         raise HTTPException(

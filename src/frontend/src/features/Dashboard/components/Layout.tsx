@@ -14,7 +14,12 @@ interface LayoutProps {
   leftSidebar: ReactNode;
   rightSidebar?: ReactNode;
 }
-export default function Layout({ navbar, leftSidebar, main }: LayoutProps) {
+export default function Layout({
+  navbar,
+  leftSidebar,
+  main,
+  rightSidebar,
+}: LayoutProps) {
   // Theme - pure derived state
   const { cssVariables } = useResolvedTheme();
 
@@ -53,7 +58,7 @@ export default function Layout({ navbar, leftSidebar, main }: LayoutProps) {
 
         <ResizableHandle className="w-px hover:bg-border/50 transition-colors" />
 
-        {/* Main Content */}
+        {/* Middle Content */}
         <ResizablePanel defaultSize={80} className="flex flex-col">
           {/* Navbar Slot */}
           <nav className="border-b bg-(--navbar-color) transition-colors">
@@ -76,6 +81,20 @@ export default function Layout({ navbar, leftSidebar, main }: LayoutProps) {
             {main}
           </main>
         </ResizablePanel>
+
+        {rightSidebar && (
+          <>
+            <ResizableHandle className="w-px hover:bg-border/50 transition-colors" />
+            <ResizablePanel
+              defaultSize={25}
+              minSize={20}
+              maxSize={40}
+              className="bg-white"
+            >
+              {rightSidebar}
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
     </div>
   );

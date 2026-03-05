@@ -1,25 +1,20 @@
 import { useEffect, useEffectEvent, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+
 import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/useProject";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useTreeFilter } from "./useTreeFilter";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 
-/**
- * Hook to manage sidebar data:
- * - Fetches project tree data based on route params.
- * - Synchronizes server data with the project store.
- * - Integrates tree filtering logic.
- */
+
 export function useSidebarData() {
   const { projectId } = useParams();
-  const queryClient = useQueryClient();
+
 
   const { data, isLoading, isSuccess } =
     useGetProjectTreeWithKeyProject({
-      key: projectId || "",
+      key: "ProjectSchema/" + projectId || "",
     });
 
   const setProjectData = useProjectStore((s) => s.setProjectData);

@@ -9,11 +9,10 @@ import queryKeys from "@/lib/queryKeys";
 export const useCreateDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateDocumentRequest) =>
-      documentsApi.createDocument(payload),
-    onSuccess: (_, { node_id }) => {
-      // Invalidate documents list for the node
-      queryClient.invalidateQueries({ queryKey: queryKeys.documents.list(node_id) });
+    mutationFn: ({ payload, projectId }: { payload: CreateDocumentRequest; projectId: string }) =>
+      documentsApi.createDocument(payload, projectId),
+    onSuccess: (_, { payload, projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.list(payload.node_id, projectId) });
     },
   });
 };
@@ -22,23 +21,23 @@ export const useCreateDocument = () => {
  * Update document mutation.
  * Updates cache directly without invalidating/refetching to prevent cursor glitches.
  */
-export const useUpdateDocument = (nodeId: string) => {
+export const useUpdateDocument = (nodeId: string, projectId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (payload: UpdateDocumentRequest) =>
-      documentsApi.updateDocument(payload),
+      documentsApi.updateDocument(payload, projectId),
     onSuccess: (updatedDocument, variables) => {
       // Update the cache directly without invalidating/refetching
       // This prevents cursor glitches and keeps UI in sync between main view and right sidebar
       queryClient.setQueryData<typeof updatedDocument[]>(
-        queryKeys.documents.list(nodeId),
+        queryKeys.documents.list(nodeId, projectId),
         (oldData) => {
           if (!oldData) return oldData;
 
           let hasChanges = false;
           const updatedDocs = oldData.map((doc) => {
-            if (doc._key !== updatedDocument._key) {
+            if (doc.id !== updatedDocument.id) {
               return doc; // Return same reference for unchanged docs
             }
 
@@ -82,11 +81,10 @@ export const useUpdateDocument = (nodeId: string) => {
 export const useDeleteDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ documentId, nodeId }: { documentId: string; nodeId: string }) =>
-      documentsApi.deleteDocument(documentId, nodeId),
-    onSuccess: (_, { nodeId }) => {
-      // Invalidate documents list for the node
-      queryClient.invalidateQueries({ queryKey: queryKeys.documents.list(nodeId) });
+    mutationFn: ({ documentId, nodeId, projectId }: { documentId: string; nodeId: string; projectId: string }) =>
+      documentsApi.deleteDocument(documentId, nodeId, projectId),
+    onSuccess: (_, { nodeId, projectId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.list(nodeId, projectId) });
     },
   });
 };

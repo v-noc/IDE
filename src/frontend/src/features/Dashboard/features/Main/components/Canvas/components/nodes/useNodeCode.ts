@@ -13,7 +13,7 @@ export interface UseNodeCodeOptions {
 export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions) {
   const [showCode, setShowCode] = useState(false);
   const { projectData } = useProjectStore();
-  const projectId = projectData?._key;
+  const projectId = projectData?.id;
 
   // Fetch code dynamically for the node
   const effectiveNodeId = nodeType === "call" && targetKey ? targetKey : nodeId;
@@ -22,7 +22,8 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
 
   const { data: codeData } = useCode(
     showCode ? effectiveNodeId : undefined,
-    effectiveNodeType
+    effectiveNodeType,
+    projectId
   );
 
   const {

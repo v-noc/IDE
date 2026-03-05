@@ -105,7 +105,7 @@ const useTabStore = create<TabStore>()(
         // If we select a node that is NOT the source of an existing child tab, destroy that child tab
         currentTab.childrenIds.forEach((childId) => {
           const childTab = get().tabs[childId];
-          if (childTab && childTab.sourceCallNodeId !== node?._key) {
+          if (childTab && childTab.sourceCallNodeId !== node?.id) {
             get().destroyTabBranch(childId);
           }
         });
@@ -134,18 +134,18 @@ const useTabStore = create<TabStore>()(
 
           if (target) {
             // Check if we already have a tab for this specific call node
-            const existingChildId = currentTab.childrenIds.find(id => get().tabs[id]?.sourceCallNodeId === node._key);
+            const existingChildId = currentTab.childrenIds.find(id => get().tabs[id]?.sourceCallNodeId === node.id);
             if (existingChildId) return;
 
             const projectData = useProjectStore.getState().projectData;
-            const lineage = findNodeLineage(projectData, target._key);
+            const lineage = findNodeLineage(projectData, target.id);
 
             const newTabId = crypto.randomUUID();
             const newTab: TabData = {
               id: newTabId,
               title: `Explore: ${target.name}`,
               parentId: tabId,
-              sourceCallNodeId: node._key,
+              sourceCallNodeId: node.id,
               childrenIds: [],
             };
 
@@ -163,7 +163,7 @@ const useTabStore = create<TabStore>()(
               useProjectStore.getState().pushFocusBulk(newTabId, lineage);
 
               // Auto-expand folders/files/nodes in the lineage including target
-              const expandKeys = lineage.map((n: AnyNodeTree) => n._key);
+              const expandKeys = lineage.map((n: AnyNodeTree) => n.id);
               useProjectStore.getState().expandNodesBulk(newTabId, expandKeys);
             } else {
               // Fallback

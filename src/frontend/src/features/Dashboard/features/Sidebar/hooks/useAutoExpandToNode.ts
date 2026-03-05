@@ -22,7 +22,7 @@ export function useAutoExpandToNode(projectTree: AnyNodeTree | null, tabId: stri
     if (!projectTree) return;
 
 
-    const targetKey = node._key;
+    const targetKey = node.id;
     if (!targetKey) return;
 
     // Access current state directly to check before dispatching

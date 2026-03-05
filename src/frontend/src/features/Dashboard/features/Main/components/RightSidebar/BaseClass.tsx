@@ -15,7 +15,7 @@ type NodeWithChildren = { children?: AnyNodeTree[] };
 
 const findNodeByQName = (
   root: AnyNodeTree | null,
-  qname?: string | null
+  qname?: string | null,
 ): AnyNodeTree | null => {
   if (!root || !qname) return null;
   const stack: AnyNodeTree[] = [root];
@@ -36,7 +36,9 @@ const BaseClass = () => {
   const activeTabId = useTabStore((s) => s.activeTabId);
   const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
   const projectData = useProjectStore((s) => s.projectData);
-  const setSecondarySelectedNode = useProjectStore((s) => s.setSecondarySelectedNode);
+  const setSecondarySelectedNode = useProjectStore(
+    (s) => s.setSecondarySelectedNode,
+  );
   const [showMethods, setShowMethods] = useState(false);
 
   const baseClassNodes = useMemo(() => {
@@ -113,10 +115,12 @@ const BaseClass = () => {
           ) : (
             mergedMethods.map((method) => (
               <TreeNode
-                key={method._key}
+                key={method.id}
                 node={method}
                 tabId={activeTabId}
-                onSelect={(n) => setSecondarySelectedNode(activeTabId, n as AnyNodeTree)}
+                onSelect={(n) =>
+                  setSecondarySelectedNode(activeTabId, n as AnyNodeTree)
+                }
               />
             ))
           )}
@@ -130,10 +134,12 @@ const BaseClass = () => {
           ) : (
             baseClassNodes.map((node) => (
               <TreeNode
-                key={node._key}
+                key={node.id}
                 node={node as ContainerNodeTree}
                 tabId={activeTabId}
-                onSelect={(n) => setSecondarySelectedNode(activeTabId, n as AnyNodeTree)}
+                onSelect={(n) =>
+                  setSecondarySelectedNode(activeTabId, n as AnyNodeTree)
+                }
               />
             ))
           )}

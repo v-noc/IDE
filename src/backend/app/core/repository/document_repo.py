@@ -1,55 +1,38 @@
-from .base.base_node_repo import BaseNodeRepository
-from app.core.model.documents import DocumentNode
-from arangoasync.database import AsyncDatabase
-from typing import List
+
+from typing import Optional
+from app.db.async_terminus_client import AsyncClient
+from app.core.repository.base_repo import BaseRepo
+from app.core.model.nodes import DocumentNode
+from app.core.model.schemas import DocumentSchema
+from app.db.async_terminus_client import WOQLQuery as WQ
 
 
-class DocumentRepo(BaseNodeRepository[DocumentNode]):
-    def __init__(self, db: AsyncDatabase):
-        super().__init__(db, "documents", DocumentNode)
+class DocumentRepo(BaseRepo[DocumentNode, DocumentSchema]):
+    def __init__(self, client: AsyncClient):
+        super().__init__(client, DocumentNode, DocumentSchema)
 
-    async def node_exists(self, node_ref: str) -> bool:
-        """Return True if node exists; accepts key or full ID."""
-        query = """
-            LET isFullId = CONTAINS(@node_ref, "/")
-            LET node = isFullId
-                ? DOCUMENT(@node_ref)
-                : DOCUMENT(@@nodes_collection, @node_ref)
-            RETURN node != null
-        """
-        cursor = await self.db.aql.execute(
-            query,
-            bind_vars={
-                "@nodes_collection": "nodes",
-                "node_ref": node_ref,
-            },
-        )
-        result = await cursor.next() if cursor else None
-        return bool(result)
+    async def get_by_parent_node(self, node_id: str):
 
-    async def get_documents_for_node(self, node_ref: str) -> List[DocumentNode]:
-        """Fetch documents for a node via one AQL; accepts key or full ID."""
         try:
-            query = """
-                LET isFullId = CONTAINS(@node_ref, "/")
-                LET node = isFullId
-                    ? DOCUMENT(@node_ref)
-                    : DOCUMENT(@@nodes_collection, @node_ref)
-                FOR doc IN (node ? DOCUMENT(node.documents) : [])
-                    FILTER doc != null
-                    RETURN doc
-            """
-            cursor = await self.db.aql.execute(
-                query,
-                bind_vars={
-                    "@nodes_collection": "nodes",
-                    "node_ref": node_ref,
-                },
+            query = WQ().select("v:document_doc").woql_and(
+                WQ().eq("v:node", node_id).
+                triple("v:node", "documents", "v:document")
+                .read_document("v:document", "v:document_doc")
             )
-            # Validate each document row into DocumentNode
-            results = []
-            async for doc in cursor:
-                results.append(self._validate(doc))
-            return results
-        except:
+            result = await self.client.query(query)
+
+            items_raw = [row["document_doc"] for row in result["bindings"]]
+        except Exception as exc:
+            print(exc)
             return []
+
+        return [DocumentNode.from_raw_dict(item_raw) for item_raw in items_raw]
+
+    async def add_to_parent_node(self, document_id: str, node_id: str):
+        await self.move_item_by_type(node_id, document_id, "document", {"document": "documents"})
+
+    async def update(self, document: DocumentNode):
+        return await self.update_node(document, commit_msg=f"Updating document {document.id}")
+
+    async def delete(self, document_id: str):
+        await self.delete_with_parent_cleanup(document_id, "documents", f"Deleting document {document_id}")

@@ -1,6 +1,7 @@
-from typing import List, Set, Optional, Dict
+from typing import List, Set, Dict, Tuple
 from dataclasses import dataclass
-from app.core.model.nodes import CodePosition
+from dataclasses import field
+from app.core.model.nodes import CodePosition, CallNode
 
 
 @dataclass
@@ -20,6 +21,9 @@ class ScopeSyncResult:
     retained_target_ids: Set[str]
     removed_target_ids: Set[str]
     created_map: Dict[str, str]
+    calls_to_create: List[CallNode] = field(default_factory=list)
+    moves_to_execute: List[Tuple[str, str, str]] = field(default_factory=list)
+    call_ids_to_remove: List[str] = field(default_factory=list)
 
     @property
     def all_active_targets(self) -> Set[str]:

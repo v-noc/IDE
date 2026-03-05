@@ -1,82 +1,58 @@
-from fastapi import Depends, Body
-from arangoasync.database import AsyncDatabase
 from typing import Optional
-from app.db.client import get_db
-from app.core.repository import Repositories
-from app.core.services.project_service import ProjectService
-from app.core.services.file_service import FileService
-from app.core.services.class_service import ClassService
-from app.core.services.function_service import FunctionService
-from app.core.services.call_service import CallService
+from fastapi import Depends, Body
+
+from app.db.client import get_terminus_client
+from app.db.context import RequestDbContext, ProjectUoW
+from app.core.model.nodes import ProjectNode
 from app.core.services.log_service import LogService
 
-
-def get_services(db: AsyncDatabase = Depends(get_db)):
-    repos = Repositories(db)
-    return (
-        ProjectService(repos),
-        FileService(repos),
-        ClassService(repos),
-        FunctionService(repos),
-        CallService(repos),
-        LogService(repos),
-    )
+from app.api.dependencies import get_project_service
 
 
-async def get_project(
+def get_jsonrpc_request_db_context() -> RequestDbContext:
+    """JSON-RPC uses default branch/ref since params come from body."""
+    return RequestDbContext(branch="main", ref=None)
+
+
+def get_jsonrpc_project_id(
     project_id: str = Body(..., embed=True, alias="project_id"),
-    services=Depends(get_services),
-):
+) -> str:
+    return project_id
+
+
+async def get_jsonrpc_project_node(
+    project_id: str = Depends(get_jsonrpc_project_id),
+    project_service=Depends(get_project_service),
+) -> Optional[ProjectNode]:
     try:
-        project_service, *_ = services
+
         project = await project_service.get(project_id)
 
-        return project
+        return ProjectNode.from_raw_dict(project) if project else None
     except Exception as e:
         print("Error getting project", e)
         return None
 
 
-def get_function_services(services=Depends(get_services)):
-    _, _, _, function_service, _, _ = services
-    return function_service
-
-
-async def get_function(
-    function_id: str = Body(..., embed=True, alias="function_id"),
-    services=Depends(get_function_services),
+async def get_jsonrpc_project_uow(
+    base=Depends(get_terminus_client),
+    project: Optional[ProjectNode] = Depends(get_jsonrpc_project_node),
+    ctx: RequestDbContext = Depends(get_jsonrpc_request_db_context),
 ):
-    func_node = None
+    """Async generator dependency. FastAPI enters it and passes the yielded ProjectUoW."""
     try:
-        function_service = services
-
-        func_node = await function_service.get(function_id)
-
-    except Exception as e:
-        print("Error getting function", e)
+        yield ProjectUoW(base, project, ctx)
     finally:
-        return func_node
+        pass
 
 
-async def get_parent_function(
-    parent_function_id: Optional[str] = Body(
-        None, embed=True, alias="parent_function_id"
-    ),
-    services=Depends(get_function_services),
+async def get_project(
+    project_node: Optional[ProjectNode] = Depends(get_jsonrpc_project_node),
 ):
-    parent_func_node = None
-    try:
-        function_service = services
-
-        if parent_function_id is not None:
-            parent_func_node = await function_service.get(parent_function_id)
-
-    except Exception as e:
-        print("Error getting function", e)
-    finally:
-        return parent_func_node
+    return project_node
 
 
-def get_log_service(services=Depends(get_services)):
-    *_, log_service = services
-    return log_service
+def get_log_service(
+    uow: ProjectUoW = Depends(get_jsonrpc_project_uow),
+) -> LogService:
+    return LogService(uow)

@@ -1,20 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 from app.core.builder.tree_builder import TreeBuilder
-from app.db.client import get_db
-from arangoasync.database import AsyncDatabase
-from app.core.repository import Repositories
+from app.db.client import get_terminus_client
+
 from app.core.services.project_service import ProjectService
-from app.api.dependencies import get_project_service
+from app.api.dependencies import ProjectUoW, get_project_service, get_project_service_with_uow, get_project_node
 from pathlib import Path
 from app.core.watcher.service import WatcherService, get_watcher_service
 from loguru import logger
 import time
 from app.core.model.nodes import ProjectNode
+from app.db.async_terminus_client import AsyncClient
+from app.db.context import RequestDbContext
 
 
 class CreateProjectRequest(BaseModel):
@@ -34,7 +35,7 @@ router = APIRouter()
 @router.post("/", response_model=ProjectTreeNode)
 async def create_project(
     project: CreateProjectRequest,
-    db: AsyncDatabase = Depends(get_db),
+    db: AsyncClient = Depends(get_terminus_client),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectTreeNode:
     """Create a project graph from a local path.
@@ -54,22 +55,20 @@ async def create_project(
         )
 
     try:
-        project_node = ProjectNode(
+        project_node = await project_service.create(
             name=project.name,
             description=project.description or "",
-            qname=project.name.lower().replace(" ", "_"),
             path=project.path,
         )
-        project_node = await project_service.create_node(project_node)
-        start_time = time.time()
+        uow = ProjectUoW(db, project_node, RequestDbContext(
+            branch="main", ref=None))
+
         orchestrator = GraphBuilderOrchestrator(
             project_node=project_node,
-            db=db,
-
+            uow=uow
         )
         await orchestrator.resync()
-        end_time = time.time()
-        print(f"Time taken to resync: {end_time - start_time} seconds")
+
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -83,7 +82,28 @@ async def create_project(
         logger.exception(f"Failed to build project graph: {exc}")
         raise
 
-    children = await project_service.get_children(project_node.id)
+    project_service.uow = uow
+    children = await project_service.get_children()
+
+    tree_builder = TreeBuilder(children)
+    tree = tree_builder.build()
+
+    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
+
+    return project_tree
+
+
+@router.get("/", response_model=ProjectTreeNode)
+async def get_project(
+    project_node: ProjectNode = Depends(get_project_node),
+    exclude_groups: bool = False,
+    project_service: ProjectService = Depends(get_project_service_with_uow),
+    watcher_service: WatcherService = Depends(get_watcher_service),
+) -> ProjectTreeNode:
+
+    watcher_service.start_watching(project_node)
+
+    children = await project_service.get_children()
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -92,67 +112,31 @@ async def create_project(
     return project_tree
 
 
-@router.get("/", response_model=list[ProjectNode])
+@router.get("/all", response_model=list[ProjectNode])
 async def get_projects(
     project_service: ProjectService = Depends(get_project_service),
 ) -> list[AnyTreeNode]:
+
     projects = await project_service.get_all()
 
     return projects
 
 
-@router.get("/{project_id}/children", response_model=list[AnyTreeNode])
-async def get_project_children(
-    project_id: str,
-    exclude_groups: bool = False,
-    project_service: ProjectService = Depends(get_project_service),
-) -> list[AnyTreeNode]:
-    project_node = await project_service.get(project_id)
-    children = await project_service.get_children(
-        project_node.id, exclude_groups=exclude_groups)
-
-    tree_builder = TreeBuilder(children)
-    tree = tree_builder.build()
-
-    return tree
-
-
-@router.get("/{project_id}", response_model=ProjectTreeNode)
-async def get_project(
-    project_id: str,
-    exclude_groups: bool = False,
-    project_service: ProjectService = Depends(get_project_service),
-    watcher_service: WatcherService = Depends(get_watcher_service),
-) -> ProjectTreeNode:
-    project_node = await project_service.get(project_id)
-    if project_node is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        )
-
-    watcher_service.start_watching(project_node)
-
-    children = await project_service.get_children(
-        project_node.id, exclude_groups=exclude_groups)
-
-    tree_builder = TreeBuilder(children)
-    tree = tree_builder.build()
-
-    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
-    return project_tree
-
-
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
-    project_id: str,
+    project_id: str = Query(...,
+                            description="The ID of the project to delete"),
+
     project_service: ProjectService = Depends(get_project_service),
 ):
+
     project = await project_service.get(project_id=project_id)
+
     if project:
-        result = await project_service.delete(project)
+        result = await project_service.delete(project_id)
+
         if result is False:
-             raise HTTPException(
+            raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to delete project {project_id}"
             )
@@ -163,10 +147,11 @@ async def delete_project(
         )
 
 
-@router.put("/{project_id}", response_model=ProjectNode)
+@router.put("/", response_model=ProjectNode)
 async def update_project(
-    project_id: str,
-    project: UpdateProjectRequest,
+    project_id: str = Query(...,
+                            description="The ID of the project to update"),
+    project: UpdateProjectRequest = Body(...),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectNode:
     project_node = await project_service.get(project_id)
@@ -175,6 +160,7 @@ async def update_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
         )
+    project_node = ProjectNode.from_raw_dict(project_node)
     if project.name is not None:
         project_node.name = project.name
     if project.description is not None:

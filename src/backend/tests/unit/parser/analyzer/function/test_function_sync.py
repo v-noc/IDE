@@ -6,10 +6,8 @@ import pytest
 import pytest_asyncio
 
 from app.core.builder.tree_builder import TreeBuilder
-from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.repository import Repositories
-from app.core.schemas.tree import AnyTreeNode
+from app.core.schemas.tree import AnyTreeNode, FunctionTreeNode
 from app.core.services.project_service import ProjectService
 
 FIXTURE_PROJECT = Path(__file__).parent / "simple_function"
@@ -17,22 +15,20 @@ PROJECT_NAME = "simple_function"
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, arangodb_client):
+async def setup_project(tmp_path, empty_project_uow):
     project_path = tmp_path / "project"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
-    project_node = ProjectNode(
+    project_service = ProjectService(empty_project_uow)
+    project_node = await project_service.create(
         name=PROJECT_NAME,
         path=str(project_path),
-        qname=PROJECT_NAME,
         description="Test Project",
     )
-    repos = Repositories(arangodb_client)
-    await repos.ensure_collections()
-    project_service = ProjectService(repos)
-    project_node = await project_service.create_node(project_node)
-
-    return project_node, repos, arangodb_client, project_path
+    empty_project_uow.project = project_node
+    yield project_node, empty_project_uow, project_path
+    await project_service.delete(project_node.id)
+    shutil.rmtree(project_path)
 
 
 def find_node_by_name(nodes: List[AnyTreeNode], name: str):
@@ -52,7 +48,7 @@ def find_node_by_qname_recursive(nodes: List[AnyTreeNode], qname: str):
 
 def find_node_by_name_recursive(nodes: List[AnyTreeNode], name: str) -> AnyTreeNode:
     for node in nodes:
-        if getattr(node, "name", None) == name:
+        if getattr(node, "name", None) == name and isinstance(node, FunctionTreeNode):
             return node
         if hasattr(node, "children") and node.children:
             found = find_node_by_name_recursive(node.children, name)
@@ -90,45 +86,41 @@ def _remove_sync_block(content: str, start_str: str, end_str: str) -> str:
     return content[:start] + content[end_line:]
 
 
-async def _build_and_get_tree(project_node, repos, db):
+async def _build_and_get_tree(project_node, pow):
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=db,
+        uow=pow,
     )
     await orchestrator.resync()
 
-    project_service = ProjectService(repos)
-    project = await project_service.get(project_node.id)
-    assert project is not None, "Project not found after build"
+    project_service = ProjectService(pow)
 
-    children = await project_service.get_children(project_node.id)
+    children = await project_service.get_children()
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
-async def _resync_and_get_tree(project_node, repos, db):
+async def _resync_and_get_tree(project_node, pow):
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=db,
+        uow=pow,
     )
     await orchestrator.resync()
 
-    project_service = ProjectService(repos)
-    project = await project_service.get(project_node.id)
-    assert project is not None, "Project not found before resync"
+    project_service = ProjectService(pow)
+    children = await project_service.get_children()
 
-    children = await project_service.get_children(project_node.id)
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
 
 @pytest.mark.asyncio
 async def test_function_sync_add_and_remove(setup_project):
-    project_node, repos, arangodb_client, project_path = setup_project
+    project_node, project_uow, project_path = setup_project
     target_file = project_path / "main.py"
 
     # 1) Build once
-    tree = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree = await _build_and_get_tree(project_node, project_uow)
     assert tree, "No tree nodes built"
 
     original = _read_file(target_file)
@@ -138,9 +130,10 @@ async def test_function_sync_add_and_remove(setup_project):
 
         # 3) Resync and verify function is present
         tree_after_add = await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, project_uow
         )
-        file_node_after_add = tree_after_add[1]
+        file_node_after_add = tree_after_add[0]
+
         names_after_add = [
             getattr(c, "name", None) for c in file_node_after_add.children
         ]
@@ -153,7 +146,7 @@ async def test_function_sync_add_and_remove(setup_project):
         _write_file(target_file, updated)
 
         tree_after_remove = await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, project_uow
         )
         file_node_after_remove = tree_after_remove[1]
         # Debug helper (kept commented to avoid noisy output / lint issues):
@@ -173,26 +166,27 @@ async def test_function_sync_add_and_remove(setup_project):
         # Restore original content
         _write_file(target_file, original)
         # Final resync to leave DB in original state
-        await _resync_and_get_tree(project_node, repos, arangodb_client)
+        await _resync_and_get_tree(project_node, project_uow)
 
 
 @pytest.mark.asyncio
 async def test_function_sync_add_and_remove_inside_function(setup_project):
-    project_node, repos, arangodb_client, project_path = setup_project
+    project_node, project_uow, project_path = setup_project
     target_file = project_path / "main.py"
 
     # 1) Build once to ensure project is in the DB
-    tree = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree = await _build_and_get_tree(project_node, project_uow)
     assert tree, "No tree nodes built"
 
     # 2) Find the target function to modify
     add_func_node = find_node_by_name_recursive(tree, "add")
     assert add_func_node is not None, "'add' function not found"
-    assert hasattr(add_func_node, "position"), "Node has no position attribute"
+    assert hasattr(
+        add_func_node, "code_position"), "Node has no position attribute"
 
     # Use the position to insert new code block
-    end_line = add_func_node.position.end_line_no
-    indent = add_func_node.position.col_offset + 4
+    end_line = add_func_node.code_position.end_line_no
+    indent = add_func_node.code_position.col_offset + 4
 
     def _insert_block(path: Path):
         lines = _read_file(path).splitlines()
@@ -212,7 +206,7 @@ async def test_function_sync_add_and_remove_inside_function(setup_project):
         _insert_block(target_file)
 
         tree_after_add = await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, project_uow
         )
         add_func_after_add = find_node_by_qname_recursive(
             tree_after_add, "simple_function.main.factory.add"
@@ -230,7 +224,7 @@ async def test_function_sync_add_and_remove_inside_function(setup_project):
         _write_file(target_file, content_without_block)
 
         tree_after_remove = await _resync_and_get_tree(
-            project_node, repos, arangodb_client
+            project_node, project_uow
         )
         add_func_after_remove = find_node_by_qname_recursive(
             tree_after_remove, "simple_function.main.factory.add"
@@ -242,4 +236,4 @@ async def test_function_sync_add_and_remove_inside_function(setup_project):
     finally:
         # 5) Restore original content and resync
         _write_file(target_file, original_content)
-        await _resync_and_get_tree(project_node, repos, arangodb_client)
+        await _resync_and_get_tree(project_node, project_uow)

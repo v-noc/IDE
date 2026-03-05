@@ -16,7 +16,7 @@ function updateNodeInTree(
   updater: (node: AnyNodeTree) => AnyNodeTree
 ): ProjectNodeTree {
   const walk = (node: AnyNodeTree): AnyNodeTree => {
-    if (node._key === key) {
+    if (node.id === key) {
       return updater({ ...node });
     }
     const children = (node as NodeWithChildren).children;
@@ -43,8 +43,8 @@ export function useRightSidebarActions() {
   const setProjectData = useProjectStore((s) => s.setProjectData);
   const setSelectedNode = useProjectStore((s) => s.setSelectedNode);
 
-  const { mutate: updateBasicInfoApi } = useUpdateBasicInfo(selectedNode?._key ?? '');
-  const { mutate: updateThemeApi } = useUpdateTheme(selectedNode?._key ?? '');
+  const { mutate: updateBasicInfoApi } = useUpdateBasicInfo(selectedNode?.id ?? '');
+  const { mutate: updateThemeApi } = useUpdateTheme(selectedNode?.id ?? '');
 
   const updateTheme = useCallback((theme: ThemeConfig) => {
     if (!selectedNode || !projectData) return;
@@ -56,7 +56,7 @@ export function useRightSidebarActions() {
 
     const updatedTree = updateNodeInTree(
       projectData,
-      selectedNode._key,
+      selectedNode.id,
       (node) => ({
         ...node,
         theme_config: theme,
@@ -78,7 +78,7 @@ export function useRightSidebarActions() {
 
     const updatedTree = updateNodeInTree(
       projectData,
-      selectedNode._key,
+      selectedNode.id,
       (node) => ({
         ...node,
         ...info,

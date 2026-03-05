@@ -6,11 +6,9 @@ import pytest
 import pytest_asyncio
 
 from app.core.builder.tree_builder import TreeBuilder
-from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.repository import Repositories
 from app.core.schemas.tree import AnyTreeNode
-from app.core.services.function_service import FunctionService
+from app.core.services.code_element_service import CodeElementService
 from app.core.services.project_service import ProjectService
 
 FIXTURE_PROJECT = Path(__file__).parent / "simple_function"
@@ -18,29 +16,21 @@ PROJECT_NAME = "simple_function"
 
 
 @pytest_asyncio.fixture
-async def setup_project(tmp_path, arangodb_client):
+async def setup_project(tmp_path, empty_project_uow):
     project_path = tmp_path / "project"
     shutil.copytree(FIXTURE_PROJECT, project_path)
 
-    project_node = ProjectNode(
-        name=PROJECT_NAME,
-        path=str(project_path),
-        qname=PROJECT_NAME,
-        description="Test Project",
+    project_service = ProjectService(empty_project_uow)
+
+    project_node = await project_service.create(
+        PROJECT_NAME, "Test Project", str(project_path)
     )
 
-    repos = Repositories(arangodb_client)
-    await repos.ensure_collections()
+    empty_project_uow.project = project_node
 
-    project_service = ProjectService(repos)
-    # Ensure project node exists in DB
-    # Check if create_node is the right method or if we should use repo directly
-    # Service usually wraps repo.
-    # We might need to handle if it already exists or just create it.
-    # Given clean DB per test (usually), create is fine.
-    project_node = await project_service.create_node(project_node)
-
-    return project_node, repos, arangodb_client
+    yield project_node, empty_project_uow
+    await project_service.delete(project_node.id)
+    shutil.rmtree(project_path)
 
 
 def find_node_by_name(nodes: List[AnyTreeNode], name: str):
@@ -49,7 +39,7 @@ def find_node_by_name(nodes: List[AnyTreeNode], name: str):
 
 def find_node(node):
     for child in node.children:
-        if child.node_type == "call":
+        if child.__class__.__name__ == "CallTreeNode":
             return child
         found = find_node(child)
         if found:
@@ -63,30 +53,29 @@ def find_node_by_qname(nodes: List[AnyTreeNode], qname: str):
 
 @pytest.mark.asyncio
 async def test_function_get_code(setup_project):
-    project_node, repos, arangodb_client = setup_project
+    project_node, project_uow = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=arangodb_client,
+        uow=project_uow,
     )
     await orchestrator.resync()
 
-    proj_service = ProjectService(repos)
-    project = await proj_service.get_all()
+    proj_service = ProjectService(project_uow)
 
-    children = await proj_service.get_children(project[0].id)
+    children = await proj_service.get_children()
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
     assert tree, "No tree nodes built"
 
-    file_node = tree[1]
+    file_node = tree[0]
     factory_qname = f"{file_node.qname}.factory"
     factory_func = find_node_by_qname(file_node.children, factory_qname)
     assert factory_func is not None, "No 'factory' function node found"
 
-    func_service = FunctionService(repos)
+    func_service = CodeElementService(project_uow)
     snippet = await func_service.get_code(factory_func.id)
 
     assert snippet is not None, "get_code returned None"
@@ -105,20 +94,18 @@ async def test_function_get_code(setup_project):
 
 @pytest.mark.asyncio
 async def test_function_collector(setup_project):
-    project_node, repos, arangodb_client = setup_project
+    project_node, project_uow = setup_project
 
     orchestrator = GraphBuilderOrchestrator(
         project_node,
-        db=arangodb_client,
+        uow=project_uow,
     )
 
     await orchestrator.resync()
 
-    project_service = ProjectService(repos)
+    project_service = ProjectService(project_uow)
 
-    project = await project_service.get_all()
-
-    children = await project_service.get_children(project[0].id)
+    children = await project_service.get_children()
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
@@ -126,13 +113,17 @@ async def test_function_collector(setup_project):
     # 1. Project structure assertions
     assert len(tree) == 2
 
-    file_node = tree[1]
+    file_node = tree[0]
 
     # 2. Function definitions in main.py
     file_functions = [
-        child for child in file_node.children if child.node_type == "function"
+        child
+        for child in file_node.children
+        if child.__class__.__name__ == "FunctionTreeNode"
     ]
+
     func_qnames = sorted([child.qname for child in file_functions])
+    print(f"func_qnames {func_qnames}")
 
     expected_func_qnames = sorted(
         [
@@ -145,8 +136,10 @@ async def test_function_collector(setup_project):
     )
     assert func_qnames == expected_func_qnames
 
-    main_func = find_node_by_qname(file_node.children, f"{file_node.qname}.main")
-    factory_func = find_node_by_qname(file_node.children, f"{file_node.qname}.factory")
+    main_func = find_node_by_qname(
+        file_node.children, f"{file_node.qname}.main")
+    factory_func = find_node_by_qname(
+        file_node.children, f"{file_node.qname}.factory")
     call_back_func = find_node_by_qname(
         file_node.children, f"{file_node.qname}.call_back"
     )
@@ -161,18 +154,20 @@ async def test_function_collector(setup_project):
 
     # 3. Assert functions and calls within `factory` function
     assert len(factory_func.children) == 2
-    add_func = find_node_by_qname(factory_func.children, f"{factory_func.qname}.add")
+    add_func = find_node_by_qname(
+        factory_func.children, f"{factory_func.qname}.add")
     build_func = find_node_by_qname(
         factory_func.children, f"{factory_func.qname}.build"
     )
     assert add_func is not None and build_func is not None
 
-    assert len(add_func.children) == 1
+    assert len(
+        add_func.children) == 1, f"add_func should have 1 child, {len(children)}"
     build_call = find_node_by_qname(
         add_func.children, f"{add_func.id}::{build_func.id}"
     )
     assert build_call is not None
-    assert build_call.node_type == "call"
+    assert build_call.__class__.__name__ == "CallTreeNode"
     assert build_call.target.id == build_func.id
 
     # 4. Assert calls within `main` function
@@ -192,7 +187,8 @@ async def test_function_collector(setup_project):
 
     # 4.1 Check `factory_call()` in `main`
     assert main_factory_call.target.id == factory_call_func.id
-    children = [{child.name: child.node_type} for child in main_factory_call.children]
+    # children = [{child.name: child.node_type}
+    #             for child in main_factory_call.children]
 
     assert len(main_factory_call.children) == 2
     inner_factory_call = find_node_by_qname(

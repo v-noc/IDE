@@ -1,11 +1,10 @@
 
-
 import aiofiles
-from app.core.model.edges import ContainsEdge, TargetsEdge
 
 from app.core.repository import Repositories
 from app.core.model.properties import ThemeConfig, CodePosition
-from app.core.model.nodes import ContainerNode, CallNode, GroupNode
+from app.core.utils.code_utils import build_abs_file_path, extract_code_from_file
+# from app.core.model.nodes import ContainerNode, CallNode, GroupNode
 from app.core.model import AllNodes
 from typing import Optional
 
@@ -145,12 +144,7 @@ class ContainerService:
         return result.get("file"), result.get("project")
 
     def _build_abs_file_path(self, project_path: str, file_path: str) -> str:
-        import os
-
-        # If file_path is absolute, prefer it; else join with project root
-        if os.path.isabs(file_path):
-            return file_path
-        return os.path.normpath(os.path.join(project_path, file_path))
+        return build_abs_file_path(project_path, file_path)
 
     async def get_code(self, node_id: str) -> Optional[dict]:
         """Generic get_code for both FileNode and positioned nodes (Class/Function)."""
@@ -180,7 +174,7 @@ class ContainerService:
         position = getattr(
             node, "position", None) if node.node_type != "file" else None
 
-        code = await self._extract_code_from_file(abs_path, position)
+        code = await extract_code_from_file(abs_path, position)
 
         result = {
             "id": node.id,
@@ -260,69 +254,6 @@ class ContainerService:
             return {"success": True}
         except IOError as e:
             return {"success": False, "error": str(e)}
-
-    async def _extract_code_from_file(
-        self,
-        abs_path: str,
-        position: Optional[CodePosition],
-    ) -> str:
-        """Read code once and optionally slice by line/column positions.
-
-        - If position is None: returns the entire file content.
-        - If position is provided: returns content from
-          (line_no, col_offset) inclusive to (end_line_no, end_col_offset)
-          exclusive. Indices follow the semantics used in CodePosition.
-        """
-        # Fast path: full file
-        if position is None:
-            async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
-                return await f.read()
-
-        start_line = max(1, position.line_no)
-        start_col = max(0, position.col_offset)
-        end_line = position.end_line_no
-        end_col = position.end_col_offset
-
-        import textwrap
-
-        # Stream through file and collect raw lines
-        collected: list[str] = []
-        async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
-            idx = 1
-            async for raw_line in f:
-                if idx < start_line:
-                    idx += 1
-                    continue
-
-                line = raw_line[:-1] if raw_line.endswith("\n") else raw_line
-
-                if end_line is None or idx < end_line:
-                    collected.append(line)
-                elif idx == end_line:
-                    slice_end = None if end_col is None else end_col
-                    # Only slice the end of the last line
-                    collected.append(line[:slice_end])
-                    break
-                else:
-                    break
-                idx += 1
-
-        if not collected:
-            return ""
-
-        # Dedent the entire block
-        joined = "\n".join(collected)
-        dedented = textwrap.dedent(joined)
-
-        # If start_col was specified and the first line still has content before it
-        # (e.g. it was a partial line like 'x = lambda: 1' and we want the lambda),
-        # we might still need to slice the first line.
-        # But for AST nodes like functions/classes, start_col points to the start
-        # of the node, so dedent should already handle it.
-        # Let's check if the first line needs further slicing.
-        # However, if we already used dedent, we should be careful.
-        # For now, let's see if dedent is enough for the identified issue.
-        return dedented
 
     async def rebuild_call_group(self, parent_id: str):
         """Ensure a single call group exists under the given parent,

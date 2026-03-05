@@ -13,6 +13,12 @@ import type {
   NodeMetadata,
 } from "../components/nodes/EnhancedNode";
 import { getIcons } from "@/features/Dashboard/utils";
+import type {
+  ParentChildDiff,
+  DiffStatus,
+} from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import type { ProjectNodeTree } from "@/types/project";
+import { createFallbackNode } from "@/features/Dashboard/features/Versioning/utils/canvasDiffOverlay";
 
 const EMPTY_METADATA_MAP = new Map<string, NodeMetadata>();
 
@@ -23,20 +29,27 @@ const NODE_HEIGHT = 150;
 interface UseEnhancedTreeLayoutProps {
   centerNode: SimpleTreeNode | null;
   expandedNodeIds: string[];
+  selectedNode?: SimpleTreeNode;
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
- 
+  parentChildDiffs?: Record<string, ParentChildDiff>;
+  nodeDiffs?: Record<string, DiffStatus>;
+  diffNodesMap?: Record<string, Record<string, unknown>>;
+  projectData?: ProjectNodeTree | null;
 }
 
 export const useEnhancedTreeLayout = ({
   centerNode,
-  
+
   expandedNodeIds,
   toggleNodeExpansion,
   nodeMetadataMap,
   layoutConfig: _layoutConfig,
-
+  parentChildDiffs = {},
+  nodeDiffs = {},
+  diffNodesMap = {},
+  projectData,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
 
@@ -61,13 +74,14 @@ export const useEnhancedTreeLayout = ({
 
     const nodes: Node[] = [];
     const edges: Edge[] = [];
+    const visitedNodeIds = new Set<string>();
 
     // Helper to check expansion
     const isExpanded = (nodeId: string) =>
       expandedNodeIds.length === 0 || expandedNodeIds.includes(nodeId);
 
     const mergeMetadata = (node: SimpleTreeNode): NodeMetadata | undefined => {
-      const mapped = metadataMap.get(node._key);
+      const mapped = metadataMap.get(node.id);
       return {
         ...mapped,
         ...(node.metadata ?? {}),
@@ -79,7 +93,11 @@ export const useEnhancedTreeLayout = ({
 
     // 2. Recursive Traversal to build the Graph Data (Nodes/Edges)
     const traverse = (node: SimpleTreeNode) => {
-      const nodeId = node._key;
+      const nodeId = node.id;
+      if (visitedNodeIds.has(nodeId)) {
+        return;
+      }
+      visitedNodeIds.add(nodeId);
 
       // Prepare Node Data
       const nodeStyle = getNodeStyle(node as unknown as ContainerNodeTree);
@@ -95,7 +113,7 @@ export const useEnhancedTreeLayout = ({
           ) : (
             <DynamicIcon
               iconName={getIcons(
-                node.target ? node.target.node_type : node.node_type
+                node.target ? node.target.node_type : node.node_type,
               )}
             />
           ),
@@ -111,9 +129,11 @@ export const useEnhancedTreeLayout = ({
           nodeType: node.node_type,
           nodeId: nodeId,
           target: node.target,
-   
-       
-          manuallyCreated: (node as unknown as { manually_created?: boolean }).manually_created ?? false,
+
+          manuallyCreated:
+            (node as unknown as { manually_created?: boolean })
+              .manually_created ?? false,
+          diffStatus: nodeDiffs[nodeId] ?? null,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,
@@ -126,10 +146,16 @@ export const useEnhancedTreeLayout = ({
       dagreGraph.setNode(nodeId, { width: NODE_WIDTH, height: NODE_HEIGHT });
 
       // Process Children if expanded
-      if (isExpanded(nodeId) && node.children && node.children.length > 0) {
-        node.children.forEach((child: AnyNodeTree) => {
+      if (isExpanded(nodeId)) {
+        const childrenToRender: AnyNodeTree[] = [...(node.children ?? [])];
+
+        if (childrenToRender.length === 0) {
+          return;
+        }
+
+        childrenToRender.forEach((child: AnyNodeTree) => {
           const simpleChild = child as unknown as SimpleTreeNode;
-          const childId = simpleChild._key;
+          const childId = simpleChild.id;
 
           // Create Edge
           edges.push({
@@ -148,8 +174,53 @@ export const useEnhancedTreeLayout = ({
           dagreGraph.setEdge(nodeId, childId);
 
           // Recurse
-          traverse(simpleChild);
+          if (!visitedNodeIds.has(childId)) {
+            traverse(simpleChild);
+          }
         });
+
+        // Process Injected Diff Children
+        const diff = parentChildDiffs[nodeId];
+        if (diff) {
+          const injectedRefs = [...diff.added, ...diff.removed];
+          injectedRefs.forEach((childRef, index) => {
+            if (visitedNodeIds.has(childRef.id)) return;
+
+            const fallbackNode = createFallbackNode(
+              childRef,
+              nodeId,
+              rfNode,
+              projectData,
+              index,
+              diffNodesMap
+            );
+
+            if (fallbackNode) {
+              const childId = fallbackNode.id;
+              visitedNodeIds.add(childId);
+
+              // Update data with diffStatus
+              fallbackNode.data = {
+                ...fallbackNode.data,
+                diffStatus: nodeDiffs[childId] ?? null,
+              };
+
+              nodes.push(fallbackNode);
+              dagreGraph.setNode(childId, {
+                width: NODE_WIDTH,
+                height: NODE_HEIGHT,
+              });
+
+              edges.push({
+                id: `${nodeId}-${childId}`,
+                source: nodeId,
+                target: childId,
+                type: "bezier",
+              });
+              dagreGraph.setEdge(nodeId, childId);
+            }
+          });
+        }
       }
     };
 
@@ -178,10 +249,18 @@ export const useEnhancedTreeLayout = ({
     // This prevents "orphaned" edges when nodes are collapsed/removed
     const nodeIds = new Set(layoutedNodes.map((node) => node.id));
     const validEdges = edges.filter(
-      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
+      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target),
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap]);
+  }, [
+    centerNode,
+    expandedNodeIds,
+    metadataMap,
+    parentChildDiffs,
+    nodeDiffs,
+    diffNodesMap,
+    projectData,
+  ]);
   return { initialNodes, initialEdges };
 };

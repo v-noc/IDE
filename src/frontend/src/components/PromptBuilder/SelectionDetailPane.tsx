@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import type { AnyNodeTree } from "@/types/project";
 import { supportsCode } from "./types";
-import { useDocuments } from "@/services/documents";
+import { useDocuments, type DocumentData } from "@/services/documents";
 import { useCode } from "@/services/code";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -10,17 +10,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface SelectionDetailPaneProps {
   node: AnyNodeTree | null;
+  projectId?: string;
   checked: boolean;
   includeDocs: boolean;
   includeCode: boolean;
   onToggleDocs: () => void;
   onToggleCode: () => void;
-  setDocumentsForNode: (key: string, docs: any[]) => void;
+  setDocumentsForNode: (key: string, docs: DocumentData[]) => void;
   setCodeForNode: (key: string, code: string) => void;
 }
 
 export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
   node,
+  projectId = "",
   checked,
   includeDocs,
   includeCode,
@@ -29,21 +31,21 @@ export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
   setDocumentsForNode,
   setCodeForNode,
 }) => {
-  const nodeId = node?._key ?? "";
+  const nodeId = node?.id ?? "";
 
   // Documents fetch when toggled on and node checked/selected
-  const docsQuery = useDocuments(nodeId || undefined);
+  const docsQuery = useDocuments(nodeId || undefined, projectId || undefined);
   useEffect(() => {
     if (node && checked && includeDocs && docsQuery.data) {
-      setDocumentsForNode(node._key, docsQuery.data);
+      setDocumentsForNode(node.id, docsQuery.data);
     }
   }, [node, checked, includeDocs, docsQuery.data, setDocumentsForNode]);
 
   // Code fetch when toggled on and supported type
-  const codeQuery = useCode(nodeId || undefined, node?.node_type);
+  const codeQuery = useCode(nodeId || undefined, node?.node_type, projectId || undefined);
   useEffect(() => {
     if (node && checked && includeCode && codeQuery.data?.code) {
-      setCodeForNode(node._key, codeQuery.data.code);
+      setCodeForNode(node.id, codeQuery.data.code);
     }
   }, [node, checked, includeCode, codeQuery.data, setCodeForNode]);
 
@@ -141,7 +143,7 @@ export const SelectionDetailPane: React.FC<SelectionDetailPaneProps> = ({
                   <div className="space-y-3 p-3">
                     {docsQuery.data.map((d) => (
                       <div
-                        key={d._key}
+                        key={d.id}
                         className="border rounded p-2 bg-background text-xs space-y-1"
                       >
                         <div className="font-semibold">{d.name}</div>

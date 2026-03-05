@@ -1,0 +1,121 @@
+from typing import Optional
+from app.db.woqlschema import (
+    DocumentTemplate
+)
+from datetime import datetime
+
+from app.core.model.properties import CodePosition, ThemeConfig
+from app.core.model.nodes import DocumentNode
+
+
+class CodePositionSchema(DocumentTemplate):
+    """Source code location — embedded inside node documents."""
+    _subdocument = []
+    line_no: int
+    col_offset: int
+    end_line_no: int
+    end_col_offset: int
+
+    @classmethod
+    def _to_dict(cls, skip_checking=False):
+        result = {
+            "@id": "CodePositionSchema",
+            "@type": "Class",
+            "@key":
+            {
+                "@type": "Random"
+            },
+
+            "@subdocument": [],
+            "line_no": "xsd:integer",
+            "col_offset": "xsd:integer",
+            "end_line_no": "xsd:integer",
+            "end_col_offset": "xsd:integer"
+        }
+        return result
+
+    @staticmethod
+    def from_pydantic(code_position: CodePosition):
+        return CodePositionSchema(
+
+            line_no=code_position.line_no,
+            col_offset=code_position.col_offset,
+            end_line_no=code_position.end_line_no,
+            end_col_offset=code_position.end_col_offset,
+        )
+
+    def to_pydantic(self):
+        return CodePosition(
+            line_no=self.line_no,
+            col_offset=self.col_offset,
+            end_line_no=self.end_line_no,
+            end_col_offset=self.end_col_offset,
+        )
+
+
+class ThemeConfigSchema(DocumentTemplate):
+    """Theme configuration — embedded inside node documents."""
+    _subdocument = []
+    navbarColor: Optional[str]
+    leftSidebarColor: Optional[str]
+    rightSidebarColor: Optional[str]
+    backgroundColor: Optional[str]
+    textColor: Optional[str]
+    iconColor: Optional[str]
+    cardColor: Optional[str]
+
+    @staticmethod
+    def from_pydantic(theme_config: ThemeConfig):
+        if theme_config is None:
+            return None
+        return ThemeConfigSchema(
+            navbarColor=theme_config.navbarColor,
+            leftSidebarColor=theme_config.leftSidebarColor,
+            rightSidebarColor=theme_config.rightSidebarColor,
+            backgroundColor=theme_config.backgroundColor,
+            textColor=theme_config.textColor,
+            iconColor=theme_config.iconColor,
+            cardColor=theme_config.cardColor,
+        )
+
+    def to_pydantic(self):
+        return ThemeConfig(
+            navbarColor=self.navbarColor,
+            leftSidebarColor=self.leftSidebarColor,
+            rightSidebarColor=self.rightSidebarColor,
+            backgroundColor=self.backgroundColor,
+            textColor=self.textColor,
+            iconColor=self.iconColor,
+            cardColor=self.cardColor,
+        )
+
+
+class DocumentSchema(DocumentTemplate):
+    """Document schema — embedded inside node documents."""
+
+    name: str
+    description: str
+    data: str
+    created_at: datetime
+    updated_at: datetime
+
+    @staticmethod
+    def from_pydantic(document: DocumentNode):
+        return DocumentSchema(
+            _id=document.id,
+            name=document.name,
+            description=document.description,
+            data=document.data,
+            created_at=document.created_at,
+            updated_at=document.updated_at,
+        )
+
+    def to_pydantic(self):
+        return DocumentNode(
+            id=self._id,
+            name=self.name,
+            description=self.description,
+            data=self.data,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )

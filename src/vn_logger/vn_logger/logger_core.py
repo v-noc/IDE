@@ -37,14 +37,16 @@ def _send_batch(batch: list, post_func: Optional[Callable], jsonrpc_url: str, pr
 
     try:
         sender = post_func or requests.post
+
         response = sender(jsonrpc_url, json=jsonrpc_request, timeout=5)
+
         if response.status_code != 200:
             print(f"Logger Error: Server returned {response.status_code}")
     except Exception as e:
         print(f"CRITICAL: Logger failed to send batch: {e}")
 
 
-def log_worker(jsonrpc_url, default_project_id, post_func, batch_size=10, flush_interval=2.0):
+def log_worker(jsonrpc_url, default_project_id, post_func, batch_size=50, flush_interval=2.0):
     """Background thread processing the queue and batching requests."""
     batch = []
     last_flush = time.time()

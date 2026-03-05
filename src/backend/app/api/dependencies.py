@@ -1,76 +1,84 @@
-from fastapi import Depends
+from typing import Optional
+from fastapi import Depends, Header, Query, HTTPException
 from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
-from app.db.client import get_db
-from arangoasync.database import AsyncDatabase
-from app.core.services.container_service import ContainerService
-from app.core.services.file_service import FileService
-from app.core.services.class_service import ClassService
-from app.core.services.function_service import FunctionService
+from app.core.services.code_element_service import CodeElementService
+
 from app.core.services.call_service import CallService
 from app.core.services.log_service import LogService
 from app.core.services.group_service import GroupService
 from app.core.services.document_service import DocumentService
-
-
-def get_group_service(
-    db: AsyncDatabase = Depends(get_db),
-) -> GroupService:
-    repos = Repositories(db)
-    return GroupService(repos)
+from app.db.client import get_terminus_client
+from app.db.async_terminus_client import AsyncClient
+from app.core.model.nodes import ProjectNode
+from app.db.context import RequestDbContext, ProjectUoW
 
 
 def get_project_service(
-    db: AsyncDatabase = Depends(get_db),
+    db: AsyncClient = Depends(get_terminus_client),
 ) -> ProjectService:
-    repos = Repositories(db)
-    return ProjectService(repos)
+    pow = ProjectUoW(db.clone(), None, RequestDbContext())
+    return ProjectService(pow)
 
 
-def get_container_service(
-    db: AsyncDatabase = Depends(get_db),
-) -> ContainerService:
-    repos = Repositories(db)
-    return ContainerService(repos)
+async def get_request_db_context(
+    branch: str = Header("main", alias="X-Vnoc-Branch"),
+    ref: Optional[str] = Query(
+        None, description="Specific commit/ref to query"),
+) -> RequestDbContext:
+    return RequestDbContext(branch=branch, ref=ref)
 
 
-def get_file_service(
-    db: AsyncDatabase = Depends(get_db),
-) -> FileService:
-    repos = Repositories(db)
-    return FileService(repos)
+async def get_project_node(
+    project_id: str = Query(..., description="The ID of the project"),
+    project_service: ProjectService = Depends(get_project_service),
+) -> ProjectNode:
+    project = await project_service.get(project_id)
+    return ProjectNode.from_raw_dict(project)
 
 
-def get_class_service(
-    db: AsyncDatabase = Depends(get_db),
-) -> ClassService:
-    repos = Repositories(db)
-    return ClassService(repos)
+async def get_project_uow(
+    base: AsyncClient = Depends(get_terminus_client),
+    project: ProjectNode = Depends(get_project_node),
+    ctx: RequestDbContext = Depends(get_request_db_context),
+):
+    """Async generator dependency. FastAPI enters it and passes the yielded ProjectUoW."""
+    try:
+        yield ProjectUoW(base, project, ctx)
+    finally:
+        pass
 
 
-def get_function_service(
-    db: AsyncDatabase = Depends(get_db),
-) -> FunctionService:
-    repos = Repositories(db)
-    return FunctionService(repos)
+def get_project_service_with_uow(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> ProjectService:
+    return ProjectService(uow)
+
+
+def get_group_service(
+    uow: ProjectUoW = Depends(get_project_uow)
+) -> GroupService:
+    return GroupService(uow)
 
 
 def get_call_service(
-    db: AsyncDatabase = Depends(get_db),
+    uow: ProjectUoW = Depends(get_project_uow)
 ) -> CallService:
-    repos = Repositories(db)
-    return CallService(repos)
+
+    return CallService(uow)
 
 
 def get_log_service(
-    db: AsyncDatabase = Depends(get_db),
+    uow: ProjectUoW = Depends(get_project_uow)
 ) -> LogService:
-    repos = Repositories(db)
-    return LogService(repos)
+    return LogService(uow)
 
 
-def get_document_service(
-    db: AsyncDatabase = Depends(get_db),
-) -> DocumentService:
-    repos = Repositories(db)
-    return DocumentService(repos)
+async def get_code_element_service(
+    uow: ProjectUoW = Depends(get_project_uow)
+) -> CodeElementService:
+    return CodeElementService(uow)
+
+
+def get_document_service(uow: ProjectUoW = Depends(get_project_uow)) -> DocumentService:
+    return DocumentService(uow)

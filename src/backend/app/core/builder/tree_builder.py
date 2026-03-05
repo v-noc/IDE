@@ -1,59 +1,182 @@
+from typing import Any, Dict, List
 
-from typing import Dict, List, Any
-from app.core.schemas.tree import AnyTreeNode, FolderTreeNode, ProjectTreeNode, FileTreeNode, ClassTreeNode, FunctionTreeNode, CallTreeNode, GroupTreeNode
+from pydantic import BaseModel
 
-# Maps a node_type string to the correct Pydantic Tree model
-NODE_TYPE_TO_TREE_MODEL_MAP = {
-    "group": GroupTreeNode,
-    "project": ProjectTreeNode,
-    "folder": FolderTreeNode,
-    "file": FileTreeNode,
-    "class": ClassTreeNode,
-    "function": FunctionTreeNode,
-    "call": CallTreeNode,
+from app.core.schemas.tree import (
+    AnyTreeNode,
+    CallTreeNode,
+    ClassTreeNode,
+    FileTreeNode,
+    FolderTreeNode,
+    FunctionTreeNode,
+    GroupTreeNode,
+    ProjectTreeNode,
+)
+
+# Schema @type or Node class -> tree model (nodes have children as string IDs; tree nodes have nested objects)
+SCHEMA_TO_TREE = {
+    "ProjectSchema": ProjectTreeNode,
+    "FolderSchema": FolderTreeNode,
+    "FileSchema": FileTreeNode,
+    "ClassSchema": ClassTreeNode,
+    "FunctionSchema": FunctionTreeNode,
+    "CallSchema": CallTreeNode,
+    "CodeElementGroupSchema": GroupTreeNode,
+    "CallGroupSchema": GroupTreeNode,
+    "StructureGroupSchema": GroupTreeNode,
+    "ProjectNode": ProjectTreeNode,
+    "FolderNode": FolderTreeNode,
+    "FileNode": FileTreeNode,
+    "ClassNode": ClassTreeNode,
+    "FunctionNode": FunctionTreeNode,
+    "CallNode": CallTreeNode,
+    "CodeElementGroupNode": GroupTreeNode,
+    "CallGroupNode": GroupTreeNode,
+    "StructureGroupNode": GroupTreeNode,
 }
+
+# Schema @type or Node class -> group_type for GroupTreeNode
+GROUP_SCHEMA_TO_GROUP_TYPE = {
+    "CodeElementGroupSchema": "code_element_group",
+    "CallGroupSchema": "call_group",
+    "StructureGroupSchema": "structure_group",
+    "CodeElementGroupNode": "code_element_group",
+    "CallGroupNode": "call_group",
+    "StructureGroupNode": "structure_group",
+}
+
+# Parent type -> allowed child types (for schema validation)
+STRUCTURE_CHILDREN = (FolderTreeNode, FileTreeNode, GroupTreeNode)
+CODE_CHILDREN = (ClassTreeNode, FunctionTreeNode, CallTreeNode, GroupTreeNode)
+CALL_CHILDREN = (CallTreeNode, GroupTreeNode)
 
 
 class TreeBuilder:
-    def __init__(self, flat_nodes: List[Dict[str, Any]]):
+    def __init__(self, flat_nodes: List[Any]):
         self.flat_nodes = flat_nodes
         self.nodes_map: Dict[str, AnyTreeNode] = {}
 
-    def build(self) -> List[AnyTreeNode]:
-        """Constructs the tree and returns the root nodes."""
-        if not self.flat_nodes:
+    @staticmethod
+    def _to_dict(item: Any) -> Dict[str, Any]:
+        if isinstance(item, BaseModel):
+            return item.model_dump()
+        return dict(item)
 
+    @staticmethod
+    def _get_model_class(item: Any, d: Dict[str, Any]) -> type | None:
+        schema = d.get("@type")
+        if isinstance(schema, str):
+            return SCHEMA_TO_TREE.get(schema)
+        cls = getattr(item, "__class__", None)
+        if cls is not None:
+            return SCHEMA_TO_TREE.get(cls.__name__)
+        return None
+
+    @staticmethod
+    def _child_ids(d: Dict[str, Any]) -> List[str]:
+        raw = d.get("children", [])
+        if isinstance(raw, (set, list, tuple)):
+            return [str(x) for x in raw if x]
+        return []
+
+    @staticmethod
+    def _is_valid_child(parent: AnyTreeNode, child: AnyTreeNode) -> bool:
+        """Check if child type is valid for parent's children schema."""
+        if isinstance(parent, (ProjectTreeNode, FolderTreeNode)):
+            return isinstance(child, STRUCTURE_CHILDREN)
+        if isinstance(parent, (FileTreeNode, ClassTreeNode, FunctionTreeNode)):
+            return isinstance(child, CODE_CHILDREN)
+        if isinstance(parent, CallTreeNode):
+            return isinstance(child, CALL_CHILDREN)
+        if isinstance(parent, GroupTreeNode):
+            return isinstance(child, (GroupTreeNode, FolderTreeNode, FileTreeNode, ClassTreeNode, FunctionTreeNode, CallTreeNode))
+        return True
+
+    @staticmethod
+    def _target_function_id(d: Dict[str, Any]) -> str | None:
+        raw = d.get("target_function")
+        if raw is None:
+            return None
+        if isinstance(raw, str) and raw:
+            return raw
+        if hasattr(raw, "id"):
+            return str(getattr(raw, "id", None))
+        if isinstance(raw, dict):
+            return raw.get("id") or raw.get("@id")
+        return str(raw) if raw else None
+
+    def build(self) -> List[AnyTreeNode]:
+        """Build tree from flat nodes; each node has children as string IDs."""
+        if not self.flat_nodes:
             return []
 
-        # First pass: Create all Pydantic model instances and map them by ID
+        child_ids_by_parent: Dict[str, List[str]] = {}
+        target_function_id_by_call: Dict[str, str] = {}
         for item in self.flat_nodes:
-            vertex_data = item["vertex"]
-            node_type = vertex_data["node_type"]
-            model_class = NODE_TYPE_TO_TREE_MODEL_MAP.get(node_type)
 
-            if model_class:
-                # If the query gave us a 'target', include it in the model
-                if 'target' in item and item['target']:
-                    vertex_data['target'] = item['target']
-
-                node_instance = model_class.model_validate(vertex_data)
-                self.nodes_map[node_instance.id] = node_instance
-
-        # Second pass: Link children to their parents
-        root_nodes = []
-
-        for item in self.flat_nodes:
-            node_id = item["vertex"]["_id"]
-            parent_id = item["parent_id"]
-
-            node = self.nodes_map.get(node_id)
-            if not node:
+            d = self._to_dict(item)
+            node_id = d.get("id") or d.get("@id")
+            if not node_id:
                 continue
 
-            parent_node = self.nodes_map.get(parent_id)
-            if parent_node:
-                parent_node.children.append(node)
-            else:
-                root_nodes.append(node)
+            model_cls = self._get_model_class(item, d)
+            if not model_cls:
+                continue
 
-        return root_nodes
+            # Exclude children: raw nodes have string IDs; tree expects nested nodes
+            validate_d = {k: v for k, v in d.items() if k != "children"}
+            validate_d["children"] = []
+            if model_cls == GroupTreeNode:
+                schema = d.get("@type") or getattr(item, "__class__", None)
+                if isinstance(schema, str):
+                    group_type = GROUP_SCHEMA_TO_GROUP_TYPE.get(schema)
+                elif schema is not None:
+                    group_type = GROUP_SCHEMA_TO_GROUP_TYPE.get(schema.__name__)
+                else:
+                    group_type = None
+                if group_type is not None:
+                    validate_d["group_type"] = group_type
+            node = model_cls.model_validate(validate_d)
+            self.nodes_map[node.id] = node
+            child_ids_by_parent[node.id] = self._child_ids(d)
+            if model_cls == CallTreeNode:
+                tid = self._target_function_id(d)
+                if tid:
+                    target_function_id_by_call[node.id] = tid
+
+        referenced: set[str] = set()
+        for pid, cids in child_ids_by_parent.items():
+            parent = self.nodes_map.get(pid)
+            if not parent:
+                continue
+            for cid in cids:
+                child = self.nodes_map.get(cid)
+                if child and self._is_valid_child(parent, child):
+                    parent.children.append(child)
+                    referenced.add(cid)
+
+        for call_id, target_id in target_function_id_by_call.items():
+            call_node = self.nodes_map.get(call_id)
+            target_node = self.nodes_map.get(target_id)
+            if (
+                call_node
+                and target_node
+                and isinstance(call_node, CallTreeNode)
+                and isinstance(target_node, (FunctionTreeNode, ClassTreeNode))
+            ):
+                target_node = target_node.model_copy(
+                    update={"node_type": "function", "children": []})
+                call_node.target = target_node
+
+        roots: List[AnyTreeNode] = []
+        seen: set[str] = set()
+        for item in self.flat_nodes:
+            d = self._to_dict(item)
+            nid = d.get("id") or d.get("@id")
+            if not nid or nid in seen or nid in referenced:
+                continue
+            node = self.nodes_map.get(nid)
+            if node:
+                roots.append(node)
+                seen.add(nid)
+        return roots

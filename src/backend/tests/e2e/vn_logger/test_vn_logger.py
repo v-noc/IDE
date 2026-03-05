@@ -1,9 +1,8 @@
-from app.core.services.log_service import LogService
-from vn_logger.configure_logger import configure_logger, stop_worker_thread
-from vn_logger.logger import context_logger, logger
-from app.core.repository import Repositories
-from app.core.services.project_service import ProjectService
+from vn_logger import configure_logger, stop_worker_thread, context_logger, logger
 import pytest
+from app.core.services.project_service import ProjectService
+from app.db.context import RequestDbContext, ProjectUoW
+from app.core.services.log_service import LogService
 
 
 def _find_fn(nodes, name: str):
@@ -16,22 +15,21 @@ def _find_fn(nodes, name: str):
     return None
 
 
-@pytest.mark.skip(reason="Skipping vn_logger test")
 @pytest.mark.asyncio
-async def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
+async def test_vn_logger(jsonrpc_url, create_sample_project, terminusdb_client):
     # Use real server URL; worker will use requests.post
-    repos = Repositories(arangodb_client)
+    project_node = create_sample_project
+    ctx = RequestDbContext()
+    project_uow = ProjectUoW(terminusdb_client, project_node, ctx)
 
-    proj_service = ProjectService(repos)
-    log_service = LogService(repos)
+    proj_service = ProjectService(project_uow)
+    log_service = LogService(project_uow)
 
-    project = await proj_service.get_all()
-    assert project
-    project_id = project[0].id
+    project_id = project_node.id
 
     from app.core.builder.tree_builder import TreeBuilder
 
-    children = await proj_service.get_children(project[0].id)
+    children = await proj_service.get_children()
     tree = TreeBuilder(children).build()
     factory_fn = _find_fn(tree, "factory")
     add_fn = _find_fn(tree, "add")
@@ -42,15 +40,15 @@ async def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
         project_id,
     )
 
-    @context_logger(function_id=build_fn.key)
+    @context_logger(function_id=build_fn.id.split("/")[-1])
     def build_function(param: str):
         logger.info("build_function ")
-        return "test"
+        return {"value": "test"}
 
-    @context_logger(function_id=add_fn.key)
+    @context_logger(function_id=add_fn.id.split("/")[-1])
     def add_function(pp):
         build_function("test")
-        return "test"
+        return {"value": "test"}
 
     add_function("dad")
     # Ensure background thread shuts down cleanly
@@ -68,7 +66,7 @@ async def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
     assert len(add_log_children) == 2
     # Root add_function enter
     assert add_log.event_type == "enter"
-    assert add_log.message == "Enter"
+    assert add_log.message.startswith("Enter")
     assert add_log.payload is not None
     assert add_log.payload.get("args") == ["'dad'"]
     assert add_log.payload.get("kwargs") == {}
@@ -82,7 +80,7 @@ async def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
     )
     assert build_enter is not None and add_exit is not None
 
-    assert build_enter.message == "Enter"
+    assert build_enter.message.startswith("Enter")
     assert build_enter.payload is not None
     assert build_enter.payload.get("args") == ["'test'"]
     assert build_enter.payload.get("kwargs") == {}
@@ -99,9 +97,9 @@ async def test_vn_logger(jsonrpc_url, create_sample_project, arangodb_client):
     assert inner_log is not None and build_exit is not None
     assert inner_log.message.strip() == "build_function"
     assert inner_log.payload is None
-    assert build_exit.result == "'test'"
+    assert build_exit.result.get("value") == "'test'"
     assert build_exit.payload is None
 
     # Add exit should also have the overall 'test' result
-    assert add_exit.message == "Exit"
-    assert add_exit.result == "'test'"
+    assert add_exit.message.startswith("Exit")
+    assert add_exit.result.get("value") == "'test'"

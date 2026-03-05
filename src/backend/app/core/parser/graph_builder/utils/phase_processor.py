@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 import asyncio
 
-from app.core.model.nodes import ProjectNode
+from app.core.model.nodes import FileNode, ProjectNode
 from app.core.parser.graph_builder.analysis.body_parser import BodyParser
 from app.core.parser.graph_builder.collection.collector import Collector
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
@@ -13,6 +13,7 @@ from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
+from app.core.parser.graph_builder.collection.structure_batch import StructureBatchPlan
 
 logger = logging.getLogger(__name__)
 
@@ -64,61 +65,81 @@ class PhaseProcessor:
         (Code remains unchanged from your snippet, it is correct)
         """
         files_to_process = [
-            tp.path
+            tp.id
             for tp in (change_set.new_files + change_set.modified_files)
-            if tp.path
+            if tp.id
         ]
         files_to_process.extend(
-            [mv.new for mv in change_set.moved_files if mv.new])
+            [mv.id for mv in change_set.moved_files if mv.id])
 
         results = []
-        removed_scope_ids = set()
 
-        async def _process_single_file(file_path: str):
+        async def _process_single_file(file_node: FileNode):
             async with self._file_semaphore:
-                checksum = scan_result.files.get(file_path)
+                checksum = scan_result.files.get(file_node.path)
                 if not checksum:
-                    return None
-                logger.info(f"Collecting structure for: {file_path}")
+                    return None, None
+                logger.info(f"Collecting structure for: {file_node.path}")
                 # Set current file at start of processing
                 if progress_tracker:
-                    progress_tracker.set_current_file(file_path)
+                    progress_tracker.set_current_file(file_node.path)
                     await progress_tracker.emit()
                 try:
+
                     result = await asyncio.wait_for(
-                        self.collector.process_file(file_path, checksum, progress_tracker),
+                        self.collector.process_file(
+                            file_node, checksum, progress_tracker=progress_tracker),
                         timeout=self._file_timeout,
                     )
+
                     # Update file progress
                     if progress_tracker:
-                        progress_tracker.increment_file_processed(file_path)
+                        progress_tracker.increment_file_processed(
+                            file_node.path)
                         await progress_tracker.emit()
-                    return result
+                    for tp in (change_set.new_files + change_set.modified_files):
+                        if file_node.id == tp.id:
+                            if len(result.insert) > 0 or len(result.update) > 0:
+                                return result, file_node
+
+                    return result, None
                 except Exception as exc:
                     logger.error(
                         "Error in collector.process_file for %s: %s",
-                        file_path, exc
+                        file_node.path, exc
                     )
                     # Still update progress even on error
                     if progress_tracker:
-                        progress_tracker.increment_file_processed(file_path)
+                        progress_tracker.increment_file_processed(
+                            file_node.path)
                         await progress_tracker.emit()
-                    return None
+                    return None, None
 
+        file_nodes = await self.repos.structure_repo.get_by_ids(files_to_process)
         async with asyncio.TaskGroup() as tg:
             tasks = [
-                tg.create_task(_process_single_file(file_path))
-                for file_path in files_to_process
+                tg.create_task(_process_single_file(node))
+                for node in file_nodes
             ]
 
+        structure_batch_plan = StructureBatchPlan()
+        results = []
         for task in tasks:
-            result = task.result()
+            result, file_node = task.result()
             if result:
-                results.append(result)
-                removed_scope_ids.update(result.removed_scope_ids)
+                structure_batch_plan.extend(result)
+            if file_node:
+                results.append(file_node)
 
-        if removed_scope_ids:
-            await self._batch_delete_scopes(list(removed_scope_ids))
+        await self.repos.code_element_repo.flush_batch(
+            structure_batch_plan.insert,
+            [],
+            structure_batch_plan.delete,
+            structure_batch_plan.move,
+
+        )
+        await self.repos.code_element_repo.update_batch(structure_batch_plan.update)
+
         return results
 
     async def process_analysis_phase(
@@ -131,88 +152,68 @@ class PhaseProcessor:
 
         Orchestrates the BodyParser which uses the CallChainBuilder.
         """
-        async def _process_single_file_analysis(result):
+        body_parser = BodyParser(
+            self.project_node,
+            self.repos,
+            self.jedi_manager,
+            batch_size=5000,
+            progress_tracker=progress_tracker,
+        )
+
+        async def _process_single_file_analysis(file_node: FileNode):
             """Process a single file's AST analysis."""
-            body_parser = BodyParser(
-                Path(self.project_path),
-                self.project_node.name,
-                self.repos,
-                self.jedi_manager,
-                batch_size=self._batch_size,
-                progress_tracker=progress_tracker,
-            )
 
             with tracker.timer("phase2.analyze_file"):
                 async with self._file_semaphore:
                     try:
                         logger.info(
                             "Analyzing call graph for: %s",
-                            result.file_node.qname,
+                            file_node.qname,
                         )
-                        
+
                         # Set current file at start of processing
                         if progress_tracker:
-                            progress_tracker.set_current_file(result.file_node.path)
+                            progress_tracker.set_current_file(
+                                file_node.path)
                             await progress_tracker.emit()
-
-                        # NOTE: Do NOT delete descendant calls here.
-                        # The BodyParser -> CallChainBuilder -> ScopeProcessor
-                        # will handle "Diffing" (Create/Keep/Delete) per function scope.
 
                         # Process AST
                         with tracker.timer("phase2.process_ast"):
                             await asyncio.wait_for(
-                                body_parser.process_ast(result.file_node),
+                                body_parser.process_ast(file_node),
                                 timeout=self._file_timeout,
                             )
-                        
+
                         # Clear current function when file is done
                         if progress_tracker:
                             progress_tracker.clear_current_function()
-                        
+
                         # Update file progress
                         if progress_tracker:
-                            progress_tracker.increment_file_processed(result.file_node.path)
+                            progress_tracker.increment_file_processed(
+                                file_node.path)
                             await progress_tracker.emit()
 
                     except Exception as exc:
                         logger.error(
-                            f"Error analyzing file {result.file_node.path}: {exc}",
+                            f"Error analyzing file {file_node.path}: {exc}",
                             exc_info=True
                         )
                         # Still update progress even on error
                         if progress_tracker:
-                            progress_tracker.increment_file_processed(result.file_node.path)
+                            progress_tracker.increment_file_processed(
+                                file_node.path)
                             await progress_tracker.emit()
 
         # Execute in parallel
         async with asyncio.TaskGroup() as tg:
             tasks = [
-                tg.create_task(_process_single_file_analysis(result))
-                for result in collection_results
+                tg.create_task(_process_single_file_analysis(file_node))
+                for file_node in collection_results
             ]
 
         for task in tasks:
             task.result()
 
-    async def _batch_delete_scopes(self, scope_ids: List[str]) -> None:
-        """Batch delete scopes with concurrency control."""
-        clean_keys = [
-            sid.split("/")[-1] if "/" in sid else sid for sid in scope_ids]
-        if not clean_keys:
-            return
-
-        # Using AQL is much faster than individual deletes
-        async with self._db_semaphore:
-            query = """
-                 FOR doc IN nodes
-                    FILTER doc._key IN @keys
-                    REMOVE doc IN nodes
-             """
-            try:
-                await self.repos.nodes.db.aql.execute(
-                    query,
-                    bind_vars={"keys": clean_keys}
-                )
-            except Exception as e:
-                logger.error(f"Batch delete failed: {e}")
+        # Flush all buffered call operations (inserts, deletes, moves) in one final batch
+        await body_parser.flush_buffers()

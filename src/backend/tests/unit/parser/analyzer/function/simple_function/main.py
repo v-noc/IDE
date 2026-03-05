@@ -1,35 +1,46 @@
-"""FileID: 511edd7f-57ee-4abf-ad3e-435a60ca0081"""
+
+
+"""FileID: bfb2ae0c-655b-4aa0-a1e7-7a02d8e16b8b"""
+
+
 def factory():
-    """ID: 4443bd2b-bcdc-4135-a8d3-16705dc8da11"""
+    """ID: 1ad3edb4-140e-4c42-af81-b0a75e6bd0ed"""
+
     def add():
-        """ID: 6cfe906e-80c1-4f9a-a984-e7154c91a767"""
+        """ID: 3d4782eb-0d78-434e-9a6e-f21b27a306b3"""
+
         build()
 
     def build():
-        """ID: 0af37d95-b990-4aa8-a6d8-f227f080aa11"""
-        build()
+        """ID: db0744f2-0aa8-44e0-8d15-648d019494fc"""
+        pass
+        # build()
 
     return add
 
 
 def call_back(call_back_func):
-    """ID: 3c2f627c-520f-4b52-8690-bc7f5dc36e09"""
+    """ID: 040d752e-b34b-49da-b595-c613c3e73dd4"""
+
     call_back_func()  # lalal
 
 
 def factory_call():
-    """ID: bf998f1a-d36e-49d8-bd98-2bc279c4428b"""
+    """ID: 9227c3fd-42f1-4857-8cce-472b40357e1f"""
+
     add = factory()
     add()
 
 
 def curry_call():
-    """ID: e7398873-f663-4c80-9b20-ff8bbb7b4967"""
+    """ID: ca8cb52d-33f8-4b03-946d-7587574b69c0"""
+
     factory()()
 
 
 def main():
-    """ID: 4b20776e-824a-45ce-9644-897fac77af54"""
+    """ID: ece4c93f-b04b-4598-b4fc-147e35758f7b"""
+
     factory_call()
     curry_call()
     call_back(factory())

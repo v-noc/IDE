@@ -21,7 +21,9 @@ export function useEditableCode(
   projectId?: string,
   nodeType?: string
 ): UseEditableCodeResult {
-  const { data, isLoading, isError } = useCode(elementId, nodeType);
+
+
+  const { data, isLoading, isError } = useCode(elementId, nodeType, projectId);
   const { mutate: saveCode, isPending: isSaving } = useWriteCode();
 
   const [editorValue, setEditorValue] = useState<string>("");
@@ -41,7 +43,7 @@ export function useEditableCode(
   };
 
   const handleSave = () => {
-    if (hasChanges && !isSaving && elementId) {
+    if (hasChanges && !isSaving && elementId && projectId) {
       saveCode({ elementId, code: editorValue, projectId });
       setHasChanges(false);
     }
