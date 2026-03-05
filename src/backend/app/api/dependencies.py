@@ -71,7 +71,6 @@ def get_call_service(
 def get_log_service(
     uow: ProjectUoW = Depends(get_project_uow)
 ) -> LogService:
-
     return LogService(uow)
 
 
