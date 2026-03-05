@@ -25,7 +25,9 @@ async def get_jsonrpc_project_node(
     project_service=Depends(get_project_service),
 ) -> Optional[ProjectNode]:
     try:
+
         project = await project_service.get(project_id)
+
         return ProjectNode.from_raw_dict(project) if project else None
     except Exception as e:
         print("Error getting project", e)

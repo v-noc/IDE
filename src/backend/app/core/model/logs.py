@@ -26,14 +26,14 @@ class LogEventType(str, Enum):
 
 
 class LogLevelName(str, Enum):
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    DEBUG = "debug"
-    TRACE = "trace"
-    FATAL = "fatal"
-    CRITICAL = "critical"
-    NOTSET = "notset"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    DEBUG = "DEBUG"
+    TRACE = "TRACE"
+    FATAL = "FATAL"
+    CRITICAL = "CRITICAL"
+    NOTSET = "NOTSET"
 
 
 class LogNode(BaseModel):

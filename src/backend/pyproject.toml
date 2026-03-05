@@ -37,7 +37,7 @@ dependencies = [
 test = ["pytest", "httpx", "pytest-asyncio"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "../vn_logger"]
 testpaths = ["tests/unit", "tests/e2e"]
 python_files = ["test_*.py", "*_test.py"]
 asyncio_mode = "strict"
