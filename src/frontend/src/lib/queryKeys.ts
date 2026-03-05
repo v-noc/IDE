@@ -11,7 +11,7 @@ const queryKeys = {
   },
   logs: {
     all: ['logs'] as const,
-    tree: (nodeId: string) => [...queryKeys.logs.all, 'tree', nodeId] as const,
+    tree: (functionId: string, projectId: string) => [...queryKeys.logs.all, 'tree', functionId, projectId] as const,
   },
   nodes: {
     all: ['nodes'] as const,

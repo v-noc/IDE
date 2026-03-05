@@ -8,61 +8,71 @@ from app.core.model.schemas import LogSchema
 from app.db.async_terminus_client import WOQLQuery as WQ
 
 
-class LogRepository(BaseRepo[LogNode, LogSchema]):
+class LogRepository():
     def __init__(self, client: AsyncClient):
-        super().__init__(client, LogNode, LogSchema)
+        self.client = client
 
-    async def create_batch(self, logs: List[LogNode], project_db_name: str, branch_name: Optional[str] = None):
-        async with self.session(project_db_name, branch_name=branch_name) as new_client:
-            try:
-                raw_dict_batch = []
+    async def create_batch(self, logs: List[LogNode]):
 
-                for log in logs:
-                    raw_dict_batch.append(log.to_raw_dict())
+        try:
+            raw_dict_batch = []
 
-                await new_client.insert_document(raw_dict_batch, commit_msg=f"Creating {len(logs)} logs")
+            for log in logs:
+                raw_dict_batch.append(log.to_raw_dict())
 
-            except Exception as exc:
-                print(exc)
-                return False
+            await self.client.insert_document(raw_dict_batch, commit_msg=f"Creating {len(logs)} logs")
+
+        except Exception as exc:
+            print(exc)
+            return False
         return True
 
-    async def move_logs_to_parent_logs(self, moves: List[Tuple[str, str, str]], project_db_name: str, branch_name: Optional[str] = None):
-        return await self.move_batch_by_type(
-            moves,
-            child_type_to_field={"log": "children_logs"},
-            project_db_name=project_db_name,
-            branch_name=branch_name,
-        )
+    async def get_function_log(self, function_id: str):
 
-    async def get_function_log(self, function_id: str, project_db_name: str, branch_name: Optional[str] = None):
-        async with self.session(project_db_name, branch_name=branch_name) as new_client:
-            try:
-                query = WQ().select("v:log_doc").woql_and(
-                    WQ().eq("v:function", function_id).
-                    path("v:log", "origin_function", "v:function")
-                    .path("v:log", "(children_logs)*", "v:child_log")
-                    .read_document("v:child_log", "v:log_doc")
-                )
-                result = await new_client.query(query)
+        try:
+            query = WQ().select("v:log_doc").woql_and(
+                WQ().eq("v:function", function_id).
+                path("v:log", "origin_function", "v:function")
+                .path("v:log", "(children_logs)*", "v:child_log")
+                .read_document("v:child_log", "v:log_doc")
+            )
+            result = await self.client.query(query)
 
-                return [LogNode.from_raw_dict(row["log_doc"]) for row in result["bindings"]]
-            except Exception as exc:
-                print(exc)
-                return []
+            return [LogNode.from_raw_dict(row["log_doc"]) for row in result["bindings"]]
+        except Exception as exc:
+            print(exc)
+            return []
 
-    async def get_parent_log(self, log_id: str, project_db_name: str, branch_name: Optional[str] = None):
-        async with self.session(project_db_name, branch_name=branch_name) as new_client:
-            try:
-                query = WQ().select("v:parent_doc").woql_and(
-                    WQ().eq("v:log", log_id).
-                    path("v:parent", "children_logs", "v:log")
-                    .read_document("v:parent", "v:parent_doc")
-                )
-                result = await new_client.query(query)
-                if len(result["bindings"]) == 0:
-                    return None
-                return self._to_node(result["bindings"][0]["parent_doc"])
-            except Exception as exc:
-                print(exc)
+    async def get_parent_log(self, log_id: str):
+
+        try:
+            query = WQ().select("v:parent_doc").woql_and(
+                WQ().eq("v:log", log_id).
+                path("v:parent", "children_logs", "v:log")
+                .read_document("v:parent", "v:parent_doc")
+            )
+            result = await self.client.query(query)
+            if len(result["bindings"]) == 0:
                 return None
+            return LogNode.from_raw_dict(result["bindings"][0]["parent_doc"])
+        except Exception as exc:
+            print(exc)
+            return None
+
+    async def flush_batch_logs(self, inserts: List[LogNode], moves: List[Tuple[str, str, str]]):
+        if not inserts and not moves:
+            return True
+
+        queries = []
+
+        for log in inserts:
+            queries.append(WQ().insert_document(
+                LogSchema.from_pydantic(log)._obj_to_dict()[0]))
+
+        for move in moves:
+            queries.append(WQ().add_triple(move[0], "children_logs", move[1]))
+        try:
+            return await self.client.query(WQ().woql_and(*queries), commit_msg=f"Flushing {len(inserts)} logs and {len(moves)} moves")
+        except Exception as exc:
+            print(exc)
+            return False

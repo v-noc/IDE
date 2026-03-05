@@ -62,8 +62,10 @@ class LogService:
 
         # 2. Bulk Insert Logs (One DB Call)
 
-        await self.repos.log_repo.create_batch(log_docs, self.project.db_name)
-        await self.repos.log_repo.move_logs_to_parent_logs(log_edges, self.project.db_name)
+        result = await self.repos.log_repo.flush_batch_logs(log_docs, log_edges)
+        if not result:
+            return False
+
         # We get back objects with valid .id properties
 
         # Emit logs:new socket events for unique function_ids
