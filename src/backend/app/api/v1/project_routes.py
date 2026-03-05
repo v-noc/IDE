@@ -8,7 +8,7 @@ from app.core.builder.tree_builder import TreeBuilder
 from app.db.client import get_terminus_client
 
 from app.core.services.project_service import ProjectService
-from app.api.dependencies import ProjectUoW, get_project_service
+from app.api.dependencies import ProjectUoW, get_project_service, get_project_service_with_uow, get_project_node
 from pathlib import Path
 from app.core.watcher.service import WatcherService, get_watcher_service
 from loguru import logger
@@ -95,24 +95,15 @@ async def create_project(
 
 @router.get("/", response_model=ProjectTreeNode)
 async def get_project(
-    project_id: str = Query(..., description="The ID of the project to get"),
+    project_node: ProjectNode = Depends(get_project_node),
     exclude_groups: bool = False,
-    project_service: ProjectService = Depends(get_project_service),
+    project_service: ProjectService = Depends(get_project_service_with_uow),
     watcher_service: WatcherService = Depends(get_watcher_service),
 ) -> ProjectTreeNode:
 
-    project_node = await project_service.get(project_id)
-    if project_node is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        )
-
-    project_node = ProjectNode.from_raw_dict(project_node)
     watcher_service.start_watching(project_node)
 
-    children = await project_service.get_children(
-        project_node.db_name)
+    children = await project_service.get_children()
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()

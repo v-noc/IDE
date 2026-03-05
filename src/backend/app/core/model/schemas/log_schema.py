@@ -3,7 +3,6 @@ from typing import Set, Optional
 
 from app.core.model.logs import LogNode
 from app.db.schema.schema import DocumentTemplate
-from .base import TerminusBase
 from app.db.woqlschema import EnumTemplate
 from .code_element_schema import FunctionSchema
 

@@ -13,6 +13,7 @@ from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
 from app.db.context import RequestDbContext, ProjectUoW
 
+
 def get_project_service(
     db: AsyncClient = Depends(get_terminus_client),
 ) -> ProjectService:
@@ -46,6 +47,12 @@ async def get_project_uow(
         yield ProjectUoW(base, project, ctx)
     finally:
         pass
+
+
+def get_project_service_with_uow(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> ProjectService:
+    return ProjectService(uow)
 
 
 def get_group_service(
