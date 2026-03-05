@@ -45,6 +45,18 @@ class LogRepository():
             print(exc)
             return []
 
+    async def get_call_log(self, call_id: str):
+        try:
+            query = WQ().select("v:log_doc").woql_and(
+                WQ().eq("v:call", call_id).
+                path("v:log", "origin_function", "v:function")
+                .path("v:log", "(children_logs)*", "v:child_log")
+                .read_document("v:child_log", "v:log_doc")
+            )
+        except Exception as exc:
+            print(exc)
+            return []
+
     async def get_parent_log(self, log_id: str):
 
         try:

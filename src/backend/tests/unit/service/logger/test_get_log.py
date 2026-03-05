@@ -2,9 +2,7 @@ from typing import List
 from datetime import datetime, timezone
 import uuid
 
-from app.core.repository import Repositories
 from app.core.services.project_service import ProjectService
-from app.core.builder.log_tree_builder import LogTreeBuilder
 from app.core.services.log_service import LogService
 import pytest
 
@@ -12,17 +10,17 @@ from app.core.model.logs import LogLevelName
 
 
 @pytest.mark.asyncio
-async def test_get_log_tree(create_sample_project, terminusdb_client):
-    project = create_sample_project
-    repos = Repositories(terminusdb_client)
-    proj_service = ProjectService(repos)
+async def test_get_log_tree(create_sample_project):
+    project, project_uow = create_sample_project
+
+    proj_service = ProjectService(project_uow)
 
     from app.core.builder.tree_builder import TreeBuilder
     from app.core.schemas.tree import AnyTreeNode
     from app.core.model.schemas import FunctionSchema, LogSchema
     from app.api.json_rpc.schemas import RegisterLogsParams, LogEventType
 
-    children = await proj_service.get_children(project.db_name)
+    children = await proj_service.get_children()
     tree = TreeBuilder(children).build()
 
     def find_fn(nodes: List[AnyTreeNode], name: str):
@@ -38,7 +36,7 @@ async def test_get_log_tree(create_sample_project, terminusdb_client):
     add_fn = find_fn(tree, 'add')
     assert factory_fn and add_fn
 
-    log_service = LogService(repos, project)
+    log_service = LogService(project_uow)
     parent_params = RegisterLogsParams(
         id=str(uuid.uuid4()),
         function_id=factory_fn.id,

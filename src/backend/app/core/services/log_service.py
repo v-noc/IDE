@@ -21,6 +21,10 @@ class LogService:
 
         return LogTreeBuilder(flat_logs).build()
 
+    async def get_call_log(self, call_id: str):
+        flat_logs = await self.uow.get_project_repos().log_repo.get_call_log(call_id)
+        return LogTreeBuilder(flat_logs).build()
+
     async def get_parent_log(self, log_id: str):
         return await self.uow.get_project_repos().log_repo.get_parent_log(log_id)
 

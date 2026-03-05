@@ -1,8 +1,21 @@
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional, Literal, Set
 
 from pydantic import Field, BaseModel
+
+
+def _parse_json_field(val: Any) -> Any:
+    """Parse JSON string from DB; payload/result/error stored as JSON strings."""
+    if val is None:
+        return None
+    if isinstance(val, str):
+        try:
+            return json.loads(val)
+        except json.JSONDecodeError:
+            return val
+    return val
 
 
 class LogEventType(str, Enum):
@@ -72,9 +85,9 @@ class LogNode(BaseModel):
             level_name=LogLevelName(raw_dict.get("level_name")),
             duration_ms=raw_dict.get("duration_ms"),
             chain_id=raw_dict.get("chain_id"),
-            payload=raw_dict.get("payload"),
-            result=raw_dict.get("result"),
-            error=raw_dict.get("error"),
+            payload=_parse_json_field(raw_dict.get("payload")),
+            result=_parse_json_field(raw_dict.get("result")),
+            error=_parse_json_field(raw_dict.get("error")),
             origin_function=raw_dict.get("origin_function"),
             children_logs=raw_dict.get("children_logs", set()),
         )

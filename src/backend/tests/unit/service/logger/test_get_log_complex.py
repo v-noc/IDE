@@ -1,14 +1,11 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import List
 
 import pytest
 
 from app.api.json_rpc.schemas import LogEventType, LogLevelName, RegisterLogsParams
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.schemas import FunctionSchema, LogSchema
-from app.core.repository import Repositories
-from app.core.schemas.log_tree import LogTreeNode
 from app.core.services.log_service import LogService
 from app.core.services.project_service import ProjectService
 
@@ -24,14 +21,11 @@ def _find_function_by_name(nodes, name: str):
 
 
 @pytest.mark.asyncio
-async def test_multiple_chains_and_nested_logs(
-    create_sample_project, terminusdb_client
-):
-    project = create_sample_project
-    repos = Repositories(terminusdb_client)
-    proj_service = ProjectService(repos)
+async def test_multiple_chains_and_nested_logs(create_sample_project):
+    project, project_uow = create_sample_project
+    proj_service = ProjectService(project_uow)
 
-    children = await proj_service.get_children(project.db_name)
+    children = await proj_service.get_children()
     tree = TreeBuilder(children).build()
 
     factory_fn = _find_function_by_name(tree, "factory")
@@ -39,7 +33,7 @@ async def test_multiple_chains_and_nested_logs(
     build_fn = _find_function_by_name(tree, "build")
     assert factory_fn and add_fn and build_fn
 
-    log_service = LogService(repos, project)
+    log_service = LogService(project_uow)
 
     # Chain A: factory(enter) -> add(enter, log, exit) -> build(enter, exit)
     base = datetime.now(timezone.utc)
@@ -53,11 +47,10 @@ async def test_multiple_chains_and_nested_logs(
         level_name=LogLevelName.INFO,
         message="factory enter A",
         function_id=factory_fn.id,
-        payload=None,
+        payload={"args": ["ctx"], "kwargs": {"name": "factory"}},
         result=None,
         error=None,
     )
-    # parent_log_A = log_service.create(factory_fn.id, p_enter)
 
     a_enter = RegisterLogsParams(
         id=str(uuid.uuid4()),
@@ -69,7 +62,7 @@ async def test_multiple_chains_and_nested_logs(
         function_id=add_fn.id,
         parent_log_id=p_enter.id,
         message="add enter A",
-        payload=None,
+        payload={"args": ["a", "b"], "kwargs": {}},
         result=None,
         error=None,
     )
@@ -99,12 +92,10 @@ async def test_multiple_chains_and_nested_logs(
         parent_log_id=a_enter.id,
         function_id=build_fn.id,
         message="build enter A",
-        payload=None,
+        payload={"args": ["target"]},
         result=None,
         error=None,
     )
-    # build_enter_A = log_service.create(
-    #     build_fn.id, b_enter, parent_function_id=add_fn.id)
 
     b_exit = RegisterLogsParams(
         id=str(uuid.uuid4()),
@@ -120,8 +111,6 @@ async def test_multiple_chains_and_nested_logs(
         result="ok",
         error=None,
     )
-    # build_exit_A = log_service.create(
-    #     build_fn.id, b_exit, parent_function_id=add_fn.id)
 
     a_exit = RegisterLogsParams(
         id=str(uuid.uuid4()),
@@ -138,6 +127,22 @@ async def test_multiple_chains_and_nested_logs(
         error=None,
     )
 
+    # Error log in chain A
+    a_error = RegisterLogsParams(
+        id=str(uuid.uuid4()),
+        chain_id="chain-A",
+        timestamp=base + timedelta(milliseconds=250),
+        duration_ms=None,
+        parent_log_id=a_enter.id,
+        event_type=LogEventType.ERROR,
+        level_name=LogLevelName.ERROR,
+        function_id=add_fn.id,
+        message="add error A",
+        payload=None,
+        result=None,
+        error={"message": "something went wrong", "code": "ERR_001"},
+    )
+
     # Chain B: independent chain on factory only (noise)
     p_enter_B = RegisterLogsParams(
         id=str(uuid.uuid4()),
@@ -152,9 +157,9 @@ async def test_multiple_chains_and_nested_logs(
         result=None,
         error=None,
     )
-    # log_service.create(factory_fn.id, p_enter_B)
+
     await log_service.create_batch(
-        [a_enter, a_log, b_enter, b_exit, a_exit, p_enter_B, p_enter]
+        [a_enter, a_log, a_error, b_enter, b_exit, a_exit, p_enter_B, p_enter]
     )
 
     # Build log tree for Chain A starting at factory enter A
@@ -175,33 +180,51 @@ async def test_multiple_chains_and_nested_logs(
 
     # 2. Assert children of 'add_enter_A'
     add_children_ids = {c.id for c in add_enter_node.children}
-    expected_add_children = {f"{LogSchema.__name__}/{a_log.id}",
-                             f"{LogSchema.__name__}/{b_enter.id}", f"{LogSchema.__name__}/{a_exit.id}"}
+    expected_add_children = {
+        f"{LogSchema.__name__}/{a_log.id}",
+        f"{LogSchema.__name__}/{a_error.id}",
+        f"{LogSchema.__name__}/{b_enter.id}",
+        f"{LogSchema.__name__}/{a_exit.id}",
+    }
     assert add_children_ids == expected_add_children
 
-    # 3. Assert children of 'build_enter_A'
+    # 2b. Assert payload, result, error when fetched
+    assert root.payload == {"args": ["ctx"], "kwargs": {"name": "factory"}}
+    assert add_enter_node.payload == {"args": ["a", "b"], "kwargs": {}}
     build_enter_node = next(
         c for c in add_enter_node.children if c.id == f"{LogSchema.__name__}/{b_enter.id}"
     )
+    assert build_enter_node.payload == {"args": ["target"]}
+    a_error_node = next(
+        c for c in add_enter_node.children if c.id == f"{LogSchema.__name__}/{a_error.id}"
+    )
+    assert a_error_node.error == {
+        "message": "something went wrong", "code": "ERR_001"}
+    a_exit_node = next(
+        c for c in add_enter_node.children if c.id == f"{LogSchema.__name__}/{a_exit.id}"
+    )
+    assert a_exit_node.result == "done"
+
+    # 3. Assert children of 'build_enter_A'
     assert len(build_enter_node.children) == 1
     build_exit_node = build_enter_node.children[0]
     assert build_exit_node.id == f"{LogSchema.__name__}/{b_exit.id}"
+    assert build_exit_node.result == "ok"
 
 
 @pytest.mark.asyncio
-async def test_get_function_log_tree(create_sample_project, terminusdb_client):
-    project = create_sample_project
-    repos = Repositories(terminusdb_client)
-    proj_service = ProjectService(repos)
+async def test_get_function_log_tree(create_sample_project):
+    project, project_uow = create_sample_project
+    proj_service = ProjectService(project_uow)
 
-    children = await proj_service.get_children(project.db_name)
+    children = await proj_service.get_children()
     tree = TreeBuilder(children).build()
 
     factory_fn = _find_function_by_name(tree, "factory")
     add_fn = _find_function_by_name(tree, "add")
     assert factory_fn and add_fn
 
-    log_service = LogService(repos, project)
+    log_service = LogService(project_uow)
     base = datetime.now(timezone.utc)
     chain_id = "chain-D"
 
@@ -216,8 +239,8 @@ async def test_get_function_log_tree(create_sample_project, terminusdb_client):
         timestamp=base,
         event_type=LogEventType.ENTER,
         message="enter factory",
-        payload=None,
-        result=None,
+        payload={"args": ["ctx"], "kwargs": {"debug": True}},
+        result={"value": 42, "status": "ok"},
         error=None,
     )
 
@@ -231,8 +254,8 @@ async def test_get_function_log_tree(create_sample_project, terminusdb_client):
         function_id=add_fn.id,
         parent_log_id=factory_enter_log.id,
         message="log in add",
-        payload=None,
-        result=None,
+        payload={"extra": "log_data"},
+        result={"value": 42, "status": "ok"},
         error=None,
     )
 
@@ -246,9 +269,9 @@ async def test_get_function_log_tree(create_sample_project, terminusdb_client):
         function_id=factory_fn.id,
         parent_log_id=factory_enter_log.id,
         message="exit factory",
-        payload=None,
-        result=None,
-        error=None,
+        payload={"args": ["ctx"], "kwargs": {"debug": True}},
+        result={"value": 42, "status": "ok"},
+        error={"message": "factory error", "code": "ERR_002"},
     )
     await log_service.create_batch([factory_enter_log, add_enter_log, factory_exit_log])
 
@@ -265,3 +288,17 @@ async def test_get_function_log_tree(create_sample_project, terminusdb_client):
     child_ids = {c.id for c in root.children}
     assert child_ids == {f"{LogSchema.__name__}/{factory_exit_log.id}",
                          f"{LogSchema.__name__}/{add_enter_log.id}"}
+
+    # Assert payload, result when fetched
+    assert root.payload == {"args": ["ctx"], "kwargs": {"debug": True}}
+    add_enter_node = next(
+        c for c in root.children if c.id == f"{LogSchema.__name__}/{add_enter_log.id}"
+    )
+    assert add_enter_node.payload == {"extra": "log_data"}
+    assert add_enter_node.result == {"value": 42, "status": "ok"}
+    factory_exit_node = next(
+        c for c in root.children if c.id == f"{LogSchema.__name__}/{factory_exit_log.id}"
+    )
+    assert factory_exit_node.result == {"value": 42, "status": "ok"}
+    assert factory_exit_node.error == {
+        "message": "factory error", "code": "ERR_002"}
