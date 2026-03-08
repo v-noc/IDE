@@ -15,5 +15,5 @@ export function useSelectedCommitDiff(
   selectedCommitId: string | null,
   currentCommitId: string | null
 ) {
-  return useCommitDiff(projectId, selectedCommitId, currentCommitId);
+  return useCommitDiff(projectId, currentCommitId, selectedCommitId);
 }

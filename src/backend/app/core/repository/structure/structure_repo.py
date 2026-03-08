@@ -9,7 +9,9 @@ from app.core.model.schemas import (
     ClassSchema,
     CallSchema,
     CodeElementGroupSchema,
-    CallGroupSchema)
+    CallGroupSchema,
+)
+from app.core.model.schemas.structure_schema import _code_content_id_for_file
 from app.core.repository.base_repo import BaseRepo
 from app.db.async_terminus_client import AsyncClient
 
@@ -59,6 +61,8 @@ class StructureRepo(BaseRepo[StructureNode, StructureSchema]):
     def _merge_file_update_fields(existing_raw: dict, _node: FileNode, schema: FileSchema):
         BaseRepo.merge_set_fields(
             schema, existing_raw, CODE_SET_FIELDS_TO_PRESERVE)
+        # Preserve code_content link so file updates don't overwrite it
+        schema.code_content = CodeContentSchema.from_file_content(_node.id, "")
 
     def _to_node(self, raw_data: dict[str, Any]) -> StructureNode:
         if raw_data["@type"] == "FolderSchema":
@@ -204,11 +208,22 @@ class StructureRepo(BaseRepo[StructureNode, StructureSchema]):
         for node in insert:
             if isinstance(node, FolderNode):
                 schema = FolderSchema.from_pydantic(node)._obj_to_dict()[0]
+                queries.append(WQ().insert_document(Doc(schema)))
             elif isinstance(node, FileNode):
-                schema = FileSchema.from_pydantic(node)._obj_to_dict()[0]
+
+                file_schema = FileSchema.from_pydantic(node)
+
+                content_id = _code_content_id_for_file(node.id)
+                file_schema.code_content = content_id
+                file_schema = file_schema._obj_to_dict()[0]
+                # Insert empty CodeContent placeholder first so file commits track content
+                content_schema = CodeContentSchema.from_file_content(
+                    node.id, ""
+                )._obj_to_dict()[0]
+                queries.append(WQ().insert_document(Doc(content_schema)))
+                queries.append(WQ().insert_document(Doc(file_schema)))
             else:
                 raise ValueError(f"Invalid node type: {type(node)}")
-            queries.append(WQ().insert_document(Doc(schema)))
 
         # for node in update:
         #     queries.append(WQ().woql_and(

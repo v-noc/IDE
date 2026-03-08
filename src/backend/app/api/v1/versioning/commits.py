@@ -30,7 +30,7 @@ class CommitResponse(BaseModel):
 async def get_commits(
     node_id: str = Query(..., description="The ID of the node"),
     start: int = Query(0, description="The start index"),
-    count: int = Query(10, description="The number of commits to return"),
+    count: int = Query(40, description="The number of commits to return"),
     project_uow: ProjectUoW = Depends(get_project_uow)
 ):
     """Get commit history for a project."""
@@ -68,5 +68,5 @@ async def get_diff(
     target = DbTarget(db=project.db_name,
                       branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
     async with scoped_client(project_uow.client, target) as session:
-        result = await session.diff_version(after_version=after_commit_id, before_version=before_commit_id)
+        result = await session.diff(after=after_commit_id, before=before_commit_id)
         return result

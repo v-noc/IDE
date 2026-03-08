@@ -16,10 +16,17 @@ from .code_element_schema import (
 from .metadata import DocumentSchema, ThemeConfigSchema
 
 
+def _code_content_id_for_file(file_id: str) -> str:
+    """Deterministic CodeContent id for a file. Reused for placeholder and updates."""
+    safe_id = file_id.replace("/", "_")
+    return f"CodeContentSchema/{safe_id}"
+
+
 class CodeContentSchema(BaseSchema):
     """
     Schema for storing file content separately from FileSchema.
     One CodeContent per file, linked via file reference.
+    Content is kept separate to avoid loading heavy content when loading graph/tree.
     """
     file: "FileSchema"
     content: str
@@ -28,9 +35,7 @@ class CodeContentSchema(BaseSchema):
     def from_file_content(file_id: str, content: str) -> "CodeContentSchema":
         import datetime
         now = datetime.datetime.now(datetime.timezone.utc)
-        # Deterministic id for upsert: CodeContentSchema/file_id_safe
-        safe_id = file_id.replace("/", "_")
-        content_id = f"CodeContentSchema/{safe_id}"
+        content_id = _code_content_id_for_file(file_id)
         return CodeContentSchema(
             _id=content_id,
             name="CodeContent",
@@ -100,6 +105,7 @@ class FileSchema(BaseSchema):
     call_children: Set["CallSchema"]
     documents: Set[DocumentSchema]
     theme_config: Optional[ThemeConfigSchema]
+    code_content: Optional[CodeContentSchema]
     hash: str
 
     @staticmethod

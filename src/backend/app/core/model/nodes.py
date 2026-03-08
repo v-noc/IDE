@@ -189,7 +189,8 @@ class StructureGroupNode(BaseGroupNode):
 class FolderNode(BaseNode):
     path: str = Field(..., description="The path of the folder.")
     qname: str = Field(..., description="The qname of the folder.")
-    is_root: bool = Field(default=False, description="True for global document theme folder.")
+    is_root: bool = Field(
+        default=False, description="True for global document theme folder.")
     children: Set[str] = Field(
         default_factory=set, description="The children of the folder."
     )

@@ -17,6 +17,7 @@ from .ast_processor import ASTProcessor
 from .folder_processor import FolderProcessor, FolderChange
 from .file_processor import FileProcessor
 from .structure_batch import StructureBatchPlan
+from app.core.model.schemas.structure_schema import _code_content_id_for_file
 from app.core.parser.graph_builder.performance import tracker
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,8 @@ logger = logging.getLogger(__name__)
 class CollectionResult:
     structure_batch_plan: "StructureBatchPlan"
     file_node: Optional[FileNode] = None  # For Phase 2 when structure changed
-    content: Optional[str] = None  # File content for CodeContent insert and Phase 2 reuse
+    # File content for CodeContent insert and Phase 2 reuse
+    content: Optional[str] = None
 
 
 class Collector:
@@ -77,7 +79,7 @@ class Collector:
 
             # Include CodeContent deletes for deleted files
             content_delete_ids = [
-                f"CodeContentSchema/{fid.replace('/', '_')}"
+                _code_content_id_for_file(fid)
                 for fid in folder_plan.delete
                 if "FileSchema" in fid or str(fid).startswith("FileSchema/")
             ]
@@ -145,7 +147,8 @@ class Collector:
                 structure_batch_plan = await self.ast_processor.sync_content(
                     file_node, ast_nodes, content=processed_content, progress_tracker=progress_tracker
                 )
-                file_node_for_phase2 = file_node if (structure_batch_plan.insert or structure_batch_plan.update) else None
+                file_node_for_phase2 = file_node if (
+                    structure_batch_plan.insert or structure_batch_plan.update) else None
                 return CollectionResult(
                     structure_batch_plan=structure_batch_plan,
                     file_node=file_node_for_phase2,

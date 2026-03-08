@@ -59,13 +59,14 @@ class CodeElementService():
 
         abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
         try:
-            # code = await extract_code_from_file(abs_path, code_position)
-            raise OSError("File not found on disk")
+            code = await extract_code_from_file(abs_path, code_position)
+
         except OSError:
             # File not found on disk; fall back to CodeContent in DB
             content_id = f"CodeContentSchema/{parent_file.id.replace('/', '_')}"
             try:
                 content_doc = await self.repos.client.get_document(content_id)
+
             except Exception:
                 return None
             if not content_doc or "content" not in content_doc:
@@ -95,7 +96,8 @@ class CodeElementService():
             )
             if not parent_file:
                 return {"success": False, "error": "Enclosing file not found"}
-            abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
+            abs_path = build_abs_file_path(
+                self.uow.project.path, parent_file.path)
             try:
                 async with aiofiles.open(abs_path, "w", encoding="utf-8") as f:
                     await f.write(code_block)
