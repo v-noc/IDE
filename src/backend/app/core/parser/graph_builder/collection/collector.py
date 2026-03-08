@@ -16,6 +16,7 @@ from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from .ast_processor import ASTProcessor
 from .folder_processor import FolderProcessor, FolderChange
 from .file_processor import FileProcessor
+from .structure_batch import StructureBatchPlan
 from app.core.parser.graph_builder.performance import tracker
 
 logger = logging.getLogger(__name__)
@@ -23,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CollectionResult:
-    file_node: FileNode
-    removed_scope_ids: List[str]  # IDs of scopes that were deleted
-    folder_changes: List[FolderChange]
+    structure_batch_plan: "StructureBatchPlan"
+    file_node: Optional[FileNode] = None  # For Phase 2 when structure changed
+    content: Optional[str] = None  # File content for CodeContent insert and Phase 2 reuse
 
 
 class Collector:
@@ -74,12 +75,19 @@ class Collector:
 
             folder_plan.extend(file_plan)
 
+            # Include CodeContent deletes for deleted files
+            content_delete_ids = [
+                f"CodeContentSchema/{fid.replace('/', '_')}"
+                for fid in folder_plan.delete
+                if "FileSchema" in fid or str(fid).startswith("FileSchema/")
+            ]
+            all_delete = list(folder_plan.delete) + content_delete_ids
+
             await self.repos.structure_repo.flush_batch(
                 folder_plan.insert,
                 [],
-                folder_plan.delete,
+                all_delete,
                 folder_plan.move,
-
             )
 
             await self.repos.structure_repo.update_batch(folder_plan.update)
@@ -134,6 +142,12 @@ class Collector:
 
             # 4. Sync Content
             with tracker.timer("collector.process_file.sync_content"):
-                return await self.ast_processor.sync_content(
-                    file_node, ast_nodes,   content=processed_content, progress_tracker=progress_tracker
+                structure_batch_plan = await self.ast_processor.sync_content(
+                    file_node, ast_nodes, content=processed_content, progress_tracker=progress_tracker
+                )
+                file_node_for_phase2 = file_node if (structure_batch_plan.insert or structure_batch_plan.update) else None
+                return CollectionResult(
+                    structure_batch_plan=structure_batch_plan,
+                    file_node=file_node_for_phase2,
+                    content=processed_content,
                 )

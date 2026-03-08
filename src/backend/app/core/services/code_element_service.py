@@ -4,7 +4,11 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 from app.core.model.nodes import FunctionNode, ClassNode
 from app.core.model.properties import CodePosition
-from app.core.utils.code_utils import build_abs_file_path, extract_code_from_file
+from app.core.utils.code_utils import (
+    build_abs_file_path,
+    extract_code_from_content,
+    extract_code_from_file,
+)
 
 from app.db.context import ProjectUoW
 
@@ -46,7 +50,20 @@ class CodeElementService():
             return None
 
         abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
-        code = await extract_code_from_file(abs_path, code_element.code_position)
+        try:
+            code = await extract_code_from_file(abs_path, code_element.code_position)
+        except OSError:
+            # File not found on disk; fall back to CodeContent in DB
+            content_id = f"CodeContentSchema/{parent_file.id.replace('/', '_')}"
+            try:
+                content_doc = await self.repos.client.get_document(content_id)
+            except Exception:
+                return None
+            if not content_doc or "content" not in content_doc:
+                return None
+            code = extract_code_from_content(
+                content_doc["content"], code_element.code_position
+            )
 
         result = {
             "id": code_element.id,

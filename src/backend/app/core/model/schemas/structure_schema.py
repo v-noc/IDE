@@ -5,6 +5,8 @@ from app.db.schema.schema import LexicalKey
 from app.core.model.nodes import FileNode, FolderNode, StructureGroupNode
 
 from .base import BaseSchema
+
+
 from .code_element_schema import (
     CallGroupSchema,
     CodeElementGroupSchema,
@@ -12,6 +14,32 @@ from .code_element_schema import (
     FunctionSchema,
     CallSchema)
 from .metadata import DocumentSchema, ThemeConfigSchema
+
+
+class CodeContentSchema(BaseSchema):
+    """
+    Schema for storing file content separately from FileSchema.
+    One CodeContent per file, linked via file reference.
+    """
+    file: "FileSchema"
+    content: str
+
+    @staticmethod
+    def from_file_content(file_id: str, content: str) -> "CodeContentSchema":
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        # Deterministic id for upsert: CodeContentSchema/file_id_safe
+        safe_id = file_id.replace("/", "_")
+        content_id = f"CodeContentSchema/{safe_id}"
+        return CodeContentSchema(
+            _id=content_id,
+            name="CodeContent",
+            description="File content",
+            file=file_id,
+            content=content,
+            created_at=now,
+            updated_at=now,
+        )
 
 
 class StructureGroupSchema(BaseSchema):

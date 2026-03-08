@@ -2,7 +2,7 @@ import logging
 import asyncio
 import aiofiles
 from pathlib import Path
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 
 from app.core.parser.ast.models import (
     BaseNode,
@@ -106,10 +106,11 @@ class BodyParser:
         """Flush any remaining buffered operations. Call after all files are processed."""
         await self._flush_buffers()
 
-    async def process_ast(self, file_node: FileNode):
+    async def process_ast(self, file_node: FileNode, content: Optional[str] = None):
         """
         Phase 2: Analyze the AST tree.
         Traverses the tree, finds DB nodes, and delegates call processing to CallChainBuilder.
+        If content is provided (from Phase 1), skips file read to avoid duplicate I/O.
         """
         file_path = Path(file_node.path)
         if not file_path.is_absolute():
@@ -129,12 +130,13 @@ class BodyParser:
         for node in existing_tree:
             node_map[node.qname] = node
 
-        # 2. Read Source
-        try:
-            async with aiofiles.open(file_path, "r", encoding="utf-8") as source:
-                content = await source.read()
-        except OSError:
-            return
+        # 2. Read Source (skip if content provided from Phase 1)
+        if content is None:
+            try:
+                async with aiofiles.open(file_path, "r", encoding="utf-8") as source:
+                    content = await source.read()
+            except OSError:
+                return
 
         # 3. Scan AST
         loop = asyncio.get_event_loop()

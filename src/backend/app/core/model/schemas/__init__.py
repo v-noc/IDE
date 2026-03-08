@@ -13,7 +13,7 @@ from .code_element_schema import (
 )
 from .log_schema import LogSchema, LogLevelName, LogEventType
 from .metadata import CodePositionSchema, ThemeConfigSchema, DocumentSchema
-from .structure_schema import StructureGroupSchema, FileSchema, FolderSchema, ProjectSchema
+from .structure_schema import StructureGroupSchema, FileSchema, FolderSchema, ProjectSchema, CodeContentSchema
 
 __all__ = [
     "BaseSchema",
@@ -32,7 +32,8 @@ __all__ = [
     "StructureGroupSchema",
     "FileSchema",
     "FolderSchema",
-    "ProjectSchema"
+    "ProjectSchema",
+    "CodeContentSchema",
 ]
 
 
@@ -56,6 +57,7 @@ async def ensure_schema(client: AsyncClient, title: str, description: str, autho
     # structure schema
     schema_obj.add_obj(FolderSchema.__name__, FolderSchema)
     schema_obj.add_obj(FileSchema.__name__, FileSchema)
+    schema_obj.add_obj(CodeContentSchema.__name__, CodeContentSchema)
     schema_obj.add_obj(StructureGroupSchema.__name__, StructureGroupSchema)
 
     # code element schema

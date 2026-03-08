@@ -58,3 +58,43 @@ async def extract_code_from_file(
 
     joined = "\n".join(collected)
     return textwrap.dedent(joined)
+
+
+def extract_code_from_content(
+    content: str,
+    position: Optional[CodePosition],
+) -> str:
+    """Extract code from content string by line/column positions.
+
+    - If position is None: returns the entire content.
+    - If position is provided: returns content from
+      (line_no, col_offset) inclusive to (end_line_no, end_col_offset)
+      exclusive. Same semantics as extract_code_from_file.
+    """
+    if position is None:
+        return content
+
+    start_line = max(1, position.line_no)
+    end_line = position.end_line_no
+    end_col = position.end_col_offset
+
+    lines = content.splitlines()
+    collected: list[str] = []
+
+    for idx, line in enumerate(lines, start=1):
+        if idx < start_line:
+            continue
+        if end_line is None or idx < end_line:
+            collected.append(line)
+        elif idx == end_line:
+            slice_end = None if end_col is None else end_col
+            collected.append(line[:slice_end])
+            break
+        else:
+            break
+
+    if not collected:
+        return ""
+
+    joined = "\n".join(collected)
+    return textwrap.dedent(joined)

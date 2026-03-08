@@ -7,7 +7,7 @@ import asyncio
 
 from app.core.model.nodes import FileNode, ProjectNode
 from app.core.parser.graph_builder.analysis.body_parser import BodyParser
-from app.core.parser.graph_builder.collection.collector import Collector
+from app.core.parser.graph_builder.collection.collector import Collector, CollectionResult
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.parser.jedi_adapter.manager import JediProjectManager
@@ -78,7 +78,7 @@ class PhaseProcessor:
             async with self._file_semaphore:
                 checksum = scan_result.files.get(file_node.path)
                 if not checksum:
-                    return None, None
+                    return None
                 logger.info(f"Collecting structure for: {file_node.path}")
                 # Set current file at start of processing
                 if progress_tracker:
@@ -97,12 +97,7 @@ class PhaseProcessor:
                         progress_tracker.increment_file_processed(
                             file_node.path)
                         await progress_tracker.emit()
-                    for tp in (change_set.new_files + change_set.modified_files):
-                        if file_node.id == tp.id:
-                            if len(result.insert) > 0 or len(result.update) > 0:
-                                return result, file_node
-
-                    return result, None
+                    return (result, file_node)
                 except Exception as exc:
                     logger.error(
                         "Error in collector.process_file for %s: %s",
@@ -113,7 +108,7 @@ class PhaseProcessor:
                         progress_tracker.increment_file_processed(
                             file_node.path)
                         await progress_tracker.emit()
-                    return None, None
+                    return None
 
         file_nodes = await self.repos.structure_repo.get_by_ids(files_to_process)
         async with asyncio.TaskGroup() as tg:
@@ -123,23 +118,40 @@ class PhaseProcessor:
             ]
 
         structure_batch_plan = StructureBatchPlan()
-        results = []
+        results = []  # (file_node, content) for Phase 2
+        content_inserts = []  # (file_id, content) for new files
+        content_updates = []  # (file_id, content) for modified files
+
         for task in tasks:
-            result, file_node = task.result()
-            if result:
-                structure_batch_plan.extend(result)
-            if file_node:
-                results.append(file_node)
+            task_result = task.result()
+            if task_result is None:
+                continue
+            result, file_node = task_result
+            if result is None:
+                continue
+            structure_batch_plan.extend(result.structure_batch_plan)
+            if result.file_node:
+                results.append((result.file_node, result.content))
+            if result.content and file_node:
+                file_id = file_node.id
+                is_new = any(tp.id == file_id for tp in change_set.new_files)
+                if is_new:
+                    content_inserts.append((file_id, result.content))
+                else:
+                    content_updates.append((file_id, result.content))
 
         await self.repos.code_element_repo.flush_batch(
             structure_batch_plan.insert,
             [],
             structure_batch_plan.delete,
             structure_batch_plan.move,
-
         )
         await self.repos.code_element_repo.update_batch(structure_batch_plan.update)
 
+        # Batch insert/update CodeContent (extends flush pattern, single API call)
+        await self.repos.structure_repo.flush_content_batch(content_inserts, content_updates)
+
+        # Return (file_node, content) for Phase 2 to avoid duplicate file reads
         return results
 
     async def process_analysis_phase(
@@ -160,8 +172,8 @@ class PhaseProcessor:
             progress_tracker=progress_tracker,
         )
 
-        async def _process_single_file_analysis(file_node: FileNode):
-            """Process a single file's AST analysis."""
+        async def _process_single_file_analysis(file_node: FileNode, content: str | None = None):
+            """Process a single file's AST analysis. Pass content to avoid duplicate file read."""
 
             with tracker.timer("phase2.analyze_file"):
                 async with self._file_semaphore:
@@ -177,10 +189,11 @@ class PhaseProcessor:
                                 file_node.path)
                             await progress_tracker.emit()
 
-                        # Process AST
+                        # Process AST (content from Phase 1 avoids duplicate file read)
                         with tracker.timer("phase2.process_ast"):
                             await asyncio.wait_for(
-                                body_parser.process_ast(file_node),
+                                body_parser.process_ast(
+                                    file_node, content=content),
                                 timeout=self._file_timeout,
                             )
 
@@ -205,11 +218,11 @@ class PhaseProcessor:
                                 file_node.path)
                             await progress_tracker.emit()
 
-        # Execute in parallel
+        # Execute in parallel (collection_results are (file_node, content) tuples)
         async with asyncio.TaskGroup() as tg:
             tasks = [
-                tg.create_task(_process_single_file_analysis(file_node))
-                for file_node in collection_results
+                tg.create_task(_process_single_file_analysis(fn, content))
+                for fn, content in collection_results
             ]
 
         for task in tasks:

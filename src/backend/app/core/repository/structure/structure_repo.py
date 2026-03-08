@@ -1,6 +1,7 @@
 from typing import Any, List, Tuple, Union
 from app.core.model.nodes import FolderNode, FileNode, StructureGroupNode
 from app.core.model.schemas import (
+    CodeContentSchema,
     FolderSchema,
     FileSchema,
     StructureGroupSchema,
@@ -245,4 +246,33 @@ class StructureRepo(BaseRepo[StructureNode, StructureSchema]):
             return True
         except Exception as exc:
             print(f"Batch operation failed: {exc}")
+            return False
+
+    async def flush_content_batch(
+        self,
+        inserts: List[Tuple[str, str]],
+        updates: List[Tuple[str, str]],
+    ) -> bool:
+        """
+        Batch insert/update CodeContent documents.
+        Each tuple is (file_id, content).
+        Uses client.update_document which upserts (add if not existed).
+        Single API call for all content ops.
+        """
+        all_ops = list(inserts) + list(updates)
+        if not all_ops:
+            return True
+
+        schemas = [
+            CodeContentSchema.from_file_content(file_id, content)
+            for file_id, content in all_ops
+        ]
+        try:
+            await self.client.update_document(
+                schemas,
+                commit_msg=f"Batch: {len(all_ops)} file content upserts",
+            )
+            return True
+        except Exception as exc:
+            print(f"Content batch operation failed: {exc}")
             return False
