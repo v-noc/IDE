@@ -33,7 +33,7 @@ async def get_branches(
 
     target = DbTarget(db=project.db_name,
                       branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
-    with scoped_client(project_uow.client, target) as session:
+    async with scoped_client(project_uow.client, target) as session:
         branches = await session.get_all_branches()
         return [BranchResponse.from_result(branch) for branch in branches]
 
@@ -50,7 +50,7 @@ async def create_branch(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     target = DbTarget(db=project.db_name,
                       branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
-    with scoped_client(project_uow.client, target) as session:
+    async with scoped_client(project_uow.client, target) as session:
         await session.create_branch(request.name)
         return {"ok": True}
 
@@ -68,6 +68,6 @@ async def delete_branch(
 
     target = DbTarget(db=project.db_name,
                       branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
-    with scoped_client(project_uow.client, target) as session:
+    async with scoped_client(project_uow.client, target) as session:
         await session.delete_branch(name)
         return {"ok": True}

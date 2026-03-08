@@ -41,7 +41,7 @@ async def get_commits(
 
     target = DbTarget(db=project.db_name,
                       branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
-    with scoped_client(project_uow.client, target) as session:
+    async with scoped_client(project_uow.client, target) as session:
         if node_id.startswith("ProjectSchema/"):
             result = await session.log(start=start, count=count)
         else:
@@ -67,6 +67,6 @@ async def get_diff(
 
     target = DbTarget(db=project.db_name,
                       branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
-    with scoped_client(project_uow.client, target) as session:
+    async with scoped_client(project_uow.client, target) as session:
         result = await session.diff_version(after_version=after_commit_id, before_version=before_commit_id)
         return result

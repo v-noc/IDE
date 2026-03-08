@@ -88,18 +88,31 @@ class CodeElementService():
 
     async def write_code(self, code_element_id: str, code_block: str) -> dict:
         """Write code for a code element at its position. Returns {success: bool, error?: str}."""
+
+        if code_element_id.startswith("FileSchema"):
+            parent_file = await self.repos.structure_repo.get_parent_file(
+                code_element_id
+            )
+            if not parent_file:
+                return {"success": False, "error": "Enclosing file not found"}
+            abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
+            try:
+                async with aiofiles.open(abs_path, "w", encoding="utf-8") as f:
+                    await f.write(code_block)
+                return {"success": True}
+            except IOError as e:
+                return {"success": False, "error": str(e)}
+
         code_element = await self.get(code_element_id)
         if not code_element:
             return {"success": False, "error": "Code element not found"}
-
         parent_file = await self.repos.structure_repo.get_parent_file(
             code_element_id
         )
         if not parent_file:
             return {"success": False, "error": "Enclosing file not found"}
-
-        abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
         position = code_element.code_position
+        abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
 
         try:
             async with aiofiles.open(abs_path, "r", encoding="utf-8") as f:
