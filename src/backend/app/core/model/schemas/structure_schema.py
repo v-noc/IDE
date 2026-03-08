@@ -158,7 +158,7 @@ class FolderSchema(BaseSchema):
     qname: str
     path: str
     folder_children: Set["FolderSchema"]
-    is_root: bool
+    is_root: str  # "true" or "false" - avoids TerminusDB xsd:boolean/terminusdb:///data/false issue
     file_children: Set["FileSchema"]
     structure_group: Set["StructureGroupSchema"]
     documents: Set[DocumentSchema]
@@ -180,7 +180,7 @@ class FolderSchema(BaseSchema):
             structure_group=set(),
             documents=set(),
             theme_config=None,
-            is_root=True,
+            is_root="true",
             created_at=now,
             updated_at=now,
         )
@@ -201,7 +201,7 @@ class FolderSchema(BaseSchema):
             documents=folder.documents,
             theme_config=ThemeConfigSchema.from_pydantic(folder.theme_config),
             updated_at=folder.updated_at,
-            is_root=folder.is_root,
+            is_root="true" if folder.is_root else "false",
         )
 
     def to_pydantic(self):
@@ -221,7 +221,7 @@ class FolderSchema(BaseSchema):
             theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
             created_at=self.created_at,
             updated_at=self.updated_at,
-            is_root=self.is_root,
+            is_root=self.is_root == "true",
         )
 
 

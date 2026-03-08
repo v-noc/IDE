@@ -24,7 +24,7 @@ class ProjectRepo():
         clone_client = self.client.clone()
 
         try:
-            await clone_client.delete_database(project["db_name"])
+            await clone_client.delete_database(project["db_name"], team="admin")
             await self.client.delete_document(project, commit_msg=f"Deleting project {project_id}")
 
             return True
@@ -65,7 +65,6 @@ class ProjectRepo():
         )
 
         await self.client.insert_document(project, commit_msg=f"Creating project {name}")
-        
 
         project_node = ProjectNode(
             id=project._id,
@@ -151,7 +150,7 @@ class ProjectRepo():
 
             children = []
             for doc in [row["doc"] for row in result["bindings"]]:
-                if doc.get("@type") == "FolderSchema" and doc.get("is_root"):
+                if doc.get("@type") == "FolderSchema" and doc.get("is_root") == "true":
                     continue
                 children.append(parse_structure_child(doc))
 

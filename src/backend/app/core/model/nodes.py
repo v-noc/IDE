@@ -211,7 +211,11 @@ class FolderNode(BaseNode):
             **base.model_dump(),
             qname=raw_dict["qname"],
             path=raw_dict["path"],
-            is_root=raw_dict.get("is_root", False),
+            is_root=(
+                raw_dict.get("is_root") == "true"
+                if isinstance(raw_dict.get("is_root"), str)
+                else bool(raw_dict.get("is_root", False))
+            ),
             children=_merge_children(
                 raw_dict,
                 ("folder_children", "file_children", "structure_group"),

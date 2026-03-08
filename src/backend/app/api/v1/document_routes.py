@@ -101,7 +101,7 @@ async def get_documents_for_node(
                          description="The ID of the node to get documents for"),
     document_service: DocumentService = Depends(get_document_service),
 ):
-    print(f"node_id: {node_id}")
+
     try:
         documents = await document_service.get_nodes_by_parent_node(node_id)
         print(f"documents: {documents}")

@@ -15,13 +15,17 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
   const { projectData } = useProjectStore();
   const projectId = projectData?.id;
 
+  // Only fetch code for file, class, or function node types
+  const shouldFetchCode =
+    nodeType === "file" || nodeType === "class" || nodeType === "function";
+
   // Fetch code dynamically for the node
   const effectiveNodeId = nodeType === "call" && targetKey ? targetKey : nodeId;
   // For call nodes, use the target's node type, otherwise use the node's type
   const effectiveNodeType = nodeType === "call" ? "call" : nodeType;
 
   const { data: codeData } = useCode(
-    showCode ? effectiveNodeId : undefined,
+    showCode && shouldFetchCode ? effectiveNodeId : undefined,
     effectiveNodeType,
     projectId
   );
@@ -34,7 +38,11 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
     isSaving,
     handleEditorChange,
     handleSave,
-  } = useEditableCode(effectiveNodeId, projectId, effectiveNodeType);
+  } = useEditableCode(
+    shouldFetchCode ? effectiveNodeId : "",
+    projectId,
+    effectiveNodeType
+  );
 
   const hasCode =
     (codeData?.code && codeData.code.length > 0) ||
