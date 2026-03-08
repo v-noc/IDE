@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends
 
 from app.db.async_terminus_client import AsyncClient
-from backend.app.db.client import get_terminus_client
+from app.db.client import get_terminus_client
 from app.api.dependencies import get_project_uow, ProjectUoW
 from app.db.context import DbTarget
 from app.db.scoped_client import scoped_client

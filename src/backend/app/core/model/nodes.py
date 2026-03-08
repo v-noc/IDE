@@ -189,6 +189,7 @@ class StructureGroupNode(BaseGroupNode):
 class FolderNode(BaseNode):
     path: str = Field(..., description="The path of the folder.")
     qname: str = Field(..., description="The qname of the folder.")
+    is_root: bool = Field(default=False, description="True for global document theme folder.")
     children: Set[str] = Field(
         default_factory=set, description="The children of the folder."
     )
@@ -210,6 +211,7 @@ class FolderNode(BaseNode):
             **base.model_dump(),
             qname=raw_dict["qname"],
             path=raw_dict["path"],
+            is_root=raw_dict.get("is_root", False),
             children=_merge_children(
                 raw_dict,
                 ("folder_children", "file_children", "structure_group"),

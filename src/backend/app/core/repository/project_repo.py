@@ -51,6 +51,9 @@ class ProjectRepo():
         print(f"clone_db--: {self.client.db} {clone_db.db}")
         await ensure_schema(clone_db, f"{name} Schema", description, [f"{name} Team"])
 
+        init_folder = FolderSchema.create_init_folder()
+        await clone_db.insert_document(init_folder, commit_msg="Add __init__ global document theme folder")
+
         project = ProjectSchema(
             _id=f"{db_name}",
             name=name,
@@ -62,6 +65,7 @@ class ProjectRepo():
         )
 
         await self.client.insert_document(project, commit_msg=f"Creating project {name}")
+        
 
         project_node = ProjectNode(
             id=project._id,
@@ -146,9 +150,10 @@ class ProjectRepo():
             result = await self.client.query(query)
 
             children = []
-            for row in [row["doc"] for row in result["bindings"]]:
-
-                children.append(parse_structure_child(row))
+            for doc in [row["doc"] for row in result["bindings"]]:
+                if doc.get("@type") == "FolderSchema" and doc.get("is_root"):
+                    continue
+                children.append(parse_structure_child(doc))
 
             return children
         except Exception as e:

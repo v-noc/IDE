@@ -54,10 +54,7 @@ async def update_document(
     document_service: DocumentService = Depends(get_document_service),
     request: UpdateDocumentRequest = Body(...),
 ):
-    is_root = False
-    if request.node_id.startswith("ProjectSchema/"):
-        is_root = True
-    existing = await document_service.get(document_id, is_root=is_root)
+    existing = await document_service.get(document_id)
 
     if not existing:
         raise HTTPException(
@@ -72,7 +69,7 @@ async def update_document(
     if request.data is not None:
         existing.data = request.data
 
-    response = await document_service.update(existing, is_root=is_root)
+    response = await document_service.update(existing)
 
     return response
 
@@ -89,10 +86,7 @@ async def delete_document(
     document_service: DocumentService = Depends(get_document_service),
 ):
     try:
-        is_root = False
-        if node_id.startswith("ProjectSchema/"):
-            is_root = True
-        await document_service.delete(document_id, is_root=is_root)
+        await document_service.delete(document_id)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

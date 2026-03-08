@@ -31,7 +31,8 @@ class StructureService():
         return await self.repos.structure_repo.move_batch(moves)
 
     async def get_all_folders(self):
-        return await self.repos.structure_repo.get_all(doc_type=FolderSchema.__name__)
+        folders = await self.repos.structure_repo.get_all(doc_type=FolderSchema.__name__)
+        return [f for f in folders if not f.is_root]
 
     async def get_all_files(self):
         return await self.repos.structure_repo.get_all(doc_type=FileSchema.__name__)

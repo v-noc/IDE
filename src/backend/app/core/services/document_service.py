@@ -1,25 +1,28 @@
 import uuid
 from app.core.model.nodes import DocumentNode
+from app.core.model.schemas.structure_schema import INIT_FOLDER_ID
 from typing import List
 
 from app.db.context import ProjectUoW
+
+
+def _resolve_node_id(node_id: str, project_id: str | None) -> str:
+    """Resolve project node id to FolderSchema/init (global document theme folder)."""
+    if project_id and (node_id == project_id or node_id.startswith("ProjectSchema/")):
+        return INIT_FOLDER_ID
+    return node_id
 
 
 class DocumentService:
     def __init__(self, uow: ProjectUoW):
         self.uow = uow
 
-    async def get(self, document_id, is_root: bool = False):
-        if is_root:
-            return await self.uow.get_meta_repos().document_repo.get_by_id(document_id)
-        else:
-            return await self.uow.get_project_repos().document_repo.get_by_id(document_id)
+    async def get(self, document_id):
+        return await self.uow.get_project_repos().document_repo.get_by_id(document_id)
 
     async def get_nodes_by_parent_node(self, node_id: str) -> List[DocumentNode]:
-        if node_id.startswith("ProjectSchema/"):
-            return await self.uow.get_meta_repos().document_repo.get_by_parent_node(node_id)
-        else:
-            return await self.uow.get_project_repos().document_repo.get_by_parent_node(node_id)
+        effective_id = _resolve_node_id(node_id, self.uow.project.id if self.uow.project else None)
+        return await self.uow.get_project_repos().document_repo.get_by_parent_node(effective_id)
 
     async def create(self,
                      name: str,
@@ -27,8 +30,7 @@ class DocumentService:
                      node_id: str,
                      ):
         repos = self.uow.get_project_repos()
-        if node_id.startswith("ProjectSchema/"):
-            repos = self.uow.get_meta_repos()
+        effective_id = _resolve_node_id(node_id, self.uow.project.id if self.uow.project else None)
 
         document = DocumentNode(
             id=f"DocumentSchema/{str(uuid.uuid4())}",
@@ -40,20 +42,12 @@ class DocumentService:
         created = await repos.document_repo.create_nodes(document, singular_name="document", plural_name="documents")
 
         if created:
-            print("adding to parent node", document.id, node_id)
-            await repos.document_repo.add_to_parent_node(document.id, node_id)
+            await repos.document_repo.add_to_parent_node(document.id, effective_id)
 
         return created
 
-    async def update(self, document: DocumentNode, is_root: bool = False):
-        repos = self.uow.get_project_repos()
-        if is_root:
-            repos = self.uow.get_meta_repos()
+    async def update(self, document: DocumentNode):
+        return await self.uow.get_project_repos().document_repo.update(document)
 
-        return await repos.document_repo.update(document)
-
-    async def delete(self, document_id: str, is_root: bool = False):
-        repos = self.uow.get_project_repos()
-        if is_root:
-            repos = self.uow.get_meta_repos()
-        return await repos.document_repo.delete(document_id)
+    async def delete(self, document_id: str):
+        return await self.uow.get_project_repos().document_repo.delete(document_id)

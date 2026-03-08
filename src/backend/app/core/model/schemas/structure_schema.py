@@ -148,6 +148,9 @@ class FileSchema(BaseSchema):
         )
 
 
+INIT_FOLDER_ID = "FolderSchema/init"
+
+
 class FolderSchema(BaseSchema):
     """
     The schema for the folder document.
@@ -155,10 +158,32 @@ class FolderSchema(BaseSchema):
     qname: str
     path: str
     folder_children: Set["FolderSchema"]
+    is_root: bool
     file_children: Set["FileSchema"]
     structure_group: Set["StructureGroupSchema"]
     documents: Set[DocumentSchema]
     theme_config: Optional[ThemeConfigSchema]
+
+    @staticmethod
+    def create_init_folder() -> "FolderSchema":
+        """Create the global document theme folder (is_root=True)."""
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        return FolderSchema(
+            _id=INIT_FOLDER_ID,
+            name="__init__",
+            description="Global document theme folder",
+            qname="__init__",
+            path="/",
+            folder_children=set(),
+            file_children=set(),
+            structure_group=set(),
+            documents=set(),
+            theme_config=None,
+            is_root=True,
+            created_at=now,
+            updated_at=now,
+        )
 
     @staticmethod
     def from_pydantic(folder: FolderNode):
@@ -176,6 +201,7 @@ class FolderSchema(BaseSchema):
             documents=folder.documents,
             theme_config=ThemeConfigSchema.from_pydantic(folder.theme_config),
             updated_at=folder.updated_at,
+            is_root=folder.is_root,
         )
 
     def to_pydantic(self):
@@ -195,6 +221,7 @@ class FolderSchema(BaseSchema):
             theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
             created_at=self.created_at,
             updated_at=self.updated_at,
+            is_root=self.is_root,
         )
 
 
@@ -207,5 +234,4 @@ class ProjectSchema(BaseSchema):
     local_path: str
     remote_path: Optional[str]
 
-    documents: Set[DocumentSchema]
     theme_config: Optional[ThemeConfigSchema]
