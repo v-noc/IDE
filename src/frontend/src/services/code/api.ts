@@ -7,6 +7,13 @@ export interface CodeData {
   file_path: string;
   node_type: string;
   qname: string;
+  content_id?: string;
+  position?: {
+    line_no: number;
+    col_offset: number;
+    end_line_no: number | null;
+    end_col_offset: number | null;
+  } | null;
   code: string;
 }
 

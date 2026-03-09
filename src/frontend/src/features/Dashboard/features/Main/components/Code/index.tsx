@@ -47,7 +47,12 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
     handleSave,
   } = useEditableCode(elementId, projectId, nodeType);
   const { showDiff, originalContent, modifiedContent, isLoadingDiff, error } =
-    useCodeDiff(elementId);
+    useCodeDiff({
+      elementId,
+      nodeType,
+      contentId: data?.content_id,
+      position: data?.position,
+    });
 
   const language = useMemo(
     () => detectLanguage(data?.file_name || data?.file_path || ""),
