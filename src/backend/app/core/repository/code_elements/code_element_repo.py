@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
+
 from typing import Union, List, Tuple
 from terminusdb_client.woqlquery.woql_query import Doc, WOQLQuery as WQ
 
 from app.core.model.nodes import ClassNode, FunctionNode
-from app.core.model.schemas import ClassSchema, CodeContentSchema, FunctionSchema
+from app.core.model.schemas import ClassSchema, CodeContentSchema, CodePositionSchema, FunctionSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
     CODE_CHILD_TYPE_TO_FIELD,
@@ -108,11 +110,65 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
     async def move_batch(self, moves: List[Tuple[str, str, str]]):
         return await self.move_batch_by_type(moves, child_type_to_field=CODE_CHILD_TYPE_TO_FIELD)
 
-    async def flush_batch(self, insert: List[FunctionNode | ClassNode], update_content: List[Tuple[str, str]], delete: List[str], move: List[Tuple[str, str, str]]):
+    async def flush_batch(self, insert: List[FunctionNode | ClassNode], code_update: List[FunctionNode | ClassNode], update_content: List[Tuple[str, str]], delete: List[str], move: List[Tuple[str, str, str]]):
         if not insert and not update_content and not delete and not move:
             return True
 
         queries = []
+        updated_at = datetime.now(timezone.utc)
+
+        for node in code_update:
+            parent_id = node.id
+
+            # Prepare new code position data with @linked-by
+
+            code_pos_schema = CodePositionSchema.from_pydantic(
+                node.code_position)
+            new_code_pos_dict = code_pos_schema._obj_to_dict()[0]
+            new_code_pos_dict["@type"] = "CodePositionSchema"
+
+            # Critical: Indicate this is a subdocument linked from parent
+            new_code_pos_dict["@linked-by"] = {
+                "@id": parent_id,
+                "@property": "code_position"
+            }
+
+            # Build the atomic subdocument update query
+
+            query = (
+                WQ().woql_and(
+                    # 1. Locate the parent and its current code_position subdocument
+                    # WQ().eq("v:parent", parent_id),
+                    WQ().triple(parent_id, "code_position", "v:old_code_pos"+parent_id),
+
+                    # 2. Delete the old code_position subdocument
+                    WQ().delete_document("v:old_code_pos"+parent_id),
+
+                    # 3. Insert new code_position subdocument (linked to parent)
+                    WQ().insert_document(Doc(new_code_pos_dict), "v:new_code_pos"+parent_id),
+
+                    # 4. Update the parent's triple to point to the new subdocument
+                    WQ().update_triple(parent_id, "code_position", "v:new_code_pos"+parent_id),
+                    WQ().opt(
+                        WQ().woql_and(
+                            WQ().triple(parent_id, "qname", "v:old_qname"+parent_id),
+                            WQ().delete_triple(parent_id, "qname", "v:old_qname"+parent_id)
+                        )
+                    ),
+                    WQ().add_triple(parent_id, "qname", WQ().string(node.qname)),
+                    WQ().opt(
+                        WQ().woql_and(
+                            WQ().triple(parent_id, "updated_at", "v:old_updated"+parent_id),
+                            WQ().delete_triple(parent_id, "updated_at", "v:old_updated"+parent_id)
+                        )
+                    ),
+                    WQ().add_triple(parent_id, "updated_at", updated_at)
+
+                )
+            )
+
+            queries.append(query)
+            # break
 
         for node in insert:
 

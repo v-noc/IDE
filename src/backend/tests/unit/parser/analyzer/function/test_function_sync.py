@@ -148,13 +148,14 @@ async def test_function_sync_add_and_remove(setup_project):
         tree_after_remove = await _resync_and_get_tree(
             project_node, project_uow
         )
-        file_node_after_remove = tree_after_remove[1]
+        file_node_after_remove = tree_after_remove[0]
         # Debug helper (kept commented to avoid noisy output / lint issues):
         # for child in file_node_after_remove.children:
         #     print(
         #         f"Child: {child.name}, Status: {child.status} "
         #         f"type: {child.node_type}"
         #     )
+
         names_after_remove = [
             getattr(c, "name", None) for c in file_node_after_remove.children
         ]
