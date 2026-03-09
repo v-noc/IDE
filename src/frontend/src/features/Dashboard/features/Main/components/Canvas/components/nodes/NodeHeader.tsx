@@ -14,7 +14,7 @@ interface NodeHeaderProps {
   showCode?: boolean;
   onCodeToggle?: () => void;
   status?: "error" | "warning" | "success" | "idle";
-  diffStatus?: "added" | "removed" | "updated" | null;
+  diffStatus?: "added" | "removed" | "modified" | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -26,7 +26,7 @@ const statusColors: Record<string, string> = {
 const diffColors: Record<string, { bg: string; text: string; label: string }> = {
   added: { bg: "bg-green-100", text: "text-green-700", label: "Added" },
   removed: { bg: "bg-red-100", text: "text-red-700", label: "Removed" },
-  updated: { bg: "bg-blue-100", text: "text-blue-700", label: "Updated" },
+  modified: { bg: "bg-blue-100", text: "text-blue-700", label: "Updated" },
 };
 
 export const NodeHeader = memo(function NodeHeader({

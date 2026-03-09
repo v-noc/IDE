@@ -3,12 +3,8 @@ import { X } from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitHistory from "./CommitHistory";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import {
-  useCommitHistory,
-  useSelectedCommitDiff,
-} from "../hooks/useCommitHistory";
+import { useCommitHistory } from "../hooks/useCommitHistory";
 import { mapCommitToDisplay } from "../utils/commitUtils";
-import { parseTerminusJsonDiff } from "@/lib/versioningDiff";
 
 const COMMITS_PER_PAGE = 10;
 
@@ -19,8 +15,8 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
     currentCommitId,
     setCurrentCommitId,
     setSelectedCommit,
-    setDiffState,
-    clearDiffState,
+    loadParsedDiff,
+    clearComparisonState,
   } = useVersioningStore();
   const { projectData, selectedNode, secondarySelectedNode } =
     useProjectStore();
@@ -35,13 +31,13 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   useEffect(() => {
     setCurrentCommitId(null);
     setSelectedCommit(null);
-    clearDiffState();
+    clearComparisonState();
   }, [
     projectData?.id,
     nodeId?.id,
     setCurrentCommitId,
     setSelectedCommit,
-    clearDiffState,
+    clearComparisonState,
   ]);
 
   const {
@@ -61,32 +57,36 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
     setCurrentCommitId(commits[0].id);
   }, [commits, currentCommitId, isLoading, page, setCurrentCommitId]);
 
-  const { data: rawDiff } = useSelectedCommitDiff(
-    projectData?.id,
-    selectedCommitId,
-    currentCommitId,
-  );
-
   useEffect(() => {
-    if (
-      !selectedCommitId ||
-      !currentCommitId ||
-      selectedCommitId === currentCommitId
-    ) {
-      clearDiffState();
+    if (!selectedCommitId) {
+      clearComparisonState();
       return;
     }
-    if (!rawDiff) return;
+    if (!projectData?.id) return;
 
-    const parsed = parseTerminusJsonDiff(rawDiff);
+    const selectedIndex = commits.findIndex((commit) => commit.id === selectedCommitId);
+    if (selectedIndex < 0) {
+      clearComparisonState();
+      return;
+    }
 
-    setDiffState(parsed.nodeDiffs, parsed.parentChildDiffs, parsed.diffNodesMap);
+    const previousCommitId = commits[selectedIndex + 1]?.id ?? null;
+    if (!previousCommitId) {
+      clearComparisonState();
+      return;
+    }
+
+    void loadParsedDiff({
+      projectId: projectData.id,
+      beforeCommitId: previousCommitId,
+      afterCommitId: selectedCommitId,
+    });
   }, [
+    projectData?.id,
+    commits,
     selectedCommitId,
-    currentCommitId,
-    rawDiff,
-    clearDiffState,
-    setDiffState,
+    clearComparisonState,
+    loadParsedDiff,
   ]);
 
   const displayCommits = commits.map(mapCommitToDisplay);

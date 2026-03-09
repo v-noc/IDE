@@ -14,9 +14,9 @@ import type {
 } from "../components/nodes/EnhancedNode";
 import { getIcons } from "@/features/Dashboard/utils";
 import type {
-  ParentChildDiff,
-  DiffStatus,
+  OverlayParentChildDiff,
 } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import type { DiffType } from "@/features/Dashboard/features/Versioning/types/diff";
 import type { ProjectNodeTree } from "@/types/project";
 import { createFallbackNode } from "@/features/Dashboard/features/Versioning/utils/canvasDiffOverlay";
 
@@ -33,9 +33,8 @@ interface UseEnhancedTreeLayoutProps {
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
-  parentChildDiffs?: Record<string, ParentChildDiff>;
-  nodeDiffs?: Record<string, DiffStatus>;
-  diffNodesMap?: Record<string, Record<string, unknown>>;
+  parentChildDiffs?: Record<string, OverlayParentChildDiff>;
+  nodeDiffs?: Record<string, DiffType>;
   projectData?: ProjectNodeTree | null;
 }
 
@@ -48,7 +47,6 @@ export const useEnhancedTreeLayout = ({
   layoutConfig: _layoutConfig,
   parentChildDiffs = {},
   nodeDiffs = {},
-  diffNodesMap = {},
   projectData,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
@@ -191,8 +189,7 @@ export const useEnhancedTreeLayout = ({
               nodeId,
               rfNode,
               projectData,
-              index,
-              diffNodesMap
+              index
             );
 
             if (fallbackNode) {
@@ -259,7 +256,6 @@ export const useEnhancedTreeLayout = ({
     metadataMap,
     parentChildDiffs,
     nodeDiffs,
-    diffNodesMap,
     projectData,
   ]);
   return { initialNodes, initialEdges };

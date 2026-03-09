@@ -4460,6 +4460,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"diff@npm:^8.0.3":
+  version: 8.0.3
+  resolution: "diff@npm:8.0.3"
+  checksum: 10c0/d29321c70d3545fdcb56c5fdd76028c3f04c012462779e062303d4c3c531af80d2c360c26b871e6e2b9a971d2422d47e1779a859106c4cac4b5d2d143df70e20
+  languageName: node
+  linkType: hard
+
 "dompurify@npm:^3.2.5":
   version: 3.3.0
   resolution: "dompurify@npm:3.3.0"
@@ -5023,6 +5030,7 @@ __metadata:
     cmdk: "npm:^1.1.1"
     dagre: "npm:^0.8.5"
     date-fns: "npm:^4.1.0"
+    diff: "npm:^8.0.3"
     driver.js: "npm:^1.4.0"
     eslint: "npm:^9.30.1"
     eslint-plugin-react-hooks: "npm:^5.2.0"

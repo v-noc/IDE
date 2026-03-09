@@ -63,11 +63,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     useShallow((s) => s.handleNodeSelection),
   );
 
-  const nodeDiffs = useVersioningStore(useShallow((s) => s.nodeDiffs));
-  const parentChildDiffs = useVersioningStore(
-    useShallow((s) => s.parentChildDiffs),
+  const nodeDiffs = useVersioningStore(
+    useShallow((s) => s.getNodeDiffStatusMap()),
   );
-  const diffNodesMap = useVersioningStore(useShallow((s) => s.diffNodesMap));
+  const parentChildDiffs = useVersioningStore(
+    useShallow((s) => s.getOverlayParentChildDiffs()),
+  );
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -94,7 +95,6 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     layoutConfig,
     parentChildDiffs,
     nodeDiffs,
-    diffNodesMap,
     projectData,
   });
 
@@ -108,7 +108,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   useEffect(() => {
     syncDiffOverlay();
-  }, [initialNodes, initialEdges, parentChildDiffs, nodeDiffs, diffNodesMap]);
+  }, [initialNodes, initialEdges, parentChildDiffs, nodeDiffs]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 
