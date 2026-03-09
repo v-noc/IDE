@@ -182,8 +182,24 @@ function handleChildSetOperation(
   currentNodeId: string,
   acc: MutableAcc
 ) {
-  const before = new Set(toNodeRefList(opObject["@before"]).map((entry) => entry.id));
-  const after = new Set(toNodeRefList(opObject["@after"]).map((entry) => entry.id));
+  let cursor: unknown = opObject;
+  let beforeList: NodeRef[] = [];
+  let afterList: NodeRef[] = [];
+
+  // Handle nested list patches, e.g. CopyList -> @rest -> SwapList.
+  while (isRecord(cursor)) {
+    const maybeBefore = toNodeRefList(cursor["@before"]);
+    const maybeAfter = toNodeRefList(cursor["@after"]);
+    if (maybeBefore.length > 0 || maybeAfter.length > 0) {
+      beforeList = maybeBefore;
+      afterList = maybeAfter;
+      break;
+    }
+    cursor = cursor["@rest"];
+  }
+
+  const before = new Set(beforeList.map((entry) => entry.id));
+  const after = new Set(afterList.map((entry) => entry.id));
   for (const id of after) {
     if (before.has(id)) continue;
     addRelationshipChange(acc, "added", currentNodeId, id);
@@ -252,6 +268,9 @@ function walkDiff(value: unknown, ctx: DiffCtx, acc: MutableAcc) {
 
   if (typeof value["@op"] === "string") {
     handleOperation(value, nextCtx, acc);
+  }
+  if (value["@rest"] != null) {
+    walkDiff(value["@rest"], nextCtx, acc);
   }
 
   for (const [key, nested] of Object.entries(value)) {

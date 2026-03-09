@@ -13,12 +13,6 @@ import type {
   NodeMetadata,
 } from "../components/nodes/EnhancedNode";
 import { getIcons } from "@/features/Dashboard/utils";
-import type {
-  OverlayParentChildDiff,
-} from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
-import type { DiffType } from "@/features/Dashboard/features/Versioning/types/diff";
-import type { ProjectNodeTree } from "@/types/project";
-import { createFallbackNode } from "@/features/Dashboard/features/Versioning/utils/canvasDiffOverlay";
 
 const EMPTY_METADATA_MAP = new Map<string, NodeMetadata>();
 
@@ -33,9 +27,6 @@ interface UseEnhancedTreeLayoutProps {
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
-  parentChildDiffs?: Record<string, OverlayParentChildDiff>;
-  nodeDiffs?: Record<string, DiffType>;
-  projectData?: ProjectNodeTree | null;
 }
 
 export const useEnhancedTreeLayout = ({
@@ -45,9 +36,6 @@ export const useEnhancedTreeLayout = ({
   toggleNodeExpansion,
   nodeMetadataMap,
   layoutConfig: _layoutConfig,
-  parentChildDiffs = {},
-  nodeDiffs = {},
-  projectData,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
 
@@ -131,7 +119,8 @@ export const useEnhancedTreeLayout = ({
           manuallyCreated:
             (node as unknown as { manually_created?: boolean })
               .manually_created ?? false,
-          diffStatus: nodeDiffs[nodeId] ?? null,
+          diffStatus:
+            (node as unknown as { diff_status?: string }).diff_status ?? null,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,
@@ -176,48 +165,6 @@ export const useEnhancedTreeLayout = ({
             traverse(simpleChild);
           }
         });
-
-        // Process Injected Diff Children
-        const diff = parentChildDiffs[nodeId];
-        if (diff) {
-          const injectedRefs = [...diff.added, ...diff.removed];
-          injectedRefs.forEach((childRef, index) => {
-            if (visitedNodeIds.has(childRef.id)) return;
-
-            const fallbackNode = createFallbackNode(
-              childRef,
-              nodeId,
-              rfNode,
-              projectData,
-              index
-            );
-
-            if (fallbackNode) {
-              const childId = fallbackNode.id;
-              visitedNodeIds.add(childId);
-
-              // Update data with diffStatus
-              fallbackNode.data = {
-                ...fallbackNode.data,
-                diffStatus: nodeDiffs[childId] ?? null,
-              };
-
-              nodes.push(fallbackNode);
-              dagreGraph.setNode(childId, {
-                width: NODE_WIDTH,
-                height: NODE_HEIGHT,
-              });
-
-              edges.push({
-                id: `${nodeId}-${childId}`,
-                source: nodeId,
-                target: childId,
-                type: "bezier",
-              });
-              dagreGraph.setEdge(nodeId, childId);
-            }
-          });
-        }
       }
     };
 
@@ -254,9 +201,6 @@ export const useEnhancedTreeLayout = ({
     centerNode,
     expandedNodeIds,
     metadataMap,
-    parentChildDiffs,
-    nodeDiffs,
-    projectData,
   ]);
   return { initialNodes, initialEdges };
 };

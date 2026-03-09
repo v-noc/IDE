@@ -1,5 +1,6 @@
 
 export type NodeType = "container" | "function" | "class" | "call" | "file" | "folder" | "project" | "group"
+export type NodeDiffStatus = "added" | "removed" | "modified" | "unchanged" | "none";
 export type TerminusSchemaType =
   | "ProjectSchema"
   | "FolderSchema"
@@ -20,6 +21,7 @@ export interface BaseNode {
   description: string;
   node_type: NodeType
   qname?: string
+  diff_status?: NodeDiffStatus
 
 }
 

@@ -4,34 +4,57 @@ import { useParams } from "react-router-dom";
 import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/useProject";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import { applyNodeDiffStatus } from "@/features/Dashboard/features/Versioning/utils/applyNodeDiffStatus";
 import { useTreeFilter } from "./useTreeFilter";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 
+const STRUCTURAL_NODE_TYPES = new Set([
+  "project",
+  "folder",
+  "file",
+  "class",
+  "function",
+  "call",
+  "group",
+]);
 
 export function useSidebarData() {
   const { projectId } = useParams();
 
-
-  const { data, isLoading, isSuccess } =
-    useGetProjectTreeWithKeyProject({
-      key: "ProjectSchema/" + projectId || "",
-    });
-
-  const setProjectData = useProjectStore((s) => s.setProjectData);
-  const rawProjectData = useProjectStore((s) => s.projectData);
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const selectedNodeByTab = useProjectStore((s) => s.selectedNode);
+  const secondarySelectedNodeByTab = useProjectStore((s) => s.secondarySelectedNode);
   const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
   const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
-  const activeTabId = useTabStore((s) => s.activeTabId);
+  const setProjectData = useProjectStore((s) => s.setProjectData);
+  const rawProjectData = useProjectStore((s) => s.projectData);
+
+  const isVersioningOpen = useVersioningStore((s) => s.isOpen);
+  const selectedCommitId = useVersioningStore((s) => s.selectedCommitId);
+  const historyScopeByTab = useVersioningStore((s) => s.historyScopeByTab);
+  const diffResult = useVersioningStore((s) => s.diffResult);
+  const activeScope = historyScopeByTab[activeTabId];
+  const activeNode =
+    secondarySelectedNodeByTab[activeTabId] ?? selectedNodeByTab[activeTabId];
+  const isStructuralScope =
+    activeScope?.scopeType === "canvas" &&
+    activeNode?.node_type != null &&
+    STRUCTURAL_NODE_TYPES.has(activeNode.node_type);
+  const commitRef = isVersioningOpen && isStructuralScope ? selectedCommitId : undefined;
+  const projectKey = "ProjectSchema/" + projectId || "";
+
+  const { data, isLoading, isSuccess } = useGetProjectTreeWithKeyProject({
+    key: projectKey,
+    ref: commitRef ?? undefined,
+  });
 
   /*
    * Sync server data to store.
    * Uses useEffectEvent to avoid reactive cycle with projectData.
    */
   const syncProjectData = useEffectEvent((newData: AnyNodeTree) => {
-    // Only update if referentially different
-    if (newData !== rawProjectData) {
-      setProjectData(newData as ProjectNodeTree);
-    }
+    setProjectData(newData as ProjectNodeTree);
     // Check expansion logic (also accesses latest state via closure/event)
     if (projectId && activeTabId && !expandedNodeIds[activeTabId]?.includes(projectId)) {
       toggleNodeExpansion(activeTabId, projectId);
@@ -40,11 +63,15 @@ export function useSidebarData() {
 
   useEffect(() => {
     if (data && isSuccess) {
-      syncProjectData(data);
+      const treeWithDiff = applyNodeDiffStatus(
+        data as ProjectNodeTree,
+        isVersioningOpen ? diffResult : null,
+      );
+      if (treeWithDiff) {
+        syncProjectData(treeWithDiff);
+      }
     }
-  }, [data, isSuccess]); // Only run when server data actually changes/arrives
-
-
+  }, [data, isSuccess, isVersioningOpen, diffResult]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tree Filtering
   const { filteredNodes, searchQuery, setSearchQuery } = useTreeFilter(

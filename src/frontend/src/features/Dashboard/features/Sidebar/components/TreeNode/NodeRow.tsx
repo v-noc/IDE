@@ -29,6 +29,7 @@ export const NodeRow = memo(function NodeRow({
   onToggle,
   onClick,
 }: NodeRowProps) {
+  const diffStatus = node.diff_status ?? "none";
   const iconName =
     node.icon ||
     getIcons(
@@ -42,7 +43,12 @@ export const NodeRow = memo(function NodeRow({
       onClick={onClick}
       className={cn(
         "flex items-center space-x-1 rounded-md p-1 cursor-pointer",
-        "transition-all duration-200 hover:bg-black/5",
+        "transition-all duration-200",
+        diffStatus === "added" || diffStatus === "removed"
+          ? "hover:bg-white/10"
+          : diffStatus === "modified"
+            ? "hover:bg-amber-200/60"
+            : "hover:bg-black/5",
       )}
     >
       {/* Toggle */}
@@ -66,7 +72,7 @@ export const NodeRow = memo(function NodeRow({
       {/* Icon */}
       <DynamicIcon
         iconName={iconName}
-        className="h-4 w-4 flex-shrink-0"
+        className="h-4 w-4 shrink-0"
         color={iconColor}
       />
 
@@ -76,6 +82,7 @@ export const NodeRow = memo(function NodeRow({
           className={cn(
             "text-sm truncate block",
             isSelected ? "font-semibold" : "font-medium",
+            diffStatus === "removed" && "opacity-90",
           )}
         >
           {node.name}
