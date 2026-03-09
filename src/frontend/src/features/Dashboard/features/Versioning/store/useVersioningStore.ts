@@ -98,7 +98,8 @@ export const useVersioningStore = create<VersioningState>()(
       isLoadingDiff: false,
       diffError: null,
       activeDiffRequestId: 0,
-      setCurrentCommitId: (id) => set({ currentCommitId: id }),
+      setCurrentCommitId: (id) =>
+        set((state) => (state.currentCommitId === id ? state : { currentCommitId: id })),
       togglePanel: () =>
         set((state) => {
           const nextOpen = !state.isOpen;
@@ -125,22 +126,33 @@ export const useVersioningStore = create<VersioningState>()(
           };
         }),
       setHistoryScope: (tabId, scope) =>
-        set((state) => ({
-          historyScopeByTab: {
-            ...state.historyScopeByTab,
-            [tabId]: scope,
-          },
-        })),
+        set((state) => {
+          const current = state.historyScopeByTab[tabId];
+          if (
+            current &&
+            current.scopeType === scope.scopeType &&
+            current.scopeId === scope.scopeId
+          ) {
+            return state;
+          }
+          return {
+            historyScopeByTab: {
+              ...state.historyScopeByTab,
+              [tabId]: scope,
+            },
+          };
+        }),
       clearHistoryScope: (tabId) =>
         set((state) => {
           if (!(tabId in state.historyScopeByTab)) {
-            return {};
+            return state;
           }
           const nextScopes = { ...state.historyScopeByTab };
           delete nextScopes[tabId];
           return { historyScopeByTab: nextScopes };
         }),
-      setSelectedCommit: (id) => set({ selectedCommitId: id }),
+      setSelectedCommit: (id) =>
+        set((state) => (state.selectedCommitId === id ? state : { selectedCommitId: id })),
       loadParsedDiff: async ({ projectId, beforeCommitId, afterCommitId }) => {
         if (!get().isOpen) {
           return;
@@ -178,13 +190,23 @@ export const useVersioningStore = create<VersioningState>()(
         }
       },
       clearComparisonState: () =>
-        set((state) => ({
-          selectedCommitId: null,
-          diffResult: null,
-          isLoadingDiff: false,
-          diffError: null,
-          activeDiffRequestId: state.activeDiffRequestId + 1,
-        })),
+        set((state) => {
+          if (
+            state.selectedCommitId == null &&
+            state.diffResult == null &&
+            state.isLoadingDiff === false &&
+            state.diffError == null
+          ) {
+            return state;
+          }
+          return {
+            selectedCommitId: null,
+            diffResult: null,
+            isLoadingDiff: false,
+            diffError: null,
+            activeDiffRequestId: state.activeDiffRequestId + 1,
+          };
+        }),
       getNodeDiffStatusMap: () => buildNodeDiffStatusMap(get().diffResult),
       getOverlayParentChildDiffs: () => buildOverlayParentChildDiffs(get().diffResult),
     }),

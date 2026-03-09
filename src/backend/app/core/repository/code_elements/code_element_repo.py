@@ -2,7 +2,7 @@ from typing import Union, List, Tuple
 from terminusdb_client.woqlquery.woql_query import Doc, WOQLQuery as WQ
 
 from app.core.model.nodes import ClassNode, FunctionNode
-from app.core.model.schemas import ClassSchema, FunctionSchema
+from app.core.model.schemas import ClassSchema, CodeContentSchema, FunctionSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
     CODE_CHILD_TYPE_TO_FIELD,
@@ -108,8 +108,8 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
     async def move_batch(self, moves: List[Tuple[str, str, str]]):
         return await self.move_batch_by_type(moves, child_type_to_field=CODE_CHILD_TYPE_TO_FIELD)
 
-    async def flush_batch(self, insert: List[FunctionNode | ClassNode], update: List[FunctionNode | ClassNode], delete: List[str], move: List[Tuple[str, str, str]]):
-        if not insert and not update and not delete and not move:
+    async def flush_batch(self, insert: List[FunctionNode | ClassNode], update_content: List[Tuple[str, str]], delete: List[str], move: List[Tuple[str, str, str]]):
+        if not insert and not update_content and not delete and not move:
             return True
 
         queries = []
@@ -140,8 +140,11 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
             ))
             # build insert operations
 
-        # for node in update:
-            # queries.append(q)
+        for file_id, content in update_content:
+            schemas = CodeContentSchema.from_file_content(file_id, content)
+
+            queries.append(WQ().update_document(
+                Doc(schemas._obj_to_dict()[0])))
 
         for item_id, new_parent_id, child_type in move:
             field = CODE_CHILD_TYPE_TO_FIELD.get(

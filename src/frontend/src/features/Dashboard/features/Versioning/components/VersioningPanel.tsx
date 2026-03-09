@@ -1,53 +1,55 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useEffectEvent } from "react";
 import { X } from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitHistory from "./CommitHistory";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import { useCommitHistory } from "../hooks/useCommitHistory";
+import { useCommitHistory, type Commit } from "../hooks/useCommitHistory";
 import { mapCommitToDisplay } from "../utils/commitUtils";
 
 const COMMITS_PER_PAGE = 10;
+const EMPTY_COMMITS: Commit[] = [];
 
 const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
-  const {
-    togglePanel,
-    historyScopeByTab,
-    selectedCommitId,
-    currentCommitId,
-    setCurrentCommitId,
-    setSelectedCommit,
-    loadParsedDiff,
-    clearComparisonState,
-  } = useVersioningStore();
+  const togglePanel = useVersioningStore((s) => s.togglePanel);
+  const historyScope = useVersioningStore((s) => s.historyScopeByTab[tabId]);
+  const selectedCommitId = useVersioningStore((s) => s.selectedCommitId);
+  const currentCommitId = useVersioningStore((s) => s.currentCommitId);
+  const setCurrentCommitId = useVersioningStore((s) => s.setCurrentCommitId);
+  const loadParsedDiff = useVersioningStore((s) => s.loadParsedDiff);
+  const clearComparisonState = useVersioningStore(
+    (s) => s.clearComparisonState,
+  );
   const { projectData, selectedNode, secondarySelectedNode } =
     useProjectStore();
 
   const nodeId = secondarySelectedNode?.[tabId] || selectedNode?.[tabId];
-  const historyScope = historyScopeByTab[tabId];
   const historyNodeId =
     historyScope?.scopeType === "docs"
       ? historyScope.scopeId
-      : historyScope?.scopeId ?? nodeId?.id;
+      : (historyScope?.scopeId ?? nodeId?.id);
   const [page, setPage] = useState(0);
+
+  const resetComparisonForScope = useEffectEvent(() => {
+    const state = useVersioningStore.getState();
+    if (state.currentCommitId !== null) {
+      state.setCurrentCommitId(null);
+    }
+    if (state.selectedCommitId !== null) {
+      state.setSelectedCommit(null);
+    }
+    state.clearComparisonState();
+  });
 
   useEffect(() => {
     setPage(0);
   }, [projectData?.id, historyNodeId]);
 
   useEffect(() => {
-    setCurrentCommitId(null);
-    setSelectedCommit(null);
-    clearComparisonState();
-  }, [
-    projectData?.id,
-    historyNodeId,
-    setCurrentCommitId,
-    setSelectedCommit,
-    clearComparisonState,
-  ]);
+    resetComparisonForScope();
+  }, [projectData?.id, historyNodeId]);
 
   const {
-    data: commits = [],
+    data: commits = EMPTY_COMMITS,
     isLoading,
     isError,
   } = useCommitHistory(projectData?.id, historyNodeId ?? undefined, {
@@ -70,7 +72,9 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
     }
     if (!projectData?.id) return;
 
-    const selectedIndex = commits.findIndex((commit) => commit.id === selectedCommitId);
+    const selectedIndex = commits.findIndex(
+      (commit) => commit.id === selectedCommitId,
+    );
     if (selectedIndex < 0) {
       clearComparisonState();
       return;
@@ -87,13 +91,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
       beforeCommitId: previousCommitId,
       afterCommitId: selectedCommitId,
     });
-  }, [
-    projectData?.id,
-    commits,
-    selectedCommitId,
-    clearComparisonState,
-    loadParsedDiff,
-  ]);
+  }, [projectData?.id, commits, selectedCommitId]);
 
   const displayCommits = commits.map(mapCommitToDisplay);
   const hasNextPage = commits.length === COMMITS_PER_PAGE;
