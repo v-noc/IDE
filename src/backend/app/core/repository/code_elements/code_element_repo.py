@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from typing import Union, List, Tuple
+import uuid
 from terminusdb_client.woqlquery.woql_query import Doc, WOQLQuery as WQ
 
 from app.core.model.nodes import ClassNode, FunctionNode
@@ -118,55 +119,77 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
         updated_at = datetime.now(timezone.utc)
 
         for node in code_update:
+            # Generate unique suffix for this iteration's variables (UUID without hyphens)
+            suffix = str(uuid.uuid4()).replace("-", "")
             parent_id = node.id
 
-            # Prepare new code position data with @linked-by
+            # Build sub-queries list
+            sub_queries = []
 
+            # 1. Code Position Update (delete old, insert new)
             code_pos_schema = CodePositionSchema.from_pydantic(
-                node.code_position)
-            new_code_pos_dict = code_pos_schema._obj_to_dict()[0]
-            new_code_pos_dict["@type"] = "CodePositionSchema"
 
-            # Critical: Indicate this is a subdocument linked from parent
+                node.code_position)
+
+            new_code_pos_dict = code_pos_schema._obj_to_dict()[0]
+
+            new_code_pos_dict["@type"] = "CodePositionSchema"
             new_code_pos_dict["@linked-by"] = {
+
                 "@id": parent_id,
+
                 "@property": "code_position"
+
             }
 
-            # Build the atomic subdocument update query
+            sub_queries.extend([
+                # Find old code_position
+                WQ().triple(parent_id, "code_position", "v:old_code_pos"+parent_id),
+                # Delete old subdocument
+                WQ().delete_document("v:old_code_pos"+parent_id),
+                # Insert new subdocument
+                WQ().insert_document(Doc(new_code_pos_dict), "v:new_code_pos"+parent_id),
+                # Update parent's link
 
-            query = (
-                WQ().woql_and(
-                    # 1. Locate the parent and its current code_position subdocument
-                    # WQ().eq("v:parent", parent_id),
-                    WQ().triple(parent_id, "code_position", "v:old_code_pos"+parent_id),
+                WQ().update_triple(parent_id, "code_position", "v:new_code_pos"+parent_id),
+            ])
 
-                    # 2. Delete the old code_position subdocument
-                    WQ().delete_document("v:old_code_pos"+parent_id),
+            # 2. Update qname (delete old if exists, add new)
+            sub_queries.extend([
+                WQ().opt(
+                    WQ().woql_and(
+                        WQ().triple(parent_id, "qname",
+                                    f"v:old_qname_{suffix}"),
+                        WQ().delete_triple(parent_id,
+                                           "qname", f"v:old_qname_{suffix}")
+                    )
+                ),
+                WQ().add_triple(parent_id, "qname", WQ().string(node.qname)),
+            ])
 
-                    # 3. Insert new code_position subdocument (linked to parent)
-                    WQ().insert_document(Doc(new_code_pos_dict), "v:new_code_pos"+parent_id),
+            # 3. Update updated_at (delete old if exists, add new)
+            sub_queries.extend([
+                WQ().opt(
+                    WQ().woql_and(
+                        WQ().triple(parent_id, "updated_at",
+                                    f"v:old_updated_{suffix}"),
+                        WQ().delete_triple(parent_id,
+                                           "updated_at", f"v:old_updated_{suffix}")
+                    )
+                ),
+                WQ().add_triple(parent_id, "updated_at", updated_at),
+            ])
 
-                    # 4. Update the parent's triple to point to the new subdocument
-                    WQ().update_triple(parent_id, "code_position", "v:new_code_pos"+parent_id),
-                    WQ().opt(
-                        WQ().woql_and(
-                            WQ().triple(parent_id, "qname", "v:old_qname"+parent_id),
-                            WQ().delete_triple(parent_id, "qname", "v:old_qname"+parent_id)
-                        )
-                    ),
-                    WQ().add_triple(parent_id, "qname", WQ().string(node.qname)),
-                    WQ().opt(
-                        WQ().woql_and(
-                            WQ().triple(parent_id, "updated_at", "v:old_updated"+parent_id),
-                            WQ().delete_triple(parent_id, "updated_at", "v:old_updated"+parent_id)
-                        )
-                    ),
-                    WQ().add_triple(parent_id, "updated_at", updated_at)
+            # 4. Handle base_classes for ClassNode (REPLACE the entire set)
+            if isinstance(node, ClassNode) and hasattr(node, 'base_classes'):
 
-                )
-            )
+                for base_class in node.base_classes:
+                    sub_queries.append(
+                        WQ().add_triple(parent_id, "base_classes", WQ().string(base_class))
+                    )
 
+            # Combine all into one atomic query for this node
+            query = WQ().woql_and(*sub_queries)
             queries.append(query)
             # break
 
