@@ -21,6 +21,11 @@ export interface OverlayParentChildDiff {
   removed: OverlayDiffNodeRef[];
 }
 
+export interface HistoryScope {
+  scopeType: string;
+  scopeId: string | null;
+}
+
 function nodeBodyForOverlay(nodeDiff: NodeDiff | undefined): Record<string, unknown> | undefined {
   if (!nodeDiff) return undefined;
   return nodeDiff.after ?? nodeDiff.before;
@@ -59,6 +64,7 @@ function buildOverlayParentChildDiffs(
 
 interface VersioningState {
   isOpen: boolean;
+  historyScopeByTab: Record<string, HistoryScope>;
   selectedCommitId: string | null;
   currentCommitId: string | null;
   diffResult: DiffResult | null;
@@ -75,6 +81,8 @@ interface VersioningState {
   clearComparisonState: () => void;
   togglePanel: () => void;
   setOpen: (open: boolean) => void;
+  setHistoryScope: (tabId: string, scope: HistoryScope) => void;
+  clearHistoryScope: (tabId: string) => void;
   getNodeDiffStatusMap: () => Record<string, DiffType>;
   getOverlayParentChildDiffs: () => Record<string, OverlayParentChildDiff>;
 }
@@ -83,6 +91,7 @@ export const useVersioningStore = create<VersioningState>()(
   devtools(
     (set, get) => ({
       isOpen: false,
+      historyScopeByTab: {},
       selectedCommitId: null,
       currentCommitId: null,
       diffResult: null,
@@ -114,6 +123,22 @@ export const useVersioningStore = create<VersioningState>()(
             diffError: null,
             activeDiffRequestId: state.activeDiffRequestId + 1,
           };
+        }),
+      setHistoryScope: (tabId, scope) =>
+        set((state) => ({
+          historyScopeByTab: {
+            ...state.historyScopeByTab,
+            [tabId]: scope,
+          },
+        })),
+      clearHistoryScope: (tabId) =>
+        set((state) => {
+          if (!(tabId in state.historyScopeByTab)) {
+            return {};
+          }
+          const nextScopes = { ...state.historyScopeByTab };
+          delete nextScopes[tabId];
+          return { historyScopeByTab: nextScopes };
         }),
       setSelectedCommit: (id) => set({ selectedCommitId: id }),
       loadParsedDiff: async ({ projectId, beforeCommitId, afterCommitId }) => {

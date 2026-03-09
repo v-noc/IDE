@@ -11,6 +11,7 @@ const COMMITS_PER_PAGE = 10;
 const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const {
     togglePanel,
+    historyScopeByTab,
     selectedCommitId,
     currentCommitId,
     setCurrentCommitId,
@@ -22,11 +23,16 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
     useProjectStore();
 
   const nodeId = secondarySelectedNode?.[tabId] || selectedNode?.[tabId];
+  const historyScope = historyScopeByTab[tabId];
+  const historyNodeId =
+    historyScope?.scopeType === "docs"
+      ? historyScope.scopeId
+      : historyScope?.scopeId ?? nodeId?.id;
   const [page, setPage] = useState(0);
 
   useEffect(() => {
     setPage(0);
-  }, [projectData?.id, nodeId?.id]);
+  }, [projectData?.id, historyNodeId]);
 
   useEffect(() => {
     setCurrentCommitId(null);
@@ -34,7 +40,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
     clearComparisonState();
   }, [
     projectData?.id,
-    nodeId?.id,
+    historyNodeId,
     setCurrentCommitId,
     setSelectedCommit,
     clearComparisonState,
@@ -44,7 +50,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
     data: commits = [],
     isLoading,
     isError,
-  } = useCommitHistory(projectData?.id, nodeId?.id, {
+  } = useCommitHistory(projectData?.id, historyNodeId ?? undefined, {
     start: page * COMMITS_PER_PAGE,
     count: COMMITS_PER_PAGE,
   });
@@ -115,8 +121,8 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
           onNextPage={() => setPage((p) => p + 1)}
           onPrevPage={() => setPage((p) => Math.max(0, p - 1))}
           emptyMessage={
-            !projectData?.id || !nodeId?.id
-              ? "Select a node to view commit history"
+            !projectData?.id || !historyNodeId
+              ? "Select content to view commit history"
               : undefined
           }
         />

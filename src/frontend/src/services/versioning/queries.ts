@@ -13,7 +13,7 @@ export const useBranches = (projectId: string | undefined) => {
 export const useCommits = (
   projectId: string | undefined,
   nodeId: string | undefined,
-  options?: { start?: number; count?: number }
+  options?: { start?: number; count?: number; enabled?: boolean }
 ) => {
   return useQuery<Commit[]>({
     queryKey: queryKeys.versioning.commits(
@@ -27,7 +27,7 @@ export const useCommits = (
         start: options?.start,
         count: options?.count,
       }),
-    enabled: !!projectId && !!nodeId,
+    enabled: (options?.enabled ?? true) && !!projectId && !!nodeId,
   });
 };
 

@@ -5,7 +5,7 @@ export type { Commit, TerminusJsonDiff } from "@/services/versioning";
 export function useCommitHistory(
   projectId: string | undefined,
   nodeId: string | undefined,
-  options?: { start?: number; count?: number }
+  options?: { start?: number; count?: number; enabled?: boolean }
 ) {
   return useCommits(projectId, nodeId, options);
 }
