@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useCode } from "@/services/code";
 import { useEditableCode } from "@/features/Dashboard/features/Main/components/Code/useEditableCode";
+import { useCodeDiff } from "@/features/Dashboard/features/Main/components/Code/useCodeDiff";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 
@@ -43,6 +44,13 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
     projectId,
     effectiveNodeType
   );
+  const {
+    showDiff,
+    originalContent,
+    modifiedContent,
+    isLoadingDiff,
+    error: diffError,
+  } = useCodeDiff(shouldFetchCode ? effectiveNodeId : "");
 
   const hasCode =
     (codeData?.code && codeData.code.length > 0) ||
@@ -66,5 +74,10 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
     fileName,
     language,
     handleSave,
+    showDiff,
+    originalContent,
+    modifiedContent,
+    isLoadingDiff,
+    diffError,
   };
 }

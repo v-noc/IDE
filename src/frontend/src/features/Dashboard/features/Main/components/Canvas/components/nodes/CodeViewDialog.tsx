@@ -1,5 +1,6 @@
-import React, { memo, lazy, Suspense, useState, useEffect } from "react";
+import { memo, lazy, Suspense, useState } from "react";
 import { Save, Copy, Check, X } from "lucide-react";
+import { DiffEditor } from "@monaco-editor/react";
 import {
     Dialog,
     DialogContent,
@@ -29,6 +30,11 @@ interface CodeViewDialogProps {
     hasChanges: boolean;
     isSaving: boolean;
     isLoading: boolean;
+    showDiff?: boolean;
+    originalContent?: string;
+    modifiedContent?: string;
+    isLoadingDiff?: boolean;
+    diffError?: string | null;
     borderColor?: string;
     iconColor?: string;
 }
@@ -44,13 +50,19 @@ export const CodeViewDialog = memo(function CodeViewDialog({
     hasChanges,
     isSaving,
     isLoading,
-    borderColor = "#e2e8f0",
+    showDiff = false,
+    originalContent = "",
+    modifiedContent = "",
+    isLoadingDiff = false,
+    diffError = null,
+    borderColor: _borderColor = "#e2e8f0",
     iconColor = "#64748b",
 }: CodeViewDialogProps) {
+    void _borderColor;
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(code);
+        navigator.clipboard.writeText(showDiff ? modifiedContent : code);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -69,7 +81,7 @@ export const CodeViewDialog = memo(function CodeViewDialog({
                     </DialogTitle>
 
                     <div className="flex items-center gap-2">
-                        {hasChanges && (
+                        {!showDiff && hasChanges && (
                             <button
                                 onClick={onSave}
                                 disabled={isSaving}
@@ -112,21 +124,49 @@ export const CodeViewDialog = memo(function CodeViewDialog({
 
                 <div className="flex-1 min-h-0 bg-slate-50 relative w-full">
                     <Suspense fallback={<CodeEditorSkeleton />}>
-                        <CodeEditor
-                            language={language}
-                            value={code}
-                            onChange={onChange}
-                            isLoading={isLoading}
-                            options={{
-                                minimap: { enabled: true },
-                                readOnly: false,
-                                scrollBeyondLastLine: false,
-                                fontSize: 14,
-                                lineHeight: 22,
-                                padding: { top: 16, bottom: 16 },
-                                automaticLayout: true,
-                            }}
-                        />
+                        {showDiff ? (
+                            isLoadingDiff ? (
+                                <CodeEditorSkeleton />
+                            ) : diffError ? (
+                                <div className="h-full w-full flex items-center justify-center text-sm text-slate-500">
+                                    {diffError}
+                                </div>
+                            ) : (
+                                <DiffEditor
+                                    height="100%"
+                                    language={language}
+                                    original={originalContent}
+                                    modified={modifiedContent}
+                                    theme="vs-light"
+                                    options={{
+                                        readOnly: true,
+                                        originalEditable: false,
+                                        renderSideBySide: true,
+                                        automaticLayout: true,
+                                        minimap: { enabled: false },
+                                        scrollBeyondLastLine: false,
+                                        fontSize: 14,
+                                        lineHeight: 22,
+                                    }}
+                                />
+                            )
+                        ) : (
+                            <CodeEditor
+                                language={language}
+                                value={code}
+                                onChange={onChange}
+                                isLoading={isLoading}
+                                options={{
+                                    minimap: { enabled: true },
+                                    readOnly: false,
+                                    scrollBeyondLastLine: false,
+                                    fontSize: 14,
+                                    lineHeight: 22,
+                                    padding: { top: 16, bottom: 16 },
+                                    automaticLayout: true,
+                                }}
+                            />
+                        )}
                     </Suspense>
                 </div>
             </DialogContent>
