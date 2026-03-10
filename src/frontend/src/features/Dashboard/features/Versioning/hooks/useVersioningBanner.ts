@@ -29,8 +29,9 @@ export function useVersioningBanner() {
   }, [compareToCommitId, targetCommitId, setCompareToCommitId, setCheckedOutCommitId]);
 
   const clearCompare = useCallback(() => {
+
     clearComparisonState();
-  }, [clearComparisonState]);
+  }, [compareToCommitId]);
 
   const closeBanner = useCallback(() => {
     setCheckedOutCommitId(null);
