@@ -104,7 +104,8 @@ async def get_documents_for_node(
 
     try:
         documents = await document_service.get_nodes_by_parent_node(node_id)
-        print(f"documents: {documents}")
+        if document_service.uow.has_compare_to():
+            documents = await document_service.get_nodes_by_parent_node(node_id, compare_to=True)
         return documents
     except ValueError as e:
         raise HTTPException(

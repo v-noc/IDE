@@ -25,8 +25,10 @@ async def get_request_db_context(
     branch: str = Header("main", alias="X-Vnoc-Branch"),
     ref: Optional[str] = Query(
         None, description="Specific commit/ref to query"),
+    compare_to: Optional[str] = Query(
+        None, description="Commit/ref to compare against"),
 ) -> RequestDbContext:
-    return RequestDbContext(branch=branch, ref=ref)
+    return RequestDbContext(branch=branch, ref=ref, compare_to=compare_to)
 
 
 async def get_project_node(

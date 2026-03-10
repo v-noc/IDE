@@ -105,7 +105,12 @@ async def get_project(
 
     children, version = await project_service.get_children(include_commit_id=True)
 
-    tree_builder = TreeBuilder(children)
+    compare_to_children = None
+    if project_service.uow.has_compare_to():
+        compare_to_children, compare_to_version = await project_service.get_children(compare_to=True, include_commit_id=True)
+        print(f"compare_to_version: {compare_to_version}")
+
+    tree_builder = TreeBuilder(children, compare_to_children)
     tree = tree_builder.build()
 
     project_tree = ProjectTreeNode(

@@ -103,6 +103,9 @@ async def get_code(
 
     code_details = await code_element_service.get_code(node_id)
 
+    if code_element_service.uow.has_compare_to():
+        code_details = await code_element_service.get_code(node_id, compare_to=True)
+
     if code_details is None:
         raise HTTPException(
             status_code=404, detail="Element or code not found")
