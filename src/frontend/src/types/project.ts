@@ -21,7 +21,7 @@ export interface BaseNode {
   description: string;
   node_type: NodeType
   qname?: string
-  diff_status?: NodeDiffStatus
+  status?: NodeDiffStatus
 
 }
 

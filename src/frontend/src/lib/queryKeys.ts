@@ -3,8 +3,13 @@ const queryKeys = {
     all: ['projects'] as const,
     list: () => [...queryKeys.projects.all, 'list'] as const,
     detail: (id: string) => [...queryKeys.projects.all, 'detail', id] as const,
-    tree: (id: string, branch?: string | null, ref?: string | null) =>
-      [...queryKeys.projects.all, 'tree', id, branch ?? 'main', ref ?? ''] as const,
+    tree: (
+      id: string,
+      branch?: string | null,
+      ref?: string | null,
+      compareTo?: string | null,
+    ) =>
+      [...queryKeys.projects.all, 'tree', id, branch ?? 'main', ref ?? '', compareTo ?? ''] as const,
   },
   code: {
     all: ['code'] as const,

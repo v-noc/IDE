@@ -17,6 +17,7 @@ type JsonRequestInit = Omit<RequestInit, "body"> & { body?: unknown };
 type ApiRequestOptions = JsonRequestInit & {
   branch?: string;
   ref?: string;
+  compareTo?: string;
 };
 
 async function apiClient<T>(
@@ -28,15 +29,21 @@ async function apiClient<T>(
     body,
     branch: branchOverride,
     ref: refOverride,
+    compareTo: compareToOverride,
     ...customConfig
   } = options as ApiRequestOptions;
   const state = useVersioningStore.getState();
   const branch = branchOverride ?? state.branch;
   const ref = refOverride ?? state.checkedOutCommitId ?? undefined;
+  const compareTo = compareToOverride ?? state.compareToCommitId ?? undefined;
   let finalEndpoint = endpoint;
   if (ref) {
     const separator = finalEndpoint.includes("?") ? "&" : "?";
     finalEndpoint = `${finalEndpoint}${separator}ref=${encodeURIComponent(ref)}`;
+  }
+  if (compareTo) {
+    const separator = finalEndpoint.includes("?") ? "&" : "?";
+    finalEndpoint = `${finalEndpoint}${separator}compare_to=${encodeURIComponent(compareTo)}`;
   }
 
   const config: RequestInit = {
