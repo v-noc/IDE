@@ -85,7 +85,7 @@ export function DocumentEditor({
   const { isDiffActive } = useDocumentDiff({
     projectId,
     nodeId,
-    documentId: document?.id,
+    document,
     versionDiff,
   });
 

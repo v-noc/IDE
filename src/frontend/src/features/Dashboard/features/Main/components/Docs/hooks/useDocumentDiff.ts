@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import type { DocumentData } from "@/services/documents";
 
 type VersionDiffController = {
   showDiff: (oldJson: unknown) => void;
@@ -9,37 +10,28 @@ type VersionDiffController = {
 interface UseDocumentDiffParams {
   projectId?: string;
   nodeId?: string;
-  documentId?: string;
+  document?: DocumentData | null;
   versionDiff?: VersionDiffController | null;
 }
 
 export function useDocumentDiff({
   projectId: _projectId,
   nodeId: _nodeId,
-  documentId,
+  document,
   versionDiff,
 }: UseDocumentDiffParams) {
   void _projectId;
   void _nodeId;
-  const { isOpen, diffResult, isLoadingDiff } = useVersioningStore();
-  const isDiffActive = Boolean(isOpen && diffResult);
+  const compareToCommitId = useVersioningStore((s) => s.compareToCommitId);
+  const isDiffActive = Boolean(compareToCommitId && document?.compare_to);
 
   useEffect(() => {
     if (!versionDiff) return;
-    if (!isDiffActive || !documentId || !diffResult) {
+    if (!isDiffActive || !document?.compare_to) {
       versionDiff.clearDiff();
       return;
     }
-    const contentDiff = diffResult.contentDiffs.find(
-      (entry) => entry.nodeId === documentId && entry.contentType === "rich_text"
-    );
-
-    if (!contentDiff || contentDiff.before == null) {
-      versionDiff.clearDiff();
-      return;
-    }
-
-    let beforeJson: unknown = contentDiff.before;
+    let beforeJson: unknown = document.compare_to.data;
     if (typeof beforeJson === "string") {
       try {
         beforeJson = JSON.parse(beforeJson);
@@ -53,15 +45,14 @@ export function useDocumentDiff({
   }, [
     versionDiff,
     isDiffActive,
-    documentId,
-    diffResult,
+    document,
   ]);
 
   return {
     isDiffActive,
-    isLoadingContent: isLoadingDiff,
-    selectedCommitId: diffResult?.commitAfter ?? null,
-    previousCommitId: diffResult?.commitBefore ?? null,
+    isLoadingContent: false,
+    selectedCommitId: null,
+    previousCommitId: null,
   };
 }
 

@@ -48,10 +48,7 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
   } = useEditableCode(elementId, projectId, nodeType);
   const { showDiff, originalContent, modifiedContent, isLoadingDiff, error } =
     useCodeDiff({
-      elementId,
-      nodeType,
-      contentId: data?.content_id,
-      position: data?.position,
+      codeData: data,
     });
 
   const language = useMemo(

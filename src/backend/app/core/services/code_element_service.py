@@ -48,7 +48,7 @@ class CodeElementService():
             )
             code_element = parent_file
         else:
-            code_element = await self.get(code_element_id)
+            code_element = await current_repos.code_element_repo.get_by_id(code_element_id)
 
             if not code_element:
                 return None

@@ -8,6 +8,7 @@ export interface DocumentData {
   data: string;
   created_at: string;
   updated_at: string;
+  compare_to?: DocumentData | null;
 }
 
 export interface CreateDocumentRequest {
@@ -43,6 +44,11 @@ interface BackendDocumentRaw {
   updated_at: string;
 }
 
+interface BackendDocumentsResponse {
+  documents?: BackendDocumentRaw[];
+  compare_to?: BackendDocumentRaw[] | BackendDocumentRaw | null;
+}
+
 const mapBackendDocument = (d: BackendDocumentRaw): DocumentData => ({
   id: d.id ?? "",
   name: d.name,
@@ -52,12 +58,43 @@ const mapBackendDocument = (d: BackendDocumentRaw): DocumentData => ({
   updated_at: d.updated_at,
 });
 
+function getDocumentMatchKey(d: BackendDocumentRaw): string {
+  return d.id ?? `${d.name}::${d.description}`;
+}
+
 export const documentsApi = {
   getDocuments: async (nodeId: string, projectId: string): Promise<DocumentData[]> => {
     const qs = buildQueryString({ node_id: nodeId, project_id: projectId });
     const response = await api(`${API_ROUTES.DOCUMENTS}${qs}`);
-    const list = response as unknown as BackendDocumentRaw[];
-    return list.map(mapBackendDocument);
+    // Supports both legacy list response and compare-aware response.
+    if (Array.isArray(response)) {
+      const list = response as BackendDocumentRaw[];
+      return list.map(mapBackendDocument);
+    }
+
+    const payload = response as BackendDocumentsResponse;
+    const documents = Array.isArray(payload.documents) ? payload.documents : [];
+    const rawCompare = payload.compare_to;
+    const compareList = Array.isArray(rawCompare)
+      ? rawCompare
+      : rawCompare
+        ? [rawCompare]
+        : [];
+
+    const compareByKey = new Map<string, BackendDocumentRaw>();
+    for (const compareDoc of compareList) {
+      compareByKey.set(getDocumentMatchKey(compareDoc), compareDoc);
+    }
+
+    return documents.map((doc) => {
+      const key = getDocumentMatchKey(doc);
+      const mapped = mapBackendDocument(doc);
+      const compareDoc = compareByKey.get(key);
+      return {
+        ...mapped,
+        compare_to: compareDoc ? mapBackendDocument(compareDoc) : null,
+      };
+    });
   },
 
   createDocument: async (payload: CreateDocumentRequest, projectId: string): Promise<DocumentData> => {

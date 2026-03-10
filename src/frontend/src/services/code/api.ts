@@ -15,6 +15,7 @@ export interface CodeData {
     end_col_offset: number | null;
   } | null;
   code: string;
+  compare_to?: CodeData;
 }
 
 function buildQueryString(params: Record<string, string>): string {

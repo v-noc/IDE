@@ -10,6 +10,10 @@ from typing import List
 router = APIRouter()
 
 
+class DocumentResponse(DocumentNode):
+    compare_to: Optional[DocumentNode] = None
+
+
 class CreateDocumentRequest(BaseModel):
     name: str = Field(..., min_length=1)
     description: str = Field(..., min_length=1)
@@ -105,8 +109,15 @@ async def get_documents_for_node(
     try:
         documents = await document_service.get_nodes_by_parent_node(node_id)
         if document_service.uow.has_compare_to():
-            documents = await document_service.get_nodes_by_parent_node(node_id, compare_to=True)
-        return documents
+            compare_to_documents = await document_service.get_nodes_by_parent_node(node_id, compare_to=True)
+            return DocumentResponse(
+                documents=documents,
+                compare_to=compare_to_documents,
+            )
+        return DocumentResponse(
+            documents=documents,
+            compare_to=None,
+        )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
