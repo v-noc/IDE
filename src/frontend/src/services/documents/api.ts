@@ -8,6 +8,7 @@ export interface DocumentData {
   data: string;
   created_at: string;
   updated_at: string;
+  status?: "added" | "removed" | "modified" | "unchanged" | "none";
   compare_to?: DocumentData | null;
 }
 
@@ -42,6 +43,8 @@ interface BackendDocumentRaw {
   data: string;
   created_at: string;
   updated_at: string;
+  status?: "added" | "removed" | "modified" | "unchanged" | "none";
+  compare_to?: BackendDocumentRaw | null;
 }
 
 interface BackendDocumentsResponse {
@@ -49,14 +52,19 @@ interface BackendDocumentsResponse {
   compare_to?: BackendDocumentRaw[] | BackendDocumentRaw | null;
 }
 
-const mapBackendDocument = (d: BackendDocumentRaw): DocumentData => ({
-  id: d.id ?? "",
-  name: d.name,
-  description: d.description,
-  data: d.data,
-  created_at: d.created_at,
-  updated_at: d.updated_at,
-});
+const mapBackendDocument = (d: BackendDocumentRaw): DocumentData => {
+  const compareToMapped = d.compare_to ? mapBackendDocument(d.compare_to) : null;
+  return {
+    id: d.id ?? "",
+    name: d.name,
+    description: d.description,
+    data: d.data,
+    created_at: d.created_at,
+    updated_at: d.updated_at,
+    status: d.status,
+    compare_to: compareToMapped,
+  };
+};
 
 function getDocumentMatchKey(d: BackendDocumentRaw): string {
   return d.id ?? `${d.name}::${d.description}`;

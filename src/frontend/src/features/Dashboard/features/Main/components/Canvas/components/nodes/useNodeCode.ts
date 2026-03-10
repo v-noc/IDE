@@ -51,10 +51,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
     isLoadingDiff,
     error: diffError,
   } = useCodeDiff({
-    elementId: shouldFetchCode ? effectiveNodeId : "",
-    nodeType: effectiveNodeType,
-    contentId: codeData?.content_id,
-    position: codeData?.position,
+    codeData,
   });
 
   const hasCode =

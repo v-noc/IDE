@@ -39,6 +39,15 @@ export function DocSidebar({
   onDocumentChange,
 }: DocSidebarProps) {
   const selectedDocument = documents.find((d) => d.id === selectedDocumentId);
+  const getStatusClasses = (status?: DocumentData["status"]) => {
+    if (status === "added") {
+      return "border-emerald-600/90 bg-emerald-600 text-white hover:bg-emerald-700";
+    }
+    if (status === "removed") {
+      return "border-rose-700/90 bg-rose-700 text-white opacity-60 hover:bg-rose-700";
+    }
+    return "";
+  };
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -52,9 +61,15 @@ export function DocSidebar({
                 onClick={() => onSelectDocument(doc.id)}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all cursor-pointer whitespace-nowrap",
+                  getStatusClasses(doc.status),
                   selectedDocumentId === doc.id
-                    ? "bg-white border border-border shadow-sm font-semibold text-foreground ring-1 ring-black/5"
-                    : "hover:bg-white/50 text-muted-foreground border border-transparent hover:text-foreground",
+                    ? "border shadow-sm font-semibold ring-1 ring-black/5"
+                    : "border border-transparent",
+                  (doc.status === "added" || doc.status === "removed")
+                    ? ""
+                    : selectedDocumentId === doc.id
+                      ? "bg-white text-foreground"
+                      : "hover:bg-white/50 text-muted-foreground hover:text-foreground",
                 )}
               >
                 <span className="truncate max-w-[120px]">

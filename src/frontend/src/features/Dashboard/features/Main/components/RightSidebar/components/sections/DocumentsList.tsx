@@ -43,7 +43,10 @@ const DocumentsList: React.FC = () => {
     }
     return selectedNode?.id;
   }, [selectedNode, secondarySelectedNode]);
-  const { data: docs = [], isLoading } = useDocuments(nodeKey ?? undefined, projectId ?? undefined);
+  const { data: docs = [], isLoading } = useDocuments(
+    nodeKey ?? undefined,
+    projectId ?? undefined,
+  );
   const createMutation = useCreateDocument();
   const updateMutation = useUpdateDocument(nodeKey ?? "", projectId ?? "");
   const deleteMutation = useDeleteDocument();
@@ -55,6 +58,15 @@ const DocumentsList: React.FC = () => {
   // Listen for external document selections to keep highlight in sync
 
   const canUseDocs = useMemo(() => Boolean(nodeKey), [nodeKey]);
+  const getStatusCardClasses = (status?: DocumentData["status"]) => {
+    if (status === "added") {
+      return "border-emerald-600/90 bg-emerald-600 text-white";
+    }
+    if (status === "removed") {
+      return "border-rose-700/90 bg-rose-700 text-white opacity-60";
+    }
+    return "";
+  };
 
   const openCreateDialog = () => {
     setEditingId(null);
@@ -190,7 +202,9 @@ const DocumentsList: React.FC = () => {
             <Card
               key={doc.id}
               className={
-                "p-3 shadow-none rounded-sm hover:cursor-pointer transition " +
+                "p-3 shadow-none rounded-sm hover:cursor-pointer transition border " +
+                getStatusCardClasses(doc.status) +
+                " " +
                 (selectedDocumentId === doc.id
                   ? "ring-2 ring-primary ring-offset-1"
                   : "")
@@ -203,7 +217,14 @@ const DocumentsList: React.FC = () => {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="text-sm font-medium">{doc.name}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div
+                    className={
+                      "text-xs " +
+                      (doc.status === "added" || doc.status === "removed"
+                        ? "text-white/90"
+                        : "text-muted-foreground")
+                    }
+                  >
                     {doc.description}
                   </div>
                 </div>
@@ -211,12 +232,13 @@ const DocumentsList: React.FC = () => {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="text-black"
                     onClick={(e) => {
                       e.stopPropagation();
                       startEdit(doc);
                     }}
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-4 w-4 " />
                   </Button>
                   <Button
                     size="sm"

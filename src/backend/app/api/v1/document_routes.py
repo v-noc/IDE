@@ -1,6 +1,6 @@
 from app.api.dependencies import get_document_service
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
-from typing import Optional
+from typing import Optional, Dict
 
 from app.core.services.document_service import DocumentService
 from app.core.model import DocumentNode
@@ -11,6 +11,7 @@ router = APIRouter()
 
 
 class DocumentResponse(DocumentNode):
+    status: str = Field(default="unchanged")
     compare_to: Optional[DocumentNode] = None
 
 
@@ -99,7 +100,7 @@ async def delete_document(
     return None
 
 
-@router.get("/", response_model=List[DocumentNode])
+@router.get("/", response_model=List[DocumentResponse])
 async def get_documents_for_node(
     node_id: str = Query(...,
                          description="The ID of the node to get documents for"),
@@ -110,14 +111,43 @@ async def get_documents_for_node(
         documents = await document_service.get_nodes_by_parent_node(node_id)
         if document_service.uow.has_compare_to():
             compare_to_documents = await document_service.get_nodes_by_parent_node(node_id, compare_to=True)
-            return DocumentResponse(
-                documents=documents,
-                compare_to=compare_to_documents,
+            compare_by_id: Dict[str, DocumentNode] = {
+                doc.id: doc for doc in compare_to_documents
+            }
+            merged_documents: List[DocumentResponse] = []
+
+            # Current docs: mark added if missing in compare_to, otherwise attach compare_to.
+            for doc in documents:
+                compare_doc = compare_by_id.pop(doc.id, None)
+                merged_documents.append(
+                    DocumentResponse(
+                        **doc.model_dump(),
+                        status="added" if compare_doc is None else "unchanged",
+                        compare_to=compare_doc,
+                    )
+                )
+
+            # Docs that exist only in compare_to: emit synthetic removed docs.
+            for compare_doc in compare_by_id.values():
+                merged_documents.append(
+                    DocumentResponse(
+                        **compare_doc.model_dump(),
+                        data="",
+                        status="removed",
+                        compare_to=compare_doc,
+                    )
+                )
+
+            return merged_documents
+
+        return [
+            DocumentResponse(
+                **doc.model_dump(),
+                status="unchanged",
+                compare_to=None,
             )
-        return DocumentResponse(
-            documents=documents,
-            compare_to=None,
-        )
+            for doc in documents
+        ]
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
