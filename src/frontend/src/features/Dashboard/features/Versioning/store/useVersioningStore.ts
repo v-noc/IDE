@@ -62,9 +62,12 @@ function buildOverlayParentChildDiffs(
   return result;
 }
 
+export type ScopeOverride = "item" | "repository";
+
 interface VersioningState {
   isOpen: boolean;
   historyScopeByTab: Record<string, HistoryScope>;
+  scopeOverrideByTab: Record<string, ScopeOverride>;
   selectedCommitId: string | null;
   currentCommitId: string | null;
   diffResult: DiffResult | null;
@@ -82,6 +85,7 @@ interface VersioningState {
   togglePanel: () => void;
   setOpen: (open: boolean) => void;
   setHistoryScope: (tabId: string, scope: HistoryScope) => void;
+  setScopeOverride: (tabId: string, override: ScopeOverride) => void;
   clearHistoryScope: (tabId: string) => void;
   getNodeDiffStatusMap: () => Record<string, DiffType>;
   getOverlayParentChildDiffs: () => Record<string, OverlayParentChildDiff>;
@@ -92,6 +96,7 @@ export const useVersioningStore = create<VersioningState>()(
     (set, get) => ({
       isOpen: false,
       historyScopeByTab: {},
+      scopeOverrideByTab: {},
       selectedCommitId: null,
       currentCommitId: null,
       diffResult: null,
@@ -142,6 +147,13 @@ export const useVersioningStore = create<VersioningState>()(
             },
           };
         }),
+      setScopeOverride: (tabId, override) =>
+        set((state) => ({
+          scopeOverrideByTab: {
+            ...state.scopeOverrideByTab,
+            [tabId]: override,
+          },
+        })),
       clearHistoryScope: (tabId) =>
         set((state) => {
           if (!(tabId in state.historyScopeByTab)) {
