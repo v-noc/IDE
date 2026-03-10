@@ -1,6 +1,6 @@
 import { versioningApi } from "@/services/versioning";
 import type { DiffResult } from "../types/diff";
-import { parseVersioningDiff } from "../utils/parseVersioningDiff";
+import { parseVersioningDiff } from "@/features/Dashboard/features/Versioning/utils/parseVersioningDiff";
 
 export interface FetchParsedDiffInput {
   projectId: string;

@@ -57,7 +57,11 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
 
   useEffect(() => {
     const targetCommitId = checkedOutCommitId ?? headCommitId;
-    if (!compareToCommitId || !targetCommitId || compareToCommitId === targetCommitId) {
+    if (
+      !compareToCommitId ||
+      !targetCommitId ||
+      compareToCommitId === targetCommitId
+    ) {
       clearComparisonState();
       return;
     }
@@ -68,14 +72,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
       beforeCommitId: compareToCommitId,
       afterCommitId: targetCommitId,
     });
-  }, [
-    checkedOutCommitId,
-    headCommitId,
-    compareToCommitId,
-    projectData?.id,
-    clearComparisonState,
-    loadParsedDiff,
-  ]);
+  }, [checkedOutCommitId, headCommitId, compareToCommitId, projectData?.id]);
 
   const displayCommits = commits.map(mapCommitToDisplay);
   const hasNextPage = commits.length === COMMITS_PER_PAGE;
@@ -111,9 +108,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[140px]">
-              <DropdownMenuItem
-                onClick={() => setScopeOverride(tabId, "item")}
-              >
+              <DropdownMenuItem onClick={() => setScopeOverride(tabId, "item")}>
                 Selected item
               </DropdownMenuItem>
               <DropdownMenuItem

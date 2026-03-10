@@ -176,6 +176,6 @@ export const NodeCodeView = memo(function NodeCodeView({
           )}
         </Suspense>
       </div>
-    </div >
+    </div>
   );
 });

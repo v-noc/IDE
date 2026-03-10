@@ -54,6 +54,7 @@ function applyPositionChanges(
   changes: Array<{ field: string; oldValue: unknown; newValue: unknown }> | undefined,
   phase: "before" | "after",
 ): CodePosition | null {
+
   const relevant = (changes ?? []).filter((change) => POSITION_FIELDS.has(change.field));
   if (!base && relevant.length === 0) return null;
 
@@ -126,7 +127,6 @@ export function useCodeDiff({
   position,
 }: UseCodeDiffParams): UseCodeDiffResult {
   const {
-    isOpen,
     checkedOutCommitId,
     compareToCommitId,
     diffResult,
@@ -135,7 +135,7 @@ export function useCodeDiff({
   } = useVersioningStore();
 
   return useMemo(() => {
-    const showDiff = Boolean(isOpen && compareToCommitId && (checkedOutCommitId || diffResult));
+    const showDiff = Boolean(compareToCommitId && (checkedOutCommitId || diffResult));
     if (!showDiff) {
       return {
         showDiff: false,
@@ -189,6 +189,7 @@ export function useCodeDiff({
     if (nodeType === "function" || nodeType === "class") {
       const nodeDiff = diffResult.nodeDiffs.find((entry) => entry.nodeId === elementId);
       const basePosition = asCodePosition(position);
+
       const beforePosition = applyPositionChanges(
         basePosition,
         nodeDiff?.changes,
@@ -218,7 +219,6 @@ export function useCodeDiff({
     diffResult,
     elementId,
     isLoadingDiff,
-    isOpen,
     nodeType,
     position,
     checkedOutCommitId,
