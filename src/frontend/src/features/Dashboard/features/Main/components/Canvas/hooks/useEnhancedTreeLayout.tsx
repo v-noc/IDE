@@ -119,8 +119,7 @@ export const useEnhancedTreeLayout = ({
           manuallyCreated:
             (node as unknown as { manually_created?: boolean })
               .manually_created ?? false,
-          diffStatus:
-            (node as unknown as { diff_status?: string }).diff_status ?? null,
+          diffStatus: (node as unknown as { status?: string }).status ?? null,
         } as EnhancedNodeData,
         type: "enhanced",
         sourcePosition: Position.Right,
@@ -197,10 +196,6 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [
-    centerNode,
-    expandedNodeIds,
-    metadataMap,
-  ]);
+  }, [centerNode, expandedNodeIds, metadataMap]);
   return { initialNodes, initialEdges };
 };

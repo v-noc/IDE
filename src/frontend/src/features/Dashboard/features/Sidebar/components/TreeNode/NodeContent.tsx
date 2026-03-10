@@ -35,7 +35,7 @@ export const NodeContent = memo(function NodeContent({
   onSelect,
 }: NodeContentProps) {
   const style = useNodeStyle(node);
-  const diffStatus = node.diff_status ?? "none";
+  const diffStatus = node.status ?? "none";
   const diffClass =
     diffStatus === "added"
       ? "border-emerald-600/90 bg-emerald-600 text-white"

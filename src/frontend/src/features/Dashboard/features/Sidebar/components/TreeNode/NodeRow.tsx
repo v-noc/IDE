@@ -29,7 +29,7 @@ export const NodeRow = memo(function NodeRow({
   onToggle,
   onClick,
 }: NodeRowProps) {
-  const diffStatus = node.diff_status ?? "none";
+  const diffStatus = node.status ?? "none";
   const iconName =
     node.icon ||
     getIcons(

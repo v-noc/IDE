@@ -21,13 +21,6 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const historyScope = useVersioningStore((s) => s.historyScopeByTab[tabId]);
   const scopeOverride = useVersioningStore((s) => s.scopeOverrideByTab[tabId]);
   const setScopeOverride = useVersioningStore((s) => s.setScopeOverride);
-  const headCommitId = useVersioningStore((s) => s.headCommitId);
-  const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
-  const compareToCommitId = useVersioningStore((s) => s.compareToCommitId);
-  const loadParsedDiff = useVersioningStore((s) => s.loadParsedDiff);
-  const clearComparisonState = useVersioningStore(
-    (s) => s.clearComparisonState,
-  );
   const { projectData, selectedNode, secondarySelectedNode } =
     useProjectStore();
 
@@ -54,25 +47,6 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
     start: page * COMMITS_PER_PAGE,
     count: COMMITS_PER_PAGE,
   });
-
-  useEffect(() => {
-    const targetCommitId = checkedOutCommitId ?? headCommitId;
-    if (
-      !compareToCommitId ||
-      !targetCommitId ||
-      compareToCommitId === targetCommitId
-    ) {
-      clearComparisonState();
-      return;
-    }
-    if (!projectData?.id) return;
-
-    void loadParsedDiff({
-      projectId: projectData.id,
-      beforeCommitId: compareToCommitId,
-      afterCommitId: targetCommitId,
-    });
-  }, [checkedOutCommitId, headCommitId, compareToCommitId, projectData?.id]);
 
   const displayCommits = commits.map(mapCommitToDisplay);
   const hasNextPage = commits.length === COMMITS_PER_PAGE;

@@ -5,7 +5,6 @@ import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/us
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
-import { applyNodeDiffStatus } from "@/features/Dashboard/features/Versioning/utils/applyNodeDiffStatus";
 import { useTreeFilter } from "./useTreeFilter";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 
@@ -21,7 +20,6 @@ export function useSidebarData() {
   const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
   const headCommitId = useVersioningStore((s) => s.headCommitId);
   const setHeadCommitId = useVersioningStore((s) => s.setHeadCommitId);
-  const diffResult = useVersioningStore((s) => s.diffResult);
   const projectKey = projectId ? `ProjectSchema/${projectId}` : "";
 
   const { data, isLoading, isSuccess } = useGetProjectTreeWithKeyProject({
@@ -48,15 +46,9 @@ export function useSidebarData() {
 
   useEffect(() => {
     if (data && isSuccess) {
-      const treeWithDiff = applyNodeDiffStatus(
-        data as ProjectNodeTree,
-        diffResult,
-      );
-      if (treeWithDiff) {
-        syncProjectData(treeWithDiff);
-      }
+      syncProjectData(data as ProjectNodeTree);
     }
-  }, [data, isSuccess, diffResult]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tree Filtering
   const { filteredNodes, searchQuery, setSearchQuery } = useTreeFilter(
