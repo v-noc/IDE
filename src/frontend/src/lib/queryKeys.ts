@@ -3,8 +3,8 @@ const queryKeys = {
     all: ['projects'] as const,
     list: () => [...queryKeys.projects.all, 'list'] as const,
     detail: (id: string) => [...queryKeys.projects.all, 'detail', id] as const,
-    tree: (id: string, ref?: string | null) =>
-      [...queryKeys.projects.all, 'tree', id, ref ?? ''] as const,
+    tree: (id: string, branch?: string | null, ref?: string | null) =>
+      [...queryKeys.projects.all, 'tree', id, branch ?? 'main', ref ?? ''] as const,
   },
   code: {
     all: ['code'] as const,
@@ -29,11 +29,42 @@ const queryKeys = {
   },
   versioning: {
     all: ['versioning'] as const,
-    branches: (projectId: string) => [...queryKeys.versioning.all, 'branches', projectId] as const,
-    commits: (projectId: string, nodeId: string, start?: number, count?: number) =>
-      [...queryKeys.versioning.all, 'commits', projectId, nodeId, start ?? 0, count ?? 10] as const,
-    diff: (projectId: string, afterCommitId: string, beforeCommitId: string) =>
-      [...queryKeys.versioning.all, 'diff', projectId, afterCommitId, beforeCommitId] as const,
+    branches: (projectId: string, branch?: string | null, ref?: string | null) =>
+      [...queryKeys.versioning.all, 'branches', projectId, branch ?? 'main', ref ?? ''] as const,
+    commits: (
+      projectId: string,
+      nodeId: string,
+      start?: number,
+      count?: number,
+      branch?: string | null,
+      ref?: string | null,
+    ) =>
+      [
+        ...queryKeys.versioning.all,
+        'commits',
+        projectId,
+        nodeId,
+        start ?? 0,
+        count ?? 10,
+        branch ?? 'main',
+        ref ?? '',
+      ] as const,
+    diff: (
+      projectId: string,
+      afterCommitId: string,
+      beforeCommitId: string,
+      branch?: string | null,
+      ref?: string | null,
+    ) =>
+      [
+        ...queryKeys.versioning.all,
+        'diff',
+        projectId,
+        afterCommitId,
+        beforeCommitId,
+        branch ?? 'main',
+        ref ?? '',
+      ] as const,
   },
 } as const;
 

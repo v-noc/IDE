@@ -128,6 +128,7 @@ export interface FolderNodeTree extends FolderNode {
 }
 
 export interface ProjectNodeTree extends ProjectNode {
+  version?: string | null;
   children: (FolderNode | FileNodeTree | GroupNodeTree)[]
 }
 

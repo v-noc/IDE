@@ -59,22 +59,22 @@ class CodeElementService():
 
         abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
         content_id = f"CodeContentSchema/{parent_file.id.replace('/', '_')}"
+        # try:
+        #     code = await extract_code_from_file(abs_path, code_position)
+
+        # except OSError:
+        # File not found on disk; fall back to CodeContent in DB
+
         try:
-            code = await extract_code_from_file(abs_path, code_position)
+            content_doc = await self.repos.client.get_document(content_id)
 
-        except OSError:
-            # File not found on disk; fall back to CodeContent in DB
-
-            try:
-                content_doc = await self.repos.client.get_document(content_id)
-
-            except Exception:
-                return None
-            if not content_doc or "content" not in content_doc:
-                return None
-            code = extract_code_from_content(
-                content_doc["content"], code_position
-            )
+        except Exception:
+            return None
+        if not content_doc or "content" not in content_doc:
+            return None
+        code = extract_code_from_content(
+            content_doc["content"], code_position
+        )
 
         result = {
             "id": code_element.id,

@@ -25,46 +25,59 @@ export interface Branch {
 }
 
 export type TerminusJsonDiff = Record<string, unknown> | unknown[];
+type VersioningRequestContext = {
+  branch?: string;
+  ref?: string;
+};
 
 export const versioningApi = {
-  getBranches: (projectId: string): Promise<Branch[]> => {
+  getBranches: (
+    projectId: string,
+    context?: VersioningRequestContext
+  ): Promise<Branch[]> => {
     const qs = buildQueryString({ project_id: projectId });
-    return api(`${API_ROUTES.VERSIONING}/branches${qs}`);
+    return api(`${API_ROUTES.VERSIONING}/branches${qs}`, context);
   },
 
-  createBranch: (projectId: string, name: string): Promise<{ ok: boolean }> => {
+  createBranch: (
+    projectId: string,
+    name: string,
+    context?: VersioningRequestContext
+  ): Promise<{ ok: boolean }> => {
     const qs = buildQueryString({ project_id: projectId, name });
     return api(`${API_ROUTES.VERSIONING}/branches${qs}`, {
       method: "POST",
       body: {},
+      ...context,
     });
   },
 
   getCommits: (
     projectId: string,
     nodeId: string,
-    options?: { start?: number; count?: number }
+    options?: { start?: number; count?: number; branch?: string; ref?: string }
   ): Promise<Commit[]> => {
-    const { start = 0, count = 10 } = options ?? {};
+    const { start = 0, count = 10, branch, ref } = options ?? {};
     const qs = buildQueryString({
       project_id: projectId,
       node_id: nodeId,
       start,
       count,
     });
-    return api(`${API_ROUTES.VERSIONING}/commits${qs}`);
+    return api(`${API_ROUTES.VERSIONING}/commits${qs}`, { branch, ref });
   },
 
   getDiff: (
     projectId: string,
     afterCommitId: string,
-    beforeCommitId: string
+    beforeCommitId: string,
+    context?: VersioningRequestContext
   ): Promise<TerminusJsonDiff> => {
     const qs = buildQueryString({
       project_id: projectId,
       after_commit_id: afterCommitId,
       before_commit_id: beforeCommitId,
     });
-    return api(`${API_ROUTES.VERSIONING}/commits/diff${qs}`);
+    return api(`${API_ROUTES.VERSIONING}/commits/diff${qs}`, context);
   },
 };

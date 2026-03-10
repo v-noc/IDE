@@ -103,12 +103,13 @@ async def get_project(
 
     watcher_service.start_watching(project_node)
 
-    children = await project_service.get_children()
+    children, version = await project_service.get_children(include_commit_id=True)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
+    project_tree = ProjectTreeNode(
+        **project_node.model_dump(), children=tree, version=version)
     return project_tree
 
 

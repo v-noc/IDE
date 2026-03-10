@@ -1,3 +1,5 @@
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 class ApiError extends Error {
@@ -12,17 +14,36 @@ class ApiError extends Error {
 }
 
 type JsonRequestInit = Omit<RequestInit, "body"> & { body?: unknown };
+type ApiRequestOptions = JsonRequestInit & {
+  branch?: string;
+  ref?: string;
+};
 
 async function apiClient<T>(
   endpoint: string,
-  options: JsonRequestInit = {}
+  options: ApiRequestOptions = {}
 ): Promise<T> {
-  const { headers, body, ...customConfig } = options as JsonRequestInit;
+  const {
+    headers,
+    body,
+    branch: branchOverride,
+    ref: refOverride,
+    ...customConfig
+  } = options as ApiRequestOptions;
+  const state = useVersioningStore.getState();
+  const branch = branchOverride ?? state.branch;
+  const ref = refOverride ?? state.checkedOutCommitId ?? undefined;
+  let finalEndpoint = endpoint;
+  if (ref) {
+    const separator = finalEndpoint.includes("?") ? "&" : "?";
+    finalEndpoint = `${finalEndpoint}${separator}ref=${encodeURIComponent(ref)}`;
+  }
 
   const config: RequestInit = {
     method: body ? 'POST' : 'GET',
     headers: {
       'Content-Type': 'application/json',
+      ...(branch ? { "X-Vnoc-Branch": branch } : {}),
       ...headers,
     },
     ...customConfig,
@@ -32,7 +53,7 @@ async function apiClient<T>(
     config.body = typeof body === 'string' ? body : JSON.stringify(body);
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  const response = await fetch(`${API_BASE_URL}${finalEndpoint}`, config);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));

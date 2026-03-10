@@ -45,6 +45,8 @@ class FolderTreeNode(FolderNode):
 
 
 class ProjectTreeNode(ProjectNode):
+    version: Optional[str] = Field(
+        default=None, description="The version of the project.")
     children: List["FolderTreeNode | FileTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Project children.")
 

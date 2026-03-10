@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useEffectEvent } from "react";
+import React, { useState, useEffect } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitHistory from "./CommitHistory";
@@ -21,9 +21,9 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const historyScope = useVersioningStore((s) => s.historyScopeByTab[tabId]);
   const scopeOverride = useVersioningStore((s) => s.scopeOverrideByTab[tabId]);
   const setScopeOverride = useVersioningStore((s) => s.setScopeOverride);
-  const selectedCommitId = useVersioningStore((s) => s.selectedCommitId);
-  const currentCommitId = useVersioningStore((s) => s.currentCommitId);
-  const setCurrentCommitId = useVersioningStore((s) => s.setCurrentCommitId);
+  const headCommitId = useVersioningStore((s) => s.headCommitId);
+  const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareToCommitId = useVersioningStore((s) => s.compareToCommitId);
   const loadParsedDiff = useVersioningStore((s) => s.loadParsedDiff);
   const clearComparisonState = useVersioningStore(
     (s) => s.clearComparisonState,
@@ -42,23 +42,8 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
       : itemScopeId;
   const [page, setPage] = useState(0);
 
-  const resetComparisonForScope = useEffectEvent(() => {
-    const state = useVersioningStore.getState();
-    if (state.currentCommitId !== null) {
-      state.setCurrentCommitId(null);
-    }
-    if (state.selectedCommitId !== null) {
-      state.setSelectedCommit(null);
-    }
-    state.clearComparisonState();
-  });
-
   useEffect(() => {
     setPage(0);
-  }, [projectData?.id, historyNodeId]);
-
-  useEffect(() => {
-    resetComparisonForScope();
   }, [projectData?.id, historyNodeId]);
 
   const {
@@ -71,40 +56,26 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   });
 
   useEffect(() => {
-    if (page !== 0) return;
-    if (isLoading) return;
-    if (currentCommitId) return;
-    if (commits.length === 0) return;
-    setCurrentCommitId(commits[0].id);
-  }, [commits, currentCommitId, isLoading, page, setCurrentCommitId]);
-
-  useEffect(() => {
-    if (!selectedCommitId) {
+    const targetCommitId = checkedOutCommitId ?? headCommitId;
+    if (!compareToCommitId || !targetCommitId || compareToCommitId === targetCommitId) {
       clearComparisonState();
       return;
     }
     if (!projectData?.id) return;
 
-    const selectedIndex = commits.findIndex(
-      (commit) => commit.id === selectedCommitId,
-    );
-    if (selectedIndex < 0) {
-      clearComparisonState();
-      return;
-    }
-
-    const previousCommitId = commits[selectedIndex + 1]?.id ?? null;
-    if (!previousCommitId) {
-      clearComparisonState();
-      return;
-    }
-
     void loadParsedDiff({
       projectId: projectData.id,
-      beforeCommitId: previousCommitId,
-      afterCommitId: selectedCommitId,
+      beforeCommitId: compareToCommitId,
+      afterCommitId: targetCommitId,
     });
-  }, [projectData?.id, commits, selectedCommitId]);
+  }, [
+    checkedOutCommitId,
+    headCommitId,
+    compareToCommitId,
+    projectData?.id,
+    clearComparisonState,
+    loadParsedDiff,
+  ]);
 
   const displayCommits = commits.map(mapCommitToDisplay);
   const hasNextPage = commits.length === COMMITS_PER_PAGE;

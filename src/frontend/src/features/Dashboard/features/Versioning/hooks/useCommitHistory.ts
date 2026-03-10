@@ -5,15 +5,22 @@ export type { Commit, TerminusJsonDiff } from "@/services/versioning";
 export function useCommitHistory(
   projectId: string | undefined,
   nodeId: string | undefined,
-  options?: { start?: number; count?: number; enabled?: boolean }
+  options?: {
+    start?: number;
+    count?: number;
+    enabled?: boolean;
+    branch?: string;
+    ref?: string;
+  }
 ) {
   return useCommits(projectId, nodeId, options);
 }
 
 export function useSelectedCommitDiff(
   projectId: string | undefined,
-  selectedCommitId: string | null,
-  currentCommitId: string | null
+  targetCommitId: string | null,
+  compareToCommitId: string | null,
+  options?: { branch?: string; ref?: string }
 ) {
-  return useCommitDiff(projectId, currentCommitId, selectedCommitId);
+  return useCommitDiff(projectId, targetCommitId, compareToCommitId, options);
 }

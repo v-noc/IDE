@@ -66,16 +66,20 @@ export type ScopeOverride = "item" | "repository";
 
 interface VersioningState {
   isOpen: boolean;
+  branch: string;
   historyScopeByTab: Record<string, HistoryScope>;
   scopeOverrideByTab: Record<string, ScopeOverride>;
-  selectedCommitId: string | null;
-  currentCommitId: string | null;
+  headCommitId: string | null;
+  checkedOutCommitId: string | null;
+  compareToCommitId: string | null;
   diffResult: DiffResult | null;
   isLoadingDiff: boolean;
   diffError: string | null;
   activeDiffRequestId: number;
-  setCurrentCommitId: (id: string | null) => void;
-  setSelectedCommit: (id: string | null) => void;
+  setBranch: (branch: string) => void;
+  setHeadCommitId: (id: string | null) => void;
+  setCheckedOutCommitId: (id: string | null) => void;
+  setCompareToCommitId: (id: string | null) => void;
   loadParsedDiff: (input: {
     projectId: string;
     beforeCommitId: string;
@@ -95,41 +99,34 @@ export const useVersioningStore = create<VersioningState>()(
   devtools(
     (set, get) => ({
       isOpen: false,
+      branch: "main",
       historyScopeByTab: {},
       scopeOverrideByTab: {},
-      selectedCommitId: null,
-      currentCommitId: null,
+      headCommitId: null,
+      checkedOutCommitId: null,
+      compareToCommitId: null,
       diffResult: null,
       isLoadingDiff: false,
       diffError: null,
       activeDiffRequestId: 0,
-      setCurrentCommitId: (id) =>
-        set((state) => (state.currentCommitId === id ? state : { currentCommitId: id })),
+      setBranch: (branch) =>
+        set((state) => (state.branch === branch ? state : { branch })),
+      setHeadCommitId: (id) =>
+        set((state) => (state.headCommitId === id ? state : { headCommitId: id })),
+      setCheckedOutCommitId: (id) =>
+        set((state) =>
+          state.checkedOutCommitId === id ? state : { checkedOutCommitId: id }
+        ),
+      setCompareToCommitId: (id) =>
+        set((state) => (state.compareToCommitId === id ? state : { compareToCommitId: id })),
       togglePanel: () =>
         set((state) => {
           const nextOpen = !state.isOpen;
           if (nextOpen) return { isOpen: true };
-          return {
-            isOpen: false,
-            selectedCommitId: null,
-            diffResult: null,
-            isLoadingDiff: false,
-            diffError: null,
-            activeDiffRequestId: state.activeDiffRequestId + 1,
-          };
+          return { isOpen: false };
         }),
       setOpen: (open) =>
-        set((state) => {
-          if (open) return { isOpen: true };
-          return {
-            isOpen: false,
-            selectedCommitId: null,
-            diffResult: null,
-            isLoadingDiff: false,
-            diffError: null,
-            activeDiffRequestId: state.activeDiffRequestId + 1,
-          };
-        }),
+        set(() => ({ isOpen: open })),
       setHistoryScope: (tabId, scope) =>
         set((state) => {
           const current = state.historyScopeByTab[tabId];
@@ -163,12 +160,7 @@ export const useVersioningStore = create<VersioningState>()(
           delete nextScopes[tabId];
           return { historyScopeByTab: nextScopes };
         }),
-      setSelectedCommit: (id) =>
-        set((state) => (state.selectedCommitId === id ? state : { selectedCommitId: id })),
       loadParsedDiff: async ({ projectId, beforeCommitId, afterCommitId }) => {
-        if (!get().isOpen) {
-          return;
-        }
         if (!projectId || !beforeCommitId || !afterCommitId || beforeCommitId === afterCommitId) {
           set({ diffResult: null, isLoadingDiff: false, diffError: null });
           return;
@@ -204,7 +196,7 @@ export const useVersioningStore = create<VersioningState>()(
       clearComparisonState: () =>
         set((state) => {
           if (
-            state.selectedCommitId == null &&
+            state.compareToCommitId == null &&
             state.diffResult == null &&
             state.isLoadingDiff === false &&
             state.diffError == null
@@ -212,7 +204,7 @@ export const useVersioningStore = create<VersioningState>()(
             return state;
           }
           return {
-            selectedCommitId: null,
+            compareToCommitId: null,
             diffResult: null,
             isLoadingDiff: false,
             diffError: null,

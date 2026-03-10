@@ -19,6 +19,7 @@ import { SidebarDialogs } from "@/features/Dashboard/components/SidebarDialogs";
 import VersioningPanel from "@/features/Dashboard/features/Versioning/components/VersioningPanel";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import AgentOverlay from "@/features/Dashboard/features/Agent";
+import VersioningStatusBanner from "@/features/Dashboard/features/Versioning/components/VersioningStatusBanner";
 
 /**
  * Dashboard Page - Entry point for the IDE dashboard.
@@ -52,20 +53,25 @@ const Dashboard = () => {
     <ResizablePanelGroup direction="horizontal">
       <Layout
         main={
-          <RightSidebar>
-            {tabStack.map((tab) => (
-              <div
-                key={tab.id}
-                className={cn(
-                  "relative h-full w-full",
-                  tab.id !== activeTabId && "hidden",
-                )}
-              >
-                <Workspace tabId={tab.id} />
-                <AgentOverlay />
-              </div>
-            ))}
-          </RightSidebar>
+          <div className="flex h-full min-h-0 w-full flex-col">
+            <VersioningStatusBanner />
+            <div className="min-h-0 flex-1">
+              <RightSidebar>
+                {tabStack.map((tab) => (
+                  <div
+                    key={tab.id}
+                    className={cn(
+                      "relative h-full w-full",
+                      tab.id !== activeTabId && "hidden",
+                    )}
+                  >
+                    <Workspace tabId={tab.id} />
+                    <AgentOverlay />
+                  </div>
+                ))}
+              </RightSidebar>
+            </div>
+          </div>
         }
         navbar={<Navbar projectId={projectId} />}
         leftSidebar={<SideBar />}

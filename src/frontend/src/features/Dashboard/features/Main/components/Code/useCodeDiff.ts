@@ -125,11 +125,17 @@ export function useCodeDiff({
   contentId,
   position,
 }: UseCodeDiffParams): UseCodeDiffResult {
-  const { isOpen, selectedCommitId, diffResult, isLoadingDiff, diffError } =
-    useVersioningStore();
+  const {
+    isOpen,
+    checkedOutCommitId,
+    compareToCommitId,
+    diffResult,
+    isLoadingDiff,
+    diffError,
+  } = useVersioningStore();
 
   return useMemo(() => {
-    const showDiff = Boolean(isOpen && selectedCommitId);
+    const showDiff = Boolean(isOpen && compareToCommitId && (checkedOutCommitId || diffResult));
     if (!showDiff) {
       return {
         showDiff: false,
@@ -215,6 +221,7 @@ export function useCodeDiff({
     isOpen,
     nodeType,
     position,
-    selectedCommitId,
+    checkedOutCommitId,
+    compareToCommitId,
   ]);
 }

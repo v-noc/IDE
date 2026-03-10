@@ -132,7 +132,7 @@ class ProjectRepo():
             updated_at=old_project["updated_at"],
         )
 
-    async def get_children(self, exclude_types: list[str] = []):
+    async def get_children(self, exclude_types: list[str] = [], include_commit_id: bool = False):
         inlcude_type = [FileSchema.__name__, FolderSchema.__name__, FunctionSchema.__name__, ClassSchema.__name__,
                         CallSchema.__name__, CodeElementGroupSchema.__name__, CallGroupSchema.__name__, StructureGroupSchema.__name__]
         filtered_types = set(inlcude_type) - set(exclude_types)
@@ -146,13 +146,17 @@ class ProjectRepo():
                         f"@schema:{t}" for t in filtered_types]))
 
             )
-            result = await self.client.query(query)
+
+            result, version = await self.client.query(query, get_data_version=True)
 
             children = []
             for doc in [row["doc"] for row in result["bindings"]]:
                 if doc.get("@type") == "FolderSchema" and doc.get("is_root") == "true":
                     continue
                 children.append(parse_structure_child(doc))
+
+            if include_commit_id:
+                return children, version
 
             return children
         except Exception as e:

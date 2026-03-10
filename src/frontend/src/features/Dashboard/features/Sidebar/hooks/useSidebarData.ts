@@ -9,44 +9,23 @@ import { applyNodeDiffStatus } from "@/features/Dashboard/features/Versioning/ut
 import { useTreeFilter } from "./useTreeFilter";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 
-const STRUCTURAL_NODE_TYPES = new Set([
-  "project",
-  "folder",
-  "file",
-  "class",
-  "function",
-  "call",
-  "group",
-]);
-
 export function useSidebarData() {
   const { projectId } = useParams();
 
   const activeTabId = useTabStore((s) => s.activeTabId);
-  const selectedNodeByTab = useProjectStore((s) => s.selectedNode);
-  const secondarySelectedNodeByTab = useProjectStore((s) => s.secondarySelectedNode);
   const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
   const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
   const setProjectData = useProjectStore((s) => s.setProjectData);
   const rawProjectData = useProjectStore((s) => s.projectData);
 
-  const isVersioningOpen = useVersioningStore((s) => s.isOpen);
-  const selectedCommitId = useVersioningStore((s) => s.selectedCommitId);
-  const historyScopeByTab = useVersioningStore((s) => s.historyScopeByTab);
+  const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
+  const headCommitId = useVersioningStore((s) => s.headCommitId);
+  const setHeadCommitId = useVersioningStore((s) => s.setHeadCommitId);
   const diffResult = useVersioningStore((s) => s.diffResult);
-  const activeScope = historyScopeByTab[activeTabId];
-  const activeNode =
-    secondarySelectedNodeByTab[activeTabId] ?? selectedNodeByTab[activeTabId];
-  const isStructuralScope =
-    activeScope?.scopeType === "canvas" &&
-    activeNode?.node_type != null &&
-    STRUCTURAL_NODE_TYPES.has(activeNode.node_type);
-  const commitRef = isVersioningOpen && isStructuralScope ? selectedCommitId : undefined;
-  const projectKey = "ProjectSchema/" + projectId || "";
+  const projectKey = projectId ? `ProjectSchema/${projectId}` : "";
 
   const { data, isLoading, isSuccess } = useGetProjectTreeWithKeyProject({
     key: projectKey,
-    ref: commitRef ?? undefined,
   });
 
   /*
@@ -62,16 +41,22 @@ export function useSidebarData() {
   });
 
   useEffect(() => {
+    if (!checkedOutCommitId && data?.version && headCommitId !== data.version) {
+      setHeadCommitId(data.version);
+    }
+  }, [checkedOutCommitId, data?.version, headCommitId, setHeadCommitId]);
+
+  useEffect(() => {
     if (data && isSuccess) {
       const treeWithDiff = applyNodeDiffStatus(
         data as ProjectNodeTree,
-        isVersioningOpen ? diffResult : null,
+        diffResult,
       );
       if (treeWithDiff) {
         syncProjectData(treeWithDiff);
       }
     }
-  }, [data, isSuccess, isVersioningOpen, diffResult]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, isSuccess, diffResult]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tree Filtering
   const { filteredNodes, searchQuery, setSearchQuery } = useTreeFilter(
