@@ -1,12 +1,22 @@
 import {
+  ChevronDown,
   GitBranch,
   GitCommit,
+  GitMerge,
   ArrowLeftRight,
   X,
 } from "lucide-react";
 import { useVersioningBanner } from "../hooks/useVersioningBanner";
 import { Button } from "@/components/ui/button";
 import { VersioningStatusActionsMenu } from "./VersioningStatusActionsMenu";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useVersioningBranches } from "../hooks/useVersioningBranches";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const VersioningStatusBanner = () => {
   const {
@@ -16,17 +26,32 @@ const VersioningStatusBanner = () => {
     targetCommitId,
     isVisible,
     isComparing,
+    isMergeMode,
+    mergeTargetBranch,
     showAffectedOnly,
     shortCommit,
     swapCompare,
     clearCompare,
     closeBanner,
+    setMergeTargetBranch,
+    closeMergeMode,
     setShowAffectedOnly,
   } = useVersioningBanner();
+  const projectId = useProjectStore((s) => s.projectData?.id);
+  const { availableBranches, isLoadingBranches } = useVersioningBranches(projectId);
+  const mergeCandidates = availableBranches.filter(
+    (candidate) => candidate.name !== branch,
+  );
+  const selectedMergeBranch = mergeCandidates.some(
+    (candidate) => candidate.name === mergeTargetBranch,
+  )
+    ? mergeTargetBranch
+    : null;
 
   if (!isVisible) return null;
   // Dynamic status text logic
   const getStatusText = () => {
+    if (isMergeMode) return "Preparing branch merge";
     if (isComparing) return "Comparing versions";
     if (checkedOutCommitId) return "Viewing historical snapshot"; // Your "temporary" text
     return "Project is live";
@@ -99,20 +124,74 @@ const VersioningStatusBanner = () => {
             </div>
           </div>
         )}
+        {isMergeMode && (
+          <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 sm:block hidden">
+              Merge
+            </span>
+            <div className="flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50/30 p-0.5 pr-1 shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 text-slate-700">
+                <GitBranch className="size-3 text-emerald-500" />
+                <span className="max-w-[120px] truncate">{branch}</span>
+              </span>
+              <span className="px-1 text-emerald-500">into</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 text-slate-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={isLoadingBranches || mergeCandidates.length === 0}
+                  >
+                    <GitMerge className="size-3 text-emerald-500" />
+                    <span className="max-w-[120px] truncate">
+                      {selectedMergeBranch ?? "Select branch"}
+                    </span>
+                    <ChevronDown className="size-3 text-emerald-500" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[200px]">
+                  {mergeCandidates.length === 0 ? (
+                    <DropdownMenuItem disabled>No branches available</DropdownMenuItem>
+                  ) : (
+                    mergeCandidates.map((candidate) => (
+                      <DropdownMenuItem
+                        key={candidate.id}
+                        onClick={() => setMergeTargetBranch(candidate.name)}
+                        className="gap-2"
+                      >
+                        <GitBranch className="size-4 opacity-70" />
+                        {candidate.name}
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <button
+                onClick={closeMergeMode}
+                className="ml-1 rounded-full p-0.5 hover:bg-emerald-100 text-emerald-500"
+                title="Close merge banner"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* RIGHT: Actions */}
       <div className="flex items-center justify-end gap-1">
-        <div className="mx-1 h-4 w-px bg-slate-200" />
-
-        <VersioningStatusActionsMenu
-          isComparing={isComparing}
-          hasCompareTo={Boolean(compareToCommitId)}
-          hasCheckedOutCommit={Boolean(checkedOutCommitId)}
-          showAffectedOnly={showAffectedOnly}
-          onToggleAffectedOnly={setShowAffectedOnly}
-          onFlipComparison={swapCompare}
-        />
+        {!isMergeMode && (
+          <>
+            <div className="mx-1 h-4 w-px bg-slate-200" />
+            <VersioningStatusActionsMenu
+              isComparing={isComparing}
+              hasCompareTo={Boolean(compareToCommitId)}
+              hasCheckedOutCommit={Boolean(checkedOutCommitId)}
+              showAffectedOnly={showAffectedOnly}
+              onToggleAffectedOnly={setShowAffectedOnly}
+              onFlipComparison={swapCompare}
+            />
+          </>
+        )}
 
         <Button
           variant="ghost"

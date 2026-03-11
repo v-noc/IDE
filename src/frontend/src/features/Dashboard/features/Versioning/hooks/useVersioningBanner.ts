@@ -13,6 +13,8 @@ export function useVersioningBanner() {
   const headCommitId = useVersioningStore((s) => s.headCommitId);
   const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
   const compareToCommitId = useVersioningStore((s) => s.compareToCommitId);
+  const isMergeMode = useVersioningStore((s) => s.isMergeMode);
+  const mergeTargetBranch = useVersioningStore((s) => s.mergeTargetBranch);
   const showAffectedOnly = useVersioningStore((s) => s.showAffectedOnly);
 
   const setCheckedOutCommitId = useVersioningStore((s) => s.setCheckedOutCommitId);
@@ -20,10 +22,12 @@ export function useVersioningBanner() {
   const clearComparisonState = useVersioningStore(
     (s) => s.clearComparisonState,
   );
+  const setMergeTargetBranch = useVersioningStore((s) => s.setMergeTargetBranch);
+  const closeMergeMode = useVersioningStore((s) => s.closeMergeMode);
   const setShowAffectedOnly = useVersioningStore((s) => s.setShowAffectedOnly);
 
   const targetCommitId = checkedOutCommitId ?? headCommitId;
-  const isVisible = Boolean(checkedOutCommitId || compareToCommitId);
+  const isVisible = Boolean(checkedOutCommitId || compareToCommitId || isMergeMode);
   const isComparing = Boolean(compareToCommitId && targetCommitId);
 
   const swapCompare = useCallback(() => {
@@ -39,14 +43,17 @@ export function useVersioningBanner() {
 
   const closeBanner = useCallback(() => {
     setCheckedOutCommitId(null);
+    closeMergeMode();
     clearComparisonState();
-  }, [setCheckedOutCommitId, clearComparisonState]);
+  }, [setCheckedOutCommitId, clearComparisonState, closeMergeMode]);
 
   return {
     branch,
     headCommitId,
     checkedOutCommitId,
     compareToCommitId,
+    isMergeMode,
+    mergeTargetBranch,
     showAffectedOnly,
     targetCommitId,
     isVisible,
@@ -55,6 +62,8 @@ export function useVersioningBanner() {
     swapCompare,
     clearCompare,
     closeBanner,
+    setMergeTargetBranch,
+    closeMergeMode,
     setShowAffectedOnly,
   };
 }

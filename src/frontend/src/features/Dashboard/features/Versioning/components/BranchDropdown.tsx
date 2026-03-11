@@ -48,7 +48,7 @@ const BranchDropdown: React.FC<BranchDropdownProps> = ({
           disabled={isLoading}
         >
           <GitBranch className="size-4 shrink-0 text-slate-600" />
-          <span className="min-w-0 flex-1 truncate text-left text-sm">
+          <span className="min-w-0 flex-1 truncate text-left text-xs">
             {currentBranch}
           </span>
           <ChevronDown className="size-4 shrink-0 text-slate-500" />

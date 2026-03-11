@@ -31,6 +31,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const historyScope = useVersioningStore((s) => s.historyScopeByTab[tabId]);
   const scopeOverride = useVersioningStore((s) => s.scopeOverrideByTab[tabId]);
   const setScopeOverride = useVersioningStore((s) => s.setScopeOverride);
+  const openMergeMode = useVersioningStore((s) => s.openMergeMode);
   const { projectData, selectedNode, secondarySelectedNode } =
     useProjectStore();
 
@@ -100,16 +101,21 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
               currentBranch={currentBranch}
               onSelectBranch={switchBranch}
               onNewBranch={() => setIsCreateBranchOpen(true)}
-              onMergeBranches={() => {}}
+              onMergeBranches={() => {
+                const firstCandidate = availableBranches.find(
+                  (candidate) => candidate.name !== currentBranch,
+                );
+                openMergeMode(firstCandidate?.name ?? null);
+              }}
               isLoading={isLoadingBranches}
-              triggerClassName="h-7  justify-start gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-normal text-slate-800 hover:bg-slate-50"
+              triggerClassName="h-7 justify-start gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-normal text-sm text-slate-800 hover:bg-slate-50"
             />
           </div>
           <div className="flex min-w-0 items-center justify-between w-full gap-1">
             <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
               Current commit
             </span>
-            <span className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md border  border-slate-200 bg-white px-2.5 font-mono text-sm text-slate-700">
+            <span className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md border  border-slate-200 bg-white px-2.5 font-mono text-xs text-slate-700">
               <GitCommit className="size-3.5 shrink-0 text-slate-500" />
               {shortCommit(displayedCommitId)}
             </span>
@@ -123,9 +129,9 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8  justify-start gap-1.5 font-normal"
+                  className="h-7 justify-start gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-normal text-sm text-slate-800 hover:bg-slate-50"
                 >
-                  <span className="truncate">
+                  <span className="truncate text-xs">
                     {scopeOverride === "repository"
                       ? "Repository"
                       : "Selected item"}
