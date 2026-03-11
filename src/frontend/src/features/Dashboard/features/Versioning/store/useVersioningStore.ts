@@ -76,6 +76,7 @@ interface VersioningState {
   isLoadingDiff: boolean;
   diffError: string | null;
   activeDiffRequestId: number;
+  showAffectedOnly: boolean;
   setBranch: (branch: string) => void;
   setHeadCommitId: (id: string | null) => void;
   setCheckedOutCommitId: (id: string | null) => void;
@@ -91,6 +92,7 @@ interface VersioningState {
   setHistoryScope: (tabId: string, scope: HistoryScope) => void;
   setScopeOverride: (tabId: string, override: ScopeOverride) => void;
   clearHistoryScope: (tabId: string) => void;
+  setShowAffectedOnly: (value: boolean) => void;
   getNodeDiffStatusMap: () => Record<string, DiffType>;
   getOverlayParentChildDiffs: () => Record<string, OverlayParentChildDiff>;
 }
@@ -109,6 +111,7 @@ export const useVersioningStore = create<VersioningState>()(
       isLoadingDiff: false,
       diffError: null,
       activeDiffRequestId: 0,
+      showAffectedOnly: false,
       setBranch: (branch) =>
         set((state) => (state.branch === branch ? state : { branch })),
       setHeadCommitId: (id) =>
@@ -160,6 +163,8 @@ export const useVersioningStore = create<VersioningState>()(
           delete nextScopes[tabId];
           return { historyScopeByTab: nextScopes };
         }),
+      setShowAffectedOnly: (value) =>
+        set((state) => (state.showAffectedOnly === value ? state : { showAffectedOnly: value })),
       loadParsedDiff: async ({ projectId, beforeCommitId, afterCommitId }) => {
         if (!projectId || !beforeCommitId || !afterCommitId || beforeCommitId === afterCommitId) {
           set({ diffResult: null, isLoadingDiff: false, diffError: null });
@@ -208,6 +213,7 @@ export const useVersioningStore = create<VersioningState>()(
             diffResult: null,
             isLoadingDiff: false,
             diffError: null,
+            showAffectedOnly: false,
             activeDiffRequestId: state.activeDiffRequestId + 1,
           };
         }),

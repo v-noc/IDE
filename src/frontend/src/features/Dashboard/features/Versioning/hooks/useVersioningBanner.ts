@@ -12,12 +12,14 @@ export function useVersioningBanner() {
   const headCommitId = useVersioningStore((s) => s.headCommitId);
   const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
   const compareToCommitId = useVersioningStore((s) => s.compareToCommitId);
+  const showAffectedOnly = useVersioningStore((s) => s.showAffectedOnly);
 
   const setCheckedOutCommitId = useVersioningStore((s) => s.setCheckedOutCommitId);
   const setCompareToCommitId = useVersioningStore((s) => s.setCompareToCommitId);
   const clearComparisonState = useVersioningStore(
     (s) => s.clearComparisonState,
   );
+  const setShowAffectedOnly = useVersioningStore((s) => s.setShowAffectedOnly);
 
   const targetCommitId = checkedOutCommitId ?? headCommitId;
   const isVisible = Boolean(checkedOutCommitId || compareToCommitId);
@@ -32,7 +34,7 @@ export function useVersioningBanner() {
   const clearCompare = useCallback(() => {
 
     clearComparisonState();
-  }, [compareToCommitId]);
+  }, [clearComparisonState]);
 
   const closeBanner = useCallback(() => {
     setCheckedOutCommitId(null);
@@ -44,6 +46,7 @@ export function useVersioningBanner() {
     headCommitId,
     checkedOutCommitId,
     compareToCommitId,
+    showAffectedOnly,
     targetCommitId,
     isVisible,
     isComparing,
@@ -51,5 +54,6 @@ export function useVersioningBanner() {
     swapCompare,
     clearCompare,
     closeBanner,
+    setShowAffectedOnly,
   };
 }

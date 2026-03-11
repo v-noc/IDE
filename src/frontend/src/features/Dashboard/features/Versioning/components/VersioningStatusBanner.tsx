@@ -3,18 +3,10 @@ import {
   GitCommit,
   ArrowLeftRight,
   X,
-  MoreVertical,
-  FileDiff,
-  Download,
 } from "lucide-react";
 import { useVersioningBanner } from "../hooks/useVersioningBanner";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { VersioningStatusActionsMenu } from "./VersioningStatusActionsMenu";
 
 const VersioningStatusBanner = () => {
   const {
@@ -24,10 +16,12 @@ const VersioningStatusBanner = () => {
     targetCommitId,
     isVisible,
     isComparing,
+    showAffectedOnly,
     shortCommit,
     swapCompare,
     clearCompare,
     closeBanner,
+    setShowAffectedOnly,
   } = useVersioningBanner();
 
   if (!isVisible) return null;
@@ -111,27 +105,14 @@ const VersioningStatusBanner = () => {
       <div className="flex items-center justify-end gap-1">
         <div className="mx-1 h-4 w-px bg-slate-200" />
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7 text-slate-400"
-            >
-              <MoreVertical className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {isComparing && (
-              <DropdownMenuItem className="gap-2">
-                <FileDiff className="size-4 opacity-70" /> Export Diff
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem className="gap-2">
-              <Download className="size-4 opacity-70" /> Download Snapshot
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <VersioningStatusActionsMenu
+          isComparing={isComparing}
+          hasCompareTo={Boolean(compareToCommitId)}
+          hasCheckedOutCommit={Boolean(checkedOutCommitId)}
+          showAffectedOnly={showAffectedOnly}
+          onToggleAffectedOnly={setShowAffectedOnly}
+          onFlipComparison={swapCompare}
+        />
 
         <Button
           variant="ghost"

@@ -13,6 +13,25 @@ function normalizeCommitId(commitId?: string | null): string | null {
   return commitId.startsWith("branch:") ? commitId.slice("branch:".length) : commitId;
 }
 
+const AFFECTED_STATUSES = new Set(["added", "removed", "modified"]);
+
+function filterAffectedTree(nodes: AnyNodeTree[]): AnyNodeTree[] {
+  return nodes.reduce<AnyNodeTree[]>((acc, node) => {
+    const children = "children" in node ? (node.children as AnyNodeTree[]) : [];
+    const filteredChildren = filterAffectedTree(children);
+    const isNodeAffected =
+      typeof node.status === "string" && AFFECTED_STATUSES.has(node.status);
+
+    if (isNodeAffected || filteredChildren.length > 0) {
+      acc.push({
+        ...node,
+        children: filteredChildren,
+      } as AnyNodeTree);
+    }
+    return acc;
+  }, []);
+}
+
 export function useSidebarData() {
   const { projectId } = useParams();
 
@@ -25,6 +44,7 @@ export function useSidebarData() {
   const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
   const headCommitId = useVersioningStore((s) => s.headCommitId);
   const setHeadCommitId = useVersioningStore((s) => s.setHeadCommitId);
+  const showAffectedOnly = useVersioningStore((s) => s.showAffectedOnly);
   const projectKey = projectId ? `ProjectSchema/${projectId}` : "";
 
   const { data, isLoading, isSuccess } = useGetProjectTreeWithKeyProject({
@@ -56,9 +76,15 @@ export function useSidebarData() {
     }
   }, [data, isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const nodesForFiltering = useMemo(() => {
+    const nodes = (rawProjectData?.children as AnyNodeTree[]) ?? [];
+    if (!showAffectedOnly) return nodes;
+    return filterAffectedTree(nodes);
+  }, [rawProjectData?.children, showAffectedOnly]);
+
   // Tree Filtering
   const { filteredNodes, searchQuery, setSearchQuery } = useTreeFilter(
-    rawProjectData?.children as AnyNodeTree[]
+    nodesForFiltering
   );
 
   // Derived filtered project data
