@@ -41,18 +41,23 @@ const BranchDropdown: React.FC<BranchDropdownProps> = ({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className={
-            triggerClassName ??
-            "inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50"
-          }
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50",
+            triggerClassName,
+          )}
           disabled={isLoading}
         >
-          <GitBranch className="size-4 text-slate-600" />
-          <span className="truncate">{currentBranch}</span>
+          <GitBranch className="size-4 shrink-0 text-slate-600" />
+          <span className="min-w-0 flex-1 truncate text-left text-sm">
+            {currentBranch}
+          </span>
           <ChevronDown className="size-4 shrink-0 text-slate-500" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className={cn("min-w-[200px]", className)}>
+      <DropdownMenuContent
+        align="start"
+        className={cn("min-w-[200px]", className)}
+      >
         <DropdownMenuLabel className="text-xs font-medium text-slate-500">
           Branches
         </DropdownMenuLabel>
@@ -65,20 +70,23 @@ const BranchDropdown: React.FC<BranchDropdownProps> = ({
             }`}
           >
             <GitBranch className="size-4 shrink-0 text-slate-600" />
-            <span className="truncate">{branch.name}</span>
+            <span className="truncate text-sm">{branch.name}</span>
           </DropdownMenuItem>
         ))}
         {(onNewBranch ?? onMergeBranches) && (
           <>
             <DropdownMenuSeparator />
             {onNewBranch && (
-              <DropdownMenuItem onClick={onNewBranch} className="gap-2">
-                <Plus className="size-4 shrink-0 text-slate-600" />
+              <DropdownMenuItem onClick={onNewBranch} className="gap-2 text-sm">
+                <Plus className="size-4 shrink-0 text-slate-600 " />
                 New Branch
               </DropdownMenuItem>
             )}
             {onMergeBranches && (
-              <DropdownMenuItem onClick={onMergeBranches} className="gap-2">
+              <DropdownMenuItem
+                onClick={onMergeBranches}
+                className="gap-2 text-sm"
+              >
                 <GitMerge className="size-4 shrink-0 text-slate-600" />
                 Merge Branches
               </DropdownMenuItem>
