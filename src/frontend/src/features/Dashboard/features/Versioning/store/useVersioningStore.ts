@@ -72,6 +72,7 @@ interface VersioningState {
   headCommitId: string | null;
   checkedOutCommitId: string | null;
   compareToCommitId: string | null;
+  mergeSourceBranch: string | null;
   mergeTargetBranch: string | null;
   isMergeMode: boolean;
   diffResult: DiffResult | null;
@@ -83,8 +84,12 @@ interface VersioningState {
   setHeadCommitId: (id: string | null) => void;
   setCheckedOutCommitId: (id: string | null) => void;
   setCompareToCommitId: (id: string | null) => void;
+  setMergeSourceBranch: (name: string | null) => void;
   setMergeTargetBranch: (name: string | null) => void;
-  openMergeMode: (targetBranch?: string | null) => void;
+  openMergeMode: (input?: {
+    sourceBranch?: string | null;
+    targetBranch?: string | null;
+  }) => void;
   closeMergeMode: () => void;
   loadParsedDiff: (input: {
     projectId: string;
@@ -112,6 +117,7 @@ export const useVersioningStore = create<VersioningState>()(
       headCommitId: null,
       checkedOutCommitId: null,
       compareToCommitId: null,
+      mergeSourceBranch: null,
       mergeTargetBranch: null,
       isMergeMode: false,
       diffResult: null,
@@ -129,14 +135,19 @@ export const useVersioningStore = create<VersioningState>()(
         ),
       setCompareToCommitId: (id) =>
         set((state) => (state.compareToCommitId === id ? state : { compareToCommitId: id })),
+      setMergeSourceBranch: (name) =>
+        set((state) =>
+          state.mergeSourceBranch === name ? state : { mergeSourceBranch: name }
+        ),
       setMergeTargetBranch: (name) =>
         set((state) =>
           state.mergeTargetBranch === name ? state : { mergeTargetBranch: name }
         ),
-      openMergeMode: (targetBranch = null) =>
+      openMergeMode: (input) =>
         set((state) => ({
           isMergeMode: true,
-          mergeTargetBranch: targetBranch,
+          mergeSourceBranch: input?.sourceBranch ?? state.branch,
+          mergeTargetBranch: input?.targetBranch ?? null,
           checkedOutCommitId: null,
           compareToCommitId: null,
           diffResult: null,
@@ -147,11 +158,16 @@ export const useVersioningStore = create<VersioningState>()(
         })),
       closeMergeMode: () =>
         set((state) => {
-          if (!state.isMergeMode && state.mergeTargetBranch == null) {
+          if (
+            !state.isMergeMode &&
+            state.mergeSourceBranch == null &&
+            state.mergeTargetBranch == null
+          ) {
             return state;
           }
           return {
             isMergeMode: false,
+            mergeSourceBranch: null,
             mergeTargetBranch: null,
           };
         }),
@@ -244,6 +260,7 @@ export const useVersioningStore = create<VersioningState>()(
           return {
             compareToCommitId: null,
             isMergeMode: false,
+            mergeSourceBranch: null,
             mergeTargetBranch: null,
             diffResult: null,
             isLoadingDiff: false,

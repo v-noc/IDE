@@ -105,7 +105,10 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
                 const firstCandidate = availableBranches.find(
                   (candidate) => candidate.name !== currentBranch,
                 );
-                openMergeMode(firstCandidate?.name ?? null);
+                openMergeMode({
+                  sourceBranch: currentBranch,
+                  targetBranch: firstCandidate?.name ?? null,
+                });
               }}
               isLoading={isLoadingBranches}
               triggerClassName="h-7 justify-start gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-normal text-sm text-slate-800 hover:bg-slate-50"
