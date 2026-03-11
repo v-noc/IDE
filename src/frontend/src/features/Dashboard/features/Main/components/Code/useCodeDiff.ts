@@ -43,8 +43,8 @@ export function useCodeDiff({
 
     return {
       showDiff: true,
-      originalContent: codeData.compare_to.code ?? "",
-      modifiedContent: codeData.code ?? "",
+      originalContent: codeData.code ?? "",
+      modifiedContent: codeData.compare_to.code ?? "",
       isLoadingDiff: false,
       error: null,
     };

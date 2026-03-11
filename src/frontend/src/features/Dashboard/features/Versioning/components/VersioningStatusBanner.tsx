@@ -5,7 +5,6 @@ import {
   X,
   MoreVertical,
   FileDiff,
-  History,
   Download,
 } from "lucide-react";
 import { useVersioningBanner } from "../hooks/useVersioningBanner";
@@ -83,7 +82,7 @@ const VersioningStatusBanner = () => {
             </span>
             <div className="flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50/30 p-0.5 pr-1 shadow-sm">
               <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-indigo-700 border border-indigo-100">
-                {shortCommit(compareToCommitId)}
+                {shortCommit(targetCommitId)}
               </span>
               <Button
                 variant="ghost"
@@ -95,7 +94,7 @@ const VersioningStatusBanner = () => {
                 <ArrowLeftRight className="size-3 text-indigo-500" />
               </Button>
               <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-indigo-700 border border-indigo-100">
-                {shortCommit(targetCommitId)}
+                {shortCommit(compareToCommitId)}
               </span>
               <button
                 onClick={clearCompare}

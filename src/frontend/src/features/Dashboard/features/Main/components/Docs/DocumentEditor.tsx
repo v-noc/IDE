@@ -88,6 +88,9 @@ export function DocumentEditor({
     document,
     versionDiff,
   });
+  const editorData = isDiffActive
+    ? (document?.compare_to?.data ?? document?.data ?? "")
+    : (document?.data ?? "");
 
   // Debounced save function
   const saveDocumentDebounced = useMemo(
@@ -126,7 +129,7 @@ export function DocumentEditor({
       return;
     }
 
-    const data = document.data ?? "";
+    const data = editorData;
 
     // Skip if we've already applied this exact content
     // Compare by value, not reference, to handle cache updates with same content
@@ -214,7 +217,7 @@ export function DocumentEditor({
     };
 
     loadContent();
-  }, [editor, document, document?.id, document?.data]);
+  }, [editor, document, document?.id, document?.data, document?.compare_to?.data, editorData]);
 
   // Handle content changes
   const handleChange = async (currentEditor: typeof editor) => {

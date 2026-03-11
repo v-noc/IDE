@@ -31,7 +31,7 @@ export function useDocumentDiff({
       versionDiff.clearDiff();
       return;
     }
-    let beforeJson: unknown = document.compare_to.data;
+    let beforeJson: unknown = document.data;
     if (typeof beforeJson === "string") {
       try {
         beforeJson = JSON.parse(beforeJson);
