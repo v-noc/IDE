@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { codeApi, type CodeData } from "./api";
 import queryKeys from "@/lib/queryKeys";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 
 /**
  * Valid node types that support code.
@@ -19,12 +20,22 @@ export const useCode = (
   nodeType?: string,
   projectId?: string
 ) => {
+  const branch = useVersioningStore((s) => s.branch);
+  const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareToCommitId = useVersioningStore((s) => s.compareToCommitId);
+
   // Validate node type if provided
   const isValidNodeType =
     !nodeType || VALID_CODE_NODE_TYPES.includes(nodeType as ValidCodeNodeType);
 
   return useQuery<CodeData>({
-    queryKey: [...queryKeys.code.detail(elementId ?? ''), projectId ?? ''],
+    queryKey: [
+      ...queryKeys.code.detail(elementId ?? ""),
+      projectId ?? "",
+      branch ?? "main",
+      checkedOutCommitId ?? "",
+      compareToCommitId ?? "",
+    ],
     queryFn: () => codeApi.getCode(elementId!, projectId!),
     enabled: !!elementId && !!projectId && isValidNodeType,
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -8,6 +8,11 @@ import { useVersioningStore } from "@/features/Dashboard/features/Versioning/sto
 import { useTreeFilter } from "./useTreeFilter";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 
+function normalizeCommitId(commitId?: string | null): string | null {
+  if (!commitId) return null;
+  return commitId.startsWith("branch:") ? commitId.slice("branch:".length) : commitId;
+}
+
 export function useSidebarData() {
   const { projectId } = useParams();
 
@@ -39,8 +44,9 @@ export function useSidebarData() {
   });
 
   useEffect(() => {
-    if (!checkedOutCommitId && data?.version && headCommitId !== data.version) {
-      setHeadCommitId(data.version);
+    const normalizedVersion = normalizeCommitId(data?.version);
+    if (!checkedOutCommitId && normalizedVersion && headCommitId !== normalizedVersion) {
+      setHeadCommitId(normalizedVersion);
     }
   }, [checkedOutCommitId, data?.version, headCommitId, setHeadCommitId]);
 

@@ -20,6 +20,11 @@ type ApiRequestOptions = JsonRequestInit & {
   compareTo?: string;
 };
 
+function normalizeCommitId(commitId?: string | null): string | undefined {
+  if (!commitId) return undefined;
+  return commitId.startsWith("branch:") ? commitId.slice("branch:".length) : commitId;
+}
+
 async function apiClient<T>(
   endpoint: string,
   options: ApiRequestOptions = {}
@@ -34,8 +39,8 @@ async function apiClient<T>(
   } = options as ApiRequestOptions;
   const state = useVersioningStore.getState();
   const branch = branchOverride ?? state.branch;
-  const ref = refOverride ?? state.checkedOutCommitId ?? undefined;
-  const compareTo = compareToOverride ?? state.compareToCommitId ?? undefined;
+  const ref = normalizeCommitId(refOverride ?? state.checkedOutCommitId ?? undefined);
+  const compareTo = normalizeCommitId(compareToOverride ?? state.compareToCommitId ?? undefined);
   let finalEndpoint = endpoint;
   if (ref) {
     const separator = finalEndpoint.includes("?") ? "&" : "?";

@@ -131,7 +131,7 @@ async def get_documents_for_node(
             for compare_doc in compare_by_id.values():
                 merged_documents.append(
                     DocumentResponse(
-                        **compare_doc.model_dump(),
+                        **compare_doc.model_dump(exclude={"data"}),
                         data="",
                         status="removed",
                         compare_to=compare_doc,
