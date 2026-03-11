@@ -26,7 +26,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
 
   const nodeId = secondarySelectedNode?.[tabId] || selectedNode?.[tabId];
   const itemScopeId =
-    historyScope?.scopeType === "docs"
+    historyScope?.scopeType === "docs" && historyScope.scopeId
       ? historyScope.scopeId
       : (historyScope?.scopeId ?? nodeId?.id);
   const historyNodeId =
