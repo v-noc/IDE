@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { ChevronDown, GitBranch, GitCommit, X } from "lucide-react";
+import { ChevronDown, GitCommit, X } from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitHistory from "./CommitHistory";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { useCommitHistory, type Commit } from "../hooks/useCommitHistory";
 import { mapCommitToDisplay } from "../utils/commitUtils";
+import { useVersioningBranches } from "../hooks/useVersioningBranches";
+import BranchDropdown from "./BranchDropdown";
+import CreateBranchDialog from "./CreateBranchDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +26,6 @@ function shortCommit(id: string | null): string {
 
 const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const togglePanel = useVersioningStore((s) => s.togglePanel);
-  const branch = useVersioningStore((s) => s.branch);
   const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
   const headCommitId = useVersioningStore((s) => s.headCommitId);
   const historyScope = useVersioningStore((s) => s.historyScopeByTab[tabId]);
@@ -42,6 +44,15 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
       ? `ProjectSchema/${projectData.id}`
       : itemScopeId;
   const [page, setPage] = useState(0);
+  const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
+  const {
+    currentBranch,
+    availableBranches,
+    switchBranch,
+    createBranch,
+    isCreatingBranch,
+    isLoadingBranches,
+  } = useVersioningBranches(projectData?.id);
 
   useEffect(() => {
     setPage(0);
@@ -67,10 +78,18 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
         <div className="space-y-2">
           <h2 className="text-lg font-semibold text-slate-800">Commit history</h2>
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-medium text-slate-700">
-              <GitBranch className="size-3.5 text-slate-500" />
-              {branch}
-            </span>
+            <BranchDropdown
+              branches={availableBranches.map((b) => ({
+                id: b.id,
+                name: b.name,
+                isCurrent: b.name === currentBranch,
+              }))}
+              currentBranch={currentBranch}
+              onSelectBranch={switchBranch}
+              onNewBranch={() => setIsCreateBranchOpen(true)}
+              onMergeBranches={() => {}}
+              isLoading={isLoadingBranches}
+            />
             <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-slate-700">
               <GitCommit className="size-3.5 text-slate-500" />
               {shortCommit(displayedCommitId)}
@@ -134,6 +153,12 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
           }
         />
       </div>
+      <CreateBranchDialog
+        open={isCreateBranchOpen}
+        onOpenChange={setIsCreateBranchOpen}
+        onCreate={createBranch}
+        isCreating={isCreatingBranch}
+      />
     </div>
   );
 };

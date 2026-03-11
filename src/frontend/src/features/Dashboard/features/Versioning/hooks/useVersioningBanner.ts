@@ -3,6 +3,7 @@ import { useVersioningStore } from "../store/useVersioningStore";
 
 function shortCommit(id: string | null): string {
   if (!id) return "";
+  if (id.startsWith("branch:")) return id.slice("branch:".length);
 
   return id.slice(0, 8);
 }

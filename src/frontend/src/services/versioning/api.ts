@@ -19,9 +19,10 @@ export interface Commit {
 }
 
 export interface Branch {
-  name?: string;
-  "@type"?: string;
-  [key: string]: unknown;
+  id: string;
+  name: string;
+  is_current: boolean;
+  head_commit: string;
 }
 
 export type TerminusJsonDiff = Record<string, unknown> | unknown[];
@@ -44,10 +45,10 @@ export const versioningApi = {
     name: string,
     context?: VersioningRequestContext
   ): Promise<{ ok: boolean }> => {
-    const qs = buildQueryString({ project_id: projectId, name });
+    const qs = buildQueryString({ project_id: projectId });
     return api(`${API_ROUTES.VERSIONING}/branches${qs}`, {
       method: "POST",
-      body: {},
+      body: { name },
       ...context,
     });
   },

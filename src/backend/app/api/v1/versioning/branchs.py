@@ -17,8 +17,18 @@ class BranchResponse(BaseModel):
     id: str
     name: str
     is_current: bool
-    created_at: datetime
-    updated_at: datetime
+    head_commit: str
+
+    @classmethod
+    def from_result(cls, result, current_branch: str):
+        name = result["name"]
+        head_commit = result["head"].split("/")[-1]
+        return cls(
+            id=result["@id"],
+            name=name,
+            is_current=name == current_branch,
+            head_commit=head_commit,
+        )
 
 
 @router.get("/")
@@ -35,7 +45,8 @@ async def get_branches(
                       branch=project_uow.ctx.branch, ref=project_uow.ctx.ref)
     async with scoped_client(project_uow.client, target) as session:
         branches = await session.get_all_branches()
-        return [BranchResponse.from_result(branch) for branch in branches]
+
+        return [BranchResponse.from_result(branch, project_uow.ctx.branch) for branch in branches]
 
 
 @router.post("/")
