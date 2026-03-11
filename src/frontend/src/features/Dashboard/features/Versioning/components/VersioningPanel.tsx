@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, GitBranch, GitCommit, X } from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitHistory from "./CommitHistory";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
@@ -16,8 +16,16 @@ import { Button } from "@/components/ui/button";
 const COMMITS_PER_PAGE = 10;
 const EMPTY_COMMITS: Commit[] = [];
 
+function shortCommit(id: string | null): string {
+  if (!id) return "N/A";
+  return id.slice(0, 8);
+}
+
 const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const togglePanel = useVersioningStore((s) => s.togglePanel);
+  const branch = useVersioningStore((s) => s.branch);
+  const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
+  const headCommitId = useVersioningStore((s) => s.headCommitId);
   const historyScope = useVersioningStore((s) => s.historyScopeByTab[tabId]);
   const scopeOverride = useVersioningStore((s) => s.scopeOverrideByTab[tabId]);
   const setScopeOverride = useVersioningStore((s) => s.setScopeOverride);
@@ -51,11 +59,27 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const displayCommits = commits.map(mapCommitToDisplay);
   const hasNextPage = commits.length === COMMITS_PER_PAGE;
   const hasPrevPage = page > 0;
+  const displayedCommitId = checkedOutCommitId ?? headCommitId;
 
   return (
     <div className="flex h-full w-full flex-col border-l bg-white shadow-sm transition-all duration-300">
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <h2 className="text-lg font-semibold text-slate-800">Commit history</h2>
+      <div className="flex items-start justify-between border-b px-4 py-3">
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-slate-800">Commit history</h2>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-medium text-slate-700">
+              <GitBranch className="size-3.5 text-slate-500" />
+              {branch}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-slate-700">
+              <GitCommit className="size-3.5 text-slate-500" />
+              {shortCommit(displayedCommitId)}
+            </span>
+            <span className="text-[11px] text-slate-500">
+              {checkedOutCommitId ? "Checked out commit" : "Current commit"}
+            </span>
+          </div>
+        </div>
         <button
           onClick={togglePanel}
           className="rounded-md p-1 hover:bg-slate-100 text-slate-500"

@@ -37,9 +37,28 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
   emptyMessage,
 }) => {
   const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareToCommitId = useVersioningStore((s) => s.compareToCommitId);
   const setCheckedOutCommitId = useVersioningStore((s) => s.setCheckedOutCommitId);
   const setCompareToCommitId = useVersioningStore((s) => s.setCompareToCommitId);
   const [pendingCommitId, setPendingCommitId] = React.useState<string | null>(null);
+
+  const handleCheckout = React.useCallback(
+    (commitId: string) => {
+      setCheckedOutCommitId(commitId);
+    },
+    [setCheckedOutCommitId],
+  );
+
+  const handleCompareWithCurrent = React.useCallback(
+    (commitId: string) => {
+      setCompareToCommitId(commitId);
+    },
+    [setCompareToCommitId],
+  );
+
+  const handleHardReset = React.useCallback(() => {
+    // Placeholder action (intentionally no backend behavior yet).
+  }, []);
 
   if (emptyMessage) {
     return (
@@ -82,7 +101,11 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
             commit={commit}
             isLast={index === commits.length - 1}
             isActive={checkedOutCommitId === commit.id}
+            isCompareTarget={compareToCommitId === commit.id}
             onClick={() => setPendingCommitId(commit.id)}
+            onCheckout={() => handleCheckout(commit.id)}
+            onCompareWithCurrent={() => handleCompareWithCurrent(commit.id)}
+            onHardReset={handleHardReset}
           />
         ))}
       </div>
@@ -125,7 +148,7 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
             <Button
               variant="outline"
               onClick={() => {
-                if (pendingCommitId) setCompareToCommitId(pendingCommitId);
+                if (pendingCommitId) handleCompareWithCurrent(pendingCommitId);
                 setPendingCommitId(null);
               }}
             >
@@ -133,7 +156,7 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
             </Button>
             <Button
               onClick={() => {
-                if (pendingCommitId) setCheckedOutCommitId(pendingCommitId);
+                if (pendingCommitId) handleCheckout(pendingCommitId);
                 setPendingCommitId(null);
               }}
             >
