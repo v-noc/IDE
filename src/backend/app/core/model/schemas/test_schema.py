@@ -18,9 +18,9 @@ class TestLinkSchema(BaseSchema):
     The schema for the test link.
     """
     lines: Set[int]
-    target_function: Optional[FunctionSchema]
-    target_class: Optional[ClassSchema]
-    target_file: Optional[FileSchema]
+    owner_function: Optional[FunctionSchema]
+    owner_class: Optional[ClassSchema]
+    owner_file: Optional[FileSchema]
 
 
 class TestCaseSchema(BaseSchema):
@@ -29,5 +29,7 @@ class TestCaseSchema(BaseSchema):
     """
     name: str
     description: str
-    test_config: Optional[TestConfigSchema]
+    node_id: str
+    path: str
+    target_function: Optional[FunctionSchema]
     test_links: Set[TestLinkSchema]
