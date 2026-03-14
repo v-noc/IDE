@@ -78,12 +78,16 @@ class TestService:
 
         now = datetime.now(timezone.utc)
         updated = TestConfigSchema(
-            _id=current.get("@id", f"TestConfigSchema/{self.uow.project.db_name}"),
+            _id=current.get(
+                "@id", f"TestConfigSchema/{self.uow.project.db_name}"),
             name=current.get("name", "TestConfig"),
             description=current.get("description", ""),
-            enabled=current.get("enabled", False) if enabled is None else enabled,
-            test_root=current.get("test_root", "") if test_root is None else test_root,
-            test_args=current.get("test_args", "") if test_args is None else test_args,
+            enabled=current.get(
+                "enabled", False) if enabled is None else enabled,
+            test_root=current.get(
+                "test_root", "") if test_root is None else test_root,
+            test_args=current.get(
+                "test_args", "") if test_args is None else test_args,
             created_at=current.get("created_at", now),
             updated_at=now,
         )
@@ -289,13 +293,96 @@ class TestService:
 
         return list(test_case_by_id.values()), list(test_link_by_id.values())
 
+    @staticmethod
+    def _normalize_doc_id(value) -> Optional[str]:
+        """Normalize Terminus ids to `Type/key` form for comparisons."""
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            value = value.get("@id")
+        if not isinstance(value, str):
+            return None
+        prefix = "terminusdb:///data/"
+        if value.startswith(prefix):
+            return value[len(prefix):]
+        return value
+
+    async def _prepare_batch_ops(
+        self,
+        test_cases: list[TestCaseSchema],
+        test_links: list[TestLinkSchema],
+    ):
+        # 1. Normalize and identify all target IDs
+        case_ids = [case._id for case in test_cases]
+        new_link_by_id = {link._id: link for link in test_links}
+        all_link_ids = list(new_link_by_id.keys())
+
+        # 2. Fetch everything that actually exists in the DB
+        existing_cases_raw = await self.repos.test_repo.get_by_ids(case_ids)
+        existing_links_raw = await self.repos.test_repo.get_by_ids(all_link_ids)
+
+        # 3. Create lookup maps with normalized IDs
+        existing_case_by_id = {
+            self._normalize_doc_id(raw.get("@id")): raw
+            for raw in existing_cases_raw if raw.get("@id")
+        }
+        existing_link_ids = {
+            self._normalize_doc_id(raw.get("@id"))
+            for raw in existing_links_raw if raw.get("@id")
+        }
+
+        # 4. Map existing relationships for deletion logic
+        delete_link_parent: dict[str, str] = {}
+        for case_id, case_doc in existing_case_by_id.items():
+            for raw_link_id in case_doc.get("test_links", []) or []:
+                link_id = self._normalize_doc_id(raw_link_id)
+                if link_id:
+                    delete_link_parent[link_id] = case_id
+
+        # 5. Categorize Links: Insert vs Update
+        new_link_ids_set = set(new_link_by_id.keys())
+        link_inserts = [
+            new_link_by_id[lid] for lid in (new_link_ids_set - existing_link_ids)
+        ]
+        link_updates = [
+            new_link_by_id[lid] for lid in (new_link_ids_set & existing_link_ids)
+        ]
+
+        # Links to delete: were in the old cases but aren't in the new test run
+        # Note: This logic assumes a "replace" strategy for a test case's links
+        current_run_link_ids = set(new_link_by_id.keys())
+        link_deletes = [
+            lid for lid in delete_link_parent.keys() if lid not in current_run_link_ids
+        ]
+
+        # 6. Categorize Cases
+        case_inserts = [
+            c for c in test_cases if c._id not in existing_case_by_id]
+        case_updates = [c for c in test_cases if c._id in existing_case_by_id]
+
+        insert_link_parent = {}
+        for case in test_cases:
+            for link_id in case.test_links:
+                insert_link_parent[link_id] = case._id
+
+        return {
+            "case_inserts": case_inserts,
+            "case_updates": case_updates,
+            "link_inserts": link_inserts,
+            "link_updates": link_updates,
+            "link_deletes": link_deletes,
+            "insert_link_parent": insert_link_parent,
+            "delete_link_parent": delete_link_parent,
+        }
+
     async def run_tests(self, path: str):
         test_path = path
         if not os.path.isabs(test_path):
             test_path = os.path.join(self.uow.project.path, test_path)
         exit_code, coverage_datas = run_tests(test_path, self.uow.project.path)
         test_cases, test_links = await self._build_documents(coverage_datas)
-        batch_ok = await self.repos.test_repo.flush_batch(test_cases, test_links)
+        batch_ops = await self._prepare_batch_ops(test_cases, test_links)
+        batch_ok = await self.repos.test_repo.flush_batch(**batch_ops)
         return {
             "exit_code": exit_code,
             "test_cases": len(test_cases),

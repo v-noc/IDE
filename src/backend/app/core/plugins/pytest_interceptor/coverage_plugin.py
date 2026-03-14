@@ -1,7 +1,7 @@
 from coverage import Coverage
 from datetime import datetime, timezone
 from pydantic import BaseModel
-from typing import Set
+from typing import Set, List
 
 
 class TestData(BaseModel):
@@ -11,7 +11,7 @@ class TestData(BaseModel):
 
 class CoverageData(BaseModel):
     test_id: str
-    tests: Set[TestData]
+    tests: List[TestData]
 
 
 class CoveragePlugin:
@@ -51,12 +51,12 @@ class CoveragePlugin:
             if not test_id:  # Skip empty context (collection/setup phase)
                 continue
             data.set_query_context(test_id)
-            coverage_data = CoverageData(test_id=test_id, tests=set())
+            coverage_data = CoverageData(test_id=test_id, tests=[])
 
             for filename in data.measured_files():
                 lines = data.lines(filename)
 
-                coverage_data.tests.add(
+                coverage_data.tests.append(
                     TestData(file_name=filename, lines=lines))
             self.all_coverage_datas.append(coverage_data)
 
