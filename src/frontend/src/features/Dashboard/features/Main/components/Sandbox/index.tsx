@@ -17,6 +17,7 @@ export default function Sandbox({ tabId }: { tabId: string }) {
     isRunning,
     setIsRunning,
     playgroundRef,
+    testRef,
     handleRun,
     handleOpenSettings,
   } = useSandboxState();
@@ -48,7 +49,7 @@ export default function Sandbox({ tabId }: { tabId: string }) {
         </TabsTrigger>
 
         <div className="border bg-white justify-end flex items-center gap-2 pr-2 w-full h-full">
-          {activeTab === "playground" ? (
+          {activeTab === "playground" || activeTab === "test" ? (
             <>
               <Button
                 size="sm"
@@ -57,7 +58,11 @@ export default function Sandbox({ tabId }: { tabId: string }) {
                 className="rounded-full bg-green-500 hover:bg-green-600 text-xs h-7 gap-2 px-4 shadow-sm transition-all active:scale-95"
               >
                 <Play className="size-3 fill-current" />
-                {isRunning ? "Running..." : "Run"}
+                {isRunning
+                  ? "Running..."
+                  : activeTab === "test"
+                    ? "Run tests"
+                    : "Run"}
               </Button>
               <Button
                 size="sm"
@@ -88,7 +93,7 @@ export default function Sandbox({ tabId }: { tabId: string }) {
           value="test"
           className="m-0 h-full overflow-hidden p-6 outline-none"
         >
-          <Test />
+          <Test ref={testRef} onRunningChange={setIsRunning} />
         </TabsContent>
 
         <TabsContent

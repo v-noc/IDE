@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { type PlayGroundHandle } from "../features/Playground";
+import type { TestHandle } from "../features/Test";
 
 /**
  * Hook to manage Sandbox UI state and interactions.
@@ -8,13 +9,26 @@ export function useSandboxState() {
     const [activeTab, setActiveTab] = useState("playground");
     const [isRunning, setIsRunning] = useState(false);
     const playgroundRef = useRef<PlayGroundHandle>(null);
+    const testRef = useRef<TestHandle>(null);
 
     const handleRun = () => {
-        playgroundRef.current?.run();
+        if (activeTab === "playground") {
+            playgroundRef.current?.run();
+            return;
+        }
+        if (activeTab === "test") {
+            testRef.current?.run();
+        }
     };
 
     const handleOpenSettings = () => {
-        playgroundRef.current?.openSettings();
+        if (activeTab === "playground") {
+            playgroundRef.current?.openSettings();
+            return;
+        }
+        if (activeTab === "test") {
+            testRef.current?.openSettings();
+        }
     };
 
     return {
@@ -23,6 +37,7 @@ export function useSandboxState() {
         isRunning,
         setIsRunning,
         playgroundRef,
+        testRef,
         handleRun,
         handleOpenSettings,
     };
