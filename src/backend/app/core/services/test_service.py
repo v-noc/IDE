@@ -56,9 +56,6 @@ class TestService:
     async def get_test_cases_for_node(self, node_id: str):
         return await self.repos.test_repo.get_test_cases_for_node(node_id)
 
-    def get_test_coverage_for_node(self, node_id: str):
-        return self.get_test_cases_for_node(node_id)
-
     @staticmethod
     def _resolve_line_to_scopes(script, line: int) -> list[ScopeInfo]:
         """
