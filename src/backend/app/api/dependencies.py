@@ -1,6 +1,5 @@
 from typing import Optional
-from fastapi import Depends, Header, Query, HTTPException
-from app.core.repository import Repositories
+from fastapi import Depends, Header, Query
 from app.core.services.project_service import ProjectService
 from app.core.services.code_element_service import CodeElementService
 
@@ -8,6 +7,7 @@ from app.core.services.call_service import CallService
 from app.core.services.log_service import LogService
 from app.core.services.group_service import GroupService
 from app.core.services.document_service import DocumentService
+from app.core.services.test_service import TestService
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
@@ -44,7 +44,7 @@ async def get_project_uow(
     project: ProjectNode = Depends(get_project_node),
     ctx: RequestDbContext = Depends(get_request_db_context),
 ):
-    """Async generator dependency. FastAPI enters it and passes the yielded ProjectUoW."""
+    """Yield project UoW for request context."""
     try:
         yield ProjectUoW(base, project, ctx)
     finally:
@@ -82,5 +82,11 @@ async def get_code_element_service(
     return CodeElementService(uow)
 
 
-def get_document_service(uow: ProjectUoW = Depends(get_project_uow)) -> DocumentService:
+def get_document_service(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> DocumentService:
     return DocumentService(uow)
+
+
+def get_test_service(uow: ProjectUoW = Depends(get_project_uow)) -> TestService:
+    return TestService(uow)

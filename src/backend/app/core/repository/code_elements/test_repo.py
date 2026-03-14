@@ -3,6 +3,7 @@ from typing import Dict, List, Sequence
 from terminusdb_client.woqlquery.woql_query import Doc
 
 from app.core.model.schemas.test_schema import TestCaseSchema, TestLinkSchema
+from app.core.model.schemas.test_schema import TestConfigSchema
 from app.db.async_terminus_client import AsyncClient
 from app.db.async_terminus_client import WOQLQuery as WQ
 
@@ -29,6 +30,29 @@ class TestRepo:
 
     async def get_test_config(self, project_db_name: str):
         return await self.get(f"TestConfigSchema/{project_db_name}")
+
+    async def upsert_test_config(self, config: TestConfigSchema) -> bool:
+        try:
+            await self.client.update_document(
+                config,
+                commit_msg=f"Upsert test config {config._id}",
+            )
+            return True
+        except Exception as exc:
+            print(f"Failed to upsert test config: {exc}")
+            return False
+
+    async def delete_test_config(self, project_db_name: str) -> bool:
+        config_id = f"TestConfigSchema/{project_db_name}"
+        try:
+            await self.client.delete_document(
+                config_id,
+                commit_msg=f"Delete test config {config_id}",
+            )
+            return True
+        except Exception as exc:
+            print(f"Failed to delete test config: {exc}")
+            return False
 
     async def get_test_cases_for_node(self, item_id: str):
         query = (
@@ -60,10 +84,16 @@ class TestRepo:
         return [row["test_case_doc"] for row in result.get("bindings", [])]
 
     @staticmethod
-    def _to_query_documents(items: Sequence[TestCaseSchema | TestLinkSchema]) -> list[dict]:
+    def _to_query_documents(
+        items: Sequence[TestCaseSchema | TestLinkSchema],
+    ) -> list[dict]:
         return [item._obj_to_dict()[0] for item in items]
 
-    async def flush_batch(self, test_cases: Sequence[TestCaseSchema], test_links: Sequence[TestLinkSchema]) -> bool:
+    async def flush_batch(
+        self,
+        test_cases: Sequence[TestCaseSchema],
+        test_links: Sequence[TestLinkSchema],
+    ) -> bool:
         """
         Diff existing test case links with the new run and apply inserts/updates/deletes
         in a single TerminusDB query.
@@ -71,7 +101,9 @@ class TestRepo:
         if not test_cases and not test_links:
             return True
 
-        existing_case_docs = await self.get_by_ids([tc._id for tc in test_cases])
+        existing_case_docs = await self.get_by_ids(
+            [tc._id for tc in test_cases],
+        )
         existing_case_by_id: Dict[str, dict] = {
             raw.get("@id"): raw for raw in existing_case_docs if raw.get("@id")
         }
@@ -99,10 +131,16 @@ class TestRepo:
                 case_inserts.append(case)
 
         queries = []
-        for raw in self._to_query_documents(link_inserts) + self._to_query_documents(case_inserts):
+        insert_docs = self._to_query_documents(
+            link_inserts,
+        ) + self._to_query_documents(case_inserts)
+        for raw in insert_docs:
             queries.append(WQ().insert_document(Doc(raw)))
 
-        for raw in self._to_query_documents(link_updates) + self._to_query_documents(case_updates):
+        update_docs = self._to_query_documents(
+            link_updates,
+        ) + self._to_query_documents(case_updates)
+        for raw in update_docs:
             queries.append(WQ().update_document(Doc(raw)))
 
         for link_id in link_deletes:
@@ -117,7 +155,10 @@ class TestRepo:
                 commit_msg=(
                     "Batch tests: "
                     f"cases(+{len(case_inserts)} ~{len(case_updates)}), "
-                    f"links(+{len(link_inserts)} ~{len(link_updates)} -{len(link_deletes)})"
+                    "links("
+                    f"+{len(link_inserts)} "
+                    f"~{len(link_updates)} "
+                    f"-{len(link_deletes)})"
                 ),
             )
             return True

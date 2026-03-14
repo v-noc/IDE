@@ -53,8 +53,80 @@ class TestService:
     async def get_test_config(self):
         return await self.repos.test_repo.get_test_config(self.uow.project.db_name)
 
+    async def create_or_update_config(
+        self,
+        enabled: bool,
+        test_root: str,
+        test_args: str = "",
+    ) -> bool:
+        config = self.create_test_config(
+            enabled=enabled,
+            test_root=test_root,
+            test_args=test_args,
+        )
+        return await self.repos.test_repo.upsert_test_config(config)
+
+    async def update_test_config(
+        self,
+        enabled: Optional[bool] = None,
+        test_root: Optional[str] = None,
+        test_args: Optional[str] = None,
+    ):
+        current = await self.get_test_config()
+        if not current:
+            return None
+
+        now = datetime.now(timezone.utc)
+        updated = TestConfigSchema(
+            _id=current.get("@id", f"TestConfigSchema/{self.uow.project.db_name}"),
+            name=current.get("name", "TestConfig"),
+            description=current.get("description", ""),
+            enabled=current.get("enabled", False) if enabled is None else enabled,
+            test_root=current.get("test_root", "") if test_root is None else test_root,
+            test_args=current.get("test_args", "") if test_args is None else test_args,
+            created_at=current.get("created_at", now),
+            updated_at=now,
+        )
+        ok = await self.repos.test_repo.upsert_test_config(updated)
+        if not ok:
+            return None
+        return await self.get_test_config()
+
+    async def delete_test_config(self) -> bool:
+        return await self.repos.test_repo.delete_test_config(self.uow.project.db_name)
+
     async def get_test_cases_for_node(self, node_id: str):
         return await self.repos.test_repo.get_test_cases_for_node(node_id)
+
+    async def run_tests_for_owner(self, owner_id: str):
+        test_cases = await self.get_test_cases_for_node(owner_id)
+        if not test_cases:
+            return {
+                "runs": [],
+                "total_runs": 0,
+                "total_test_cases": 0,
+                "total_test_links": 0,
+            }
+
+        run_targets = []
+        seen_targets = set()
+        for case in test_cases:
+            target = case.get("node_id") or case.get("path")
+            if not target or target in seen_targets:
+                continue
+            seen_targets.add(target)
+            run_targets.append(target)
+
+        runs = []
+        for target in run_targets:
+            runs.append(await self.run_tests(target))
+
+        return {
+            "runs": runs,
+            "total_runs": len(runs),
+            "total_test_cases": sum(item.get("test_cases", 0) for item in runs),
+            "total_test_links": sum(item.get("test_links", 0) for item in runs),
+        }
 
     @staticmethod
     def _resolve_line_to_scopes(script, line: int) -> list[ScopeInfo]:
