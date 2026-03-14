@@ -65,6 +65,7 @@ class RunTestsResponse(BaseModel):
 async def get_test_config(
     test_service: TestService = Depends(get_test_service),
 ) -> TestConfigResponse:
+    print("Getting test config")
     config = await test_service.get_test_config()
     if not config:
         raise HTTPException(

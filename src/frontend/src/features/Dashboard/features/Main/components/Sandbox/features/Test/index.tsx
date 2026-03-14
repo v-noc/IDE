@@ -5,6 +5,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { useParams } from "react-router";
+import {
+  useCreateTestConfig,
+  useTestConfig,
+  useUpdateTestConfig,
+} from "@/services/tests";
 import ConfigNotCreatedState from "./components/ConfigNotCreatedState";
 import DetectedTestsLayout from "./components/DetectedTestsLayout";
 import NoTestCasesState from "./components/NoTestCasesState";
@@ -22,30 +28,58 @@ interface TestProps {
 }
 
 const DEFAULT_CONFIG: TestConfig = {
-  framework: "pytest",
-  testsPath: "src/backend/tests",
-  commandPrefix: "python -m",
+  enabled: true,
+  testRoot: "src/backend/tests",
+  testArgs: "",
 };
 
 const Test = forwardRef<TestHandle, TestProps>(({ onRunningChange }, ref) => {
-  const [viewState, setViewState] = useState<TestViewState>("missing_config");
+  const { projectId } = useParams();
+  const projectNodeId = projectId ? `ProjectSchema/${projectId}` : "";
+  const [viewState, setViewState] = useState<TestViewState>("empty_tests");
   const [selectedTestId, setSelectedTestId] = useState<string>(MOCK_TEST_CASES[0].id);
   const [isRunning, setIsRunning] = useState(false);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
-  const [isConfigCreated, setIsConfigCreated] = useState(false);
   const [testConfig, setTestConfig] = useState<TestConfig>(DEFAULT_CONFIG);
   const runTimeoutRef = useRef<number | null>(null);
+  const {
+    data: configData,
+    isLoading: isConfigLoading,
+    error: configError,
+  } = useTestConfig(projectNodeId);
+  const createConfigMutation = useCreateTestConfig(projectNodeId);
+  const updateConfigMutation = useUpdateTestConfig(projectNodeId);
+  const isConfigCreated = Boolean(configData);
+
+  const isConfigMissing =
+    !isConfigLoading &&
+    !configData &&
+    typeof configError === "object" &&
+    configError !== null &&
+    "status" in configError &&
+    (configError as { status?: number }).status === 404;
 
   const handleOpenSettings = () => {
     setIsConfigDialogOpen(true);
   };
 
-  const handleSaveConfiguration = () => {
-    setIsConfigCreated(true);
-    setIsConfigDialogOpen(false);
-    if (viewState === "missing_config") {
-      setViewState("empty_tests");
+  const handleSaveConfiguration = async () => {
+    if (!projectNodeId) return;
+
+    const payload = {
+      enabled: testConfig.enabled,
+      test_root: testConfig.testRoot,
+      test_args: testConfig.testArgs,
+    };
+
+    if (isConfigCreated) {
+      await updateConfigMutation.mutateAsync(payload);
+    } else {
+      await createConfigMutation.mutateAsync(payload);
     }
+
+    setIsConfigDialogOpen(false);
+    setViewState("empty_tests");
   };
 
   const handleRunTests = () => {
@@ -75,12 +109,36 @@ const Test = forwardRef<TestHandle, TestProps>(({ onRunningChange }, ref) => {
   }, [isRunning, onRunningChange]);
 
   useEffect(() => {
+    if (!configData) return;
+    setTestConfig({
+      enabled: configData.enabled,
+      testRoot: configData.test_root,
+      testArgs: configData.test_args,
+    });
+    setViewState((prev) => (prev === "missing_config" ? "empty_tests" : prev));
+  }, [configData]);
+
+  useEffect(() => {
+    if (isConfigMissing) {
+      setViewState("missing_config");
+    }
+  }, [isConfigMissing]);
+
+  useEffect(() => {
     return () => {
       if (runTimeoutRef.current) {
         window.clearTimeout(runTimeoutRef.current);
       }
     };
   }, []);
+
+  if (isConfigLoading) {
+    return (
+      <div className="h-full w-full rounded-lg border bg-white p-8 flex items-center justify-center text-sm text-muted-foreground">
+        Loading test configuration...
+      </div>
+    );
+  }
 
   let content = (
     <DetectedTestsLayout
@@ -114,7 +172,9 @@ const Test = forwardRef<TestHandle, TestProps>(({ onRunningChange }, ref) => {
         config={testConfig}
         isConfigCreated={isConfigCreated}
         onChangeConfig={setTestConfig}
-        onSave={handleSaveConfiguration}
+        onSave={() => {
+          void handleSaveConfiguration();
+        }}
       />
     </>
   );

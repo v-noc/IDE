@@ -9,7 +9,7 @@ export interface TestCaseItem {
 export type TestViewState = "missing_config" | "empty_tests" | "detected_tests";
 
 export interface TestConfig {
-  framework: string;
-  testsPath: string;
-  commandPrefix: string;
+  enabled: boolean;
+  testRoot: string;
+  testArgs: string;
 }

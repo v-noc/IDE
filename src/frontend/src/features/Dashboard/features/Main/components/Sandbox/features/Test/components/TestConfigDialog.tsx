@@ -32,51 +32,56 @@ export default function TestConfigDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {isConfigCreated ? "Edit Test Configuration" : "Create Test Configuration"}
+            {isConfigCreated
+              ? "Edit Test Configuration"
+              : "Create Test Configuration"}
           </DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="testFramework">Test framework</Label>
-            <Input
-              id="testFramework"
-              placeholder="e.g. pytest"
-              value={config.framework}
-              onChange={(e) =>
-                onChangeConfig({
-                  ...config,
-                  framework: e.target.value,
-                })
-              }
-            />
+            <Label htmlFor="enabled">Test execution</Label>
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <span className="text-sm text-slate-700">Enable test execution</span>
+              <input
+                id="enabled"
+                type="checkbox"
+                checked={config.enabled}
+                onChange={(e) =>
+                  onChangeConfig({
+                    ...config,
+                    enabled: e.target.checked,
+                  })
+                }
+              />
+            </div>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="testsPath">Tests path</Label>
+            <Label htmlFor="testsPath">Test root path</Label>
             <Input
               id="testsPath"
               placeholder="e.g. src/backend/tests"
-              value={config.testsPath}
+              value={config.testRoot}
               onChange={(e) =>
                 onChangeConfig({
                   ...config,
-                  testsPath: e.target.value,
+                  testRoot: e.target.value,
                 })
               }
             />
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="commandPrefix">Run command prefix</Label>
+            <Label htmlFor="testArgs">Test arguments</Label>
             <Input
-              id="commandPrefix"
-              placeholder="e.g. python -m"
-              value={config.commandPrefix}
+              id="testArgs"
+              placeholder="e.g. -q -k smoke"
+              value={config.testArgs}
               onChange={(e) =>
                 onChangeConfig({
                   ...config,
-                  commandPrefix: e.target.value,
+                  testArgs: e.target.value,
                 })
               }
             />
@@ -84,7 +89,11 @@ export default function TestConfigDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
           <Button type="button" onClick={onSave}>
