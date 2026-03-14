@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import Depends, Header, Query
+from fastapi import Depends, Header, HTTPException, Query, status
 from app.core.services.project_service import ProjectService
 from app.core.services.code_element_service import CodeElementService
 
@@ -36,7 +36,19 @@ async def get_project_node(
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectNode:
     project = await project_service.get(project_id)
-    return ProjectNode.from_raw_dict(project)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project not found: {project_id}",
+        )
+
+    try:
+        return ProjectNode.from_raw_dict(project)
+    except (TypeError, KeyError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Invalid project payload for id: {project_id}",
+        ) from exc
 
 
 async def get_project_uow(
