@@ -36,10 +36,10 @@ async def test_hierarchy_and_ignore(setup_structure_project):
     Test that the initial hierarchy is built correctly and respects ignore
     files.
     """
-    project_node, repos, arangodb_client, project_path = setup_structure_project
+    project_node, project_uow, arangodb_client, project_path = setup_structure_project
 
     # Build the project tree
-    tree = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree = await _build_and_get_tree(project_node, project_uow)
     assert tree, "No tree nodes built"
 
     project_name = project_node.name
@@ -86,10 +86,10 @@ async def test_scope_contains_links(setup_structure_project):
     Test that parent-child relationships are correctly established in the
     tree.
     """
-    project_node, repos, arangodb_client, project_path = setup_structure_project
+    project_node, project_uow, arangodb_client, project_path = setup_structure_project
 
     # Build the project tree
-    tree = await _build_and_get_tree(project_node, repos, arangodb_client)
+    tree = await _build_and_get_tree(project_node, project_uow)
     assert tree, "No tree nodes built"
 
     project_name = project_node.name
