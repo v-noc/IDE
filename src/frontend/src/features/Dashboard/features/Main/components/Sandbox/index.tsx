@@ -91,7 +91,7 @@ export default function Sandbox({ tabId }: { tabId: string }) {
 
         <TabsContent
           value="test"
-          className="m-0 h-full overflow-hidden p-6 outline-none"
+          className="m-0 h-full overflow-hidden outline-none"
         >
           <Test ref={testRef} onRunningChange={setIsRunning} />
         </TabsContent>
