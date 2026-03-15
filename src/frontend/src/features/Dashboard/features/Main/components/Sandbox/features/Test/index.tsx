@@ -25,6 +25,7 @@ export type TestHandle = {
 
 interface TestProps {
   onRunningChange?: (isRunning: boolean) => void;
+  onConfigChange?: (isConfigCreated: boolean) => void;
 }
 
 const DEFAULT_CONFIG: TestConfig = {
@@ -33,11 +34,14 @@ const DEFAULT_CONFIG: TestConfig = {
   testArgs: "",
 };
 
-const Test = forwardRef<TestHandle, TestProps>(({ onRunningChange }, ref) => {
+const Test = forwardRef<TestHandle, TestProps>(
+  ({ onRunningChange, onConfigChange }, ref) => {
   const { projectId } = useParams();
   const projectNodeId = projectId ? `ProjectSchema/${projectId}` : "";
   const [viewState, setViewState] = useState<TestViewState>("empty_tests");
-  const [selectedTestId, setSelectedTestId] = useState<string>(MOCK_TEST_CASES[0].id);
+  const [selectedTestId, setSelectedTestId] = useState<string>(
+    MOCK_TEST_CASES[0].id,
+  );
   const [isRunning, setIsRunning] = useState(false);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [testConfig, setTestConfig] = useState<TestConfig>(DEFAULT_CONFIG);
@@ -119,6 +123,10 @@ const Test = forwardRef<TestHandle, TestProps>(({ onRunningChange }, ref) => {
   }, [configData]);
 
   useEffect(() => {
+    onConfigChange?.(isConfigCreated);
+  }, [isConfigCreated, onConfigChange]);
+
+  useEffect(() => {
     if (isConfigMissing) {
       setViewState("missing_config");
     }
@@ -151,14 +159,12 @@ const Test = forwardRef<TestHandle, TestProps>(({ onRunningChange }, ref) => {
   );
 
   if (viewState === "missing_config") {
-    content = <ConfigNotCreatedState onCreateConfiguration={handleOpenSettings} />;
+    content = (
+      <ConfigNotCreatedState onCreateConfiguration={handleOpenSettings} />
+    );
   } else if (viewState === "empty_tests") {
     content = (
-      <NoTestCasesState
-        onCreateTest={() => {}}
-        onRunTests={handleRunTests}
-        onLoadMockDetectedTests={() => setViewState("detected_tests")}
-      />
+      <NoTestCasesState onCreateTest={() => {}} onRunTests={handleRunTests} />
     );
   }
 
@@ -178,7 +184,8 @@ const Test = forwardRef<TestHandle, TestProps>(({ onRunningChange }, ref) => {
       />
     </>
   );
-});
+  },
+);
 
 Test.displayName = "Test";
 

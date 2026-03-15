@@ -1,16 +1,13 @@
 import { Button } from "@/components/ui/button";
-import { Beaker, Play, Plus } from "lucide-react";
+import { Beaker, Play } from "lucide-react";
 
 interface NoTestCasesStateProps {
   onCreateTest: () => void;
   onRunTests: () => void;
-  onLoadMockDetectedTests: () => void;
 }
 
 export default function NoTestCasesState({
-  onCreateTest,
   onRunTests,
-  onLoadMockDetectedTests,
 }: NoTestCasesStateProps) {
   return (
     <div className="h-full w-full p-6">
@@ -25,15 +22,10 @@ export default function NoTestCasesState({
             </h3>
             <p className="text-sm text-muted-foreground">
               No tests were detected for this function yet. Create your first
-              test and run it here to validate behavior and catch regressions
-              early.
+              test and run it here to be seen here.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" className="gap-2" onClick={onCreateTest}>
-              <Plus className="size-4" />
-              Create first test
-            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -42,9 +34,6 @@ export default function NoTestCasesState({
             >
               <Play className="size-4" />
               Run tests
-            </Button>
-            <Button size="sm" variant="ghost" onClick={onLoadMockDetectedTests}>
-              Load mock detected tests
             </Button>
           </div>
         </div>

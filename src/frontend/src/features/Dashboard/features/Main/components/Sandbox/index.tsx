@@ -1,9 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Play, Settings } from "lucide-react";
 import Playground from "./features/Playground";
 import LogsContainer from "./features/Logs";
 import Test from "./features/Test";
+import { SandboxToolbar } from "./components/SandboxToolbar";
 import { useSandboxState } from "./hooks/useSandboxState";
 
 /**
@@ -16,11 +15,20 @@ export default function Sandbox({ tabId }: { tabId: string }) {
     setActiveTab,
     isRunning,
     setIsRunning,
+    isTestConfigCreated,
+    setIsTestConfigCreated,
     playgroundRef,
     testRef,
     handleRun,
     handleOpenSettings,
   } = useSandboxState();
+
+  const toolbarVariant: "playground" | "test" | "mode-only" =
+    activeTab === "playground"
+      ? "playground"
+      : activeTab === "test" && isTestConfigCreated
+        ? "test"
+        : "mode-only";
 
   return (
     <Tabs
@@ -48,36 +56,14 @@ export default function Sandbox({ tabId }: { tabId: string }) {
           Logs
         </TabsTrigger>
 
-        <div className="border bg-white justify-end flex items-center gap-2 pr-2 w-full h-full">
-          {activeTab === "playground" || activeTab === "test" ? (
-            <>
-              <Button
-                size="sm"
-                onClick={handleRun}
-                disabled={isRunning}
-                className="rounded-full bg-green-500 hover:bg-green-600 text-xs h-7 gap-2 px-4 shadow-sm transition-all active:scale-95"
-              >
-                <Play className="size-3 fill-current" />
-                {isRunning
-                  ? "Running..."
-                  : activeTab === "test"
-                    ? "Run tests"
-                    : "Run"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="size-7 rounded-full p-0 flex items-center justify-center hover:bg-accent border shadow-sm transition-all active:scale-95"
-                onClick={handleOpenSettings}
-              >
-                <Settings className="size-3.5 text-muted-foreground" />
-              </Button>
-            </>
-          ) : (
-            <div className="text-[10px] font-bold text-muted-foreground/60 px-2 uppercase tracking-widest">
-              {activeTab} Mode
-            </div>
-          )}
+        <div className="border bg-white justify-end flex items-center w-full h-full">
+          <SandboxToolbar
+            variant={toolbarVariant}
+            modeLabel={activeTab}
+            isRunning={isRunning}
+            onRun={handleRun}
+            onOpenSettings={handleOpenSettings}
+          />
         </div>
       </TabsList>
 
@@ -93,7 +79,11 @@ export default function Sandbox({ tabId }: { tabId: string }) {
           value="test"
           className="m-0 h-full overflow-hidden outline-none"
         >
-          <Test ref={testRef} onRunningChange={setIsRunning} />
+          <Test
+            ref={testRef}
+            onRunningChange={setIsRunning}
+            onConfigChange={setIsTestConfigCreated}
+          />
         </TabsContent>
 
         <TabsContent
