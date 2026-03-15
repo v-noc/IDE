@@ -106,14 +106,14 @@ async def get_code(
     if code_element_service.uow.has_compare_to():
 
         compare_to_code_details = await code_element_service.get_code(node_id, compare_to=True)
-        print(f"compare_to_code_details: {compare_to_code_details}")
+
         if compare_to_code_details is not None:
             if code_details is not None:
                 code_details["compare_to"] = compare_to_code_details
             else:
                 code_details = {"compare_to": compare_to_code_details,
                                 **compare_to_code_details, "code": ""}
-    print(f"code_details: {code_details}")
+
     if code_details is None:
         raise HTTPException(
             status_code=404, detail="Element or code not found")
