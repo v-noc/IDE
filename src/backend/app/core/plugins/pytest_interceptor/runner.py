@@ -19,7 +19,21 @@ class CoverageData:
     tests: list[TestData]
 
 
-def _build_runner_script(test_path: str, result_path: str) -> str:
+def _build_omit_patterns(test_root: str | None) -> list[str]:
+    """Build coverage omit patterns: temp runner file and files under test_root."""
+    omit = ["*__ide_coverage_runner_*.py"]
+    if test_root and test_root.strip():
+        root = test_root.strip().replace("\\", "/").rstrip("/")
+        if root:
+            omit.append(f"*{root}/*")
+    return omit
+
+
+def _build_runner_script(
+    test_path: str, result_path: str, test_root: str | None = None
+) -> str:
+    omit_patterns = _build_omit_patterns(test_root)
+    omit_repr = repr(omit_patterns)
     return textwrap.dedent(
         f"""
         import json
@@ -45,7 +59,7 @@ def _build_runner_script(test_path: str, result_path: str) -> str:
                 self.result_path = result_path
                 self.cov = Coverage(
                     data_file=".coverage.ide",
-                    omit=[""],
+                    omit={omit_repr},
                     branch=False,
                 )
                 self.all_coverage_datas: list[CoverageData] = []
@@ -162,6 +176,7 @@ def run_tests(
     project_root: str,
     python_executable: str | None = None,
     command_prefix: str | None = None,
+    test_root: str | None = None,
 ) -> tuple[int, list[CoverageData], str | None, str | None]:
     python_cmd = python_executable or "python"
     probe_cmd = (
@@ -197,6 +212,7 @@ def run_tests(
         runner_script = _build_runner_script(
             test_path=test_path,
             result_path=result_path,
+            test_root=test_root,
         )
         with open(runner_path, "w", encoding="utf-8") as fp:
             fp.write(runner_script)

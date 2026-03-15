@@ -58,7 +58,7 @@ class TestRepo:
     async def get_test_cases_for_node(self, item_id: str):
         query = (
             WQ()
-            .select("v:test_case_doc", "v:test_link_doc")
+            .select("v:test_case_doc", "v:test_link_doc", )
             .woql_and(
                 WQ().woql_or(
                     WQ().woql_and(

@@ -1,9 +1,12 @@
-export type TestCaseStatus = "ready" | "draft";
-
 export interface TestCaseItem {
   id: string;
   name: string;
-  status: TestCaseStatus;
+  description: string;
+  nodeId: string;
+  path: string;
+  targetFunctionId: string | null;
+  targetFunctionName: string;
+  targetFunctionDescription: string;
 }
 
 export type TestViewState = "missing_config" | "empty_tests" | "detected_tests";

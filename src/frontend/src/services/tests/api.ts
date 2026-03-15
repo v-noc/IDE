@@ -46,6 +46,25 @@ export interface RunTestsResponse {
   total_test_links: number;
 }
 
+export interface TestCaseResponse {
+  "@id"?: string;
+  id?: string;
+  name: string;
+  description?: string;
+  node_id: string;
+  path: string;
+  target_function?:
+    | string
+    | {
+        "@id"?: string;
+        id?: string;
+        name?: string;
+        description?: string;
+      }
+    | null;
+  test_links?: unknown[];
+}
+
 function withProjectId(path: string, projectId: string): string {
   const query = new URLSearchParams({ project_id: projectId });
   return `${path}?${query.toString()}`;
@@ -81,4 +100,9 @@ export const testsApi = {
       method: "POST",
       body: payload,
     }),
+
+  getTestCases: (nodeId: string, projectId: string): Promise<TestCaseResponse[]> => {
+    const params = new URLSearchParams({ project_id: projectId, node_id: nodeId });
+    return api(`${API_ROUTES.TESTS}/cases?${params.toString()}`);
+  },
 };

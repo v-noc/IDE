@@ -1,11 +1,16 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { useParams } from "react-router";
 import {
   useCreateTestConfig,
   type RunTestsResponse,
+  useTestCases,
   useTestConfig,
   useUpdateTestConfig,
 } from "@/services/tests";
+import { useWorkspaceState } from "@/features/Dashboard/features/Main/hooks/useWorkspaceState";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
+import { useCode } from "@/services/code";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +19,6 @@ import ConfigNotCreatedState from "./components/ConfigNotCreatedState";
 import DetectedTestsLayout from "./components/DetectedTestsLayout";
 import NoTestCasesState from "./components/NoTestCasesState";
 import TestConfigDialog from "./components/TestConfigDialog";
-import { MOCK_TARGET_FUNCTION_CODE, MOCK_TEST_CASES } from "./mocks";
 import type { TestConfig, TestViewState } from "./types";
 import { useRunAllTests } from "./hooks/useRunAllTests";
 
@@ -24,6 +28,7 @@ export type TestHandle = {
 };
 
 interface TestProps {
+  tabId: string;
   onRunningChange?: (isRunning: boolean) => void;
   onConfigChange?: (isConfigCreated: boolean) => void;
 }
@@ -35,14 +40,38 @@ const DEFAULT_CONFIG: TestConfig = {
   executablePath: "",
 };
 
+function normalizeDocId(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const prefix = "terminusdb:///data/";
+    return value.startsWith(prefix) ? value.slice(prefix.length) : value;
+  }
+  if (typeof value === "object" && value !== null) {
+    const id = (value as { "@id"?: unknown; id?: unknown })["@id"] ?? (value as { id?: unknown }).id;
+    return normalizeDocId(id);
+  }
+  return null;
+}
+
 const Test = forwardRef<TestHandle, TestProps>(
-  ({ onRunningChange, onConfigChange }, ref) => {
+  ({ tabId, onRunningChange, onConfigChange }, ref) => {
     const { projectId } = useParams();
     const projectNodeId = projectId ? `ProjectSchema/${projectId}` : "";
-    const [viewState, setViewState] = useState<TestViewState>("empty_tests");
-    const [selectedTestId, setSelectedTestId] = useState<string>(
-      MOCK_TEST_CASES[0].id,
+    const { effectiveNode } = useWorkspaceState(tabId);
+    const projectData = useProjectStore((s) => s.projectData);
+
+    const nodeIdForTestCases =
+      effectiveNode &&
+      (effectiveNode.node_type === "class" || effectiveNode.node_type === "function")
+        ? effectiveNode.id
+        : null;
+
+    const { data: testCases } = useTestCases(
+      nodeIdForTestCases ?? null,
+      projectNodeId,
     );
+    const [viewState, setViewState] = useState<TestViewState>("empty_tests");
+    const [selectedTestId, setSelectedTestId] = useState<string>("");
     const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
     const [testConfig, setTestConfig] = useState<TestConfig>(DEFAULT_CONFIG);
     const [latestRunResult, setLatestRunResult] =
@@ -58,6 +87,46 @@ const Test = forwardRef<TestHandle, TestProps>(
     const updateConfigMutation = useUpdateTestConfig(projectNodeId);
     const { runAllTests, isRunning } = useRunAllTests(projectNodeId);
     const isConfigCreated = Boolean(configData);
+    const normalizedTestCases = useMemo(() => {
+      if (!Array.isArray(testCases)) return [];
+      return testCases.map((item, index) => {
+        const targetFunctionId = normalizeDocId(item.target_function);
+        const targetFunctionNode = targetFunctionId
+          ? findNodeByKey(projectData, targetFunctionId)
+          : null;
+        const targetNodeMeta =
+          item.target_function && typeof item.target_function === "object"
+            ? item.target_function
+            : null;
+
+        return {
+          id:
+            normalizeDocId(item["@id"] ?? item.id) ??
+            `test-case-${item.node_id}-${index}`,
+          name: item.name,
+          description: item.description ?? "",
+          nodeId: item.node_id,
+          path: item.path,
+          targetFunctionId,
+          targetFunctionName:
+            targetFunctionNode?.name ??
+            (targetNodeMeta?.name ?? "Target function"),
+          targetFunctionDescription:
+            targetFunctionNode?.description ??
+            (targetNodeMeta?.description ?? ""),
+        };
+      });
+    }, [projectData, testCases]);
+    const selectedTestCase = useMemo(
+      () => normalizedTestCases.find((testCase) => testCase.id === selectedTestId) ?? null,
+      [normalizedTestCases, selectedTestId],
+    );
+    const selectedTargetFunctionId = selectedTestCase?.targetFunctionId ?? undefined;
+    const {
+      data: targetFunctionCodeData,
+      isLoading: isTargetFunctionCodeLoading,
+      isError: isTargetFunctionCodeError,
+    } = useCode(selectedTargetFunctionId, "function", projectNodeId);
 
     const isConfigMissing =
       !isConfigLoading &&
@@ -156,6 +225,28 @@ const Test = forwardRef<TestHandle, TestProps>(
       }
     }, [isConfigMissing]);
 
+    useEffect(() => {
+      if (!normalizedTestCases.length) {
+        if (selectedTestId !== "") {
+          setSelectedTestId("");
+        }
+        return;
+      }
+
+      const selectedExists = normalizedTestCases.some((item) => item.id === selectedTestId);
+      if (!selectedExists) {
+        setSelectedTestId(normalizedTestCases[0].id);
+      }
+    }, [normalizedTestCases, selectedTestId]);
+
+    useEffect(() => {
+      if (!isConfigCreated || isConfigMissing) return;
+      setViewState((prev) => {
+        const next = normalizedTestCases.length > 0 ? "detected_tests" : "empty_tests";
+        return prev === next ? prev : next;
+      });
+    }, [isConfigCreated, isConfigMissing, normalizedTestCases.length]);
+
     if (isConfigLoading) {
       return (
         <div className="h-full w-full rounded-lg border bg-white p-8 flex items-center justify-center text-sm text-muted-foreground">
@@ -166,9 +257,13 @@ const Test = forwardRef<TestHandle, TestProps>(
 
     let content = (
       <DetectedTestsLayout
-        testCases={MOCK_TEST_CASES}
+        testCases={normalizedTestCases}
         selectedTestId={selectedTestId}
-        targetFunctionCode={MOCK_TARGET_FUNCTION_CODE}
+        targetFunctionCode={targetFunctionCodeData?.code ?? ""}
+        targetFunctionName={selectedTestCase?.targetFunctionName ?? "Target function code"}
+        targetFunctionDescription={selectedTestCase?.targetFunctionDescription ?? ""}
+        isTargetFunctionCodeLoading={isTargetFunctionCodeLoading}
+        isTargetFunctionCodeError={isTargetFunctionCodeError}
         onSelectTest={setSelectedTestId}
         onBackToEmptyState={() => setViewState("empty_tests")}
       />

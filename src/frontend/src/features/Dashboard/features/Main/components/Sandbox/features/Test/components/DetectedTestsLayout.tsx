@@ -13,6 +13,10 @@ interface DetectedTestsLayoutProps {
   testCases: TestCaseItem[];
   selectedTestId: string;
   targetFunctionCode: string;
+  targetFunctionName: string;
+  targetFunctionDescription: string;
+  isTargetFunctionCodeLoading?: boolean;
+  isTargetFunctionCodeError?: boolean;
   onSelectTest: (id: string) => void;
   onBackToEmptyState: () => void;
 }
@@ -21,6 +25,10 @@ export default function DetectedTestsLayout({
   testCases,
   selectedTestId,
   targetFunctionCode,
+  targetFunctionName,
+  targetFunctionDescription,
+  isTargetFunctionCodeLoading = false,
+  isTargetFunctionCodeError = false,
   onSelectTest,
   onBackToEmptyState,
 }: DetectedTestsLayoutProps) {
@@ -33,9 +41,6 @@ export default function DetectedTestsLayout({
           <div className="h-full rounded-lg border bg-white p-3 flex flex-col">
             <div className="border-b pb-2 mb-2">
               <div className="text-sm font-semibold text-slate-800">Detected test cases</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Select a test to preview related code context.
-              </p>
             </div>
 
             <div className="space-y-2 overflow-y-auto">
@@ -55,9 +60,11 @@ export default function DetectedTestsLayout({
                     <div className="text-sm font-medium text-slate-800 truncate">
                       {testCase.name}
                     </div>
-                    <div className="text-[11px] text-muted-foreground mt-1 uppercase tracking-wide">
-                      {testCase.status}
-                    </div>
+                    {testCase.description ? (
+                      <div className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                        {testCase.description}
+                      </div>
+                    ) : null}
                   </button>
                 );
               })}
@@ -71,10 +78,14 @@ export default function DetectedTestsLayout({
           <div className="h-full rounded-lg border bg-white p-2 flex flex-col">
             <div className="border-b px-2 pb-2 mb-2 flex items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-semibold text-slate-800">Target function code</div>
-                <p className="text-xs text-muted-foreground">
-                  Mock preview from <code>target_function</code> (integration pending).
-                </p>
+                <div className="text-sm font-semibold text-slate-800">
+                  {targetFunctionName || "Target function code"}
+                </div>
+                {targetFunctionDescription ? (
+                  <p className="text-xs text-muted-foreground">
+                    {targetFunctionDescription}
+                  </p>
+                ) : null}
               </div>
               <Button size="sm" variant="outline" onClick={onBackToEmptyState}>
                 Back to empty state
@@ -85,6 +96,8 @@ export default function DetectedTestsLayout({
               <CodeEditor
                 language={language}
                 value={targetFunctionCode}
+                isLoading={isTargetFunctionCodeLoading}
+                isError={isTargetFunctionCodeError}
                 options={{ readOnly: true }}
               />
             </div>

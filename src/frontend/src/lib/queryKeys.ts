@@ -22,6 +22,8 @@ const queryKeys = {
   tests: {
     all: ['tests'] as const,
     config: (projectId: string) => [...queryKeys.tests.all, 'config', projectId] as const,
+    cases: (projectId: string, nodeId: string) =>
+      [...queryKeys.tests.all, 'cases', projectId, nodeId] as const,
   },
   nodes: {
     all: ['nodes'] as const,

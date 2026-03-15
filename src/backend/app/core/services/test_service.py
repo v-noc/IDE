@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 import os
 import re
 from typing import Optional
@@ -35,7 +36,7 @@ class TestService:
     def __init__(self, uow: ProjectUoW):
         self.uow = uow
         self.repos = self.uow.get_project_repos()
-        self.jedi_manager = JediProjectManager(self.uow.project.path)
+        self.jedi_manager = JediProjectManager(Path(self.uow.project.path))
 
     def create_test_config(
         self,
@@ -149,28 +150,43 @@ class TestService:
         }
 
     @staticmethod
-    def _resolve_line_to_scopes(script, line: int) -> list[ScopeInfo]:
+    def _resolve_line_to_scopes(script, line: int, column: int) -> list[ScopeInfo]:
         """
         Resolve a covered line to scope chain from inner scope -> module.
         """
-        ctx = script.get_context(line, column=0)
+        ctx = script.get_context(line, column=column)
         scopes: list[ScopeInfo] = []
-        while ctx:
-            qname = getattr(ctx, "full_name", None) or getattr(
-                ctx, "name", None)
-            if qname:
-                start_pos = ctx.get_definition_start_position() or (line, 0)
-                end_pos = ctx.get_definition_end_position() or (line, 0)
-                scopes.append(
-                    ScopeInfo(
-                        qname=qname,
-                        type=ctx.type,
-                        line_start=start_pos[0],
-                        line_end=end_pos[0],
-                    )
+
+        qname = TestService._get_qname(ctx)
+
+        if qname:
+            start_pos = ctx.get_definition_start_position() or (line, 0)
+            end_pos = ctx.get_definition_end_position() or (line, 0)
+            scopes.append(
+                ScopeInfo(
+                    qname=qname,
+                    type=ctx.type,
+                    line_start=start_pos[0],
+                    line_end=end_pos[0],
                 )
-            ctx = ctx.parent()
+            )
+
         return scopes
+
+    @staticmethod
+    def _get_qname(node_name):
+        if hasattr(node_name, "get_qualified_names"):
+            qnames = node_name.get_qualified_names(True)
+            if qnames:
+                qualified_name = ".".join(qnames)
+                return qualified_name
+
+        if hasattr(node_name, "full_name"):
+            return node_name.full_name
+
+        if hasattr(node_name, "tree_node"):
+            return TestService._get_qname(node_name.parent_context) + "." + node_name.tree_node.name
+        return None
 
     async def _resolve_scope_node_ids(self, scope_coverages: dict[str, ScopeCoverage]) -> None:
         function_qnames = [
@@ -232,15 +248,30 @@ class TestService:
 
             for file_coverage in coverage_data.tests:
                 try:
+
                     script = self.jedi_manager.get_script(
                         file_coverage.file_name)
                 except Exception:
+
                     continue
 
                 for line in sorted(file_coverage.lines):
                     try:
-                        scopes = self._resolve_line_to_scopes(script, line)
+                        source = Path(file_coverage.file_name).read_text()
+                        lines = source.splitlines()
+
+                        # Jedi uses 1-based indexing for lines
+                        target_line = lines[line - 1]
+
+                        # Find the first non-whitespace character index (the "real" column)
+                        # This skips the spaces/tabs and puts Jedi right in the action
+                        active_column = len(target_line) - \
+                            len(target_line.lstrip())
+                        scopes = self._resolve_line_to_scopes(
+                            script, line, active_column)
+
                     except Exception:
+
                         continue
                     for scope in scopes:
                         item = scope_coverages.get(scope.qname)
@@ -396,18 +427,21 @@ class TestService:
         if not os.path.isabs(test_path):
             test_path = os.path.join(self.uow.project.path, test_path)
 
-        if python_executable is None:
-            config = await self.get_test_config()
-            if config:
-                python_executable = config.get("executable_path")
+        config = await self.get_test_config()
+        if python_executable is None and config:
+            python_executable = config.get("executable_path")
+        test_root = config.get("test_root", "") if config else None
 
         exit_code, coverage_datas, error_message, raw_output = run_tests(
             test_path,
             self.uow.project.path,
             python_executable=python_executable,
             command_prefix=None,
+            test_root=test_root or None,
         )
+
         test_cases, test_links = await self._build_documents(coverage_datas)
+
         batch_ops = await self._prepare_batch_ops(test_cases, test_links)
         batch_ok = await self.repos.test_repo.flush_batch(**batch_ops)
         return {

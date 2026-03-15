@@ -81,6 +81,7 @@ export default function Sandbox({ tabId }: { tabId: string }) {
         >
           <Test
             ref={testRef}
+            tabId={tabId}
             onRunningChange={setIsRunning}
             onConfigChange={setIsTestConfigCreated}
           />

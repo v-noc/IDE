@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import get_test_service
@@ -204,7 +204,7 @@ async def run_tests(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Test config not found",
         )
-    project_test = test_service.uow.project.path
+
     run_result = await test_service.run_tests(config.get("test_root", ""))
     run = RunResult(**run_result)
     return RunTestsResponse(
@@ -215,3 +215,11 @@ async def run_tests(
         total_test_cases=run.test_cases,
         total_test_links=run.test_links,
     )
+
+
+@router.get("/cases",)
+async def get_test_cases(
+    node_id: str = Query(..., description="The ID of the node"),
+    test_service: TestService = Depends(get_test_service),
+):
+    return await test_service.get_test_cases_for_node(node_id)
