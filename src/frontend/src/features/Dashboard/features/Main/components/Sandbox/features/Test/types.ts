@@ -12,4 +12,5 @@ export interface TestConfig {
   enabled: boolean;
   testRoot: string;
   testArgs: string;
+  executablePath: string;
 }

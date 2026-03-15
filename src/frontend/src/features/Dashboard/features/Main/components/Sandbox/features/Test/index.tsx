@@ -1,15 +1,15 @@
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useState,
-} from "react";
+import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { useParams } from "react-router";
 import {
   useCreateTestConfig,
+  type RunTestsResponse,
   useTestConfig,
   useUpdateTestConfig,
 } from "@/services/tests";
+import { toast } from "sonner";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import ConfigNotCreatedState from "./components/ConfigNotCreatedState";
 import DetectedTestsLayout from "./components/DetectedTestsLayout";
 import NoTestCasesState from "./components/NoTestCasesState";
@@ -32,6 +32,7 @@ const DEFAULT_CONFIG: TestConfig = {
   enabled: true,
   testRoot: "src/backend/tests",
   testArgs: "",
+  executablePath: "",
 };
 
 const Test = forwardRef<TestHandle, TestProps>(
@@ -44,6 +45,9 @@ const Test = forwardRef<TestHandle, TestProps>(
     );
     const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
     const [testConfig, setTestConfig] = useState<TestConfig>(DEFAULT_CONFIG);
+    const [latestRunResult, setLatestRunResult] =
+      useState<RunTestsResponse | null>(null);
+    const [isResultPanelOpen, setIsResultPanelOpen] = useState(false);
 
     const {
       data: configData,
@@ -74,6 +78,7 @@ const Test = forwardRef<TestHandle, TestProps>(
         enabled: testConfig.enabled,
         test_root: testConfig.testRoot,
         test_args: testConfig.testArgs,
+        executable_path: testConfig.executablePath,
       };
 
       if (isConfigCreated) {
@@ -94,13 +99,27 @@ const Test = forwardRef<TestHandle, TestProps>(
 
       if (isRunning) return;
 
-      const runResult = await runAllTests();
-      if (runResult.total_test_cases > 0 || runResult.total_test_links > 0) {
-        setViewState("detected_tests");
-        return;
-      }
+      try {
+        const runResult = await runAllTests();
+        setLatestRunResult(runResult);
+        setIsResultPanelOpen(true);
+        const runError =
+          runResult.run?.error_message ??
+          runResult.runs.find((item) => item.error_message)?.error_message;
+        if (runError) {
+          toast.error(runError);
+          setViewState("empty_tests");
+          return;
+        }
+        if (runResult.total_test_cases > 0 || runResult.total_test_links > 0) {
+          setViewState("detected_tests");
+          return;
+        }
 
-      setViewState("empty_tests");
+        setViewState("empty_tests");
+      } catch {
+        toast.error("Failed to run tests.");
+      }
     };
 
     useImperativeHandle(ref, () => ({
@@ -120,6 +139,7 @@ const Test = forwardRef<TestHandle, TestProps>(
         enabled: configData.enabled,
         testRoot: configData.test_root,
         testArgs: configData.test_args,
+        executablePath: configData.executable_path ?? "",
       });
       setViewState((prev) =>
         prev === "missing_config" ? "empty_tests" : prev,
@@ -164,9 +184,63 @@ const Test = forwardRef<TestHandle, TestProps>(
       );
     }
 
+    const latestRawOutput = latestRunResult
+      ? latestRunResult.runs
+          .map((run, index) => {
+            if (!run.raw_output) return null;
+            return latestRunResult.runs.length > 1
+              ? `--- Run ${index + 1} ---\n${run.raw_output}`
+              : run.raw_output;
+          })
+          .filter(Boolean)
+          .join("\n\n")
+      : "";
+
     return (
       <>
-        {content}
+        <div className="h-full w-full flex min-w-0 gap-1">
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            {latestRunResult && !isResultPanelOpen && (
+              <div className="flex justify-end px-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsResultPanelOpen(true)}
+                >
+                  Show output
+                </Button>
+              </div>
+            )}
+            <div className="flex-1 min-h-0">{content}</div>
+          </div>
+
+          {latestRunResult && isResultPanelOpen && (
+            <aside className="w-[45%] shrink-0 rounded-lg border bg-white flex flex-col">
+              <div className="px-3 py-2 border-b flex items-center justify-between">
+                <div className="text-sm font-semibold text-slate-800">
+                  Output
+                </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setIsResultPanelOpen(false)}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+
+              <ScrollArea className="flex-1">
+                <div className="p-3">
+                  <pre className="text-xs whitespace-pre-wrap wrap-break-word">
+                    {latestRawOutput || "No subprocess output from last run."}
+                  </pre>
+                </div>
+              </ScrollArea>
+            </aside>
+          )}
+        </div>
 
         <TestConfigDialog
           open={isConfigDialogOpen}

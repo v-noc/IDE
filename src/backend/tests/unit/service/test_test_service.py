@@ -24,7 +24,7 @@ class _ScopeResolver:
         return [ScopeInfo(self.target_qname, "function", 1, 200)]
 
 
-def _mock_coverage_data(test_id: str, file_name: str, lines: set[int]):
+def _mock_coverage_data(test_id: str, file_name: str, lines):
     return CoverageData(
         test_id=test_id,
         tests=[TestData(file_name=file_name, lines=lines)],
@@ -163,7 +163,12 @@ async def test_run_tests_uses_mocked_runner(create_sample_project, monkeypatch):
     )
     monkeypatch.setattr(
         "app.core.services.test_service.run_tests",
-        lambda _path, _root: (0, [mocked_cov]),
+        lambda _path, _root, python_executable=None, command_prefix=None: (
+            0,
+            [mocked_cov],
+            None,
+            "",
+        ),
     )
 
     result = await service.run_tests("tests/test_main.py")
@@ -171,3 +176,5 @@ async def test_run_tests_uses_mocked_runner(create_sample_project, monkeypatch):
     assert result["test_cases"] == 1
     assert result["test_links"] == 1
     assert result["persisted"] is True
+    assert result["error_message"] is None
+    assert result["raw_output"] == ""

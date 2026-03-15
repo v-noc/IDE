@@ -86,6 +86,21 @@ export default function TestConfigDialog({
               }
             />
           </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="executablePath">Python executable path</Label>
+            <Input
+              id="executablePath"
+              placeholder="e.g. .venv/bin/python"
+              value={config.executablePath}
+              onChange={(e) =>
+                onChangeConfig({
+                  ...config,
+                  executablePath: e.target.value,
+                })
+              }
+            />
+          </div>
         </div>
 
         <DialogFooter>

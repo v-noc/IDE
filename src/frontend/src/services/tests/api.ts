@@ -6,18 +6,21 @@ export interface TestConfigResponse {
   enabled: boolean;
   test_root: string;
   test_args: string;
+  executable_path?: string | null;
 }
 
 export interface CreateTestConfigPayload {
   enabled: boolean;
   test_root: string;
   test_args: string;
+  executable_path?: string | null;
 }
 
 export interface UpdateTestConfigPayload {
   enabled?: boolean;
   test_root?: string;
   test_args?: string;
+  executable_path?: string | null;
 }
 
 export interface RunTestsPayload {
@@ -30,6 +33,8 @@ export interface RunResultResponse {
   test_cases: number;
   test_links: number;
   persisted: boolean;
+  error_message?: string | null;
+  raw_output?: string | null;
 }
 
 export interface RunTestsResponse {

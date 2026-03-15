@@ -37,7 +37,13 @@ class TestService:
         self.repos = self.uow.get_project_repos()
         self.jedi_manager = JediProjectManager(self.uow.project.path)
 
-    def create_test_config(self, enabled: bool, test_root: str, test_args: str = ""):
+    def create_test_config(
+        self,
+        enabled: bool,
+        test_root: str,
+        test_args: str = "",
+        executable_path: Optional[str] = None,
+    ):
         now = datetime.now(timezone.utc)
         return TestConfigSchema(
             _id=f"TestConfigSchema/{self.uow.project.db_name}",
@@ -46,6 +52,7 @@ class TestService:
             enabled=enabled,
             test_root=test_root,
             test_args=test_args,
+            executable_path=executable_path.strip() if executable_path else None,
             created_at=now,
             updated_at=now,
         )
@@ -58,11 +65,13 @@ class TestService:
         enabled: bool,
         test_root: str,
         test_args: str = "",
+        executable_path: Optional[str] = None,
     ) -> bool:
         config = self.create_test_config(
             enabled=enabled,
             test_root=test_root,
             test_args=test_args,
+            executable_path=executable_path,
         )
         return await self.repos.test_repo.upsert_test_config(config)
 
@@ -71,8 +80,10 @@ class TestService:
         enabled: Optional[bool] = None,
         test_root: Optional[str] = None,
         test_args: Optional[str] = None,
+        executable_path: Optional[str] = None,
     ):
         current = await self.get_test_config()
+
         if not current:
             return None
 
@@ -88,6 +99,11 @@ class TestService:
                 "test_root", "") if test_root is None else test_root,
             test_args=current.get(
                 "test_args", "") if test_args is None else test_args,
+            executable_path=(
+                current.get("executable_path")
+                if executable_path is None
+                else (executable_path.strip() or None)
+            ),
             created_at=current.get("created_at", now),
             updated_at=now,
         )
@@ -375,11 +391,22 @@ class TestService:
             "delete_link_parent": delete_link_parent,
         }
 
-    async def run_tests(self, path: str):
+    async def run_tests(self, path: str, python_executable: Optional[str] = None):
         test_path = path
         if not os.path.isabs(test_path):
             test_path = os.path.join(self.uow.project.path, test_path)
-        exit_code, coverage_datas = run_tests(test_path, self.uow.project.path)
+
+        if python_executable is None:
+            config = await self.get_test_config()
+            if config:
+                python_executable = config.get("executable_path")
+
+        exit_code, coverage_datas, error_message, raw_output = run_tests(
+            test_path,
+            self.uow.project.path,
+            python_executable=python_executable,
+            command_prefix=None,
+        )
         test_cases, test_links = await self._build_documents(coverage_datas)
         batch_ops = await self._prepare_batch_ops(test_cases, test_links)
         batch_ok = await self.repos.test_repo.flush_batch(**batch_ops)
@@ -388,4 +415,6 @@ class TestService:
             "test_cases": len(test_cases),
             "test_links": len(test_links),
             "persisted": batch_ok,
+            "error_message": error_message,
+            "raw_output": raw_output,
         }

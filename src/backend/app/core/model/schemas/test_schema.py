@@ -22,6 +22,7 @@ class TestConfigSchema(BaseSchema):
     enabled: bool
     test_root: str
     test_args: str
+    executable_path: Optional[str] = None
 
 
 class TestLinkSchema(BaseSchema):

@@ -13,12 +13,14 @@ class CreateTestConfigRequest(BaseModel):
     enabled: bool = Field(default=True)
     test_root: str = Field(..., min_length=1)
     test_args: str = Field(default="")
+    executable_path: Optional[str] = Field(default=None)
 
 
 class UpdateTestConfigRequest(BaseModel):
     enabled: Optional[bool] = None
     test_root: Optional[str] = Field(default=None, min_length=1)
     test_args: Optional[str] = None
+    executable_path: Optional[str] = None
 
 
 class TestConfigResponse(BaseModel):
@@ -26,6 +28,7 @@ class TestConfigResponse(BaseModel):
     enabled: bool
     test_root: str
     test_args: str
+    executable_path: Optional[str] = None
 
 
 class RunTestsRequest(BaseModel):
@@ -50,6 +53,8 @@ class RunResult(BaseModel):
     test_cases: int
     test_links: int
     persisted: bool
+    error_message: Optional[str] = None
+    raw_output: Optional[str] = None
 
 
 class RunTestsResponse(BaseModel):
@@ -77,6 +82,7 @@ async def get_test_config(
         enabled=config.get("enabled", False),
         test_root=config.get("test_root", ""),
         test_args=config.get("test_args", ""),
+        executable_path=config.get("executable_path"),
     )
 
 
@@ -89,6 +95,7 @@ async def create_test_config(
         enabled=request.enabled,
         test_root=request.test_root,
         test_args=request.test_args,
+        executable_path=request.executable_path,
     )
     if not ok:
         raise HTTPException(
@@ -101,6 +108,7 @@ async def create_test_config(
         enabled=config.get("enabled", False),
         test_root=config.get("test_root", ""),
         test_args=config.get("test_args", ""),
+        executable_path=config.get("executable_path"),
     )
 
 
@@ -113,6 +121,7 @@ async def update_test_config(
         request.enabled is None
         and request.test_root is None
         and request.test_args is None
+        and request.executable_path is None
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -123,6 +132,7 @@ async def update_test_config(
         enabled=request.enabled,
         test_root=request.test_root,
         test_args=request.test_args,
+        executable_path=request.executable_path,
     )
     if not config:
         raise HTTPException(
@@ -135,6 +145,7 @@ async def update_test_config(
         enabled=config.get("enabled", False),
         test_root=config.get("test_root", ""),
         test_args=config.get("test_args", ""),
+        executable_path=config.get("executable_path"),
     )
 
 

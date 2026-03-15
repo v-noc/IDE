@@ -1,17 +1,18 @@
 from coverage import Coverage
 from datetime import datetime, timezone
-from pydantic import BaseModel
-from typing import Set, List
+from dataclasses import dataclass
 
 
-class TestData(BaseModel):
+@dataclass
+class TestData:
     file_name: str
-    lines: Set[int]
+    lines: list[int]
 
 
-class CoverageData(BaseModel):
+@dataclass
+class CoverageData:
     test_id: str
-    tests: List[TestData]
+    tests: list[TestData]
 
 
 class CoveragePlugin:
@@ -57,7 +58,7 @@ class CoveragePlugin:
                 lines = data.lines(filename)
 
                 coverage_data.tests.append(
-                    TestData(file_name=filename, lines=lines))
+                    TestData(file_name=filename, lines=sorted(lines or [])))
             self.all_coverage_datas.append(coverage_data)
 
         return self.all_coverage_datas
