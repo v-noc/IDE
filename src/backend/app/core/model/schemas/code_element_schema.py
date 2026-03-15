@@ -7,6 +7,21 @@ from .base import BaseSchema
 from .metadata import CodePositionSchema, DocumentSchema, ThemeConfigSchema
 
 
+class PlayGroundSchema(BaseSchema):
+    name: str
+    description: str
+    relative_path: str
+    executable_path: Optional[str] = None
+    examples_path: Optional[str] = None
+    command_prefix: Optional[str] = None
+    filename: Optional[str] = None
+    code: str
+    owner_function: Optional[str] = None
+    owner_class: Optional[str] = None
+    owner_file: Optional[str] = None
+    owner_folder: Optional[str] = None
+
+
 class CodeElementGroupSchema(BaseSchema):
     """
     The schema for the code element group document.

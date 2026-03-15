@@ -9,11 +9,18 @@ from .code_element_schema import (
     CodeElementGroupSchema,
     ClassSchema,
     FunctionSchema,
-    CallSchema
+    CallSchema,
+    PlayGroundSchema,
 )
 from .log_schema import LogSchema, LogLevelName, LogEventType
 from .metadata import CodePositionSchema, ThemeConfigSchema, DocumentSchema
-from .structure_schema import StructureGroupSchema, FileSchema, FolderSchema, ProjectSchema, CodeContentSchema
+from .structure_schema import (
+    StructureGroupSchema,
+    FileSchema,
+    FolderSchema,
+    ProjectSchema,
+    CodeContentSchema,
+)
 from .test_schema import TestConfigSchema, TestCaseSchema, TestLinkSchema
 
 __all__ = [
@@ -24,6 +31,7 @@ __all__ = [
     "ClassSchema",
     "FunctionSchema",
     "CallSchema",
+    "PlayGroundSchema",
     "LogSchema",
     "LogLevelName",
     "LogEventType",
@@ -41,7 +49,12 @@ __all__ = [
 ]
 
 
-async def ensure_schema(client: AsyncClient, title: str, description: str, authors: list[str]):
+async def ensure_schema(
+    client: AsyncClient,
+    title: str,
+    description: str,
+    authors: list[str],
+):
     schema_obj = WOQLSchema(
         title=title,
         description=description,
@@ -70,8 +83,13 @@ async def ensure_schema(client: AsyncClient, title: str, description: str, autho
     schema_obj.add_obj(FunctionSchema.__name__, FunctionSchema)
     schema_obj.add_obj(CallGroupSchema.__name__, CallGroupSchema)
     schema_obj.add_obj(CallSchema.__name__, CallSchema)
+    schema_obj.add_obj(PlayGroundSchema.__name__, PlayGroundSchema)
     schema_obj.add_obj(TestConfigSchema.__name__, TestConfigSchema)
     schema_obj.add_obj(TestCaseSchema.__name__, TestCaseSchema)
     schema_obj.add_obj(TestLinkSchema.__name__, TestLinkSchema)
 
-    await schema_obj.commit(client, f"Initialize schema for {title}", full_replace=True)
+    await schema_obj.commit(
+        client,
+        f"Initialize schema for {title}",
+        full_replace=True,
+    )

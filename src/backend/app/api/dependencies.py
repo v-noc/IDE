@@ -8,6 +8,7 @@ from app.core.services.log_service import LogService
 from app.core.services.group_service import GroupService
 from app.core.services.document_service import DocumentService
 from app.core.services.test_service import TestService
+from app.core.services.play_ground_service import PlayGroundService
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
@@ -100,5 +101,13 @@ def get_document_service(
     return DocumentService(uow)
 
 
-def get_test_service(uow: ProjectUoW = Depends(get_project_uow)) -> TestService:
+def get_test_service(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> TestService:
     return TestService(uow)
+
+
+def get_play_ground_service(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> PlayGroundService:
+    return PlayGroundService(uow)
