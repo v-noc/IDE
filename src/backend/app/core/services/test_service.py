@@ -229,10 +229,9 @@ class TestService:
         raw_name = node_id.split("::")[-1]
         # remove parametrized suffix
         raw_name = re.sub(r"\[.*\]$", "", raw_name)
-        candidate = raw_name[5:] if raw_name.startswith("test_") else raw_name
 
         for cov in function_coverages:
-            if cov.scope.qname.split(".")[-1] == candidate:
+            if cov.scope.qname.split(".")[-1] == raw_name:
                 return cov.scope.node_id
 
         most_covered = max(function_coverages, key=lambda cov: len(cov.lines))
@@ -288,6 +287,7 @@ class TestService:
 
             target_function_id = self._pick_target_function(
                 coverage_data.test_id, scope_coverages)
+
             if not target_function_id:
                 continue
 
