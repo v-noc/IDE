@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Set
 
 from terminusdb_client.woqlquery.woql_query import Doc
 
@@ -31,6 +31,46 @@ class TestRepo:
 
     async def get_test_config(self, project_db_name: str):
         return await self.get(f"TestConfigSchema/{project_db_name}")
+
+    async def get_links_for_node(self, node_id: str):
+        query = (
+            WQ()
+            .select("v:line")
+            .woql_and(
+                # Traverse from TestCase to linked TestLink entries
+                WQ().triple("v:test_case", "test_links", "v:link"),
+                # Match any owner type for this node id
+                WQ().woql_or(
+                    WQ().triple("v:link", "owner_function", node_id),
+                    WQ().triple("v:link", "owner_class", node_id),
+                    WQ().triple("v:link", "owner_file", node_id),
+                ),
+                # Pull each covered line for matched links
+                WQ().triple("v:link", "lines", "v:line"),
+            )
+        )
+        try:
+            result = await self.client.query(query)
+
+        except Exception as exc:
+            print(f"Failed to get links for node: {exc}")
+            return set()
+
+        # Union all lines into a single set, deduplicating across links.
+        lines_set: Set[int] = set()
+        if result and "bindings" in result:
+            for binding in result["bindings"]:
+                line_val = binding.get("line")
+                if line_val is None:
+                    # Keep compatibility with prefixed variable names.
+                    line_val = binding.get("v:line")
+                if line_val is not None:
+                    if isinstance(line_val, dict):
+                        line_val = line_val.get("@value")
+                    if line_val is not None:
+                        lines_set.add(int(line_val))
+
+        return lines_set
 
     async def upsert_test_config(self, config: TestConfigSchema) -> bool:
         try:
@@ -129,7 +169,13 @@ class TestRepo:
         insert_link_parent: Dict[str, str],
         delete_link_parent: Dict[str, str],
     ) -> bool:
-        if not (case_inserts or case_updates or link_inserts or link_updates or link_deletes):
+        if not (
+            case_inserts
+            or case_updates
+            or link_inserts
+            or link_updates
+            or link_deletes
+        ):
             return True
 
         queries = []
@@ -212,7 +258,10 @@ class TestRepo:
         try:
             await self.client.query(
                 WQ().woql_and(*queries),
-                commit_msg=f"Batch tests: {len(case_updates)} cases updated, {len(link_updates)} links updated"
+                commit_msg=(
+                    f"Batch tests: {len(case_updates)} cases updated, "
+                    f"{len(link_updates)} links updated"
+                ),
             )
             return True
         except Exception as exc:

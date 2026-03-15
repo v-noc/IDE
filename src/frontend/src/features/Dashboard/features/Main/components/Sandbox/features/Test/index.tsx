@@ -1,4 +1,10 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { useParams } from "react-router";
 import {
   useCreateTestConfig,
@@ -47,7 +53,9 @@ function normalizeDocId(value: unknown): string | null {
     return value.startsWith(prefix) ? value.slice(prefix.length) : value;
   }
   if (typeof value === "object" && value !== null) {
-    const id = (value as { "@id"?: unknown; id?: unknown })["@id"] ?? (value as { id?: unknown }).id;
+    const id =
+      (value as { "@id"?: unknown; id?: unknown })["@id"] ??
+      (value as { id?: unknown }).id;
     return normalizeDocId(id);
   }
   return null;
@@ -62,11 +70,13 @@ const Test = forwardRef<TestHandle, TestProps>(
 
     const nodeIdForTestCases =
       effectiveNode &&
-      (effectiveNode.node_type === "class" || effectiveNode.node_type === "function")
+      (effectiveNode.node_type === "class" ||
+        effectiveNode.node_type === "function" ||
+        effectiveNode.node_type === "file")
         ? effectiveNode.id
         : null;
 
-    const { data: testCases } = useTestCases(
+    const { data: testCasesResponse } = useTestCases(
       nodeIdForTestCases ?? null,
       projectNodeId,
     );
@@ -88,6 +98,7 @@ const Test = forwardRef<TestHandle, TestProps>(
     const { runAllTests, isRunning } = useRunAllTests(projectNodeId);
     const isConfigCreated = Boolean(configData);
     const normalizedTestCases = useMemo(() => {
+      const testCases = testCasesResponse?.test_cases ?? [];
       if (!Array.isArray(testCases)) return [];
       return testCases.map((item, index) => {
         const targetFunctionId = normalizeDocId(item.target_function);
@@ -110,18 +121,24 @@ const Test = forwardRef<TestHandle, TestProps>(
           targetFunctionId,
           targetFunctionName:
             targetFunctionNode?.name ??
-            (targetNodeMeta?.name ?? "Target function"),
+            targetNodeMeta?.name ??
+            "Target function",
           targetFunctionDescription:
             targetFunctionNode?.description ??
-            (targetNodeMeta?.description ?? ""),
+            targetNodeMeta?.description ??
+            "",
         };
       });
-    }, [projectData, testCases]);
+    }, [projectData, testCasesResponse]);
     const selectedTestCase = useMemo(
-      () => normalizedTestCases.find((testCase) => testCase.id === selectedTestId) ?? null,
+      () =>
+        normalizedTestCases.find(
+          (testCase) => testCase.id === selectedTestId,
+        ) ?? null,
       [normalizedTestCases, selectedTestId],
     );
-    const selectedTargetFunctionId = selectedTestCase?.targetFunctionId ?? undefined;
+    const selectedTargetFunctionId =
+      selectedTestCase?.targetFunctionId ?? undefined;
     const {
       data: targetFunctionCodeData,
       isLoading: isTargetFunctionCodeLoading,
@@ -233,7 +250,9 @@ const Test = forwardRef<TestHandle, TestProps>(
         return;
       }
 
-      const selectedExists = normalizedTestCases.some((item) => item.id === selectedTestId);
+      const selectedExists = normalizedTestCases.some(
+        (item) => item.id === selectedTestId,
+      );
       if (!selectedExists) {
         setSelectedTestId(normalizedTestCases[0].id);
       }
@@ -242,7 +261,8 @@ const Test = forwardRef<TestHandle, TestProps>(
     useEffect(() => {
       if (!isConfigCreated || isConfigMissing) return;
       setViewState((prev) => {
-        const next = normalizedTestCases.length > 0 ? "detected_tests" : "empty_tests";
+        const next =
+          normalizedTestCases.length > 0 ? "detected_tests" : "empty_tests";
         return prev === next ? prev : next;
       });
     }, [isConfigCreated, isConfigMissing, normalizedTestCases.length]);
@@ -260,8 +280,12 @@ const Test = forwardRef<TestHandle, TestProps>(
         testCases={normalizedTestCases}
         selectedTestId={selectedTestId}
         targetFunctionCode={targetFunctionCodeData?.code ?? ""}
-        targetFunctionName={selectedTestCase?.targetFunctionName ?? "Target function code"}
-        targetFunctionDescription={selectedTestCase?.targetFunctionDescription ?? ""}
+        targetFunctionName={
+          selectedTestCase?.targetFunctionName ?? "Target function code"
+        }
+        targetFunctionDescription={
+          selectedTestCase?.targetFunctionDescription ?? ""
+        }
         isTargetFunctionCodeLoading={isTargetFunctionCodeLoading}
         isTargetFunctionCodeError={isTargetFunctionCodeError}
         onSelectTest={setSelectedTestId}

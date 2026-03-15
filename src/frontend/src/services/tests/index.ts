@@ -7,4 +7,5 @@ export type {
   RunTestsPayload,
   RunTestsResponse,
   TestCaseResponse,
+  TestCasesResponse,
 } from "./api";

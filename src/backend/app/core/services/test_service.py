@@ -76,6 +76,9 @@ class TestService:
         )
         return await self.repos.test_repo.upsert_test_config(config)
 
+    async def get_links_for_node(self, node_id: str):
+        return await self.repos.test_repo.get_links_for_node(node_id)
+
     async def update_test_config(
         self,
         enabled: Optional[bool] = None,

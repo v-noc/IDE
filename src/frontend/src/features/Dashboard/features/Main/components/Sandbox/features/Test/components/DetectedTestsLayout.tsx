@@ -40,7 +40,9 @@ export default function DetectedTestsLayout({
         <ResizablePanel defaultSize={25} minSize={18}>
           <div className="h-full rounded-lg border bg-white p-3 flex flex-col">
             <div className="border-b pb-2 mb-2">
-              <div className="text-sm font-semibold text-slate-800">Detected test cases</div>
+              <div className="text-sm font-semibold text-slate-800">
+                Detected test cases
+              </div>
             </div>
 
             <div className="space-y-2 overflow-y-auto">
@@ -87,9 +89,6 @@ export default function DetectedTestsLayout({
                   </p>
                 ) : null}
               </div>
-              <Button size="sm" variant="outline" onClick={onBackToEmptyState}>
-                Back to empty state
-              </Button>
             </div>
 
             <div className="flex-1 min-h-0 overflow-hidden">

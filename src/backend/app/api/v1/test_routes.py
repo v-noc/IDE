@@ -222,4 +222,7 @@ async def get_test_cases(
     node_id: str = Query(..., description="The ID of the node"),
     test_service: TestService = Depends(get_test_service),
 ):
-    return await test_service.get_test_cases_for_node(node_id)
+    return {
+        "test_cases": await test_service.get_test_cases_for_node(node_id),
+        "lines": sorted(await test_service.get_links_for_node(node_id)),
+    }
