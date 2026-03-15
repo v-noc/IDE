@@ -160,20 +160,22 @@ class TestService:
         ctx = script.get_context(line, column=column)
         scopes: list[ScopeInfo] = []
 
-        qname = TestService._get_qname(ctx)
-
-        if qname:
-            start_pos = ctx.get_definition_start_position() or (line, 0)
-            end_pos = ctx.get_definition_end_position() or (line, 0)
-            scopes.append(
-                ScopeInfo(
-                    qname=qname,
-                    type=ctx.type,
-                    line_start=start_pos[0],
-                    line_end=end_pos[0],
+        while ctx:
+            qname = TestService._get_qname(ctx)
+            if qname:
+                start_pos = ctx.get_definition_start_position() or (line, 0)
+                end_pos = ctx.get_definition_end_position() or (line, 0)
+                scopes.append(
+                    ScopeInfo(
+                        qname=qname,
+                        type=ctx.type,
+                        line_start=start_pos[0],
+                        line_end=end_pos[0],
+                    )
                 )
-            )
-
+            if ctx.type == "module":
+                break
+            ctx = ctx.parent()
         return scopes
 
     @staticmethod
@@ -277,6 +279,7 @@ class TestService:
                         continue
                     for scope in scopes:
                         item = scope_coverages.get(scope.qname)
+
                         if item is None:
                             scope_coverages[scope.qname] = ScopeCoverage(
                                 scope=scope, lines={line})
