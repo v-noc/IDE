@@ -3,6 +3,7 @@ import queryKeys from "@/lib/queryKeys";
 import {
   testsApi,
   type CreateTestConfigPayload,
+  type RunTestsPayload,
   type UpdateTestConfigPayload,
 } from "./api";
 
@@ -25,5 +26,11 @@ export const useUpdateTestConfig = (projectId: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tests.config(projectId) });
     },
+  });
+};
+
+export const useRunTests = (projectId: string) => {
+  return useMutation({
+    mutationFn: (payload: RunTestsPayload) => testsApi.runTests(payload, projectId),
   });
 };

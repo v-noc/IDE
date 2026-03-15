@@ -158,10 +158,10 @@ async def run_tests(
 ) -> RunTestsResponse:
     has_node_id = bool(request.node_id)
     has_owner_id = bool(request.owner_id)
-    if has_node_id == has_owner_id:
+    if has_node_id and has_owner_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Provide exactly one of node_id or owner_id",
+            detail="Provide at most one of node_id or owner_id",
         )
 
     if request.node_id:
@@ -176,12 +176,31 @@ async def run_tests(
             total_test_links=run.test_links,
         )
 
-    owner_result = await test_service.run_tests_for_owner(request.owner_id)
-    runs = [RunResult(**item) for item in owner_result.get("runs", [])]
+    if request.owner_id:
+        owner_result = await test_service.run_tests_for_owner(request.owner_id)
+        runs = [RunResult(**item) for item in owner_result.get("runs", [])]
+        return RunTestsResponse(
+            mode="owner_id",
+            runs=runs,
+            total_runs=owner_result.get("total_runs", 0),
+            total_test_cases=owner_result.get("total_test_cases", 0),
+            total_test_links=owner_result.get("total_test_links", 0),
+        )
+
+    config = await test_service.get_test_config()
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Test config not found",
+        )
+
+    run_result = await test_service.run_tests(config.get("test_root", ""))
+    run = RunResult(**run_result)
     return RunTestsResponse(
-        mode="owner_id",
-        runs=runs,
-        total_runs=owner_result.get("total_runs", 0),
-        total_test_cases=owner_result.get("total_test_cases", 0),
-        total_test_links=owner_result.get("total_test_links", 0),
+        mode="config",
+        run=run,
+        runs=[run],
+        total_runs=1,
+        total_test_cases=run.test_cases,
+        total_test_links=run.test_links,
     )
