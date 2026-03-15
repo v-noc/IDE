@@ -204,7 +204,7 @@ async def run_tests(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Test config not found",
         )
-
+    project_test = test_service.uow.project.path
     run_result = await test_service.run_tests(config.get("test_root", ""))
     run = RunResult(**run_result)
     return RunTestsResponse(

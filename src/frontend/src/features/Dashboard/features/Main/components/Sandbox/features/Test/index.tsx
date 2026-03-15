@@ -233,7 +233,7 @@ const Test = forwardRef<TestHandle, TestProps>(
 
               <ScrollArea className="flex-1">
                 <div className="p-3">
-                  <pre className="text-xs whitespace-pre-wrap wrap-break-word">
+                  <pre className="text-xs whitespace-break-spaces wrap-break-word">
                     {latestRawOutput || "No subprocess output from last run."}
                   </pre>
                 </div>

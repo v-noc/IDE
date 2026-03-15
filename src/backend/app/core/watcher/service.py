@@ -11,6 +11,7 @@ from app.core.watcher.project_watcher import ProjectWatcher
 from app.core.socket.manager import get_socket_manager
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
+from app.db.context import ProjectUoW, RequestDbContext
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +135,14 @@ class WatcherService:
 
                 # Re-initialize orchestrator for the specific job
                 # Note: We create a fresh one to ensure clean state
+                uow = ProjectUoW(
+                    self.db.clone(),
+                    project_node,
+                    RequestDbContext(),
+                )
                 orchestrator = GraphBuilderOrchestrator(
                     project_node=project_node,
-                    db=self.db.clone()
+                    uow=uow,
                 )
 
                 # Perform the sync (orchestrator is async; run in main loop)
