@@ -14,6 +14,35 @@ services:
       - TERMINUSDB_ADMIN_PASS=${TERMINUSDB_ADMIN_PASS:-root}
     volumes:
       - terminusdb_storage:/app/terminusdb/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6363/ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  semantic_indexer:
+    image: terminusdb/vectorlink:latest
+    container_name: terminusdb-semantic-indexer
+    ports:
+      - "8080:8080"
+    depends_on:
+      terminusdb:
+        condition: service_healthy
+    environment:
+      - TERMINUSDB_CONTENT_ENDPOINT=http://terminusdb:6363
+      - TERMINUSDB_USER_FORWARD_HEADER=X-User-Forward
+      - OPENAI_KEY=${OPENAI_KEY}
+    volumes:
+      - ./vector_storage:/app/storage
+    command:
+      [
+        "./terminusdb-semantic-indexer",
+        "serve",
+        "--directory",
+        "/app/storage",
+        "--size",
+        "${BUFFER_AMOUNT:-100}",
+      ]
 
 volumes:
   terminusdb_storage:

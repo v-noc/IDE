@@ -12,7 +12,7 @@ class _ScopeResolver:
     target_qname: str
     helper_qname: str
 
-    def first_pass(self, _script, line: int):
+    def first_pass(self, _script, line: int, _column: int):
         if line == 10:
             return [
                 ScopeInfo(self.target_qname, "function", 1, 200),
@@ -20,7 +20,7 @@ class _ScopeResolver:
             ]
         return [ScopeInfo(self.target_qname, "function", 1, 200)]
 
-    def second_pass(self, _script, _line: int):
+    def second_pass(self, _script, _line: int, _column: int):
         return [ScopeInfo(self.target_qname, "function", 1, 200)]
 
 
@@ -42,7 +42,6 @@ async def test_build_documents_creates_test_case_and_links(create_sample_project
     helper_fn = functions[1]
 
     resolver = _ScopeResolver("scope.target", "scope.helper")
-    service.jedi_manager.get_script = lambda _path: object()
     service._resolve_line_to_scopes = resolver.first_pass
 
     async def _resolve_ids(scope_coverages):
@@ -79,7 +78,6 @@ async def test_flush_batch_update_delete_and_get_by_owner(create_sample_project)
     helper_fn = functions[1]
 
     resolver = _ScopeResolver("scope.target", "scope.helper")
-    service.jedi_manager.get_script = lambda _path: object()
     service._pick_target_function = lambda _node_id, _scopes: target_fn.id
 
     async def _resolve_ids(scope_coverages):
@@ -111,6 +109,7 @@ async def test_flush_batch_update_delete_and_get_by_owner(create_sample_project)
     )
     second_cases, second_links = await service._build_documents([second_coverage])
     second_batch = await service._prepare_batch_ops(second_cases, second_links)
+
     second_ok = await service.repos.test_repo.flush_batch(**second_batch)
     assert second_ok is True
 
@@ -145,10 +144,9 @@ async def test_run_tests_uses_mocked_runner(create_sample_project, monkeypatch):
     assert len(functions) >= 1
     target_fn = functions[0]
 
-    service.jedi_manager.get_script = lambda _path: object()
-    service._resolve_line_to_scopes = lambda _script, _line: [
-        ScopeInfo("scope.target", "function", 1, 200),
-    ]
+    # service._resolve_line_to_scopes = lambda _script, _line, _column: [
+    #     ScopeInfo("scope.target", "function", 1, 200),
+    # ]
 
     async def _resolve_ids(scope_coverages):
         scope_coverages["scope.target"].scope.node_id = target_fn.id
@@ -163,7 +161,7 @@ async def test_run_tests_uses_mocked_runner(create_sample_project, monkeypatch):
     )
     monkeypatch.setattr(
         "app.core.services.test_service.run_tests",
-        lambda _path, _root, python_executable=None, command_prefix=None: (
+        lambda _path, _root, python_executable=None, command_prefix=None, test_root=None: (
             0,
             [mocked_cov],
             None,
