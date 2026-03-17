@@ -35,8 +35,6 @@ class PlayGroundService:
         relative_path: str,
         code: str,
         executable_path: Optional[str] = None,
-        examples_path: Optional[str] = None,
-        command_prefix: Optional[str] = None,
         filename: Optional[str] = None,
         owner_function: Optional[str] = None,
         owner_class: Optional[str] = None,
@@ -62,8 +60,6 @@ class PlayGroundService:
             relative_path=relative_path,
             code=code,
             executable_path=executable_path,
-            examples_path=examples_path,
-            command_prefix=command_prefix,
             filename=filename,
             owner_function=owner_function,
             owner_class=owner_class,
@@ -88,8 +84,6 @@ class PlayGroundService:
         relative_path: Optional[str] = None,
         code: Optional[str] = None,
         executable_path: Optional[str] = None,
-        examples_path: Optional[str] = None,
-        command_prefix: Optional[str] = None,
         filename: Optional[str] = None,
     ) -> Optional[dict]:
         existing = await self.repos.play_ground_repo.get_by_id(playground_id)
@@ -110,12 +104,6 @@ class PlayGroundService:
             executable_path=existing.get("executable_path")
             if executable_path is None
             else executable_path,
-            examples_path=existing.get("examples_path")
-            if examples_path is None
-            else examples_path,
-            command_prefix=existing.get("command_prefix")
-            if command_prefix is None
-            else command_prefix,
             filename=existing.get("filename") if filename is None else filename,
             owner_function=existing.get("owner_function"),
             owner_class=existing.get("owner_class"),
@@ -161,7 +149,5 @@ class PlayGroundService:
             project_root_path=project_path,
             python_executable=playground.get("executable_path"),
             code=playground.get("code", ""),
-            examples_path=playground.get("examples_path"),
-            command_prefix=playground.get("command_prefix"),
             filename=playground.get("filename"),
         )
