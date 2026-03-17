@@ -9,6 +9,7 @@ const API_ROUTES = {
     CALLS: '/calls/',
     VERSIONING: '/versioning',
     TESTS: '/tests',
+    PLAYGROUNDS: '/playgrounds',
 };
 
 export default API_ROUTES; 

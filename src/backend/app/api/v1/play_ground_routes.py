@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import get_play_ground_service
@@ -202,52 +202,20 @@ async def delete_playground(
 
 
 @router.get(
-    "/owners/function/{owner_function_id}",
+    "/owners",
     response_model=list[PlayGroundResponse],
 )
-async def get_playgrounds_by_owner_function_id(
-    owner_function_id: str,
+async def get_playgrounds_by_owner_node_id(
+    node_id: str = Query(..., min_length=1),
     play_ground_service: PlayGroundService = Depends(get_play_ground_service),
 ) -> list[PlayGroundResponse]:
-    items = await play_ground_service.get_by_owner_function_id(
-        owner_function_id
-    )
-    return [_to_response(item) for item in items]
-
-
-@router.get(
-    "/owners/class/{owner_class_id}",
-    response_model=list[PlayGroundResponse],
-)
-async def get_playgrounds_by_owner_class_id(
-    owner_class_id: str,
-    play_ground_service: PlayGroundService = Depends(get_play_ground_service),
-) -> list[PlayGroundResponse]:
-    items = await play_ground_service.get_by_owner_class_id(owner_class_id)
-    return [_to_response(item) for item in items]
-
-
-@router.get(
-    "/owners/file/{owner_file_id}",
-    response_model=list[PlayGroundResponse],
-)
-async def get_playgrounds_by_owner_file_id(
-    owner_file_id: str,
-    play_ground_service: PlayGroundService = Depends(get_play_ground_service),
-) -> list[PlayGroundResponse]:
-    items = await play_ground_service.get_by_owner_file_id(owner_file_id)
-    return [_to_response(item) for item in items]
-
-
-@router.get(
-    "/owners/folder/{owner_folder_id}",
-    response_model=list[PlayGroundResponse],
-)
-async def get_playgrounds_by_owner_folder_id(
-    owner_folder_id: str,
-    play_ground_service: PlayGroundService = Depends(get_play_ground_service),
-) -> list[PlayGroundResponse]:
-    items = await play_ground_service.get_by_owner_folder_id(owner_folder_id)
+    try:
+        items = await play_ground_service.get_by_owner_node_id(node_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     return [_to_response(item) for item in items]
 
 
