@@ -25,6 +25,13 @@ const queryKeys = {
     cases: (projectId: string, nodeId: string) =>
       [...queryKeys.tests.all, 'cases', projectId, nodeId] as const,
   },
+  playgrounds: {
+    all: ['playgrounds'] as const,
+    detail: (projectId: string, playgroundId: string) =>
+      [...queryKeys.playgrounds.all, 'detail', projectId, playgroundId] as const,
+    byOwner: (projectId: string, nodeId: string) =>
+      [...queryKeys.playgrounds.all, 'owners', projectId, nodeId] as const,
+  },
   nodes: {
     all: ['nodes'] as const,
     detail: (nodeId: string) => [...queryKeys.nodes.all, nodeId] as const,

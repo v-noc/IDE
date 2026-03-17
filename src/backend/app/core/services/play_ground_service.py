@@ -9,6 +9,13 @@ from app.db.context import ProjectUoW
 
 
 class PlayGroundService:
+    OWNER_FIELD_BY_PREFIX = {
+        "FunctionSchema": "owner_function",
+        "ClassSchema": "owner_class",
+        "FileSchema": "owner_file",
+        "FolderSchema": "owner_folder",
+    }
+
     def __init__(self, uow: ProjectUoW):
         self.uow = uow
         self.repos = self.uow.get_project_repos()
@@ -120,17 +127,22 @@ class PlayGroundService:
     async def delete_playground(self, playground_id: str) -> bool:
         return await self.repos.play_ground_repo.delete(playground_id)
 
-    async def get_by_owner_function_id(self, owner_function_id: str) -> list[dict]:
-        return await self.repos.play_ground_repo.get_by_owner_function_id(owner_function_id)
+    @classmethod
+    def _owner_field_from_node_id(cls, node_id: str) -> str:
+        prefix = node_id.split("/", 1)[0]
+        owner_field = cls.OWNER_FIELD_BY_PREFIX.get(prefix)
+        if owner_field is None:
+            supported = ", ".join(sorted(cls.OWNER_FIELD_BY_PREFIX.keys()))
+            raise ValueError(
+                f"Unsupported node id prefix '{prefix}'. Supported prefixes: {supported}"
+            )
+        return owner_field
 
-    async def get_by_owner_class_id(self, owner_class_id: str) -> list[dict]:
-        return await self.repos.play_ground_repo.get_by_owner_class_id(owner_class_id)
-
-    async def get_by_owner_file_id(self, owner_file_id: str) -> list[dict]:
-        return await self.repos.play_ground_repo.get_by_owner_file_id(owner_file_id)
-
-    async def get_by_owner_folder_id(self, owner_folder_id: str) -> list[dict]:
-        return await self.repos.play_ground_repo.get_by_owner_folder_id(owner_folder_id)
+    async def get_by_owner_node_id(self, node_id: str) -> list[dict]:
+        owner_field = self._owner_field_from_node_id(node_id)
+        return await self.repos.play_ground_repo.get_by_owner_field(
+            owner_field, node_id
+        )
 
     async def run_code(self, playground_id: str) -> CodeResponse:
         playground = await self.repos.play_ground_repo.get_by_id(playground_id)

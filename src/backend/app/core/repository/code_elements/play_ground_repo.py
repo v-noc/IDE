@@ -68,16 +68,3 @@ class PlayGroundRepo:
 
         return [row["playground_doc"] for row in result.get("bindings", [])]
 
-    async def get_by_owner_function_id(
-        self, owner_function_id: str
-    ) -> list[dict]:
-        return await self.get_by_owner_field("owner_function", owner_function_id)
-
-    async def get_by_owner_class_id(self, owner_class_id: str) -> list[dict]:
-        return await self.get_by_owner_field("owner_class", owner_class_id)
-
-    async def get_by_owner_file_id(self, owner_file_id: str) -> list[dict]:
-        return await self.get_by_owner_field("owner_file", owner_file_id)
-
-    async def get_by_owner_folder_id(self, owner_folder_id: str) -> list[dict]:
-        return await self.get_by_owner_field("owner_folder", owner_folder_id)
