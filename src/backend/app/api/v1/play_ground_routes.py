@@ -18,8 +18,6 @@ class PlayGroundResponse(BaseModel):
     relative_path: str
     code: str
     executable_path: Optional[str] = None
-    examples_path: Optional[str] = None
-    command_prefix: Optional[str] = None
     filename: Optional[str] = None
     owner_function: Optional[str] = None
     owner_class: Optional[str] = None
@@ -35,8 +33,6 @@ class CreatePlayGroundRequest(BaseModel):
     relative_path: str = Field(..., min_length=1)
     code: str = Field(..., min_length=1)
     executable_path: Optional[str] = None
-    examples_path: Optional[str] = None
-    command_prefix: Optional[str] = None
     filename: Optional[str] = None
     owner_function: Optional[str] = None
     owner_class: Optional[str] = None
@@ -50,8 +46,6 @@ class UpdatePlayGroundRequest(BaseModel):
     relative_path: Optional[str] = Field(default=None, min_length=1)
     code: Optional[str] = Field(default=None, min_length=1)
     executable_path: Optional[str] = None
-    examples_path: Optional[str] = None
-    command_prefix: Optional[str] = None
     filename: Optional[str] = None
 
 
@@ -82,8 +76,6 @@ def _to_response(raw: dict) -> PlayGroundResponse:
         relative_path=raw.get("relative_path", ""),
         code=raw.get("code", ""),
         executable_path=raw.get("executable_path"),
-        examples_path=raw.get("examples_path"),
-        command_prefix=raw.get("command_prefix"),
         filename=raw.get("filename"),
         owner_function=raw.get("owner_function"),
         owner_class=raw.get("owner_class"),
@@ -125,8 +117,6 @@ async def create_playground(
             relative_path=request.relative_path,
             code=request.code,
             executable_path=request.executable_path,
-            examples_path=request.examples_path,
-            command_prefix=request.command_prefix,
             filename=request.filename,
             owner_function=request.owner_function,
             owner_class=request.owner_class,
@@ -173,8 +163,6 @@ async def update_playground(
         and request.relative_path is None
         and request.code is None
         and request.executable_path is None
-        and request.examples_path is None
-        and request.command_prefix is None
         and request.filename is None
     ):
         raise HTTPException(
@@ -189,8 +177,6 @@ async def update_playground(
         relative_path=request.relative_path,
         code=request.code,
         executable_path=request.executable_path,
-        examples_path=request.examples_path,
-        command_prefix=request.command_prefix,
         filename=request.filename,
     )
     if not updated:

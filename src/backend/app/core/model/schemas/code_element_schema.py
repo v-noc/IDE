@@ -12,8 +12,6 @@ class PlayGroundSchema(BaseSchema):
     description: str
     relative_path: str
     executable_path: Optional[str] = None
-    examples_path: Optional[str] = None
-    command_prefix: Optional[str] = None
     filename: Optional[str] = None
     code: str
     owner_function: Optional[str] = None
