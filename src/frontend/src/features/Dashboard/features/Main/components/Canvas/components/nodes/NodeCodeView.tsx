@@ -1,5 +1,6 @@
 import React, { memo, lazy, Suspense, useState } from "react";
 import { Save, Copy, Check, Maximize2 } from "lucide-react";
+import { DiffEditor } from "@monaco-editor/react";
 import { CodeViewDialog } from "./CodeViewDialog";
 
 // Lazy load Monaco Editor
@@ -22,6 +23,11 @@ interface NodeCodeViewProps {
   hasChanges: boolean;
   isSaving: boolean;
   isLoading: boolean;
+  showDiff?: boolean;
+  originalContent?: string;
+  modifiedContent?: string;
+  isLoadingDiff?: boolean;
+  diffError?: string | null;
   borderColor: string;
   iconColor: string;
 }
@@ -35,6 +41,11 @@ export const NodeCodeView = memo(function NodeCodeView({
   hasChanges,
   isSaving,
   isLoading,
+  showDiff = false,
+  originalContent = "",
+  modifiedContent = "",
+  isLoadingDiff = false,
+  diffError = null,
   borderColor,
   iconColor,
 }: NodeCodeViewProps) {
@@ -43,7 +54,7 @@ export const NodeCodeView = memo(function NodeCodeView({
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(showDiff ? modifiedContent : code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -58,7 +69,7 @@ export const NodeCodeView = memo(function NodeCodeView({
           {fileName || "Code"}
         </span>
         <div className="flex items-center gap-2">
-          {hasChanges && (
+          {!showDiff && hasChanges && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -109,6 +120,11 @@ export const NodeCodeView = memo(function NodeCodeView({
         hasChanges={hasChanges}
         isSaving={isSaving}
         isLoading={isLoading}
+        showDiff={showDiff}
+        originalContent={originalContent}
+        modifiedContent={modifiedContent}
+        isLoadingDiff={isLoadingDiff}
+        diffError={diffError}
         borderColor={borderColor}
         iconColor={iconColor}
       />
@@ -117,21 +133,49 @@ export const NodeCodeView = memo(function NodeCodeView({
         style={{ borderColor }}
       >
         <Suspense fallback={<CodeEditorSkeleton />}>
-          <CodeEditor
-            language={language}
-            value={code}
-            onChange={onChange}
-            isLoading={isLoading}
-            options={{
-              minimap: { enabled: false },
-              readOnly: false,
-              scrollBeyondLastLine: false,
-              fontSize: 12,
-              lineHeight: 18,
-            }}
-          />
+          {showDiff ? (
+            isLoadingDiff ? (
+              <CodeEditorSkeleton />
+            ) : diffError ? (
+              <div className="h-full w-full flex items-center justify-center text-xs text-slate-500">
+                {diffError}
+              </div>
+            ) : (
+              <DiffEditor
+                height="100%"
+                language={language}
+                original={originalContent}
+                modified={modifiedContent}
+                theme="vs-light"
+                options={{
+                  readOnly: true,
+                  originalEditable: false,
+                  renderSideBySide: true,
+                  automaticLayout: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  fontSize: 12,
+                  lineHeight: 18,
+                }}
+              />
+            )
+          ) : (
+            <CodeEditor
+              language={language}
+              value={code}
+              onChange={onChange}
+              isLoading={isLoading}
+              options={{
+                minimap: { enabled: false },
+                readOnly: false,
+                scrollBeyondLastLine: false,
+                fontSize: 12,
+                lineHeight: 18,
+              }}
+            />
+          )}
         </Suspense>
       </div>
-    </div >
+    </div>
   );
 });

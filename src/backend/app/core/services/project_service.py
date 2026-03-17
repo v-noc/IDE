@@ -1,3 +1,4 @@
+from typing import Optional
 from app.core.repository import Repositories
 from app.core.model.nodes import ProjectNode
 # from app.core.services.container_service import ContainerService
@@ -28,9 +29,16 @@ class ProjectService():
     async def get_all(self):
         return await self.meta_repos.project_repo.get_all()
 
-    async def get_children(self, exclude_types: list[str] = [], depth: int | str = 50):
-        self.project_repos = self.uow.get_project_repos()
-
-        return await self.project_repos.project_repo.get_children(
+    async def get_children(self, exclude_types: list[str] = [],  include_commit_id: bool = False, compare_to: Optional[bool] = False):
+        project_repos = self.uow.get_project_repos()
+        if compare_to:
+            project_repos = self.uow.get_project_repos(
+                use_compare_to=True)
+            return await project_repos.project_repo.get_children(
+                exclude_types,
+                include_commit_id,
+            )
+        return await project_repos.project_repo.get_children(
             exclude_types,
+            include_commit_id,
         )

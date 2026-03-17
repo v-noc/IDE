@@ -1,8 +1,11 @@
+from datetime import datetime, timezone
+
 from typing import Union, List, Tuple
+import uuid
 from terminusdb_client.woqlquery.woql_query import Doc, WOQLQuery as WQ
 
 from app.core.model.nodes import ClassNode, FunctionNode
-from app.core.model.schemas import ClassSchema, FunctionSchema
+from app.core.model.schemas import ClassSchema, CodeContentSchema, CodePositionSchema, FunctionSchema
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
     CODE_CHILD_TYPE_TO_FIELD,
@@ -108,11 +111,87 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
     async def move_batch(self, moves: List[Tuple[str, str, str]]):
         return await self.move_batch_by_type(moves, child_type_to_field=CODE_CHILD_TYPE_TO_FIELD)
 
-    async def flush_batch(self, insert: List[FunctionNode | ClassNode], update: List[FunctionNode | ClassNode], delete: List[str], move: List[Tuple[str, str, str]]):
-        if not insert and not update and not delete and not move:
+    async def flush_batch(self, insert: List[FunctionNode | ClassNode], code_update: List[FunctionNode | ClassNode], update_content: List[Tuple[str, str]], delete: List[str], move: List[Tuple[str, str, str]]):
+        if not insert and not update_content and not delete and not move:
             return True
 
         queries = []
+        updated_at = datetime.now(timezone.utc)
+
+        for node in code_update:
+            # Generate unique suffix for this iteration's variables (UUID without hyphens)
+            suffix = str(uuid.uuid4()).replace("-", "")
+            parent_id = node.id
+
+            # Build sub-queries list
+            sub_queries = []
+
+            # 1. Code Position Update (delete old, insert new)
+            code_pos_schema = CodePositionSchema.from_pydantic(
+
+                node.code_position)
+
+            new_code_pos_dict = code_pos_schema._obj_to_dict()[0]
+
+            new_code_pos_dict["@type"] = "CodePositionSchema"
+            new_code_pos_dict["@linked-by"] = {
+
+                "@id": parent_id,
+
+                "@property": "code_position"
+
+            }
+
+            sub_queries.extend([
+                # Find old code_position
+                WQ().triple(parent_id, "code_position", "v:old_code_pos"+parent_id),
+                # Delete old subdocument
+                WQ().delete_document("v:old_code_pos"+parent_id),
+                # Insert new subdocument
+                WQ().insert_document(Doc(new_code_pos_dict), "v:new_code_pos"+parent_id),
+                # Update parent's link
+
+                WQ().update_triple(parent_id, "code_position", "v:new_code_pos"+parent_id),
+            ])
+
+            # 2. Update qname (delete old if exists, add new)
+            sub_queries.extend([
+                WQ().opt(
+                    WQ().woql_and(
+                        WQ().triple(parent_id, "qname",
+                                    f"v:old_qname_{suffix}"),
+                        WQ().delete_triple(parent_id,
+                                           "qname", f"v:old_qname_{suffix}")
+                    )
+                ),
+                WQ().add_triple(parent_id, "qname", WQ().string(node.qname)),
+            ])
+
+            # 3. Update updated_at (delete old if exists, add new)
+            sub_queries.extend([
+                WQ().opt(
+                    WQ().woql_and(
+                        WQ().triple(parent_id, "updated_at",
+                                    f"v:old_updated_{suffix}"),
+                        WQ().delete_triple(parent_id,
+                                           "updated_at", f"v:old_updated_{suffix}")
+                    )
+                ),
+                WQ().add_triple(parent_id, "updated_at", updated_at),
+            ])
+
+            # 4. Handle base_classes for ClassNode (REPLACE the entire set)
+            if isinstance(node, ClassNode) and hasattr(node, 'base_classes'):
+
+                for base_class in node.base_classes:
+                    sub_queries.append(
+                        WQ().add_triple(parent_id, "base_classes", WQ().string(base_class))
+                    )
+
+            # Combine all into one atomic query for this node
+            query = WQ().woql_and(*sub_queries)
+            queries.append(query)
+            # break
 
         for node in insert:
 
@@ -140,8 +219,11 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
             ))
             # build insert operations
 
-        # for node in update:
-            # queries.append(q)
+        for file_id, content in update_content:
+            schemas = CodeContentSchema.from_file_content(file_id, content)
+
+            queries.append(WQ().update_document(
+                Doc(schemas._obj_to_dict()[0])))
 
         for item_id, new_parent_id, child_type in move:
             field = CODE_CHILD_TYPE_TO_FIELD.get(

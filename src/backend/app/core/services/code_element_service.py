@@ -36,20 +36,24 @@ class CodeElementService():
     async def add_child(self, parent_node_id: str, child_node_id: str, child_type: Literal["function", "class", "call", "code_element_group", "call_group"]):
         return await self.repos.code_element_repo.move_item(parent_node_id, child_node_id, child_type)
 
-    async def get_code(self, code_element_id: str):
+    async def get_code(self, code_element_id: str, compare_to: Optional[bool] = False):
+
+        current_repos = self.repos
+        if compare_to:
+            current_repos = self.uow.get_project_repos(use_compare_to=True)
         code_position = None
         if code_element_id.startswith("FileSchema"):
-            parent_file = await self.repos.structure_repo.get_parent_file(
+            parent_file = await current_repos.structure_repo.get_parent_file(
                 code_element_id
             )
             code_element = parent_file
         else:
-            code_element = await self.get(code_element_id)
+            code_element = await current_repos.code_element_repo.get_by_id(code_element_id)
 
             if not code_element:
                 return None
 
-            parent_file = await self.repos.structure_repo.get_parent_file(
+            parent_file = await current_repos.structure_repo.get_parent_file(
                 code_element_id
             )
             code_position = code_element.code_position
@@ -58,28 +62,30 @@ class CodeElementService():
             return None
 
         abs_path = build_abs_file_path(self.uow.project.path, parent_file.path)
+        content_id = f"CodeContentSchema/{parent_file.id.replace('/', '_')}"
+        # try:
+        #     code = await extract_code_from_file(abs_path, code_position)
+
+        # except OSError:
+        # File not found on disk; fall back to CodeContent in DB
+
         try:
-            code = await extract_code_from_file(abs_path, code_position)
+            content_doc = await current_repos.client.get_document(content_id)
 
-        except OSError:
-            # File not found on disk; fall back to CodeContent in DB
-            content_id = f"CodeContentSchema/{parent_file.id.replace('/', '_')}"
-            try:
-                content_doc = await self.repos.client.get_document(content_id)
-
-            except Exception:
-                return None
-            if not content_doc or "content" not in content_doc:
-                return None
-            code = extract_code_from_content(
-                content_doc["content"], code_position
-            )
+        except Exception:
+            return None
+        if not content_doc or "content" not in content_doc:
+            return None
+        code = extract_code_from_content(
+            content_doc["content"], code_position
+        )
 
         result = {
             "id": code_element.id,
             "name": code_element.name,
             "qname": code_element.qname,
             "file_path": parent_file.path,
+            "content_id": content_id,
             "file_name": parent_file.name,
             "code": code,
         }

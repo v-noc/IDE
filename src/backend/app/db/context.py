@@ -11,6 +11,7 @@ from app.db.async_terminus_client import AsyncClient
 class RequestDbContext:
     branch: str = "main"
     ref: Optional[str] = None  # commit id / ref
+    compare_to: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -32,16 +33,23 @@ class ProjectUoW:
 
         return Repositories(self.client)
 
-    def get_project_repos(self) -> Repositories:
+    def has_compare_to(self) -> bool:
+        return self.ctx.compare_to is not None
+
+    def get_project_repos(self, use_compare_to: bool = False) -> Repositories:
         if self.project is None:
             return Repositories(self.client)
 
         client_clone = self.client.clone()
         client_clone.db = self.project.db_name
         client_clone.branch = self.ctx.branch
-        client_clone.ref = self.ctx.ref
+
+        if use_compare_to and self.ctx.compare_to:
+            client_clone.ref = self.ctx.compare_to
+        else:
+            client_clone.ref = self.ctx.ref
         return Repositories(client_clone)
 
     @property
     def readonly(self) -> bool:
-        return self.ctx.ref is not None
+        return self.ctx.ref is not None or self.ctx.compare_to is not None

@@ -5,9 +5,11 @@ import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
 import { BlockNoteSchema } from "@blocknote/core";
+
 import {
   SuggestionMenuController,
   getDefaultReactSlashMenuItems,
+  useExtension,
 } from "@blocknote/react";
 import { useEffect, useRef, useMemo } from "react";
 import { FileText } from "lucide-react";
@@ -15,6 +17,8 @@ import { filterSuggestionItems } from "@blocknote/core/extensions";
 import { debounce } from "remeda";
 import { useUpdateDocument } from "@/services/documents";
 import type { DocumentData } from "@/services/documents";
+import { VersionDiffExtension } from "./Version";
+import { useDocumentDiff } from "./hooks/useDocumentDiff";
 
 export interface DocumentEditorProps {
   /**
@@ -64,18 +68,29 @@ export function DocumentEditor({
   containerClassName = "",
 }: DocumentEditorProps) {
   const editor = useCreateBlockNote({
+    extensions: [VersionDiffExtension()],
     schema: BlockNoteSchema.create().extend({
       blockSpecs: {
         codeBlock: createCodeBlockSpec(codeBlockOptions),
       },
     }),
   });
+  const versionDiff = useExtension(VersionDiffExtension, { editor });
 
   const applyingRemoteContent = useRef(false);
   const lastAppliedDataRef = useRef<string | null>(null);
 
   // API mutation for auto-save
   const updateMutation = useUpdateDocument(nodeId, projectId);
+  const { isDiffActive } = useDocumentDiff({
+    projectId,
+    nodeId,
+    document,
+    versionDiff,
+  });
+  const editorData = isDiffActive
+    ? (document?.compare_to?.data ?? document?.data ?? "")
+    : (document?.data ?? "");
 
   // Debounced save function
   const saveDocumentDebounced = useMemo(
@@ -114,7 +129,7 @@ export function DocumentEditor({
       return;
     }
 
-    const data = document.data ?? "";
+    const data = editorData;
 
     // Skip if we've already applied this exact content
     // Compare by value, not reference, to handle cache updates with same content
@@ -159,6 +174,7 @@ export function DocumentEditor({
             // Empty content - clear editor
             editor.replaceBlocks(editor.document, []);
             lastAppliedDataRef.current = data;
+
             return;
           }
 
@@ -201,7 +217,7 @@ export function DocumentEditor({
     };
 
     loadContent();
-  }, [editor, document, document?.id, document?.data]);
+  }, [editor, document, document?.id, document?.data, document?.compare_to?.data, editorData]);
 
   // Handle content changes
   const handleChange = async (currentEditor: typeof editor) => {
@@ -254,7 +270,8 @@ export function DocumentEditor({
           theme="light"
           onChange={handleChange}
           editor={editor}
-          slashMenu={false}
+          slashMenu={!isDiffActive}
+          editable={!isDiffActive}
         >
           <SuggestionMenuController
             triggerCharacter="/"

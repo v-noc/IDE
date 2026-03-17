@@ -67,7 +67,7 @@ const EnhancedNode = memo(function EnhancedNode({
     // Base colors for diff statuses
     const diffBorderColors: Record<string, string> = {
       added: "#22c55e", // green-500
-      updated: "#3b82f6", // blue-500
+      modified: "#3b82f6", // blue-500
       removed: "#dc262676", // red-600 (more vibrant)
     };
 
@@ -158,6 +158,11 @@ const EnhancedNode = memo(function EnhancedNode({
               hasChanges={nodeCode.hasChanges}
               isSaving={nodeCode.isSaving}
               isLoading={nodeCode.isLoading}
+              showDiff={nodeCode.showDiff}
+              originalContent={nodeCode.originalContent}
+              modifiedContent={nodeCode.modifiedContent}
+              isLoadingDiff={nodeCode.isLoadingDiff}
+              diffError={nodeCode.diffError}
               borderColor={
                 (statusStyles.borderColor as string) || data.borderColor
               }

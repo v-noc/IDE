@@ -35,6 +35,21 @@ export const NodeContent = memo(function NodeContent({
   onSelect,
 }: NodeContentProps) {
   const style = useNodeStyle(node);
+  const diffStatus = node.status ?? "none";
+  const diffClass =
+    diffStatus === "added"
+      ? "border-emerald-600/90 bg-emerald-600 text-white"
+      : diffStatus === "removed"
+        ? "border-rose-700/90 bg-rose-700 text-white opacity-50"
+        : diffStatus === "modified"
+          ? "border-amber-500/90 bg-amber-100 text-amber-950"
+          : "";
+  const iconColor =
+    diffStatus === "added" || diffStatus === "removed"
+      ? "#ffffff"
+      : diffStatus === "modified"
+        ? "#78350f"
+        : style.iconColor;
 
   return (
     <TooltipProvider>
@@ -44,13 +59,23 @@ export const NodeContent = memo(function NodeContent({
             "rounded-lg p-1 transition-all duration-200 border",
             "mx-1 my-0.5",
             nestingLevel > 0 && "ml-2",
+            diffClass,
             isSelected && "ring-1 ring-blue-500/80",
             isActive && "ring-2 ring-blue-600",
           )}
           style={{
-            backgroundColor: style.backgroundColor,
-            color: style.color,
-            borderColor: style.borderColor,
+            backgroundColor:
+              diffStatus === "none" || diffStatus === "unchanged"
+                ? style.backgroundColor
+                : undefined,
+            color:
+              diffStatus === "none" || diffStatus === "unchanged"
+                ? style.color
+                : undefined,
+            borderColor:
+              diffStatus === "none" || diffStatus === "unchanged"
+                ? style.borderColor
+                : undefined,
           }}
           data-node-key={node.id}
         >
@@ -59,7 +84,7 @@ export const NodeContent = memo(function NodeContent({
             isOpen={isOpen}
             isSelected={isSelected}
             hasChildren={hasChildren}
-            iconColor={style.iconColor}
+            iconColor={iconColor}
             onToggle={handleToggle}
             onClick={handleSelectNode}
           />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 
 import { useWorkspaceState } from "./hooks/useWorkspaceState";
@@ -10,6 +10,8 @@ import { WorkspaceTabs } from "./components/WorkspaceTabs";
 import { WorkspaceLayout } from "./components/WorkspaceLayout";
 import { DocSidebar } from "./components/Docs/DocSidebar";
 import { useWorkspaceDocs } from "./hooks/useWorkspaceDocs";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import { useCommitHistory } from "@/features/Dashboard/features/Versioning/hooks/useCommitHistory";
 
 /**
  * Workspace Container - Manages the state, logic, and data flow for the central central area.
@@ -32,6 +34,9 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
 
   const [tabValue, setTabValue] = useState("docs");
   const [isSandboxOpen, setIsSandboxOpen] = useState(true);
+  const isVersioningOpen = useVersioningStore((s) => s.isOpen);
+  const setHistoryScope = useVersioningStore((s) => s.setHistoryScope);
+  const clearHistoryScope = useVersioningStore((s) => s.clearHistoryScope);
   const isDocSidebarOpen = useProjectStore(
     (s: ProjectStore) => s.isDocSidebarOpen[tabId]
   );
@@ -54,6 +59,34 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
     selectedNode,
     secondarySelectedNode
   );
+
+  const historyScope = useMemo(() => {
+    if (tabValue === "docs") {
+      return { scopeType: "docs", scopeId: selectedDocument?.id ?? null };
+    }
+    if (tabValue === "code") {
+      return { scopeType: "code", scopeId: nodeKey || null };
+    }
+    return { scopeType: tabValue, scopeId: nodeKey || null };
+  }, [nodeKey, selectedDocument?.id, tabValue]);
+
+  useEffect(() => {
+    setHistoryScope(tabId, historyScope);
+  }, [historyScope, setHistoryScope, tabId]);
+
+  useEffect(() => {
+    return () => {
+      clearHistoryScope(tabId);
+    };
+  }, [clearHistoryScope, tabId]);
+
+  useCommitHistory(projectId ?? undefined, historyScope.scopeId ?? undefined, {
+    start: 0,
+    count: 10,
+    enabled:
+      Boolean(historyScope.scopeId) &&
+      (isVersioningOpen || historyScope.scopeType === "docs"),
+  });
 
   // 3. Effects
   useEffect(() => {

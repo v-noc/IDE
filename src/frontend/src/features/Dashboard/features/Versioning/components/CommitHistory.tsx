@@ -3,6 +3,15 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitItem from "./CommitItem";
 import type { CommitDisplay } from "../store/useVersioningStore";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface CommitHistoryProps {
   commits: CommitDisplay[];
@@ -27,7 +36,29 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
   onPrevPage,
   emptyMessage,
 }) => {
-  const { selectedCommitId, setSelectedCommit } = useVersioningStore();
+  const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareToCommitId = useVersioningStore((s) => s.compareToCommitId);
+  const setCheckedOutCommitId = useVersioningStore((s) => s.setCheckedOutCommitId);
+  const setCompareToCommitId = useVersioningStore((s) => s.setCompareToCommitId);
+  const [pendingCommitId, setPendingCommitId] = React.useState<string | null>(null);
+
+  const handleCheckout = React.useCallback(
+    (commitId: string) => {
+      setCheckedOutCommitId(commitId);
+    },
+    [setCheckedOutCommitId],
+  );
+
+  const handleCompareWithCurrent = React.useCallback(
+    (commitId: string) => {
+      setCompareToCommitId(commitId);
+    },
+    [setCompareToCommitId],
+  );
+
+  const handleHardReset = React.useCallback(() => {
+    // Placeholder action (intentionally no backend behavior yet).
+  }, []);
 
   if (emptyMessage) {
     return (
@@ -69,8 +100,12 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
             key={commit.id}
             commit={commit}
             isLast={index === commits.length - 1}
-            isActive={selectedCommitId === commit.id}
-            onClick={() => setSelectedCommit(commit.id)}
+            isActive={checkedOutCommitId === commit.id}
+            isCompareTarget={compareToCommitId === commit.id}
+            onClick={() => setPendingCommitId(commit.id)}
+            onCheckout={() => handleCheckout(commit.id)}
+            onCompareWithCurrent={() => handleCompareWithCurrent(commit.id)}
+            onHardReset={handleHardReset}
           />
         ))}
       </div>
@@ -96,6 +131,40 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
           </button>
         </div>
       )}
+      <Dialog
+        open={pendingCommitId != null}
+        onOpenChange={(open) => {
+          if (!open) setPendingCommitId(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Commit action</DialogTitle>
+            <DialogDescription>
+              Choose how you want to use this commit.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (pendingCommitId) handleCompareWithCurrent(pendingCommitId);
+                setPendingCommitId(null);
+              }}
+            >
+              Compare with current
+            </Button>
+            <Button
+              onClick={() => {
+                if (pendingCommitId) handleCheckout(pendingCommitId);
+                setPendingCommitId(null);
+              }}
+            >
+              Checkout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

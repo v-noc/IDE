@@ -1,6 +1,8 @@
 
 from app.db.async_terminus_client import AsyncClient
-from app.core.repository.code_elements.code_element_group import CodeElementGroupRepo
+from app.core.repository.code_elements.code_element_group import (
+    CodeElementGroupRepo,
+)
 from app.core.repository.code_elements.call_group import CallGroupRepo
 from app.core.repository.structure.structure_group import StructureGroupRepo
 
@@ -11,6 +13,8 @@ from .code_elements.call_repo import CallRepo
 from .log_repo import LogRepository
 from .document_repo import DocumentRepo
 from .code_elements.code_element_repo import CodeElementRepo
+from .code_elements.test_repo import TestRepo
+from .code_elements.play_ground_repo import PlayGroundRepo
 
 
 class Repositories:
@@ -31,3 +35,5 @@ class Repositories:
         self.call_group_repo = CallGroupRepo(client)
         self.log_repo = LogRepository(client)
         self.document_repo = DocumentRepo(client)
+        self.test_repo = TestRepo(client)
+        self.play_ground_repo = PlayGroundRepo(client)

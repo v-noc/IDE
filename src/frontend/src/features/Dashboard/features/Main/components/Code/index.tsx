@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { useCode } from "@/services/code";
 import { useEditableCode } from "./useEditableCode";
+import { useCodeDiff } from "./useCodeDiff";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
 import CodeEditor from "@/components/CodeEditor";
 import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
+import { DiffEditor } from "@monaco-editor/react";
+import { Loader2, Save } from "lucide-react";
 import type { CallNodeTree } from "@/types/project";
 
 interface EditorCodeProps {
@@ -44,6 +46,10 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
     handleEditorChange,
     handleSave,
   } = useEditableCode(elementId, projectId, nodeType);
+  const { showDiff, originalContent, modifiedContent, isLoadingDiff, error } =
+    useCodeDiff({
+      codeData: data,
+    });
 
   const language = useMemo(
     () => detectLanguage(data?.file_name || data?.file_path || ""),
@@ -60,24 +66,55 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
 
   return (
     <div className="relative h-full w-full">
-      <CodeEditor
-        language={language}
-        value={editorValue}
-        onChange={handleEditorChange}
-        isLoading={isLoading}
-        isError={isError}
-      />
-      {hasChanges && (
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="absolute bottom-4 right-4"
-          variant="outline"
-          size="sm"
-        >
-          <Save className="mr-2 h-4 w-4" />
-          {isSaving ? "Saving..." : "Save"}
-        </Button>
+      {showDiff ? (
+        isLoadingDiff ? (
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Loading historical file data...
+          </div>
+        ) : error ? (
+          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+            {error}
+          </div>
+        ) : (
+          <DiffEditor
+            height="100%"
+            language={language}
+            original={originalContent}
+            modified={modifiedContent}
+            theme="vs-light"
+            options={{
+              readOnly: true,
+              originalEditable: false,
+              renderSideBySide: true,
+              automaticLayout: true,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+            }}
+          />
+        )
+      ) : (
+        <>
+          <CodeEditor
+            language={language}
+            value={editorValue}
+            onChange={handleEditorChange}
+            isLoading={isLoading}
+            isError={isError}
+          />
+          {hasChanges && (
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="absolute bottom-4 right-4"
+              variant="outline"
+              size="sm"
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+          )}
+        </>
       )}
     </div>
   );

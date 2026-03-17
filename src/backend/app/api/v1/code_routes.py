@@ -1,9 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from typing import Dict, Any
-from pydantic import BaseModel
-import os
-
-from app.core.sandbox.code_run import CodeResponse, CodeRunner
 
 from app.api.dependencies import (
     ProjectUoW,
@@ -18,14 +14,6 @@ from app.core.services import CodeElementService
 
 
 router = APIRouter()
-
-
-class RunCode(BaseModel):
-    code: str
-    executable_path: str | None = None
-    examples_path: str | None = None
-    command_prefix: str | None = None
-    filename: str | None = None
 
 
 @router.post("/write-code")
@@ -103,6 +91,17 @@ async def get_code(
 
     code_details = await code_element_service.get_code(node_id)
 
+    if code_element_service.uow.has_compare_to():
+
+        compare_to_code_details = await code_element_service.get_code(node_id, compare_to=True)
+
+        if compare_to_code_details is not None:
+            if code_details is not None:
+                code_details["compare_to"] = compare_to_code_details
+            else:
+                code_details = {"compare_to": compare_to_code_details,
+                                **compare_to_code_details, "code": ""}
+
     if code_details is None:
         raise HTTPException(
             status_code=404, detail="Element or code not found")
@@ -110,33 +109,3 @@ async def get_code(
     return code_details
 
 
-@router.post("/run-code")
-async def run_code(
-
-    run_code: RunCode,
-    project_uow: ProjectUoW = Depends(get_project_uow),
-) -> CodeResponse:
-    """Execute provided code using the project's absolute root path and
-    return stdout/stderr."""
-    project_node = project_uow.project
-    if project_node is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Project not found",
-        )
-
-    project_path = os.path.abspath(getattr(project_node, "path", ""))
-    if not project_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Project path is missing",
-        )
-
-    return await CodeRunner().run_code(
-        project_root_path=project_path,
-        python_executable=run_code.executable_path,
-        code=run_code.code,
-        examples_path=run_code.examples_path,
-        command_prefix=run_code.command_prefix,
-        filename=run_code.filename,
-    )

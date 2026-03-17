@@ -1,108 +1,162 @@
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { ChevronDown, GitCommit, X } from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitHistory from "./CommitHistory";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
-import {
-  useCommitHistory,
-  useSelectedCommitDiff,
-} from "../hooks/useCommitHistory";
+import { useCommitHistory, type Commit } from "../hooks/useCommitHistory";
 import { mapCommitToDisplay } from "../utils/commitUtils";
-import { parseTerminusJsonDiff } from "@/lib/versioningDiff";
+import { useVersioningBranches } from "../hooks/useVersioningBranches";
+import BranchDropdown from "./BranchDropdown";
+import CreateBranchDialog from "./CreateBranchDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 const COMMITS_PER_PAGE = 10;
+const EMPTY_COMMITS: Commit[] = [];
+
+function shortCommit(id: string | null): string {
+  if (!id) return "N/A";
+  return id.slice(0, 8);
+}
 
 const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
-  const {
-    togglePanel,
-    selectedCommitId,
-    currentCommitId,
-    setCurrentCommitId,
-    setSelectedCommit,
-    setDiffState,
-    clearDiffState,
-  } = useVersioningStore();
+  const togglePanel = useVersioningStore((s) => s.togglePanel);
+  const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
+  const headCommitId = useVersioningStore((s) => s.headCommitId);
+  const historyScope = useVersioningStore((s) => s.historyScopeByTab[tabId]);
+  const scopeOverride = useVersioningStore((s) => s.scopeOverrideByTab[tabId]);
+  const setScopeOverride = useVersioningStore((s) => s.setScopeOverride);
+  const openMergeMode = useVersioningStore((s) => s.openMergeMode);
   const { projectData, selectedNode, secondarySelectedNode } =
     useProjectStore();
 
   const nodeId = secondarySelectedNode?.[tabId] || selectedNode?.[tabId];
+  const itemScopeId =
+    historyScope?.scopeType === "docs" && historyScope.scopeId
+      ? historyScope.scopeId
+      : (historyScope?.scopeId ?? nodeId?.id);
+  const historyNodeId =
+    scopeOverride === "repository" && projectData?.id
+      ? `ProjectSchema/${projectData.id}`
+      : itemScopeId;
   const [page, setPage] = useState(0);
+  const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
+  const {
+    currentBranch,
+    availableBranches,
+    switchBranch,
+    createBranch,
+    isCreatingBranch,
+    isLoadingBranches,
+  } = useVersioningBranches(projectData?.id);
 
   useEffect(() => {
     setPage(0);
-  }, [projectData?.id, nodeId?.id]);
-
-  useEffect(() => {
-    setCurrentCommitId(null);
-    setSelectedCommit(null);
-    clearDiffState();
-  }, [
-    projectData?.id,
-    nodeId?.id,
-    setCurrentCommitId,
-    setSelectedCommit,
-    clearDiffState,
-  ]);
+  }, [projectData?.id, historyNodeId]);
 
   const {
-    data: commits = [],
+    data: commits = EMPTY_COMMITS,
     isLoading,
     isError,
-  } = useCommitHistory(projectData?.id, nodeId?.id, {
+  } = useCommitHistory(projectData?.id, historyNodeId ?? undefined, {
     start: page * COMMITS_PER_PAGE,
     count: COMMITS_PER_PAGE,
   });
 
-  useEffect(() => {
-    if (page !== 0) return;
-    if (isLoading) return;
-    if (currentCommitId) return;
-    if (commits.length === 0) return;
-    setCurrentCommitId(commits[0].id);
-  }, [commits, currentCommitId, isLoading, page, setCurrentCommitId]);
-
-  const { data: rawDiff } = useSelectedCommitDiff(
-    projectData?.id,
-    selectedCommitId,
-    currentCommitId,
-  );
-
-  useEffect(() => {
-    if (
-      !selectedCommitId ||
-      !currentCommitId ||
-      selectedCommitId === currentCommitId
-    ) {
-      clearDiffState();
-      return;
-    }
-    if (!rawDiff) return;
-
-    const parsed = parseTerminusJsonDiff(rawDiff);
-
-    setDiffState(parsed.nodeDiffs, parsed.parentChildDiffs, parsed.diffNodesMap);
-  }, [
-    selectedCommitId,
-    currentCommitId,
-    rawDiff,
-    clearDiffState,
-    setDiffState,
-  ]);
-
   const displayCommits = commits.map(mapCommitToDisplay);
   const hasNextPage = commits.length === COMMITS_PER_PAGE;
   const hasPrevPage = page > 0;
+  const displayedCommitId = checkedOutCommitId ?? headCommitId;
 
   return (
     <div className="flex h-full w-full flex-col border-l bg-white shadow-sm transition-all duration-300">
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <h2 className="text-lg font-semibold text-slate-800">Commit history</h2>
-        <button
-          onClick={togglePanel}
-          className="rounded-md p-1 hover:bg-slate-100 text-slate-500"
-        >
-          <X size={20} />
-        </button>
+      <div className="border-b px-4 py-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-800">
+            Commit history
+          </h2>
+          <button
+            onClick={togglePanel}
+            className="rounded-md p-1 hover:bg-slate-100 text-slate-500"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="mt-3 flex flex-col gap-1">
+          <div className="flex min-w-0 items-center justify-between w-full gap-1">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Branch
+            </span>
+            <BranchDropdown
+              branches={availableBranches.map((b) => ({
+                id: b.id,
+                name: b.name,
+                isCurrent: b.name === currentBranch,
+              }))}
+              currentBranch={currentBranch}
+              onSelectBranch={switchBranch}
+              onNewBranch={() => setIsCreateBranchOpen(true)}
+              onMergeBranches={() => {
+                const firstCandidate = availableBranches.find(
+                  (candidate) => candidate.name !== currentBranch,
+                );
+                openMergeMode({
+                  sourceBranch: currentBranch,
+                  targetBranch: firstCandidate?.name ?? null,
+                });
+              }}
+              isLoading={isLoadingBranches}
+              triggerClassName="h-7 justify-start gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-normal text-sm text-slate-800 hover:bg-slate-50"
+            />
+          </div>
+          <div className="flex min-w-0 items-center justify-between w-full gap-1">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Current commit
+            </span>
+            <span className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md border  border-slate-200 bg-white px-2.5 font-mono text-xs text-slate-700">
+              <GitCommit className="size-3.5 shrink-0 text-slate-500" />
+              {shortCommit(displayedCommitId)}
+            </span>
+          </div>
+          <div className="flex min-w-0 items-center justify-between w-full gap-1">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              Scope
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 justify-start gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-normal text-sm text-slate-800 hover:bg-slate-50"
+                >
+                  <span className="truncate text-xs">
+                    {scopeOverride === "repository"
+                      ? "Repository"
+                      : "Selected item"}
+                  </span>
+                  <ChevronDown className="size-4 shrink-0 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[140px]">
+                <DropdownMenuItem
+                  onClick={() => setScopeOverride(tabId, "item")}
+                >
+                  Selected item
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setScopeOverride(tabId, "repository")}
+                >
+                  Repository
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto">
         <CommitHistory
@@ -115,12 +169,18 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
           onNextPage={() => setPage((p) => p + 1)}
           onPrevPage={() => setPage((p) => Math.max(0, p - 1))}
           emptyMessage={
-            !projectData?.id || !nodeId?.id
-              ? "Select a node to view commit history"
+            !projectData?.id || !historyNodeId
+              ? "Select content to view commit history"
               : undefined
           }
         />
       </div>
+      <CreateBranchDialog
+        open={isCreateBranchOpen}
+        onOpenChange={setIsCreateBranchOpen}
+        onCreate={createBranch}
+        isCreating={isCreatingBranch}
+      />
     </div>
   );
 };

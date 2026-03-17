@@ -1,6 +1,5 @@
 from typing import Optional
-from fastapi import Depends, Header, Query, HTTPException
-from app.core.repository import Repositories
+from fastapi import Depends, Header, HTTPException, Query, status
 from app.core.services.project_service import ProjectService
 from app.core.services.code_element_service import CodeElementService
 
@@ -8,6 +7,8 @@ from app.core.services.call_service import CallService
 from app.core.services.log_service import LogService
 from app.core.services.group_service import GroupService
 from app.core.services.document_service import DocumentService
+from app.core.services.test_service import TestService
+from app.core.services.play_ground_service import PlayGroundService
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
@@ -25,8 +26,10 @@ async def get_request_db_context(
     branch: str = Header("main", alias="X-Vnoc-Branch"),
     ref: Optional[str] = Query(
         None, description="Specific commit/ref to query"),
+    compare_to: Optional[str] = Query(
+        None, description="Commit/ref to compare against"),
 ) -> RequestDbContext:
-    return RequestDbContext(branch=branch, ref=ref)
+    return RequestDbContext(branch=branch, ref=ref, compare_to=compare_to)
 
 
 async def get_project_node(
@@ -34,7 +37,19 @@ async def get_project_node(
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectNode:
     project = await project_service.get(project_id)
-    return ProjectNode.from_raw_dict(project)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project not found: {project_id}",
+        )
+
+    try:
+        return ProjectNode.from_raw_dict(project)
+    except (TypeError, KeyError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Invalid project payload for id: {project_id}",
+        ) from exc
 
 
 async def get_project_uow(
@@ -42,7 +57,7 @@ async def get_project_uow(
     project: ProjectNode = Depends(get_project_node),
     ctx: RequestDbContext = Depends(get_request_db_context),
 ):
-    """Async generator dependency. FastAPI enters it and passes the yielded ProjectUoW."""
+    """Yield project UoW for request context."""
     try:
         yield ProjectUoW(base, project, ctx)
     finally:
@@ -80,5 +95,19 @@ async def get_code_element_service(
     return CodeElementService(uow)
 
 
-def get_document_service(uow: ProjectUoW = Depends(get_project_uow)) -> DocumentService:
+def get_document_service(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> DocumentService:
     return DocumentService(uow)
+
+
+def get_test_service(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> TestService:
+    return TestService(uow)
+
+
+def get_play_ground_service(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> PlayGroundService:
+    return PlayGroundService(uow)

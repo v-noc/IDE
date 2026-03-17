@@ -137,6 +137,7 @@ async def test_class_sync_add_and_remove(setup_project):
         names_after_add = [
             getattr(c, "name", None) for c in file_node_after_add.children
         ]
+
         assert "SyncAddedClass" in names_after_add, (
             "New class not detected after resync"
         )

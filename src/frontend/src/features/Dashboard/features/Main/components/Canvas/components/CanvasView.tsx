@@ -23,7 +23,6 @@ import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
-import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
@@ -63,12 +62,6 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     useShallow((s) => s.handleNodeSelection),
   );
 
-  const nodeDiffs = useVersioningStore(useShallow((s) => s.nodeDiffs));
-  const parentChildDiffs = useVersioningStore(
-    useShallow((s) => s.parentChildDiffs),
-  );
-  const diffNodesMap = useVersioningStore(useShallow((s) => s.diffNodesMap));
-
   const centerNode = selectedNode as SimpleTreeNode | null;
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
@@ -92,10 +85,6 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
-    parentChildDiffs,
-    nodeDiffs,
-    diffNodesMap,
-    projectData,
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -108,7 +97,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   useEffect(() => {
     syncDiffOverlay();
-  }, [initialNodes, initialEdges, parentChildDiffs, nodeDiffs, diffNodesMap]);
+  }, [initialNodes, initialEdges]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 

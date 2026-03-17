@@ -8,6 +8,7 @@ const API_ROUTES = {
     GROUPS: '/groups/',
     CALLS: '/calls/',
     VERSIONING: '/versioning',
+    TESTS: '/tests',
 };
 
 export default API_ROUTES; 

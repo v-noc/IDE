@@ -11,11 +11,34 @@ import type {
   ProjectNodeTree,
 } from "@/types/project";
 import type {
-  DiffNodeRef,
-  DiffStatus,
-  ParentChildDiff,
+  OverlayDiffNodeRef,
+  OverlayParentChildDiff,
 } from "../store/useVersioningStore";
-import { toFrontendNodeType } from "@/lib/versioningDiff";
+import type { DiffType } from "../types/diff";
+
+function extractSchemaTypeName(raw: string): string {
+  const compact = raw.trim();
+  const slashToken = compact.split("/").pop() ?? compact;
+  const hashToken = slashToken.split("#").pop() ?? slashToken;
+  const colonToken = hashToken.split(":").pop() ?? hashToken;
+  return colonToken.toLowerCase();
+}
+
+function toFrontendNodeType(typeValue: unknown): NodeType | null {
+  if (typeof typeValue !== "string" || typeValue.trim() === "") return null;
+  const normalized = extractSchemaTypeName(typeValue);
+  if (normalized.includes("project")) return "project";
+  if (normalized.includes("folder")) return "folder";
+  if (normalized.includes("file")) return "file";
+  if (normalized.includes("function")) return "function";
+  if (normalized.includes("class")) return "class";
+  if (normalized.includes("codeelementgroup")) return "group";
+  if (normalized.includes("structuregroup")) return "group";
+  if (normalized.includes("callgroup")) return "group";
+  if (normalized.includes("group")) return "group";
+  if (normalized.includes("call")) return "call";
+  return null;
+}
 
 type OverlayNodesResult = {
   nodes: Node[];
@@ -33,7 +56,7 @@ const VALID_NODE_TYPES: Set<NodeType> = new Set([
   "group",
 ]);
 
-function withDiffStatus(node: Node, nodeDiffs: Record<string, DiffStatus>): Node {
+function withDiffStatus(node: Node, nodeDiffs: Record<string, DiffType>): Node {
   return {
     ...node,
     data: {
@@ -103,13 +126,9 @@ function fromProjectNode(node: AnyNodeTree): FallbackNodeData {
 }
 
 function fromDiffBody(
-  ref: DiffNodeRef,
-  diffNodesMap?: Record<string, Record<string, unknown>>
+  ref: OverlayDiffNodeRef
 ): FallbackNodeData | null {
   let body = asRecord(ref.body);
-  if (!body && diffNodesMap) {
-    body = asRecord(diffNodesMap[ref.id]);
-  }
   if (!body) return null;
 
   const id =
@@ -151,15 +170,14 @@ function fromDiffBody(
 }
 
 export function createFallbackNode(
-  childRef: DiffNodeRef,
+  childRef: OverlayDiffNodeRef,
   parentId: string,
   parentNode: Node | undefined,
   projectData: ProjectNodeTree | null | undefined,
-  index: number,
-  diffNodesMap?: Record<string, Record<string, unknown>>
+  index: number
 ): Node | null {
   const fromStore = projectData ? findNodeByKey(projectData, childRef.id) : null;
-  const source = fromStore ? fromProjectNode(fromStore) : fromDiffBody(childRef, diffNodesMap);
+  const source = fromStore ? fromProjectNode(fromStore) : fromDiffBody(childRef);
   if (!source) return null;
 
   const nodeStyle = getNodeStyle(source as unknown as ContainerNodeTree);
@@ -203,9 +221,8 @@ export function createFallbackNode(
 export function buildDiffOverlayNodes(
   initialNodes: Node[],
   currentNodes: Node[],
-  parentChildDiffs: Record<string, ParentChildDiff>,
-  nodeDiffs: Record<string, DiffStatus>,
-  diffNodesMap?: Record<string, Record<string, unknown>>,
+  parentChildDiffs: Record<string, OverlayParentChildDiff>,
+  nodeDiffs: Record<string, DiffType>,
   projectData?: ProjectNodeTree | null
 ): OverlayNodesResult {
   const currentNodeMap = new Map(currentNodes.map((n) => [n.id, n]));
@@ -261,8 +278,7 @@ export function buildDiffOverlayNodes(
         parentId,
         parentNode,
         projectData,
-        injectionIndex,
-        diffNodesMap
+        injectionIndex
       );
       if (!fallbackNode) continue;
       mergedNodeMap.set(childId, withDiffStatus(fallbackNode, nodeDiffs));
@@ -276,7 +292,7 @@ export function buildDiffOverlayNodes(
 
 export function buildDiffOverlayEdges(
   initialEdges: Edge[],
-  parentChildDiffs: Record<string, ParentChildDiff>,
+  parentChildDiffs: Record<string, OverlayParentChildDiff>,
   nodeIds: Set<string>
 ): Edge[] {
   if (Object.keys(parentChildDiffs).length === 0) {

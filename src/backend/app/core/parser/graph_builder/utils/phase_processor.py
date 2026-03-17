@@ -142,14 +142,15 @@ class PhaseProcessor:
 
         await self.repos.code_element_repo.flush_batch(
             structure_batch_plan.insert,
-            [],
+            structure_batch_plan.update,
+            content_inserts + content_updates,
             structure_batch_plan.delete,
             structure_batch_plan.move,
         )
-        await self.repos.code_element_repo.update_batch(structure_batch_plan.update)
+        # await self.repos.code_element_repo.update_batch(structure_batch_plan.update)
 
         # Batch insert/update CodeContent (extends flush pattern, single API call)
-        await self.repos.structure_repo.flush_content_batch(content_inserts, content_updates)
+        # await self.repos.structure_repo.flush_content_batch(content_inserts, content_updates)
 
         # Return (file_node, content) for Phase 2 to avoid duplicate file reads
         return results

@@ -4,6 +4,8 @@ from .v1 import project_routes
 from .v1 import code_routes
 from .v1 import logger_routes
 from .v1 import document_routes
+from .v1 import test_routes
+from .v1 import play_ground_routes
 from .v1.versioning import router as versioning_router
 # from .v1 import call_routes
 from .v1 import group_routes
@@ -33,6 +35,12 @@ router.include_router(logger_routes.router, prefix="/logs", tags=["logs"])
 
 router.include_router(document_routes.router,
                       prefix="/documents", tags=["documents"])
+
+router.include_router(test_routes.router, prefix="/tests", tags=["tests"])
+
+router.include_router(
+    play_ground_routes.router, prefix="/playgrounds", tags=["playgrounds"]
+)
 
 router.include_router(
     versioning_router, prefix="/versioning", tags=["versioning"])
