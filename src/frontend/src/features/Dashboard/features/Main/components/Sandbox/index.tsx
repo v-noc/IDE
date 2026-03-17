@@ -72,7 +72,11 @@ export default function Sandbox({ tabId }: { tabId: string }) {
           value="playground"
           className="m-0 h-full overflow-hidden outline-none"
         >
-          <Playground ref={playgroundRef} onRunningChange={setIsRunning} />
+          <Playground
+            ref={playgroundRef}
+            tabId={tabId}
+            onRunningChange={setIsRunning}
+          />
         </TabsContent>
 
         <TabsContent

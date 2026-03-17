@@ -24,11 +24,16 @@ export const useCreatePlayground = (projectId: string) => {
   });
 };
 
-export const useUpdatePlayground = (projectId: string, playgroundId: string) => {
+export const useUpdatePlayground = (projectId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: UpdatePlaygroundPayload) =>
-      playgroundApi.update(playgroundId, payload, projectId),
+    mutationFn: ({
+      playgroundId,
+      payload,
+    }: {
+      playgroundId: string;
+      payload: UpdatePlaygroundPayload;
+    }) => playgroundApi.update(playgroundId, payload, projectId),
     onSuccess: () => {
       invalidatePlaygroundQueries(queryClient);
     },
