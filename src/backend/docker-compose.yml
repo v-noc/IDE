@@ -28,7 +28,7 @@ services:
     #   terminusdb:
     #     condition: service_healthy
     environment:
-      - TERMINUSDB_CONTENT_ENDPOINT=http://terminusdb:6363
+      - TERMINUSDB_CONTENT_ENDPOINT=http://terminusdb:6363/api/index
       - TERMINUSDB_USER_FORWARD_HEADER=X-User-Forward
       - OPENAI_KEY=${OPENAI_KEY}
     volumes:
