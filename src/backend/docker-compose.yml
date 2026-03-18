@@ -4,7 +4,7 @@ services:
   terminusdb:
     image: terminusdb/terminusdb-server:latest
     container_name: terminusdb-server
-    pull_policy: always
+
     ports:
       - "6363:6363"
     environment:
@@ -25,9 +25,7 @@ services:
     container_name: terminusdb-semantic-indexer
     ports:
       - "8080:8080"
-    depends_on:
-      terminusdb:
-        condition: service_healthy
+
     environment:
       - TERMINUSDB_CONTENT_ENDPOINT=http://terminusdb:6363
       - TERMINUSDB_USER_FORWARD_HEADER=X-User-Forward
