@@ -13,7 +13,12 @@ class TaskManager:
         self._tasks: dict[str, TaskStatus] = {}
         self._asyncio_tasks: dict[str, asyncio.Task] = {}
 
-    def submit(self, name: str, coro_factory: Callable[..., Any], **kwargs) -> str:
+    def submit(
+        self,
+        name: str,
+        coro_factory: Callable[..., Any],
+        **kwargs
+    ) -> str:
         task_id = str(uuid.uuid4())
         status = TaskStatus(
             id=task_id,

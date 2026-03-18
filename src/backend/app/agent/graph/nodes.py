@@ -1,4 +1,5 @@
 from app.agent.graph.state import AgentState
+from app.agent.llm import factory
 
 
 async def planner(state: AgentState) -> AgentState:
@@ -7,7 +8,8 @@ async def planner(state: AgentState) -> AgentState:
     Decides: use a tool, answer directly, or give up.
     Populates: plan, selected_tool, tool_input.
     """
-    ...
+    llm = factory.create()
+    response = await llm.invoke(state["messages"])
 
 
 async def executor(state: AgentState) -> AgentState:

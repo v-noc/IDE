@@ -55,12 +55,12 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         return results
 
     async def _generate_description(self, node, code, child_descriptions) -> str:
-        llm = self.llm_factory()
+        llm = self.llm_factory.create(model="gpt-4o-mini")
         prompt = self._build_description_prompt(node, code, child_descriptions)
         return await llm.ainvoke(prompt)
 
     async def _generate_documentation(self, node, code, child_descriptions) -> str:
-        llm = self.llm_factory()
+        llm = self.llm_factory.create(model="gpt-4o-mini")
         prompt = self._build_documentation_prompt(
             node, code, child_descriptions)
         return await llm.ainvoke(prompt)

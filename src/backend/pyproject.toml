@@ -35,6 +35,7 @@ dependencies = [
   "litellm>=1.82.4",
   "langgraph>=1.1.2",
   "langchain>=1.2.12",
+  "langchain-openai>=1.1.11",
 ]
 
 [project.optional-dependencies]
