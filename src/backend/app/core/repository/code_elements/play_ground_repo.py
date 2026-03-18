@@ -67,4 +67,3 @@ class PlayGroundRepo:
             return []
 
         return [row["playground_doc"] for row in result.get("bindings", [])]
-

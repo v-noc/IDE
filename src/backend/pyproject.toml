@@ -32,6 +32,9 @@ dependencies = [
   "trio>=0.32.0",
   "python-slugify>=8.0.4",
   "coverage>=7.13.4",
+  "litellm>=1.82.4",
+  "langgraph>=1.1.2",
+  "langchain>=1.2.12",
 ]
 
 [project.optional-dependencies]
