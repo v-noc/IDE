@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.socket.manager import get_socket_manager
+from app.agent.runner.task_manager import TaskManager
 
 from .api import root
 from .db.client import get_terminus_client, close_db_client
@@ -29,7 +30,10 @@ async def lifespan(app: FastAPI):
     watcher_service.set_event_loop(
         asyncio.get_running_loop()
     )
+    task_manager = TaskManager()
+
     app.state.watcher_service = watcher_service
+    app.state.task_manager = task_manager
 
     # Init Socket Manager (creates the server instance)
     _ = get_socket_manager()
