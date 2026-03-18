@@ -1,4 +1,5 @@
 from app.agent.tools.base import BaseTool
+from app.agent.tools.tool_card import ToolCard
 
 
 class ToolRegistry:
