@@ -103,7 +103,12 @@ class SocketManager:
         # Prevent re-initialization
         if not hasattr(self, "initialized"):
             self.initialized = True
+            self._stream_registry = None
             self._setup_handlers()
+
+    def bind_stream_registry(self, registry) -> None:
+        """Process-wide stream buffers for `stream:resume` replay."""
+        self._stream_registry = registry
 
     def _setup_handlers(self):
         @self.server.event
@@ -150,6 +155,69 @@ class SocketManager:
                 f"left project room: {normalized_id}"
             )
             await self.server.leave_room(sid, normalized_id)
+
+        @self.server.event
+        async def join_conversation(sid, conversation_id: str):
+            room = f"conv:{conversation_id}"
+            await self.server.enter_room(sid, room)
+            logger.info(
+                "Client %s... joined conversation room %s",
+                sid[:8],
+                conversation_id[:16],
+            )
+
+        @self.server.event
+        async def leave_conversation(sid, conversation_id: str):
+            room = f"conv:{conversation_id}"
+            await self.server.leave_room(sid, room)
+
+        @self.server.on("stream:resume")
+        async def stream_resume(sid, data):
+            await self._handle_stream_resume(sid, data)
+
+    async def _handle_stream_resume(self, sid, data: Any) -> None:
+        if not isinstance(data, dict):
+            await self.server.emit(
+                "stream:error",
+                {"stream_id": None, "error": "invalid_payload"},
+                to=sid,
+            )
+            return
+        stream_id = data.get("stream_id")
+        last_seq = data.get("last_seq", -1)
+        reg = self._stream_registry
+        if reg is None:
+            await self.server.emit(
+                "stream:error",
+                {"stream_id": stream_id, "error": "server_misconfigured"},
+                to=sid,
+            )
+            return
+        buf = reg.get(stream_id) if stream_id else None
+        if buf is None:
+            await self.server.emit(
+                "stream:error",
+                {"stream_id": stream_id, "error": "stream_expired"},
+                to=sid,
+            )
+            return
+        start = int(last_seq) + 1
+        for seq, delta in buf.get_chunks_since(start):
+            await self.server.emit(
+                "stream:chunk",
+                {"stream_id": stream_id, "seq": seq, "delta": delta},
+                to=sid,
+            )
+        if buf.is_finished and buf.message_id:
+            await self.server.emit(
+                "stream:end",
+                {
+                    "stream_id": stream_id,
+                    "message_id": buf.message_id,
+                    "total_seq": buf.next_seq,
+                },
+                to=sid,
+            )
 
     def _normalize_project_id(self, project_id: str) -> str:
         """Normalize project_id to key format (remove nodes/ prefix)."""

@@ -24,7 +24,7 @@ class ConversationStore(Protocol):
         self,
         conversation_id: str,
         message: ConversationMessage,
-    ) -> None:
+    ) -> str | None:
         ...
 
     async def get_conversation(
@@ -32,9 +32,22 @@ class ConversationStore(Protocol):
     ) -> Conversation | None:
         ...
 
+    async def get_conversation_metadata(
+        self, conversation_id: str
+    ) -> ConversationSummary | None:
+        ...
+
     async def list_conversations(
-        self, limit: int = 50
+        self, limit: int = 50, cursor: str | None = None
     ) -> list[ConversationSummary]:
+        ...
+
+    async def list_messages(
+        self,
+        conversation_id: str,
+        cursor: int = 0,
+        limit: int = 50,
+    ) -> list[ConversationMessage]:
         ...
 
     async def upsert_task_part(
@@ -70,22 +83,38 @@ class TerminusConversationStore:
         self,
         conversation_id: str,
         message: ConversationMessage,
-    ) -> None:
+    ) -> str | None:
         mid = await self._repo.add_message(conversation_id, message)
         if mid is None:
             raise ValueError(
                 f"Failed to add message to conversation {conversation_id!r}"
             )
+        return mid
 
     async def get_conversation(
         self, conversation_id: str
     ) -> Conversation | None:
         return await self._repo.get_conversation(conversation_id)
 
+    async def get_conversation_metadata(
+        self, conversation_id: str
+    ) -> ConversationSummary | None:
+        return await self._repo.get_conversation_summary(conversation_id)
+
     async def list_conversations(
-        self, limit: int = 50
+        self, limit: int = 50, cursor: str | None = None
     ) -> list[ConversationSummary]:
-        return await self._repo.list_conversations(limit=limit)
+        return await self._repo.list_conversations(limit=limit, cursor=cursor)
+
+    async def list_messages(
+        self,
+        conversation_id: str,
+        cursor: int = 0,
+        limit: int = 50,
+    ) -> list[ConversationMessage]:
+        return await self._repo.get_messages(
+            conversation_id, cursor=cursor, limit=limit
+        )
 
     async def upsert_task_part(
         self,

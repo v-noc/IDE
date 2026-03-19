@@ -52,17 +52,19 @@ async def lifespan(app: FastAPI):
     executor = AgentExecutor(
         task_manager=task_manager,
         llm_factory=llm_factory,
-        conversation_store=conversation_store
+        conversation_store=conversation_store,
     )
 
     # Attach to app state for dependency injection to use later
     app.state.agent_executor = executor
     app.state.task_manager = task_manager
     app.state.conversation_store = conversation_store
+    app.state.conversation_repo = conversation_repo
     app.state.watcher_service = watcher_service
 
     # Init Socket Manager (creates the server instance)
-    _ = get_socket_manager()
+    socket_manager = get_socket_manager()
+    socket_manager.bind_stream_registry(executor.stream_registry)
     print("🔌 Socket.IO server initialized and ready")
 
     yield

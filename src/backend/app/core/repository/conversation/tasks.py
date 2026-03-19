@@ -184,3 +184,35 @@ class TasksMixin:
         if not raw:
             return None
         return Task.from_raw_dict(raw)
+
+    async def list_tasks_for_conversation(
+        self,
+        conversation_id: str,
+        *,
+        limit: int = 50,
+        cursor: int = 0,
+    ) -> list[Task]:
+        query = (
+            WQ()
+            .select("v:task_doc")
+            .woql_and(
+                WQ().triple("v:task", "conversation", conversation_id),
+                WQ().triple("v:task", "rdf:type", "@schema:TaskSchema"),
+                WQ().read_document("v:task", "v:task_doc"),
+            )
+        )
+        try:
+            result = await self.client.query(query)
+        except Exception as exc:
+            print(exc)
+            return []
+        out: list[Task] = []
+        for row in result.get("bindings", []):
+            raw = row.get("task_doc")
+            if raw:
+                out.append(Task.from_raw_dict(raw))
+        out.sort(key=lambda t: t.created_at, reverse=True)
+        cursor = max(0, int(cursor))
+        cap = max(1, int(limit))
+        slice_start = cursor
+        return out[slice_start : slice_start + cap]

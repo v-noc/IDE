@@ -1,10 +1,22 @@
 # agent/runner/executor.py
 
+import asyncio
+import logging
 import uuid
 
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel, Field
+
+from app.agent.conversation_store import ConversationStore
+from app.agent.realtime import (
+    conversation_message_to_wire,
+    emit_conversation_patch,
+    emit_to_conversation,
+)
+from app.agent.runner.patch_builder import ConversationPatchBuilder
+from app.agent.runner.stream_buffer import StreamRegistry
 from app.agent.runner.task_manager import TaskManager
 from app.agent.workflows.base import BaseWorkflow
-from app.agent.conversation_store import ConversationStore
 from app.core.model.conversation_domain import (
     ConversationMessage,
     TaskPart,
@@ -12,8 +24,8 @@ from app.core.model.conversation_domain import (
 )
 from app.core.model.conversation_enums import MessageRole, TaskState as ConversationTaskState
 from app.core.model.conversation_nodes import Task
-from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationTitleOutput(BaseModel):
@@ -39,11 +51,179 @@ class AgentExecutor:
         task_manager: TaskManager,
         llm_factory,
         conversation_store: ConversationStore,
+        stream_registry: StreamRegistry | None = None,
     ):
         self.task_manager = task_manager
         self.llm_factory = llm_factory
         self.store = conversation_store
+        self.stream_registry = stream_registry or StreamRegistry()
         self._task_part_templates: dict[str, TaskPart] = {}
+
+    @staticmethod
+    def _text_from_domain_message(message: ConversationMessage) -> str:
+        texts = [p.text for p in message.parts if isinstance(p, TextPart)]
+        return "\n".join(texts) if texts else ""
+
+    def _domain_messages_to_lc(self, messages: list[ConversationMessage]):
+        out = []
+        for m in messages:
+            text = self._text_from_domain_message(m)
+            if m.role == MessageRole.USER:
+                out.append(HumanMessage(content=text))
+            elif m.role == MessageRole.ASSISTANT:
+                out.append(AIMessage(content=text))
+        return out
+
+    async def handle_chat_message(
+        self,
+        conversation_id: str,
+        user_message: ConversationMessage,
+    ) -> dict:
+        """Persist user text, broadcast patch, and stream assistant reply in background."""
+        user_mid = await self.store.add_message(conversation_id, user_message)
+        meta = await self.store.get_conversation_metadata(conversation_id)
+        if meta is None:
+            raise ValueError(f"Conversation not found: {conversation_id}")
+
+        user_wire = conversation_message_to_wire(
+            user_message.model_copy(
+                update={
+                    "id": user_mid or user_message.id,
+                    "sequence": meta.message_count - 1,
+                }
+            )
+        )
+        user_patches = (
+            ConversationPatchBuilder()
+            .add_message_wire(user_wire)
+            .message_count(meta.message_count)
+            .build()
+        )
+        await emit_conversation_patch(conversation_id, user_patches)
+
+        stream_id = str(uuid.uuid4())
+        self.stream_registry.create(stream_id, conversation_id)
+
+        task_id = self.task_manager.submit(
+            name="chat:response",
+            coro_factory=self._generate_response,
+            conversation_id=conversation_id,
+            stream_id=stream_id,
+        )
+
+        return {
+            "conversation_id": conversation_id,
+            "message_id": user_mid,
+            "task_id": task_id,
+            "stream_id": stream_id,
+        }
+
+    async def _generate_response(
+        self,
+        *,
+        conversation_id: str,
+        stream_id: str,
+        task_status: Task | None = None,
+    ) -> None:
+        buffer = self.stream_registry.get(stream_id)
+        if buffer is None:
+            logger.error("Missing stream buffer for stream_id=%s", stream_id)
+            return
+
+        payload = {
+            "stream_id": stream_id,
+            "conversation_id": conversation_id,
+        }
+        if task_status is not None:
+            payload["task_id"] = task_status.id
+
+        await emit_to_conversation(
+            conversation_id,
+            "stream:start",
+            payload,
+        )
+
+        try:
+            history = await self.store.list_messages(
+                conversation_id, cursor=0, limit=500
+            )
+            lc_messages = self._domain_messages_to_lc(history)
+            if not lc_messages:
+                lc_messages = [HumanMessage(content="")]
+
+            provider = self.llm_factory.create(model="gpt-4o-mini")
+            async for delta in provider.stream(lc_messages):
+                if not delta:
+                    continue
+                seq = buffer.append(delta)
+                await emit_to_conversation(
+                    conversation_id,
+                    "stream:chunk",
+                    {
+                        "stream_id": stream_id,
+                        "seq": seq,
+                        "delta": delta,
+                    },
+                )
+
+            full_text = buffer.finish()
+            assistant_id = str(uuid.uuid4())
+            assistant_msg = ConversationMessage(
+                id=assistant_id,
+                role=MessageRole.ASSISTANT,
+                parts=[TextPart(text=full_text)],
+            )
+            saved_id = await self.store.add_message(
+                conversation_id, assistant_msg
+            )
+            final_id = saved_id or assistant_id
+            buffer.set_message_id(final_id)
+
+            meta = await self.store.get_conversation_metadata(conversation_id)
+            if meta is None:
+                raise RuntimeError("conversation disappeared after save")
+
+            msg_index = meta.message_count - 1
+            seq_value = msg_index
+            finalize_patches = (
+                ConversationPatchBuilder()
+                .finalize_assistant_text_part(
+                    msg_index,
+                    full_text,
+                    message_id=final_id,
+                    sequence=seq_value,
+                )
+                .message_count(meta.message_count)
+                .build()
+            )
+            await emit_conversation_patch(conversation_id, finalize_patches)
+
+            await emit_to_conversation(
+                conversation_id,
+                "stream:end",
+                {
+                    "stream_id": stream_id,
+                    "message_id": final_id,
+                    "total_seq": buffer.next_seq,
+                },
+            )
+        except asyncio.CancelledError:
+            await emit_to_conversation(
+                conversation_id,
+                "stream:error",
+                {"stream_id": stream_id, "error": "cancelled"},
+            )
+            raise
+        except Exception as e:
+            logger.exception("chat:response failed")
+            await emit_to_conversation(
+                conversation_id,
+                "stream:error",
+                {"stream_id": stream_id, "error": str(e)},
+            )
+            raise
+        finally:
+            self.stream_registry.schedule_remove(stream_id)
 
     async def run_workflow(
         self,

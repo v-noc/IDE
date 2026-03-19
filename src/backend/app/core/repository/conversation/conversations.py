@@ -94,3 +94,11 @@ class ConversationsMixin:
         return [
             ConversationSummary.from_conversation_node(n) for n in nodes[:cap]
         ]
+
+    async def get_conversation_summary(
+        self, conversation_id: str
+    ) -> ConversationSummary | None:
+        conv = await self._get_conversation_node(conversation_id)
+        if conv is None:
+            return None
+        return ConversationSummary.from_conversation_node(conv)
