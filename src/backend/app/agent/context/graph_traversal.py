@@ -1,6 +1,7 @@
 from app.db.context import ProjectUoW
 from app.db.async_terminus_client import WOQLQuery as WQ
 from app.core.builder.tree_builder import TreeBuilder
+from app.core.services.code_element_service import CodeElementService
 
 
 class GraphTraversal:
@@ -19,7 +20,9 @@ class GraphTraversal:
     EDGE_PATTERN = "(" + "|".join(EDGE_FIELDS) + ")"
 
     def __init__(self, uow: ProjectUoW):
+        self.uow = uow
         self.repos = uow.get_project_repos()
+        self.code_service = CodeElementService(uow)
 
     def _extract_children(self, doc: dict) -> list[str]:
         children: list[str] = []
@@ -55,9 +58,10 @@ class GraphTraversal:
             unique[node_id] = node
         return list(unique.values())
 
+    # TODO: Make imporve type filtering
     async def traverse_down(
         self,
-        node_id: str,
+        node_id: str | None,
         max_depth: int = 5,
         node_types: list[str] | None = None,
     ) -> list[dict]:
@@ -65,6 +69,14 @@ class GraphTraversal:
         Get all descendants from node_id and include the start node.
         Returns full node docs with normalized `id`, `type`, and `children`.
         """
+        if not node_id:
+            all_nodes = await self.repos.project_repo.get_children(exclude_types=[])
+            normalized_nodes = [
+                self._normalize_doc(node.model_dump())
+                for node in all_nodes
+            ]
+            return self._dedupe_nodes(normalized_nodes)
+
         pattern = "+" if max_depth <= 0 else f"{{1,{max_depth}}}"
         query = (
             WQ()
@@ -126,9 +138,9 @@ class GraphTraversal:
 
         return self._dedupe_nodes(nodes)
 
-    async def build_tree(self, node_id: str, max_depth: int = 5):
+    async def build_tree(self, node_id: str | None, node_types: list[str] | None = None, max_depth: int = 5):
         """Build nested tree nodes for subtree rooted at `node_id`."""
-        nodes = await self.traverse_down(node_id=node_id, max_depth=max_depth)
+        nodes = await self.traverse_down(node_id=node_id, node_types=node_types, max_depth=max_depth)
         tree = TreeBuilder(base_nodes=nodes).build()
         return tree
 
@@ -148,7 +160,7 @@ class GraphTraversal:
         return [c for c in children if c["id"] not in {node_id, parent_id}]
 
     async def get_node_with_code(self, node_id: str) -> dict:
-        """Fetch node and hydrate file code content when linked."""
+        """Fetch node and hydrate code via CodeElementService.get_code."""
         if not self.repos.client:
             return {}
 
@@ -156,20 +168,21 @@ class GraphTraversal:
         if not doc:
             return {}
 
-        code_ref = doc.get("code_content")
-        if not code_ref:
-            return doc
-
-        if isinstance(code_ref, dict):
-            doc["code_content_data"] = code_ref.get("content", "")
-            return doc
-
-        if isinstance(code_ref, str):
-            try:
-                code_doc = await self.repos.client.get_document(code_ref)
-                if code_doc:
-                    doc["code_content_data"] = code_doc.get("content", "")
-            except Exception:
-                doc["code_content_data"] = ""
-
+        try:
+            code_payload = await self.code_service.get_code(node_id)
+            if code_payload and code_payload.get("code"):
+                doc["code_content_data"] = code_payload["code"]
+        except Exception:
+            # Keep workflow robust for nodes that don't have code ranges.
+            doc["code_content_data"] = ""
         return doc
+
+    async def get_code_content(self, node_id: str) -> str:
+        """Fetch only code content for a node without hydrating full doc."""
+        try:
+            code_payload = await self.code_service.get_code(node_id)
+            if code_payload and code_payload.get("code"):
+                return code_payload["code"]
+        except Exception:
+            return ""
+        return ""

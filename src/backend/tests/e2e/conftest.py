@@ -8,6 +8,7 @@ from pathlib import Path
 from app.db.client import get_terminus_client
 from app.core.services.project_service import ProjectService
 from app.db.async_terminus_client import AsyncClient as TerminusClient
+from app.db.context import ProjectUoW, RequestDbContext
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
 
@@ -42,24 +43,26 @@ def sample_project_path(tmp_path):
 
 
 @pytest_asyncio.fixture
-async def built_sample_project(sample_project_path, create_repos, terminusdb_client):
+async def built_sample_project(sample_project_path, terminusdb_client):
     """Creates a project and runs GraphBuilder to populate structure (no API)."""
-    project_service = ProjectService(create_repos)
-    print(f"Creating sample project at: {create_repos.client.db}")
+    ctx = RequestDbContext()
+    project_uow = ProjectUoW(terminusdb_client, None, ctx)
+    project_service = ProjectService(project_uow)
+    print(f"Creating sample project at: {terminusdb_client.db}")
     project_node = await project_service.create(
         "sample_project",
         "A sample project for E2E tests",
         sample_project_path,
     )
 
-    clone_db = terminusdb_client.clone()
+    project_uow = ProjectUoW(terminusdb_client, project_node, ctx)
     orchestrator = GraphBuilderOrchestrator(
         project_node=project_node,
-        db=clone_db,
+        uow=project_uow,
         ignore_file_name=".gitignore",
     )
     await orchestrator.resync()
-    yield project_node, create_repos
+    yield project_node, project_uow
 
     await project_service.delete(project_node.id)
 
@@ -77,8 +80,10 @@ async def sample_project_node(empty_project_uow):
 
 
 @pytest_asyncio.fixture
-async def created_sample_project(create_repos):
-    project_service = ProjectService(create_repos)
+async def created_sample_project(terminusdb_client):
+    ctx = RequestDbContext()
+    project_uow = ProjectUoW(terminusdb_client, None, ctx)
+    project_service = ProjectService(project_uow)
     return await project_service.create(
         "sample_project",
         "A sample project for E2E tests",

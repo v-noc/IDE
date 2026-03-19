@@ -14,7 +14,7 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
 
     async def run(
         self,
-        node_id: str,
+        node_id: str | None = None,
         direction: str = "down",
         max_depth: int = 5,
         task_status: TaskStatus | None = None,
@@ -23,7 +23,9 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
         # Documentation starts only after description phase finishes.
         if task_status:
             task_status.progress = 0.0
-            task_status.progress_message = "Generating descriptions before documentation..."
+            task_status.progress_message = (
+                "Generating descriptions before documentation..."
+            )
 
         description_result = await super().run(
             node_id=node_id,
@@ -33,15 +35,29 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
         )
 
         if self.graph is None:
-            raise ValueError("GraphTraversal is required for documentation workflow.")
+            raise ValueError(
+                "GraphTraversal is required for documentation workflow."
+            )
 
-        roots = await self.graph.build_tree(node_id=node_id, max_depth=max_depth)
+        roots = await self.graph.build_tree(
+            node_id=node_id,
+            node_types=["FileSchema", "FunctionSchema",
+                        "ClassSchema", "FolderSchema"],
+            max_depth=max_depth,
+        )
         execution_nodes = self._ordered_nodes(roots=roots, direction=direction)
         if not execution_nodes:
-            return {"processed": 0, "documentation_results": {}, "upserted_document_ids": []}
+            return {
+                "processed": 0,
+                "documentation_results": {},
+                "upserted_document_ids": [],
+            }
 
-        description_values: dict[str, str] = description_result.get("description_results", {})
+        description_values: dict[str, str] = description_result.get(
+            "description_results", {}
+        )
         documentation_values: dict[str, str] = {}
+        processed_nodes: dict[str, object] = {}
 
         total = len(execution_nodes)
         for index, tree_node in enumerate(execution_nodes):
@@ -49,9 +65,10 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
             if not current_node_id:
                 continue
 
-            node_doc = await self.graph.get_node_with_code(current_node_id)
-            if not node_doc:
-                continue
+            node_doc = self._tree_node_to_prompt_doc(tree_node)
+            node_doc["code_content_data"] = await self.graph.get_code_content(
+                current_node_id
+            )
 
             child_documentations = self._child_values(
                 tree_node=tree_node,
@@ -64,20 +81,30 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
 
             prompt = self._build_documentation_prompt(
                 node_doc=node_doc,
-                node_description=description_values.get(current_node_id, node_doc.get("description", "")),
+                node_description=description_values.get(
+                    current_node_id,
+                    node_doc.get("description", ""),
+                ),
                 child_documentations=child_documentations,
                 child_descriptions=child_descriptions,
             )
-            documentation_values[current_node_id] = await self._invoke_llm(prompt)
+            documentation_values[current_node_id] = await self._invoke_llm(
+                prompt
+            )
+            processed_nodes[current_node_id] = tree_node
 
             if task_status:
                 phase_progress = (index + 1) / total
                 task_status.progress = 0.5 + (phase_progress * 0.5)
                 task_status.progress_message = (
-                    f"Generated documentation: {node_doc.get('name', current_node_id)}"
+                    "Generated documentation: "
+                    f"{node_doc.get('name', current_node_id)}"
                 )
 
-        upserted_doc_ids = await self._flush_documentation_batch(documentation_values)
+        upserted_doc_ids = await self._flush_documentation_batch(
+            documentation_values,
+            processed_nodes,
+        )
         return {
             "processed": len(documentation_values),
             "direction": direction,
@@ -102,12 +129,16 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
             "\n".join([f"- {item}" for item in child_descriptions])
             if child_descriptions else "None"
         )
-        code_context = self._extract_code_context(node_doc) or "No direct code content found."
+        code_context = (
+            self._extract_code_context(node_doc)
+            or "No direct code content found."
+        )
 
         return (
             "Task: documentation\n"
             "Write practical technical documentation for this node.\n"
-            "Use node description and child outputs to keep hierarchy-consistent docs.\n\n"
+            "Use node description and child outputs to keep "
+            "hierarchy-consistent docs.\n\n"
             f"Node id: {node_doc.get('@id')}\n"
             f"Node type: {node_doc.get('@type')}\n"
             f"Node name: {node_doc.get('name')}\n"
@@ -122,13 +153,24 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
         safe = node_id.replace("/", "_").replace(":", "_")
         return f"DocumentSchema/{safe}_workflow_documentation"
 
-    async def _flush_documentation_batch(self, documentation_values: dict[str, str]) -> list[str]:
-        if not self.graph or not self.graph.repos.client or not documentation_values:
+    async def _flush_documentation_batch(
+        self,
+        documentation_values: dict[str, str],
+        processed_nodes: dict[str, object],
+    ) -> list[str]:
+        if (
+            not self.graph
+            or not self.graph.repos.client
+            or not documentation_values
+        ):
             return []
 
         client = self.graph.repos.client
         now = datetime.now(timezone.utc)
-        doc_ids = [self._documentation_doc_id(node_id) for node_id in documentation_values]
+        doc_ids = [
+            self._documentation_doc_id(node_id)
+            for node_id in documentation_values
+        ]
 
         existing_docs: dict[str, dict] = {}
         try:
@@ -138,7 +180,7 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
             existing_docs = {}
 
         documents_to_upsert: list[DocumentSchema] = []
-        node_updates: list[dict] = []
+        node_updates: dict[str, object] = {}
 
         for node_id, content in documentation_values.items():
             doc_id = self._documentation_doc_id(node_id)
@@ -156,11 +198,11 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
                 )
             )
 
-            node_doc = await self.graph.get_node_with_code(node_id)
-            if not node_doc:
+            tree_node = processed_nodes.get(node_id)
+            if tree_node is None:
                 continue
 
-            current_docs = node_doc.get("documents")
+            current_docs = getattr(tree_node, "documents", None)
             if isinstance(current_docs, set):
                 docs_set = set(current_docs)
             elif isinstance(current_docs, list):
@@ -170,17 +212,18 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
             else:
                 docs_set = set()
             docs_set.add(doc_id)
-            node_doc["documents"] = docs_set
-            node_updates.append(node_doc)
+            node_updates[node_id] = tree_node.model_copy(
+                update={"documents": docs_set}
+            )
 
         await client.update_document(
             documents_to_upsert,
-            commit_msg=f"Workflow: upsert {len(documents_to_upsert)} generated documents",
+            commit_msg=(
+                f"Workflow: upsert {len(documents_to_upsert)} "
+                "generated documents"
+            ),
         )
         if node_updates:
-            await client.update_document(
-                node_updates,
-                commit_msg=f"Workflow: update {len(node_updates)} node document links",
-            )
+            await self._flush_node_updates(node_updates=node_updates)
 
         return doc_ids

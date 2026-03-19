@@ -3,6 +3,7 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage
 
+from app.db.async_terminus_client import WOQLQuery as WQ
 from app.agent.workflows.base import BaseWorkflow
 from app.agent.context.graph_traversal import GraphTraversal
 from app.agent.models.task_status import TaskStatus
@@ -18,20 +19,29 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
 
     async def run(
         self,
-        node_id: str,
-        direction: str = "down",   # "up" (leaf -> parent) | "down" (parent -> leaf)
+        node_id: str | None = None,
+        # "up" (leaf -> parent) | "down" (parent -> leaf)
+        direction: str = "down",
         max_depth: int = 5,
         task_status: TaskStatus | None = None,
         **kwargs,
     ):
         if self.graph is None:
-            raise ValueError("GraphTraversal is required for description workflow.")
+            raise ValueError(
+                "GraphTraversal is required for description workflow."
+            )
         if self.llm_factory is None:
-            raise ValueError("LLM factory is required for description workflow.")
+            raise ValueError(
+                "LLM factory is required for description workflow.")
         if direction not in {"up", "down"}:
             raise ValueError(f"Invalid direction: {direction}")
 
-        roots = await self.graph.build_tree(node_id=node_id, max_depth=max_depth)
+        roots = await self.graph.build_tree(
+            node_id=node_id,
+            node_types=["FileSchema", "FunctionSchema",
+                        "ClassSchema", "FolderSchema"],
+            max_depth=max_depth,
+        )
         execution_nodes = self._ordered_nodes(roots=roots, direction=direction)
 
         total = len(execution_nodes)
@@ -39,16 +49,15 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             return {"processed": 0, "results": {}}
 
         generated_descriptions: dict[str, str] = {}
-        node_updates: dict[str, dict] = {}
+        node_updates: dict[str, Any] = {}
 
         for index, tree_node in enumerate(execution_nodes):
             node_id = getattr(tree_node, "id", None)
             if not node_id:
                 continue
 
-            node_doc = await self.graph.get_node_with_code(node_id)
-            if not node_doc:
-                continue
+            node_doc = self._tree_node_to_prompt_doc(tree_node)
+            node_doc["code_content_data"] = await self.graph.get_code_content(node_id)
 
             child_descriptions = self._child_values(
                 tree_node=tree_node,
@@ -61,9 +70,9 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             generated_description = await self._invoke_llm(prompt)
             generated_descriptions[node_id] = generated_description
 
-            updated_node_doc = dict(node_updates.get(node_id, node_doc))
-            updated_node_doc["description"] = generated_description
-            node_updates[node_id] = updated_node_doc
+            node_updates[node_id] = tree_node.model_copy(
+                update={"description": generated_description}
+            )
 
             if task_status:
                 task_status.progress = (index + 1) / total
@@ -132,6 +141,15 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
                 values.append(child_value)
         return values
 
+    def _tree_node_to_prompt_doc(self, tree_node: Any) -> dict:
+        node_type = f"{tree_node.__class__.__name__.replace('TreeNode', 'Schema')}"
+        return {
+            "@id": getattr(tree_node, "id", None),
+            "@type": node_type,
+            "name": getattr(tree_node, "name", ""),
+            "description": getattr(tree_node, "description", ""),
+        }
+
     async def _invoke_llm(self, prompt: str) -> str:
         llm = self.llm_factory.create(model="gpt-4o-mini")
         response = await llm.invoke([HumanMessage(content=prompt)])
@@ -167,7 +185,10 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             "\n".join([f"- {item}" for item in child_descriptions])
             if child_descriptions else "None"
         )
-        code_context = self._extract_code_context(node_doc) or "No direct code content found."
+        code_context = (
+            self._extract_code_context(node_doc)
+            or "No direct code content found."
+        )
 
         return (
             "Task: description\n"
@@ -184,13 +205,50 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
     async def _flush_node_updates(
         self,
         *,
-        node_updates: dict[str, dict],
+        node_updates: dict[str, Any],
     ) -> None:
-        if not self.graph or not self.graph.repos.client:
+        if not self.graph:
             return
 
-        if node_updates:
-            await self.graph.repos.client.update_document(
-                list(node_updates.values()),
-                commit_msg=f"Workflow: update {len(node_updates)} node descriptions",
-            )
+        if not node_updates:
+            return
+
+        client = self.graph.repos.client
+        if not client:
+            return
+
+        for node in node_updates.values():
+            node_id = getattr(node, "id", None)
+            if not node_id:
+                continue
+
+            queries = []
+            if hasattr(node, "description"):
+                queries.extend(
+                    [
+                        WQ().opt(
+                            WQ()
+                            .triple(node_id, "description", "v:old_description")
+                            .delete_triple(
+                                node_id, "description", "v:old_description"
+                            )
+                        ),
+                        WQ().add_triple(
+                            node_id,
+                            "description",
+                            WQ().string(getattr(node, "description", "") or ""),
+                        ),
+                    ]
+                )
+
+            if hasattr(node, "documents"):
+                for document_id in set(getattr(node, "documents") or set()):
+                    queries.append(
+                        WQ().add_triple(node_id, "documents", document_id)
+                    )
+
+            if queries:
+                await client.query(
+                    WQ().woql_and(*queries),
+                    commit_msg=f"Workflow: update node {node_id}",
+                )
