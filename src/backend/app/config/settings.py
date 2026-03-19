@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 class Settings(BaseSettings):
-    APP_ENV: str
+    APP_ENV: str = "development"
 
     TERMINUS_HOST: str
     TERMINUS_USER: str
@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     model_config = SettingsConfigDict(
-        # Pydantic-Settings will automatically use the ENV_FILE env var if it exists.
+        # Pydantic-Settings will automatically use ENV_FILE when present.
         # Otherwise, it will fall back to ".env".
         env_file=os.environ.get("ENV_FILE", ".env"),
         env_file_encoding="utf-8",
@@ -38,7 +38,8 @@ def get_settings() -> Settings:
     """
     Returns a cached, singleton instance of the Settings.
     This function will only create the Settings object once.
-    It also ensures that the test environment variables are loaded if APP_ENV is set to 'test'.
+    It also ensures test environment variables are loaded
+    if APP_ENV is set to 'test'.
     """
     env_file = os.environ.get("ENV_FILE", ".env")
     if os.environ.get("APP_ENV") == "test":

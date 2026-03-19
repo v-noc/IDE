@@ -1,4 +1,9 @@
-from pydantic_settings import BaseSettings
+import os
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AgentConfig(BaseSettings):
@@ -8,12 +13,27 @@ class AgentConfig(BaseSettings):
     openai_api_key: str = ""
 
     # Agent behavior
-    max_iterations: int = 10
-    max_total_tokens: int = 128_000
+    max_iterations: int = Field(default=10, ge=1, le=1000)
+    max_total_tokens: int = Field(default=128_000, ge=1024)
 
     # VectorLink
     vectorlink_url: str = "http://localhost:8080"
 
-    class Config:
-        env_prefix = "AGENT_"
-        env_file = ".env"
+    # Conversation store
+    conversation_store_backend: Literal["memory", "sqlite"] = "memory"
+    conversation_store_sqlite_path: str = "data/agent_conversations.sqlite3"
+
+    model_config = SettingsConfigDict(
+        env_prefix="AGENT_",
+        env_file=os.environ.get("ENV_FILE", ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
+@lru_cache()
+def get_agent_settings() -> AgentConfig:
+    return AgentConfig()
+
+
+settings = get_agent_settings()

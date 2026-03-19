@@ -1,9 +1,11 @@
 # agent/runner/executor.py
 
-from agent.runner.task_manager import TaskManager
-from agent.graph.builder import build_agent_graph
-from agent.workflows.base import BaseWorkflow
+import uuid
+
+from app.agent.runner.task_manager import TaskManager
+from app.agent.workflows.base import BaseWorkflow
 from app.agent.models.conversation import ConversationMessage, MessageRole, SubTask, TaskPart, TextPart
+from app.agent.models.conversation_store import ConversationStore
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
@@ -30,7 +32,7 @@ class AgentExecutor:
         self,
         task_manager: TaskManager,
         llm_factory,
-        conversation_store,
+        conversation_store: ConversationStore,
     ):
         self.task_manager = task_manager
         self.llm_factory = llm_factory
@@ -53,25 +55,26 @@ class AgentExecutor:
             conversation_id = self.store.create_conversation(
                 title, description)
 
-        # 2. Create TaskPart and insert as assistant message
+        # 2. Submit task and attach a timeline message to the conversation
+        task_id = self.task_manager.submit(
+            name=f"workflow:{workflow.name}",
+            coro_factory=workflow.run,
+            **kwargs,
+        )
+
         task_part = TaskPart(
-            task_id=...,
+            task_id=task_id,
             title=f"{workflow.name}: {kwargs.get('node_id', '')}",
             workflow_name=workflow.name,
             workflow_params=kwargs,
         )
-        self.store.add_message(conversation_id, ConversationMessage(
-            id=..., role=MessageRole.ASSISTANT,
-            parts=[TextPart(text=f"Starting {workflow.name}..."), task_part],
-        ))
-
-        # 3. Submit to background with progress callback
-        task_id = self.task_manager.submit(
-            name=f"workflow:{workflow.name}",
-            coro_factory=workflow.run,
-            on_subtask_update=lambda st: self._update_task_part(
-                conversation_id, task_part, st),
-            **kwargs,
+        self.store.add_message(
+            conversation_id,
+            ConversationMessage(
+                id=str(uuid.uuid4()),
+                role=MessageRole.ASSISTANT,
+                parts=[TextPart(text=f"Starting {workflow.name}..."), task_part],
+            ),
         )
         return conversation_id, task_id
 

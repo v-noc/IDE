@@ -4,11 +4,15 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.socket.manager import get_socket_manager
+from app.agent.config import settings as agent_settings
 from app.agent.runner.task_manager import TaskManager
-from backend.app.agent.llm.factory import LLMFactory
-from backend.app.agent.config import settings
+from app.agent.llm.factory import LLMFactory
 from app.agent.llm.providers.openai_provider import OpenAIProvider
-from backend.app.agent.runner.executor import AgentExecutor
+from app.agent.models.conversation_store import (
+    InMemoryConversationStore,
+    SQLiteConversationStore,
+)
+from app.agent.runner.executor import AgentExecutor
 
 from .api import root
 from .db.client import get_terminus_client, close_db_client
@@ -36,14 +40,20 @@ async def lifespan(app: FastAPI):
     )
 
     # 2. Initialize LLM Factory
-    llm_factory = LLMFactory(settings)
-    if settings.openai_api_key:
+    llm_factory = LLMFactory(agent_settings)
+    if agent_settings.openai_api_key:
         llm_factory.register_provider(
-            "openai", OpenAIProvider(api_key=settings.openai_api_key))
+            "openai", OpenAIProvider(api_key=agent_settings.openai_api_key)
+        )
     task_manager = TaskManager()
-# 3. Initialize Conversation Store (Singleton for Phase 1 in-memory, or Repo for DB)
 
-    # conversation_store = InMemoryConversationStore()
+    # 3. Initialize conversation store (in-memory or sqlite)
+    if agent_settings.conversation_store_backend == "sqlite":
+        conversation_store = SQLiteConversationStore(
+            db_path=agent_settings.conversation_store_sqlite_path
+        )
+    else:
+        conversation_store = InMemoryConversationStore()
 
     # 4. Create the Executor (wires runner, LLM, and store together)
     executor = AgentExecutor(
@@ -57,7 +67,6 @@ async def lifespan(app: FastAPI):
     app.state.task_manager = task_manager
     app.state.conversation_store = conversation_store
     app.state.watcher_service = watcher_service
-    app.state.task_manager = task_manager
 
     # Init Socket Manager (creates the server instance)
     _ = get_socket_manager()
