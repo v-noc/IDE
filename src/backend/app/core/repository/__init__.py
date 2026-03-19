@@ -15,6 +15,7 @@ from .document_repo import DocumentRepo
 from .code_elements.code_element_repo import CodeElementRepo
 from .code_elements.test_repo import TestRepo
 from .code_elements.play_ground_repo import PlayGroundRepo
+from .conversation_repo import ConversationRepo
 
 
 class Repositories:
@@ -37,3 +38,4 @@ class Repositories:
         self.document_repo = DocumentRepo(client)
         self.test_repo = TestRepo(client)
         self.play_ground_repo = PlayGroundRepo(client)
+        self.conversation_repo = ConversationRepo(client)
