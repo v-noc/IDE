@@ -7,6 +7,8 @@ import uuid
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
+from app.agent.chat.completion_params import ChatCompletionParams
+from app.agent.config import settings as agent_settings
 from app.agent.conversation_store import ConversationStore
 from app.agent.realtime import (
     conversation_message_to_wire,
@@ -74,10 +76,28 @@ class AgentExecutor:
                 out.append(AIMessage(content=text))
         return out
 
+    def _resolve_llm(self, completion_params: ChatCompletionParams | None):
+        params = completion_params or ChatCompletionParams()
+        model = params.model or agent_settings.default_model
+        provider_name = params.provider or agent_settings.default_provider
+        extra = params.provider_create_kwargs()
+        mt = extra.get("max_tokens")
+        if mt is not None and mt > agent_settings.max_total_tokens:
+            extra["max_tokens"] = agent_settings.max_total_tokens
+        llm = self.llm_factory.create(
+            provider=provider_name,
+            model=model,
+            **extra,
+        )
+        return llm, model, provider_name
+
     async def handle_chat_message(
         self,
         conversation_id: str,
         user_message: ConversationMessage,
+        *,
+        completion_params: ChatCompletionParams | None = None,
+        client_ref: str | None = None,
     ) -> dict:
         """Persist user text, broadcast patch, and stream assistant reply in background."""
         user_mid = await self.store.add_message(conversation_id, user_message)
@@ -109,6 +129,8 @@ class AgentExecutor:
             coro_factory=self._generate_response,
             conversation_id=conversation_id,
             stream_id=stream_id,
+            completion_params=completion_params,
+            client_ref=client_ref,
         )
 
         return {
@@ -116,6 +138,7 @@ class AgentExecutor:
             "message_id": user_mid,
             "task_id": task_id,
             "stream_id": stream_id,
+            "client_ref": client_ref,
         }
 
     async def _generate_response(
@@ -124,18 +147,28 @@ class AgentExecutor:
         conversation_id: str,
         stream_id: str,
         task_status: Task | None = None,
+        completion_params: ChatCompletionParams | None = None,
+        client_ref: str | None = None,
     ) -> None:
         buffer = self.stream_registry.get(stream_id)
         if buffer is None:
             logger.error("Missing stream buffer for stream_id=%s", stream_id)
             return
 
+        provider, resolved_model, resolved_provider = self._resolve_llm(
+            completion_params
+        )
+
         payload = {
             "stream_id": stream_id,
             "conversation_id": conversation_id,
+            "model": resolved_model,
+            "provider": resolved_provider,
         }
         if task_status is not None:
             payload["task_id"] = task_status.id
+        if client_ref:
+            payload["client_ref"] = client_ref
 
         await emit_to_conversation(
             conversation_id,
@@ -151,7 +184,6 @@ class AgentExecutor:
             if not lc_messages:
                 lc_messages = [HumanMessage(content="")]
 
-            provider = self.llm_factory.create(model="gpt-4o-mini")
             async for delta in provider.stream(lc_messages):
                 if not delta:
                     continue
@@ -172,6 +204,7 @@ class AgentExecutor:
                 id=assistant_id,
                 role=MessageRole.ASSISTANT,
                 parts=[TextPart(text=full_text)],
+                model=resolved_model,
             )
             saved_id = await self.store.add_message(
                 conversation_id, assistant_msg
