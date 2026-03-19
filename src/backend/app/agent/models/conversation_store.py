@@ -11,6 +11,7 @@ from app.agent.models.conversation import (
     Conversation,
     ConversationMessage,
     ConversationSummary,
+    TaskPart,
 )
 
 
@@ -34,6 +35,13 @@ class ConversationStore(Protocol):
         ...
 
     def list_conversations(self, limit: int = 50) -> list[ConversationSummary]:
+        ...
+
+    def upsert_task_part(
+        self,
+        conversation_id: str,
+        task_part: TaskPart,
+    ) -> None:
         ...
 
 
@@ -105,11 +113,43 @@ class InMemoryConversationStore:
                 for item in sliced
             ]
 
+    def upsert_task_part(
+        self,
+        conversation_id: str,
+        task_part: TaskPart,
+    ) -> None:
+        with self._lock:
+            conversation = self._conversations.get(conversation_id)
+            if conversation is None:
+                raise ValueError(f"Conversation not found: {conversation_id}")
+
+            for message in reversed(conversation.messages):
+                replaced = False
+                for idx, part in enumerate(message.parts):
+                    if (
+                        isinstance(part, TaskPart)
+                        and part.task_id == task_part.task_id
+                    ):
+                        message.parts[idx] = task_part
+                        replaced = True
+                        break
+                if replaced:
+                    conversation.updated_at = datetime.utcnow()
+                    return
+
+            raise ValueError(
+                f"TaskPart not found for task_id={task_part.task_id} "
+                f"in conversation={conversation_id}"
+            )
+
 
 class SQLiteConversationStore:
     """SQLite-backed conversation store with the same interface."""
 
-    def __init__(self, db_path: str):
+    def __init__(
+        self,
+        db_path: str,
+    ):
         self.db_path = db_path
         self._lock = threading.Lock()
         path = Path(db_path)
@@ -201,7 +241,9 @@ class SQLiteConversationStore:
                     (conversation_id,),
                 ).fetchone()
                 if row is None:
-                    raise ValueError(f"Conversation not found: {conversation_id}")
+                    raise ValueError(
+                        f"Conversation not found: {conversation_id}"
+                    )
 
                 message_json = message.model_dump_json()
                 created_at = datetime.utcnow().isoformat()
@@ -231,7 +273,12 @@ class SQLiteConversationStore:
                 row = conn.execute(
                     """
                     SELECT
-                        id, title, description, metadata_json, created_at, updated_at
+                        id,
+                        title,
+                        description,
+                        metadata_json,
+                        created_at,
+                        updated_at
                     FROM conversations
                     WHERE id = ?
                     """,
@@ -303,3 +350,57 @@ class SQLiteConversationStore:
             )
             for row in rows
         ]
+
+    def upsert_task_part(
+        self,
+        conversation_id: str,
+        task_part: TaskPart,
+    ) -> None:
+        with self._lock:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, message_json
+                    FROM conversation_messages
+                    WHERE conversation_id = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (conversation_id,),
+                ).fetchall()
+
+                for row in rows:
+                    msg = ConversationMessage.model_validate_json(
+                        row["message_json"]
+                    )
+                    replaced = False
+                    for idx, part in enumerate(msg.parts):
+                        if (
+                            isinstance(part, TaskPart)
+                            and part.task_id == task_part.task_id
+                        ):
+                            msg.parts[idx] = task_part
+                            replaced = True
+                            break
+                    if not replaced:
+                        continue
+
+                    conn.execute(
+                        (
+                            "UPDATE conversation_messages "
+                            "SET message_json = ? WHERE id = ?"
+                        ),
+                        (msg.model_dump_json(), row["id"]),
+                    )
+                    conn.execute(
+                        "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                        (datetime.utcnow().isoformat(), conversation_id),
+                    )
+                    conn.commit()
+                    return
+
+                raise ValueError(
+                    (
+                        f"TaskPart not found for task_id={task_part.task_id} "
+                        f"in conversation={conversation_id}"
+                    )
+                )

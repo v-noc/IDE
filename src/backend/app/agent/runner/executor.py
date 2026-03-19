@@ -4,8 +4,15 @@ import uuid
 
 from app.agent.runner.task_manager import TaskManager
 from app.agent.workflows.base import BaseWorkflow
-from app.agent.models.conversation import ConversationMessage, MessageRole, SubTask, TaskPart, TextPart
+from app.agent.models.conversation import (
+    ConversationMessage,
+    MessageRole,
+    TaskPart,
+    TaskState as ConversationTaskState,
+    TextPart,
+)
 from app.agent.models.conversation_store import ConversationStore
+from app.agent.models.task_status import TaskStatus
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
@@ -37,6 +44,7 @@ class AgentExecutor:
         self.task_manager = task_manager
         self.llm_factory = llm_factory
         self.store = conversation_store
+        self._task_part_templates: dict[str, TaskPart] = {}
 
     async def run_workflow(
         self,
@@ -59,6 +67,11 @@ class AgentExecutor:
         task_id = self.task_manager.submit(
             name=f"workflow:{workflow.name}",
             coro_factory=workflow.run,
+            on_status_update=lambda status: self._update_task_part(
+                conversation_id,
+                task_id,
+                status,
+            ),
             **kwargs,
         )
 
@@ -75,6 +88,13 @@ class AgentExecutor:
                 role=MessageRole.ASSISTANT,
                 parts=[TextPart(text=f"Starting {workflow.name}..."), task_part],
             ),
+        )
+        self._task_part_templates[task_id] = task_part
+        # Push initial state after the message has been written.
+        self._update_task_part(
+            conversation_id,
+            task_id,
+            self.task_manager.get_status(task_id),
         )
         return conversation_id, task_id
 
@@ -137,9 +157,28 @@ class AgentExecutor:
             # Never block workflow scheduling on title generation issues.
             return fallback_title, fallback_description
 
-    def _update_task_part(self, conv_id, task_part, sub_task: SubTask):
-        """Update TaskPart's sub_tasks list and push via WebSocket."""
-        task_part.sub_tasks.append(sub_task)
-        task_part.touched_node_ids.extend(sub_task.touched_node_ids)
-        # Push real-time update via WebSocket
-        ...
+    def _update_task_part(
+        self,
+        conversation_id: str,
+        task_id: str,
+        task_status: TaskStatus | None,
+    ):
+        """Update existing TaskPart container for one workflow task."""
+        if task_status is None:
+            return
+
+        base_part = self._task_part_templates.get(task_id)
+        if base_part is None:
+            base_part = TaskPart(task_id=task_id, title=task_status.name)
+
+        updated_part = base_part.model_copy(
+            update={
+                "state": ConversationTaskState(task_status.state.value),
+                "progress": task_status.progress,
+                "description": task_status.progress_message or "",
+                "started_at": task_status.started_at,
+                "finished_at": task_status.finished_at,
+            }
+        )
+        self.store.upsert_task_part(conversation_id, updated_part)
+        self._task_part_templates[task_id] = updated_part

@@ -28,7 +28,7 @@ class EventPart(BaseModel):
     type: Literal["event"] = "event"
     at: int
     event_type: str        # "wait" | "click" | "focus"
-    payload: dict = {}
+    payload: dict = Field(default_factory=dict)
 
 
 class SubTaskState(str, Enum):
@@ -49,7 +49,7 @@ class SubTask(BaseModel):
     finished_at: Optional[datetime] = None
     error: Optional[str] = None
     # TerminusDB node IDs modified by this step
-    touched_node_ids: list[str] = []
+    touched_node_ids: list[str] = Field(default_factory=list)
 
 
 class TaskState(str, Enum):
@@ -75,8 +75,8 @@ class TaskPart(BaseModel):
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     progress: float = 0.0
-    sub_tasks: list[SubTask] = []
-    touched_node_ids: list[str] = []
+    sub_tasks: list[SubTask] = Field(default_factory=list)
+    touched_node_ids: list[str] = Field(default_factory=list)
     workflow_name: Optional[str] = None
     workflow_params: Optional[dict] = None
 
@@ -105,5 +105,5 @@ class ConversationSummary(BaseModel):
 
 
 class Conversation(ConversationSummary):
-    messages: list[ConversationMessage] = []
-    metadata: dict = {}   # arbitrary metadata (e.g. linked project, node_id)
+    messages: list[ConversationMessage] = Field(default_factory=list)
+    metadata: dict = Field(default_factory=dict)
