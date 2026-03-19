@@ -133,12 +133,10 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
     ) -> list[str]:
         values: list[str] = []
         for child in getattr(tree_node, "children", []) or []:
-            child_id = getattr(child, "id", None)
-            if not child_id:
+            child_description = getattr(child, "description", None)
+            if not child_description:
                 continue
-            child_value = generated_values.get(child_id)
-            if child_value:
-                values.append(child_value)
+            values.append(child_description)
         return values
 
     def _tree_node_to_prompt_doc(self, tree_node: Any) -> dict:

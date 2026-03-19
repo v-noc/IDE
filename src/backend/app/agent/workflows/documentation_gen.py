@@ -29,13 +29,6 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
                 "Generating descriptions before documentation..."
             )
 
-        description_result = await super().run(
-            node_id=node_id,
-            direction=direction,
-            max_depth=max_depth,
-            task_status=None,
-        )
-
         if self.graph is None:
             raise ValueError(
                 "GraphTraversal is required for documentation workflow."
@@ -55,9 +48,6 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
                 "upserted_document_ids": [],
             }
 
-        description_values: dict[str, str] = description_result.get(
-            "description_results", {}
-        )
         documentation_values: dict[str, str] = {}
         processed_nodes: dict[str, object] = {}
 
@@ -78,15 +68,12 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
             )
             child_descriptions = self._child_values(
                 tree_node=tree_node,
-                generated_values=description_values,
+                generated_values=tree_node.description,
             )
 
             prompt = self._build_documentation_prompt(
                 node_doc=node_doc,
-                node_description=description_values.get(
-                    current_node_id,
-                    node_doc.get("description", ""),
-                ),
+                node_description=tree_node.description,
                 child_documentations=child_documentations,
                 child_descriptions=child_descriptions,
             )
@@ -110,7 +97,7 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
         return {
             "processed": len(documentation_values),
             "direction": direction,
-            "description_results": description_values,
+
             "documentation_results": documentation_values,
             "upserted_document_ids": upserted_doc_ids,
         }

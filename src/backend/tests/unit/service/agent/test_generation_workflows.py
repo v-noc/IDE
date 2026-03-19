@@ -88,7 +88,6 @@ async def test_documentation_workflow_creates_documents_and_links(
 
     repos = uow.get_project_repos()
     raw_main_doc = await repos.client.get_document(main_node.id)
-    assert raw_main_doc["description"].startswith("DESC::")
 
     expected_doc_id = _doc_id_for_node(main_node.id)
     assert expected_doc_id in set(raw_main_doc.get("documents", []))
