@@ -83,7 +83,7 @@ async def create_project(
         raise
 
     project_service.uow = uow
-    children = await project_service.get_children()
+    children, _ = await project_service.get_children()
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
