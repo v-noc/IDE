@@ -4,7 +4,7 @@ from typing import AsyncIterator
 from langchain_core.messages import BaseMessage
 
 
-class OpenAIProvider(LLMProvider):
+class OpenAIProvider(LLMProvider, ):
     name = "openai"
 
     MODEL_CONTEXTS = {

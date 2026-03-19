@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, List, Optional, Set
 
 from pydantic import BaseModel
@@ -13,7 +14,10 @@ from app.core.schemas.tree import (
     ProjectTreeNode,
 )
 
-# Schema @type or Node class -> tree model (nodes have children as string IDs; tree nodes have nested objects)
+logger = logging.getLogger(__name__)
+
+# Schema @type or Node class -> tree model.
+# Nodes use children as string IDs; tree nodes use nested objects.
 SCHEMA_TO_TREE = {
     "ProjectSchema": ProjectTreeNode,
     "FolderSchema": FolderTreeNode,
@@ -220,7 +224,10 @@ class TreeBuilder:
         return list(merged.values())
 
     def _propagate_statuses(self, nodes_map: Dict[str, AnyTreeNode]) -> None:
-        """Bubble up changes: if child is added/removed/modified/moved, parent becomes modified."""
+        """
+        Bubble up changes:
+        if child is added/removed/modified/moved, parent becomes modified.
+        """
         changed_ids = {
             nid for nid, status in self.status_map.items()
             if status in ("added", "removed", "modified", "moved")
@@ -282,7 +289,10 @@ class TreeBuilder:
 
         return result
 
-    def _build_tree_from_dicts(self, node_dicts: List[Dict[str, Any]]) -> List[AnyTreeNode]:
+    def _build_tree_from_dicts(
+        self,
+        node_dicts: List[Dict[str, Any]],
+    ) -> List[AnyTreeNode]:
         """Build tree from prepared node dictionaries."""
         if not node_dicts:
             return []

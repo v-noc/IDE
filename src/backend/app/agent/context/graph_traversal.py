@@ -1,41 +1,175 @@
 from app.db.context import ProjectUoW
-from app.core.model.nodes import BaseNode
+from app.db.async_terminus_client import WOQLQuery as WQ
+from app.core.builder.tree_builder import TreeBuilder
 
 
 class GraphTraversal:
-    """Walk the TerminusDB graph up or down from a starting node."""
+    """Walk and shape project graph data for workflow execution."""
+
+    EDGE_FIELDS = (
+        "folder_children",
+        "file_children",
+        "class_children",
+        "function_children",
+        "call_children",
+        "code_element_group",
+        "call_group",
+        "structure_group",
+    )
+    EDGE_PATTERN = "(" + "|".join(EDGE_FIELDS) + ")"
 
     def __init__(self, uow: ProjectUoW):
         self.repos = uow.get_project_repos()
 
+    def _extract_children(self, doc: dict) -> list[str]:
+        children: list[str] = []
+        for edge in self.EDGE_FIELDS:
+            raw = doc.get(edge)
+            if raw is None:
+                continue
+            if isinstance(raw, (list, set, tuple)):
+                children.extend([str(item) for item in raw if item])
+            else:
+                children.append(str(raw))
+        return list(set(children))
+
+    @staticmethod
+    def _normalize_type_name(type_name: str | None) -> str:
+        if not type_name:
+            return ""
+        return type_name.replace("Schema", "")
+
+    def _normalize_doc(self, doc: dict) -> dict:
+        normalized = dict(doc)
+        normalized["id"] = normalized.get("@id")
+        normalized["type"] = normalized.get("@type")
+        normalized["children"] = self._extract_children(doc)
+        return normalized
+
+    def _dedupe_nodes(self, nodes: list[dict]) -> list[dict]:
+        unique: dict[str, dict] = {}
+        for node in nodes:
+            node_id = node.get("id") or node.get("@id")
+            if not node_id:
+                continue
+            unique[node_id] = node
+        return list(unique.values())
+
     async def traverse_down(
         self,
         node_id: str,
-        max_depth: int = 3,
+        max_depth: int = 5,
         node_types: list[str] | None = None,
     ) -> list[dict]:
         """
-        BFS/DFS downward from node_id.
-        Returns a flat list of node dicts with depth metadata.
-        Respects node_types filter (e.g. ["FunctionSchema", "ClassSchema"]).
+        Get all descendants from node_id and include the start node.
+        Returns full node docs with normalized `id`, `type`, and `children`.
         """
-        ...
+        pattern = "+" if max_depth <= 0 else f"{{1,{max_depth}}}"
+        query = (
+            WQ()
+            .eq("v:start", node_id)
+            .path("v:start", f"{self.EDGE_PATTERN}{pattern}", "v:child")
+            .read_document("v:child", "v:child_doc")
+        )
+
+        allowed_types = None
+        if node_types:
+            allowed_types = {
+                self._normalize_type_name(node_type) for node_type in node_types
+            }
+
+        nodes: list[dict] = []
+        if self.repos.client:
+            result = await self.repos.client.query(query)
+            for row in result.get("bindings", []):
+                doc = row.get("child_doc", {})
+                if allowed_types:
+                    doc_type = self._normalize_type_name(doc.get("@type"))
+                    if doc_type not in allowed_types:
+                        continue
+                nodes.append(self._normalize_doc(doc))
+
+            start_result = await self.repos.client.get_document(node_id)
+            if start_result:
+                nodes.append(self._normalize_doc(start_result))
+
+        return self._dedupe_nodes(nodes)
 
     async def traverse_up(
         self,
         node_id: str,
-        max_depth: int = 3,
+        max_depth: int = 5,
     ) -> list[dict]:
         """
-        Walk upward via parent references.
-        Useful for "what file/folder does this function belong to?"
+        Get all ancestors from node_id and include the start node.
+        Returns full node docs with normalized `id`, `type`, and `children`.
         """
-        ...
+        pattern = "+" if max_depth <= 0 else f"{{1,{max_depth}}}"
+        query = (
+            WQ()
+            .eq("v:start", node_id)
+            .path("v:start", f"<{self.EDGE_PATTERN}{pattern}", "v:parent")
+            .read_document("v:parent", "v:parent_doc")
+        )
+
+        nodes: list[dict] = []
+        if self.repos.client:
+            result = await self.repos.client.query(query)
+            for row in result.get("bindings", []):
+                doc = row.get("parent_doc", {})
+                nodes.append(self._normalize_doc(doc))
+
+            start_result = await self.repos.client.get_document(node_id)
+            if start_result:
+                nodes.append(self._normalize_doc(start_result))
+
+        return self._dedupe_nodes(nodes)
+
+    async def build_tree(self, node_id: str, max_depth: int = 5):
+        """Build nested tree nodes for subtree rooted at `node_id`."""
+        nodes = await self.traverse_down(node_id=node_id, max_depth=max_depth)
+        tree = TreeBuilder(base_nodes=nodes).build()
+        return tree
 
     async def get_siblings(self, node_id: str) -> list[dict]:
         """Get nodes at the same level (same parent)."""
-        ...
+        parents = await self.traverse_up(node_id, max_depth=1)
+        if not parents:
+            return []
+
+        parent_id = parents[0]["id"] if parents[0]["id"] != node_id else (
+            parents[1]["id"] if len(parents) > 1 else None
+        )
+        if not parent_id:
+            return []
+
+        children = await self.traverse_down(parent_id, max_depth=1)
+        return [c for c in children if c["id"] not in {node_id, parent_id}]
 
     async def get_node_with_code(self, node_id: str) -> dict:
-        """Fetch node + its CodeContentSchema content."""
-        ...
+        """Fetch node and hydrate file code content when linked."""
+        if not self.repos.client:
+            return {}
+
+        doc = await self.repos.client.get_document(node_id)
+        if not doc:
+            return {}
+
+        code_ref = doc.get("code_content")
+        if not code_ref:
+            return doc
+
+        if isinstance(code_ref, dict):
+            doc["code_content_data"] = code_ref.get("content", "")
+            return doc
+
+        if isinstance(code_ref, str):
+            try:
+                code_doc = await self.repos.client.get_document(code_ref)
+                if code_doc:
+                    doc["code_content_data"] = code_doc.get("content", "")
+            except Exception:
+                doc["code_content_data"] = ""
+
+        return doc

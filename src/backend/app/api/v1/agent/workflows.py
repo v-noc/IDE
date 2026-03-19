@@ -1,12 +1,13 @@
 
 from typing import Optional, Any
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.v1.agent.deps import get_agent_executor
 from app.agent.runner.executor import AgentExecutor
 from app.agent.workflows.documentation_gen import DocumentationGeneratorWorkflow
-# Import other workflows...
+from app.agent.workflows.description_gen import DescriptionGeneratorWorkflow
+
 
 router = APIRouter(prefix="/workflows", tags=["Agent Workflows"])
 
@@ -38,10 +39,10 @@ async def run_workflow(
     If conversation_id is None, a new conversation is automatically created.
     """
 
-    # 1. Resolve workflow name to class instance
+    # 1. Resolve workflow name to class instance (route decides description vs documentation)
     workflow_map = {
         "documentation_generator": DocumentationGeneratorWorkflow(),
-        # "description_generator": DescriptionGeneratorWorkflow(),
+        "description_generator": DescriptionGeneratorWorkflow(),
     }
 
     workflow = workflow_map.get(req.workflow_name)
@@ -52,12 +53,16 @@ async def run_workflow(
         )
 
     try:
+        params = dict(req.params or {})
+        # Keep generations separate by route; ignore legacy combined mode params.
+        params.pop("mode", None)
+
         # 2. Instruct executor to start the workflow
         # The executor handles creating the TaskPart message and submitting to TaskManager
         conv_id, task_id = await executor.run_workflow(
             workflow=workflow,
             conversation_id=req.conversation_id,
-            **req.params
+            **params
         )
 
         # 3. Return accepted status immediately (task is running in background)
