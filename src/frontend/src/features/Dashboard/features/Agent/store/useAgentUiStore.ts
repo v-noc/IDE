@@ -3,7 +3,7 @@ import { devtools } from "zustand/middleware";
 
 /**
  * Which backend conversation is driving the live agent (patches + streams).
- * Local demo fixtures use `useConversationStore` when this is null.
+ * `null` means a local “new chat” draft; the server conversation is created on first send.
  */
 export interface AgentUiState {
   backendConversationId: string | null;

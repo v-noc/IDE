@@ -4,8 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useSendAgentMessage } from "@/services/agent";
-import { useAgentUiStore } from "../store/useAgentUiStore";
+import { useAgentChatSend } from "../hooks/useAgentChatSend";
 
 interface AgentChatInputProps {
   className?: string;
@@ -13,35 +12,20 @@ interface AgentChatInputProps {
 
 export function AgentChatInput({ className }: AgentChatInputProps) {
   const [value, setValue] = useState("");
-  const backendConversationId = useAgentUiStore((s) => s.backendConversationId);
-  const sendMessage = useSendAgentMessage();
+  const sendMessage = useAgentChatSend();
 
   const handleSubmit = () => {
     const text = value.trim();
     if (!text) return;
 
-    if (!backendConversationId) {
-      toast.message("Select a server conversation", {
-        description:
-          "Open chat history and pick a conversation from the API list (Live), or use local demos without sending.",
-      });
-      return;
-    }
-
-    sendMessage.mutate(
-      {
-        conversation_id: backendConversationId,
-        parts: [{ type: "text", text }],
+    sendMessage.mutate(text, {
+      onSuccess: () => setValue(""),
+      onError: (e) => {
+        toast.error("Failed to send message", {
+          description: e instanceof Error ? e.message : String(e),
+        });
       },
-      {
-        onSuccess: () => setValue(""),
-        onError: (e) => {
-          toast.error("Failed to send message", {
-            description: e instanceof Error ? e.message : String(e),
-          });
-        },
-      },
-    );
+    });
   };
 
   return (
@@ -55,11 +39,7 @@ export function AgentChatInput({ className }: AgentChatInputProps) {
             handleSubmit();
           }
         }}
-        placeholder={
-          backendConversationId
-            ? "Message…"
-            : "Select a live conversation to send…"
-        }
+        placeholder="Message…"
         className="h-9 text-xs"
       />
       <Button
