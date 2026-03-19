@@ -8,9 +8,7 @@ from app.agent.config import settings as agent_settings
 from app.agent.runner.task_manager import TaskManager
 from app.agent.llm.factory import LLMFactory
 from app.agent.llm.providers.openai_provider import OpenAIProvider
-from app.agent.conversation_store import TerminusConversationStore
 from app.agent.runner.executor import AgentExecutor
-from app.core.repository.conversation import ConversationRepo
 
 from .api import root
 from .db.client import get_terminus_client, close_db_client
@@ -45,21 +43,15 @@ async def lifespan(app: FastAPI):
         )
     task_manager = TaskManager()
 
-    conversation_repo = ConversationRepo(db)
-    conversation_store = TerminusConversationStore(conversation_repo)
-
-    # 4. Create the Executor (wires runner, LLM, and store together)
+    # 4. Create the Executor (per-request conversation store uses project DB via Depends)
     executor = AgentExecutor(
         task_manager=task_manager,
         llm_factory=llm_factory,
-        conversation_store=conversation_store,
     )
 
     # Attach to app state for dependency injection to use later
     app.state.agent_executor = executor
     app.state.task_manager = task_manager
-    app.state.conversation_store = conversation_store
-    app.state.conversation_repo = conversation_repo
     app.state.watcher_service = watcher_service
 
     # Init Socket Manager (creates the server instance)

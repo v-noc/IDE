@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
@@ -86,8 +85,8 @@ class MessageSchema(TerminusBase):
 
 
 class TaskSchema(BaseSchema):
-    conversation: "ConversationSchema"
-    message: "MessageSchema"
+    conversation: ConversationSchema
+    message: MessageSchema
     state: str
     progress: float
     progress_message: str
@@ -128,8 +127,10 @@ class TaskSchema(BaseSchema):
             id=self._id,
             name=self.name,
             description=self.description,
-            conversation_id=conv if isinstance(conv, str) else getattr(conv, "_id", ""),
-            message_id=msg if isinstance(msg, str) else getattr(msg, "_id", ""),
+            conversation_id=conv if isinstance(
+                conv, str) else getattr(conv, "_id", ""),
+            message_id=msg if isinstance(
+                msg, str) else getattr(msg, "_id", ""),
             state=_coerce_task_state(self.state),
             progress=float(self.progress or 0.0),
             progress_message=self.progress_message or "",
@@ -146,7 +147,7 @@ class TaskSchema(BaseSchema):
 
 
 class SubTaskSchema(TerminusBase):
-    task: "TaskSchema"
+    task: TaskSchema
     name: str
     description: str
     state: str
@@ -177,7 +178,8 @@ class SubTaskSchema(TerminusBase):
         parent = self.task
         return SubTask(
             id=self._id,
-            task_id=parent if isinstance(parent, str) else getattr(parent, "_id", ""),
+            task_id=parent if isinstance(
+                parent, str) else getattr(parent, "_id", ""),
             name=self.name,
             description=self.description,
             state=_coerce_subtask_state(self.state),

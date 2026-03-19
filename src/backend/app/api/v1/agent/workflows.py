@@ -1,15 +1,24 @@
+from typing import Any, Optional, Type
 
-from typing import Optional, Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.api.v1.agent.deps import get_agent_executor
+from app.agent.context.graph_traversal import GraphTraversal
 from app.agent.runner.executor import AgentExecutor
-from app.agent.workflows.documentation_gen import DocumentationGeneratorWorkflow
+from app.agent.workflows.base import BaseWorkflow
 from app.agent.workflows.description_gen import DescriptionGeneratorWorkflow
+from app.agent.workflows.documentation_gen import DocumentationGeneratorWorkflow
+from app.api.dependencies import get_project_conversation_store
+from app.api.v1.agent.deps import get_agent_executor, get_graph_traversal
+from app.agent.conversation_store import ConversationStore
 
 
 router = APIRouter(prefix="/workflows", tags=["Agent Workflows"])
+
+_WORKFLOW_CLASSES: dict[str, Type[BaseWorkflow]] = {
+    "documentation_generator": DocumentationGeneratorWorkflow,
+    "description_generator": DescriptionGeneratorWorkflow,
+}
 
 
 # ─── Schemas ──────────────────────────────────────────────
@@ -33,24 +42,24 @@ class RunWorkflowResponse(BaseModel):
 async def run_workflow(
     req: RunWorkflowRequest,
     executor: AgentExecutor = Depends(get_agent_executor),
+    graph: GraphTraversal = Depends(get_graph_traversal),
 ):
     """
     Trigger a background workflow (e.g., documentation generation).
     If conversation_id is None, a new conversation is automatically created.
     """
 
-    # 1. Resolve workflow name to class instance (route decides description vs documentation)
-    workflow_map = {
-        "documentation_generator": DocumentationGeneratorWorkflow(),
-        "description_generator": DescriptionGeneratorWorkflow(),
-    }
-
-    workflow = workflow_map.get(req.workflow_name)
-    if not workflow:
+    workflow_cls = _WORKFLOW_CLASSES.get(req.workflow_name)
+    if not workflow_cls:
         raise HTTPException(
             status_code=400,
             detail=f"Unknown workflow: {req.workflow_name}"
         )
+
+    workflow = workflow_cls(
+        graph=graph,
+        llm_factory=executor.llm_factory,
+    )
 
     try:
         params = dict(req.params or {})
@@ -62,7 +71,8 @@ async def run_workflow(
         conv_id, task_id = await executor.run_workflow(
             workflow=workflow,
             conversation_id=req.conversation_id,
-            **params
+            store=store,
+            **params,
         )
 
         # 3. Return accepted status immediately (task is running in background)

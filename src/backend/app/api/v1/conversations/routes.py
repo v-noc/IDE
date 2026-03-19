@@ -170,6 +170,7 @@ async def post_message(
     out = await executor.handle_chat_message(
         cid,
         user_msg,
+        store=store,
         completion_params=body.generation,
         client_ref=body.client_ref,
     )

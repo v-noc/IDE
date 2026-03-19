@@ -1,11 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import queryKeys from "@/lib/queryKeys";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { agentApi } from "@/services/agent/api";
 import { useSocket } from "@/services/socket";
 import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { useAgentUiStore } from "../store/useAgentUiStore";
-
-const LIST_LIMIT = 50;
 
 /**
  * Sends a user message. If there is no active conversation id (new chat), creates
@@ -18,37 +17,48 @@ export function useAgentChatSend() {
 
   return useMutation({
     mutationFn: async (text: string) => {
+      const projectId = useProjectStore.getState().projectData?.id;
+      if (!projectId) {
+        throw new Error("No project loaded; cannot use agent chat.");
+      }
+
       let cid = useAgentUiStore.getState().backendConversationId;
       if (!cid) {
-        const meta = await agentApi.createConversation({
+        const meta = await agentApi.createConversation(projectId, {
           title: "New conversation",
           description: "",
         });
         cid = meta.id;
         useAgentUiStore.getState().setBackendConversationId(cid);
-        const wire = await agentApi.hydrateConversation(cid);
+        const wire = await agentApi.hydrateConversation(projectId, cid);
         useAgentLiveStore.getState().setWire(wire);
         if (socket?.connected) {
           socket.emit("join_conversation", cid);
         }
         void queryClient.invalidateQueries({
-          queryKey: queryKeys.agent.conversations.list(LIST_LIMIT),
+          queryKey: queryKeys.agent.conversations.all(),
         });
       }
-      return agentApi.sendMessage({
+      return agentApi.sendMessage(projectId, {
         conversation_id: cid,
         parts: [{ type: "text", text }],
       });
     },
     onSuccess: () => {
+      const projectId = useProjectStore.getState().projectData?.id;
       const cid = useAgentUiStore.getState().backendConversationId;
-      if (cid) {
+      if (projectId && cid) {
         void queryClient.invalidateQueries({
-          queryKey: queryKeys.agent.conversations.detail(cid),
+          queryKey: [
+            ...queryKeys.agent.conversations.all(),
+            "detail",
+            projectId,
+            cid,
+          ],
         });
       }
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.agent.conversations.list(LIST_LIMIT),
+        queryKey: queryKeys.agent.conversations.all(),
       });
     },
   });

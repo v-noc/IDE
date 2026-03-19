@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import { agentConversationHydrationQueryOptions } from "@/services/agent";
 import { useAgentLiveStore } from "../store/useAgentLiveStore";
 
@@ -22,10 +23,25 @@ function useResetLiveWhenLeaving(conversationId: string | null) {
  * Push TanStack Query snapshot into the live store only when a fetch finishes
  * (`dataUpdatedAt`), not on every `query.data` reference change.
  */
-export function useAgentConversationSync(conversationId: string | null) {
+export function useAgentConversationSync(
+  conversationId: string | null,
+  projectId: string,
+) {
   useResetLiveWhenLeaving(conversationId);
 
-  const query = useQuery(agentConversationHydrationQueryOptions(conversationId));
+  const branch = useVersioningStore((s) => s.branch);
+  const ref = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareTo = useVersioningStore((s) => s.compareToCommitId);
+
+  const query = useQuery(
+    agentConversationHydrationQueryOptions(
+      projectId,
+      conversationId,
+      branch,
+      ref,
+      compareTo,
+    ),
+  );
 
   useEffect(() => {
     if (!conversationId) return;

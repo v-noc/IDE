@@ -2,20 +2,44 @@ import { queryOptions } from "@tanstack/react-query";
 import queryKeys from "@/lib/queryKeys";
 import { agentApi } from "./api";
 
-export const agentConversationSummariesQueryOptions = (limit = 50) =>
+export const agentConversationSummariesQueryOptions = (
+  projectId: string,
+  branch: string | null | undefined,
+  ref: string | null | undefined,
+  compareTo: string | null | undefined,
+  limit = 50,
+) =>
   queryOptions({
-    queryKey: queryKeys.agent.conversations.list(limit),
-    queryFn: () => agentApi.listConversations(limit),
+    queryKey: queryKeys.agent.conversations.list(
+      projectId,
+      limit,
+      branch,
+      ref,
+      compareTo,
+    ),
+    queryFn: () => agentApi.listConversations(projectId, limit),
+    enabled: Boolean(projectId),
     staleTime: 30_000,
   });
 
 export const agentConversationHydrationQueryOptions = (
+  projectId: string,
   conversationId: string | null,
+  branch: string | null | undefined,
+  ref: string | null | undefined,
+  compareTo: string | null | undefined,
   messageLimit = 200,
 ) =>
   queryOptions({
-    queryKey: queryKeys.agent.conversations.detail(conversationId ?? ""),
-    queryFn: () => agentApi.hydrateConversation(conversationId!, messageLimit),
-    enabled: Boolean(conversationId),
+    queryKey: queryKeys.agent.conversations.detail(
+      projectId,
+      conversationId ?? "",
+      branch,
+      ref,
+      compareTo,
+    ),
+    queryFn: () =>
+      agentApi.hydrateConversation(projectId, conversationId!, messageLimit),
+    enabled: Boolean(projectId && conversationId),
     staleTime: 10_000,
   });

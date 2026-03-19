@@ -49,10 +49,38 @@ const queryKeys = {
     all: ["agent"] as const,
     conversations: {
       all: () => [...queryKeys.agent.all, "conversations"] as const,
-      list: (limit: number) =>
-        [...queryKeys.agent.conversations.all(), "list", limit] as const,
-      detail: (id: string) =>
-        [...queryKeys.agent.conversations.all(), "detail", id] as const,
+      list: (
+        projectId: string,
+        limit: number,
+        branch?: string | null,
+        ref?: string | null,
+        compareTo?: string | null,
+      ) =>
+        [
+          ...queryKeys.agent.conversations.all(),
+          "list",
+          projectId,
+          limit,
+          branch ?? "main",
+          ref ?? "",
+          compareTo ?? "",
+        ] as const,
+      detail: (
+        projectId: string,
+        id: string,
+        branch?: string | null,
+        ref?: string | null,
+        compareTo?: string | null,
+      ) =>
+        [
+          ...queryKeys.agent.conversations.all(),
+          "detail",
+          projectId,
+          id,
+          branch ?? "main",
+          ref ?? "",
+          compareTo ?? "",
+        ] as const,
     },
   },
   versioning: {

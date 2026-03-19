@@ -1,7 +1,9 @@
+from fastapi import Depends, Request
 
-from fastapi import Request
+from app.agent.context.graph_traversal import GraphTraversal
 from app.agent.runner.executor import AgentExecutor
-from app.agent.conversation_store import ConversationStore
+from app.api.dependencies import get_project_uow
+from app.db.context import ProjectUoW
 
 
 def get_agent_executor(request: Request) -> AgentExecutor:
@@ -11,8 +13,8 @@ def get_agent_executor(request: Request) -> AgentExecutor:
     return request.app.state.agent_executor
 
 
-def get_conversation_store(request: Request) -> ConversationStore:
-    """Dependency to get the global Conversation Store."""
-    if not hasattr(request.app.state, "conversation_store"):
-        raise RuntimeError("Conversation store not initialized in app state.")
-    return request.app.state.conversation_store
+def get_graph_traversal(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> GraphTraversal:
+    """Graph access scoped to the resolved project, branch, and ref (see RequestDbContext)."""
+    return GraphTraversal(uow)

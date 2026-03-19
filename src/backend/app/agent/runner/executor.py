@@ -52,12 +52,10 @@ class AgentExecutor:
         self,
         task_manager: TaskManager,
         llm_factory,
-        conversation_store: ConversationStore,
         stream_registry: StreamRegistry | None = None,
     ):
         self.task_manager = task_manager
         self.llm_factory = llm_factory
-        self.store = conversation_store
         self.stream_registry = stream_registry or StreamRegistry()
         self._task_part_templates: dict[str, TaskPart] = {}
 
@@ -96,12 +94,13 @@ class AgentExecutor:
         conversation_id: str,
         user_message: ConversationMessage,
         *,
+        store: ConversationStore,
         completion_params: ChatCompletionParams | None = None,
         client_ref: str | None = None,
     ) -> dict:
         """Persist user text, broadcast patch, and stream assistant reply in background."""
-        user_mid = await self.store.add_message(conversation_id, user_message)
-        meta = await self.store.get_conversation_metadata(conversation_id)
+        user_mid = await store.add_message(conversation_id, user_message)
+        meta = await store.get_conversation_metadata(conversation_id)
         if meta is None:
             raise ValueError(f"Conversation not found: {conversation_id}")
 
@@ -127,6 +126,7 @@ class AgentExecutor:
         task_id = self.task_manager.submit(
             name="chat:response",
             coro_factory=self._generate_response,
+            store=store,
             conversation_id=conversation_id,
             stream_id=stream_id,
             completion_params=completion_params,
@@ -144,6 +144,7 @@ class AgentExecutor:
     async def _generate_response(
         self,
         *,
+        store: ConversationStore,
         conversation_id: str,
         stream_id: str,
         task_status: Task | None = None,
@@ -177,7 +178,7 @@ class AgentExecutor:
         )
 
         try:
-            history = await self.store.list_messages(
+            history = await store.list_messages(
                 conversation_id, cursor=0, limit=500
             )
             lc_messages = self._domain_messages_to_lc(history)
@@ -206,13 +207,13 @@ class AgentExecutor:
                 parts=[TextPart(text=full_text)],
                 model=resolved_model,
             )
-            saved_id = await self.store.add_message(
+            saved_id = await store.add_message(
                 conversation_id, assistant_msg
             )
             final_id = saved_id or assistant_id
             buffer.set_message_id(final_id)
 
-            meta = await self.store.get_conversation_metadata(conversation_id)
+            meta = await store.get_conversation_metadata(conversation_id)
             if meta is None:
                 raise RuntimeError("conversation disappeared after save")
 
@@ -262,6 +263,8 @@ class AgentExecutor:
         self,
         workflow: BaseWorkflow,
         conversation_id: str | None = None,
+        *,
+        store: ConversationStore,
         **kwargs,
     ) -> tuple[str, str]:
         """
@@ -272,13 +275,13 @@ class AgentExecutor:
         # 1. Auto-create conversation if standalone
         if conversation_id is None:
             title, description = await self._generate_title(workflow, kwargs)
-            conversation_id = await self.store.create_conversation(
+            conversation_id = await store.create_conversation(
                 title, description
             )
 
         async def _on_status(status: Task) -> None:
             await self._update_task_part(
-                conversation_id, task_id, status
+                store, conversation_id, task_id, status
             )
 
         # 2. Submit task and attach a timeline message to the conversation
@@ -295,7 +298,7 @@ class AgentExecutor:
             workflow_name=workflow.name,
             workflow_params=kwargs,
         )
-        await self.store.add_message(
+        await store.add_message(
             conversation_id,
             ConversationMessage(
                 id=str(uuid.uuid4()),
@@ -306,6 +309,7 @@ class AgentExecutor:
         self._task_part_templates[task_id] = task_part
         # Push initial state after the message has been written.
         await self._update_task_part(
+            store,
             conversation_id,
             task_id,
             self.task_manager.get_status(task_id),
@@ -373,6 +377,7 @@ class AgentExecutor:
 
     async def _update_task_part(
         self,
+        store: ConversationStore,
         conversation_id: str,
         task_id: str,
         task_status: Task | None,
@@ -394,5 +399,5 @@ class AgentExecutor:
                 "finished_at": task_status.finished_at,
             }
         )
-        await self.store.upsert_task_part(conversation_id, updated_part)
+        await store.upsert_task_part(conversation_id, updated_part)
         self._task_part_templates[task_id] = updated_part

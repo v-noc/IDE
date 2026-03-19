@@ -1,5 +1,6 @@
 from typing import Optional
 from fastapi import Depends, Header, HTTPException, Query, status
+from app.agent.conversation_store import TerminusConversationStore
 from app.core.services.project_service import ProjectService
 from app.core.services.code_element_service import CodeElementService
 
@@ -9,6 +10,7 @@ from app.core.services.group_service import GroupService
 from app.core.services.document_service import DocumentService
 from app.core.services.test_service import TestService
 from app.core.services.play_ground_service import PlayGroundService
+from app.core.repository.conversation import ConversationRepo
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
@@ -111,3 +113,17 @@ def get_play_ground_service(
     uow: ProjectUoW = Depends(get_project_uow),
 ) -> PlayGroundService:
     return PlayGroundService(uow)
+
+
+def get_project_conversation_repo(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> ConversationRepo:
+    """Conversation/task documents in the project Terminus DB (branch/ref from request context)."""
+    return uow.get_project_repos().conversation_repo
+
+
+def get_project_conversation_store(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> TerminusConversationStore:
+    repo = uow.get_project_repos().conversation_repo
+    return TerminusConversationStore(repo)

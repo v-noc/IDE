@@ -16,7 +16,10 @@ import { useAgentLiveStore } from "../store/useAgentLiveStore";
  * Subscribes to agent stream + patch events for one conversation.
  * Uses `useEffectEvent` so handlers stay fresh without re-subscribing on every render.
  */
-export function useAgentConversationSocket(conversationId: string | null) {
+export function useAgentConversationSocket(
+  conversationId: string | null,
+  projectId: string,
+) {
   const { socket, isConnected } = useSocket();
   const queryClient = useQueryClient();
 
@@ -75,10 +78,15 @@ export function useAgentConversationSocket(conversationId: string | null) {
   const patchFailed = useAgentLiveStore((s) => s.patchApplyFailed);
 
   useEffect(() => {
-    if (!patchFailed || !conversationId) return;
+    if (!patchFailed || !conversationId || !projectId) return;
     void queryClient.invalidateQueries({
-      queryKey: queryKeys.agent.conversations.detail(conversationId),
+      queryKey: [
+        ...queryKeys.agent.conversations.all(),
+        "detail",
+        projectId,
+        conversationId,
+      ],
     });
     useAgentLiveStore.getState().clearPatchFailure();
-  }, [patchFailed, conversationId, queryClient]);
+  }, [patchFailed, conversationId, projectId, queryClient]);
 }

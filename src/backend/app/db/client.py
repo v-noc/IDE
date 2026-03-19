@@ -7,7 +7,16 @@ management for use with FastAPI.
 
 from .async_terminus_client import AsyncClient
 from ..config.settings import get_settings
-from app.core.model.schemas import ProjectSchema, BaseSchema, TerminusBase, ThemeConfigSchema
+from app.core.model.schemas import (
+    BaseSchema,
+    ConversationSchema,
+    MessageSchema,
+    ProjectSchema,
+    SubTaskSchema,
+    TaskSchema,
+    TerminusBase,
+    ThemeConfigSchema,
+)
 from app.db.woqlschema import *
 
 _client: AsyncClient | None = None
@@ -23,6 +32,11 @@ async def migrate_base(client):
     schema_obj.add_obj(BaseSchema.__name__, BaseSchema)
     schema_obj.add_obj(ThemeConfigSchema.__name__, ThemeConfigSchema)
     schema_obj.add_obj(ProjectSchema.__name__, ProjectSchema)
+    # Hub DB includes conversation types for schema compatibility; live data uses project DBs.
+    schema_obj.add_obj(ConversationSchema.__name__, ConversationSchema)
+    schema_obj.add_obj(MessageSchema.__name__, MessageSchema)
+    schema_obj.add_obj(TaskSchema.__name__, TaskSchema)
+    schema_obj.add_obj(SubTaskSchema.__name__, SubTaskSchema)
     await schema_obj.commit(client, "Add ProjectSchema to schema", full_replace=True)
 
 

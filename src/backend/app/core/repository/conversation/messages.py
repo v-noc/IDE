@@ -48,9 +48,10 @@ class MessagesMixin:
             created_at=message.created_at or now,
             updated_at=now,
         )
+        schmea = MessageSchema.from_pydantic(msg_node)
         try:
             await self.client.insert_document(
-                MessageSchema.from_pydantic(msg_node),
+                schmea,
                 commit_msg=f"Message in {conversation_id}",
             )
         except Exception as exc:

@@ -70,7 +70,8 @@ class GraphTraversal:
         Returns full node docs with normalized `id`, `type`, and `children`.
         """
         if not node_id:
-            all_nodes = await self.repos.project_repo.get_children(exclude_types=[])
+            all_nodes, _ = await self.repos.project_repo.get_children(
+                exclude_types=[])
             normalized_nodes = [
                 self._normalize_doc(node.model_dump())
                 for node in all_nodes

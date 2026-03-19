@@ -13,6 +13,8 @@ import { AgentSidebar } from "./AgentSidebar";
 import { useAgentOverlayStore } from "../store/useAgentOverlayStore";
 import { useAgentUiStore } from "../store/useAgentUiStore";
 import { useShallow } from "zustand/react/shallow";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { agentConversationSummariesQueryOptions } from "@/services/agent";
 
 const MIN_WIDTH = 280;
@@ -37,8 +39,19 @@ export function AgentOverlay() {
     useShallow((s) => [s.backendConversationId, s.setBackendConversationId]),
   );
 
+  const projectId = useProjectStore((s) => s.projectData?.id ?? "");
+  const branch = useVersioningStore((s) => s.branch);
+  const ref = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareTo = useVersioningStore((s) => s.compareToCommitId);
+
   const serverQuery = useQuery(
-    agentConversationSummariesQueryOptions(LIST_LIMIT),
+    agentConversationSummariesQueryOptions(
+      projectId,
+      branch,
+      ref,
+      compareTo,
+      LIST_LIMIT,
+    ),
   );
 
   const [width, setWidth] = useState(DEFAULT_WIDTH);

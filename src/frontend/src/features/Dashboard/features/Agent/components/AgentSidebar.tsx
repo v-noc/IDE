@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { agentConversationHydrationQueryOptions } from "@/services/agent";
 import { useAgentUiStore } from "../store/useAgentUiStore";
 import { useAgentChatSession } from "../live";
@@ -17,13 +19,24 @@ interface AgentSidebarProps {
 
 export function AgentSidebar({ className }: AgentSidebarProps) {
   const backendConversationId = useAgentUiStore((s) => s.backendConversationId);
-  useAgentChatSession(backendConversationId);
+  const projectId = useProjectStore((s) => s.projectData?.id ?? "");
+  const branch = useVersioningStore((s) => s.branch);
+  const ref = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareTo = useVersioningStore((s) => s.compareToCommitId);
+
+  useAgentChatSession(backendConversationId, projectId);
 
   const wire = useAgentLiveStore((s) => s.wire);
   const activeStreams = useAgentLiveStore((s) => s.activeStreams);
 
   const hydrationQuery = useQuery(
-    agentConversationHydrationQueryOptions(backendConversationId),
+    agentConversationHydrationQueryOptions(
+      projectId,
+      backendConversationId,
+      branch,
+      ref,
+      compareTo,
+    ),
   );
   const isLiveLoading =
     Boolean(backendConversationId) && hydrationQuery.isPending;

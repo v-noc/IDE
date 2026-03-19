@@ -9,6 +9,7 @@ from .v1 import play_ground_routes
 from .v1.versioning import router as versioning_router
 # from .v1 import call_routes
 from .v1 import group_routes
+from .v1.agent.workflows import router as agent_workflows_router
 from .v1.conversations import router as conversations_router
 from .v1.conversations import tasks_router as conversation_tasks_router
 
@@ -53,3 +54,4 @@ router.include_router(group_routes.router, prefix="/groups", tags=["groups"])
 
 router.include_router(conversations_router)
 router.include_router(conversation_tasks_router)
+router.include_router(agent_workflows_router, prefix="/agent")

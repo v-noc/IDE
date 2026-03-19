@@ -6,15 +6,17 @@ from fastapi import Request
 
 from app.agent.runner.executor import AgentExecutor
 from app.agent.runner.task_manager import TaskManager
-from app.agent.conversation_store import ConversationStore
-from app.core.repository.conversation import ConversationRepo
+from app.api.dependencies import (
+    get_project_conversation_repo as get_conversation_repo,
+    get_project_conversation_store as get_conversation_store,
+)
 
-
-def get_conversation_repo(request: Request) -> ConversationRepo:
-    repo = getattr(request.app.state, "conversation_repo", None)
-    if repo is None:
-        raise RuntimeError("conversation_repo not initialized on app.state")
-    return repo
+__all__ = [
+    "get_agent_executor",
+    "get_conversation_repo",
+    "get_conversation_store",
+    "get_task_manager",
+]
 
 
 def get_task_manager(request: Request) -> TaskManager:
@@ -29,10 +31,3 @@ def get_agent_executor(request: Request) -> AgentExecutor:
     if ex is None:
         raise RuntimeError("agent_executor not initialized on app.state")
     return ex
-
-
-def get_conversation_store(request: Request) -> ConversationStore:
-    st = getattr(request.app.state, "conversation_store", None)
-    if st is None:
-        raise RuntimeError("conversation_store not initialized on app.state")
-    return st

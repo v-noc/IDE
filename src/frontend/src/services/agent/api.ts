@@ -20,23 +20,32 @@ const Q = (params: Record<string, string | number | undefined>) => {
 };
 
 export const agentApi = {
-  createConversation: (body: CreateConversationPayload) =>
-    agentFetch<ConversationMetaWire>("/conversations", {
-      method: "POST",
-      body,
-    }),
-
-  listConversations: (limit = 50, cursor?: string) =>
-    agentFetch<PaginatedResponse<ConversationMetaWire>>(
-      `/conversations${Q({ limit, cursor })}`,
+  createConversation: (projectId: string, body: CreateConversationPayload) =>
+    agentFetch<ConversationMetaWire>(
+      "/conversations",
+      {
+        method: "POST",
+        body,
+      },
+      projectId,
     ),
 
-  getConversationMeta: (conversationId: string) =>
+  listConversations: (projectId: string, limit = 50, cursor?: string) =>
+    agentFetch<PaginatedResponse<ConversationMetaWire>>(
+      `/conversations${Q({ limit, cursor })}`,
+      {},
+      projectId,
+    ),
+
+  getConversationMeta: (projectId: string, conversationId: string) =>
     agentFetch<ConversationMetaWire>(
       `/conversations/meta${Q({ conversation_id: conversationId })}`,
+      {},
+      projectId,
     ),
 
   listMessages: (
+    projectId: string,
     conversationId: string,
     cursor = 0,
     limit = 50,
@@ -47,15 +56,23 @@ export const agentApi = {
         cursor,
         limit,
       })}`,
+      {},
+      projectId,
     ),
 
   /** Builds a full wire conversation for the client store (meta + first page of messages). */
   hydrateConversation: async (
+    projectId: string,
     conversationId: string,
     messageLimit = 200,
   ): Promise<WireConversation> => {
-    const meta = await agentApi.getConversationMeta(conversationId);
-    const page = await agentApi.listMessages(conversationId, 0, messageLimit);
+    const meta = await agentApi.getConversationMeta(projectId, conversationId);
+    const page = await agentApi.listMessages(
+      projectId,
+      conversationId,
+      0,
+      messageLimit,
+    );
     return {
       id: meta.id,
       title: meta.title,
@@ -69,9 +86,13 @@ export const agentApi = {
     };
   },
 
-  sendMessage: (payload: SendMessagePayload) =>
-    agentFetch<SendMessageResponse>("/conversations/messages", {
-      method: "POST",
-      body: payload,
-    }),
+  sendMessage: (projectId: string, payload: SendMessagePayload) =>
+    agentFetch<SendMessageResponse>(
+      "/conversations/messages",
+      {
+        method: "POST",
+        body: payload,
+      },
+      projectId,
+    ),
 };

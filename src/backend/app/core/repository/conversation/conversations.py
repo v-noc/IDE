@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING, Any
 
 from app.core.model.conversation_domain import Conversation, ConversationSummary
@@ -13,6 +14,8 @@ from ._common import new_doc_id, utcnow
 
 if TYPE_CHECKING:
     from app.db.async_terminus_client import AsyncClient
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationsMixin:
@@ -41,8 +44,8 @@ class ConversationsMixin:
                 ConversationSchema.from_pydantic(node),
                 commit_msg=f"Creating conversation {title!r}",
             )
-        except Exception as exc:
-            print(exc)
+        except Exception:
+            logger.exception("TerminusDB insert_document failed for conversation")
             return None
         return conv_id
 

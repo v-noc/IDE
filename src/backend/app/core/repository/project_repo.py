@@ -158,7 +158,7 @@ class ProjectRepo():
             if include_commit_id:
                 return children, version
 
-            return children
+            return children, None
         except Exception as e:
             print(e)
-            return []
+            return [], None
