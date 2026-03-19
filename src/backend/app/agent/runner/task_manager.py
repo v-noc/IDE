@@ -1,39 +1,49 @@
 import asyncio
+import inspect
+import json
 import uuid
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
-from app.agent.models.task_status import TaskStatus, TaskState
+from app.core.model.conversation_enums import TaskState
+from app.core.model.conversation_nodes import Task
 
 
 class TaskManager:
 
     def __init__(self):
-        self._tasks: dict[str, TaskStatus] = {}
+        self._tasks: dict[str, Task] = {}
         self._asyncio_tasks: dict[str, asyncio.Task] = {}
 
     def submit(
         self,
         name: str,
         coro_factory: Callable[..., Any],
-        on_status_update: Optional[Callable[[TaskStatus], None]] = None,
+        on_status_update: Optional[
+            Callable[[Task], Union[None, Any]]
+        ] = None,
         **kwargs
     ) -> str:
         task_id = str(uuid.uuid4())
-        status = TaskStatus(
+        now = datetime.utcnow()
+        status = Task(
             id=task_id,
             name=name,
             state=TaskState.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=now,
+            updated_at=now,
         )
         self._tasks[task_id] = status
 
         update_interval_s = 0.5
-        def _emit_status_update():
+
+        async def _emit_status_update():
             if not on_status_update:
                 return
             try:
-                on_status_update(status.model_copy(deep=True))
+                out = on_status_update(status.model_copy(deep=True))
+                if inspect.isawaitable(out):
+                    await out
             except Exception:
                 # Status propagation should never crash task execution.
                 return
@@ -41,13 +51,13 @@ class TaskManager:
         async def _wrapper():
             status.state = TaskState.RUNNING
             status.started_at = datetime.utcnow()
-            _emit_status_update()
+            await _emit_status_update()
 
             reporter_task = None
             if on_status_update:
                 async def _reporter():
                     while status.state == TaskState.RUNNING:
-                        _emit_status_update()
+                        await _emit_status_update()
                         await asyncio.sleep(update_interval_s)
 
                 reporter_task = asyncio.create_task(_reporter())
@@ -57,7 +67,9 @@ class TaskManager:
                 run_kwargs.setdefault("task_status", status)
                 result = await coro_factory(**run_kwargs)
                 status.state = TaskState.COMPLETED
-                status.result = result
+                status.result_json = (
+                    json.dumps(result, default=str) if result is not None else None
+                )
             except asyncio.CancelledError:
                 status.state = TaskState.CANCELLED
             except Exception as e:
@@ -71,14 +83,14 @@ class TaskManager:
                         await reporter_task
                     except asyncio.CancelledError:
                         pass
-                _emit_status_update()
+                await _emit_status_update()
 
         loop = asyncio.get_running_loop()
         atask = loop.create_task(_wrapper())
         self._asyncio_tasks[task_id] = atask
         return task_id
 
-    def get_status(self, task_id: str) -> Optional[TaskStatus]:
+    def get_status(self, task_id: str) -> Optional[Task]:
         return self._tasks.get(task_id)
 
     def cancel(self, task_id: str) -> bool:
@@ -88,5 +100,5 @@ class TaskManager:
             return True
         return False
 
-    def list_tasks(self) -> list[TaskStatus]:
+    def list_tasks(self) -> list[Task]:
         return list(self._tasks.values())

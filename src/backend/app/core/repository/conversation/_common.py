@@ -7,13 +7,17 @@ from datetime import datetime, timezone
 
 from pydantic import TypeAdapter
 
-from app.agent.models.conversation import MessagePart
-from app.agent.models.task import TaskState
+from app.core.model.conversation_domain import MessagePart
+from app.core.model.conversation_enums import TaskState
 
 MESSAGE_PARTS_ADAPTER = TypeAdapter(list[MessagePart])
 
 TERMINAL_TASK_STATES = frozenset(
-    {TaskState.COMPLETED.value, TaskState.FAILED.value, TaskState.CANCELLED.value}
+    {
+        TaskState.COMPLETED,
+        TaskState.FAILED,
+        TaskState.CANCELLED,
+    }
 )
 
 

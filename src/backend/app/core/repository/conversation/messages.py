@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.agent.models.conversation import (
-    ConversationMessage,
-    MessageRole,
-)
+from app.core.model.conversation_domain import ConversationMessage
+from app.core.model.conversation_enums import MessageRole
 from app.core.model.conversation_nodes import MessageNode
 from app.core.model.schemas.conversation_schema import (
     ConversationSchema,
@@ -135,3 +133,44 @@ class MessagesMixin:
             token_count=node.token_count,
             model=node.model_name,
         )
+
+    async def update_message(
+        self,
+        conversation_id: str,
+        message: ConversationMessage,
+    ) -> bool:
+        try:
+            raw = await self.client.get_document(message.id)
+        except Exception as exc:
+            print(exc)
+            return False
+        if not raw or "MessageSchema" not in str(raw.get("@type", "")):
+            return False
+        node = MessageNode.from_raw_dict(raw)
+        if node.conversation_id != conversation_id:
+            return False
+        now = utcnow()
+        if isinstance(message.role, MessageRole):
+            role_val = message.role.value
+        else:
+            role_val = str(message.role)
+        updated = MessageNode(
+            id=message.id,
+            conversation_id=conversation_id,
+            role=role_val,
+            parts_json=parts_to_json(message.parts),
+            token_count=message.token_count,
+            model_name=message.model,
+            sequence=node.sequence,
+            created_at=node.created_at,
+            updated_at=now,
+        )
+        try:
+            await self.client.update_document(
+                MessageSchema.from_pydantic(updated),
+                commit_msg=f"Update message {message.id}",
+            )
+        except Exception as exc:
+            print(exc)
+            return False
+        return True

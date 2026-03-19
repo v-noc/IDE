@@ -5,8 +5,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from app.agent.models.task import SubTask, SubTaskState
-from app.core.model.conversation_nodes import SubTaskNode, TaskNode
+from app.core.model.conversation_nodes import SubTask, Task, _coerce_subtask_state
 from app.core.model.schemas.conversation_schema import (
     SubTaskSchema,
     TaskSchema,
@@ -32,25 +31,18 @@ class SubtasksMixin:
             return None
         if not task_raw:
             return None
-        task_node = TaskNode.from_raw_dict(task_raw)
+        task_node = Task.from_raw_dict(task_raw)
         now = utcnow()
         seq = task_node.sub_task_count
         sub_id = subtask.id or new_doc_id("SubTaskSchema")
-        st = subtask.state
-        state_val = st.value if isinstance(st, SubTaskState) else str(st)
-        sub_node = SubTaskNode(
-            id=sub_id,
-            task_id=task_id,
-            name=subtask.name,
-            description=subtask.description,
-            state=state_val,
-            sequence=seq,
-            started_at=subtask.started_at,
-            finished_at=subtask.finished_at,
-            error=subtask.error,
-            touched_node_ids_json=json.dumps(subtask.touched_node_ids),
-            created_at=now,
-            updated_at=now,
+        sub_node = subtask.model_copy(
+            update={
+                "id": sub_id,
+                "task_id": task_id,
+                "sequence": seq,
+                "created_at": now,
+                "updated_at": now,
+            }
         )
 
         try:
@@ -82,15 +74,14 @@ class SubtasksMixin:
             return False
         if not raw:
             return False
-        node = SubTaskNode.from_raw_dict(raw)
+        node = SubTask.from_raw_dict(raw)
 
         if "name" in fields:
             node.name = fields["name"]
         if "description" in fields:
             node.description = fields["description"]
         if "state" in fields:
-            st = fields["state"]
-            node.state = st.value if hasattr(st, "value") else str(st)
+            node.state = _coerce_subtask_state(fields["state"])
         if "sequence" in fields:
             node.sequence = int(fields["sequence"])
         if "started_at" in fields:
@@ -144,23 +135,5 @@ class SubtasksMixin:
             raw = row.get("st_doc")
             if not raw:
                 continue
-            n = SubTaskNode.from_raw_dict(raw)
-            touched: list[str] = []
-            try:
-                touched = json.loads(n.touched_node_ids_json or "[]")
-            except json.JSONDecodeError:
-                touched = []
-            out.append(
-                SubTask(
-                    id=n.id,
-                    name=n.name,
-                    description=n.description,
-                    state=SubTaskState(n.state),
-                    sequence=n.sequence,
-                    started_at=n.started_at,
-                    finished_at=n.finished_at,
-                    error=n.error,
-                    touched_node_ids=touched,
-                )
-            )
+            out.append(SubTask.from_raw_dict(raw))
         return out

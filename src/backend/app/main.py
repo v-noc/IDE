@@ -8,11 +8,9 @@ from app.agent.config import settings as agent_settings
 from app.agent.runner.task_manager import TaskManager
 from app.agent.llm.factory import LLMFactory
 from app.agent.llm.providers.openai_provider import OpenAIProvider
-from app.agent.models.conversation_store import (
-    InMemoryConversationStore,
-    SQLiteConversationStore,
-)
+from app.agent.conversation_store import TerminusConversationStore
 from app.agent.runner.executor import AgentExecutor
+from app.core.repository.conversation import ConversationRepo
 
 from .api import root
 from .db.client import get_terminus_client, close_db_client
@@ -47,13 +45,8 @@ async def lifespan(app: FastAPI):
         )
     task_manager = TaskManager()
 
-    # 3. Initialize conversation store (in-memory or sqlite)
-    if agent_settings.conversation_store_backend == "sqlite":
-        conversation_store = SQLiteConversationStore(
-            db_path=agent_settings.conversation_store_sqlite_path
-        )
-    else:
-        conversation_store = InMemoryConversationStore()
+    conversation_repo = ConversationRepo(db)
+    conversation_store = TerminusConversationStore(conversation_repo)
 
     # 4. Create the Executor (wires runner, LLM, and store together)
     executor = AgentExecutor(

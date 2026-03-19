@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from app.agent.models.task import Task, TaskState
-from app.core.model.conversation_nodes import TaskNode
+from app.core.model.conversation_enums import TaskState
+from app.core.model.conversation_nodes import Task, _coerce_task_state
 from app.core.model.schemas.conversation_schema import (
     ConversationSchema,
     TaskSchema,
@@ -33,11 +33,15 @@ class TasksMixin:
             return None
         now = utcnow()
         task_id = task.id or new_doc_id("TaskSchema")
-        task.conversation_id = conversation_id
-        task.message_id = message_id
-        task.created_at = task.created_at or now
-        task.updated_at = now
-        node = task.to_task_node(task_id)
+        node = task.model_copy(
+            update={
+                "id": task_id,
+                "conversation_id": conversation_id,
+                "message_id": message_id,
+                "created_at": task.created_at or now,
+                "updated_at": now,
+            }
+        )
         try:
             await self.client.insert_document(
                 TaskSchema.from_pydantic(node),
@@ -67,7 +71,7 @@ class TasksMixin:
             return False
         if not raw:
             return False
-        node = TaskNode.from_raw_dict(raw)
+        node = Task.from_raw_dict(raw)
         conv_id = node.conversation_id
 
         if "name" in fields:
@@ -75,11 +79,7 @@ class TasksMixin:
         if "description" in fields:
             node.description = fields["description"]
         if "state" in fields:
-            st = fields["state"]
-            if isinstance(st, TaskState):
-                node.state = st.value
-            else:
-                node.state = str(st)
+            node.state = _coerce_task_state(fields["state"])
         if "progress" in fields:
             node.progress = float(fields["progress"])
         if "progress_message" in fields:
@@ -88,7 +88,9 @@ class TasksMixin:
             node.workflow_name = fields["workflow_name"]
         if "workflow_params" in fields:
             wp = fields["workflow_params"]
-            node.workflow_params_json = json.dumps(wp) if wp is not None else None
+            node.workflow_params_json = (
+                json.dumps(wp) if wp is not None else None
+            )
         if "started_at" in fields:
             node.started_at = fields["started_at"]
         if "finished_at" in fields:
@@ -123,12 +125,10 @@ class TasksMixin:
         try:
             open_tasks = await self._query_tasks_for_conversation(
                 conversation_id,
-                states=list(
-                    {
-                        TaskState.PENDING.value,
-                        TaskState.RUNNING.value,
-                    }
-                ),
+                states=[
+                    TaskState.PENDING.value,
+                    TaskState.RUNNING.value,
+                ],
             )
         except Exception as exc:
             print(exc)
@@ -149,7 +149,7 @@ class TasksMixin:
         self,
         conversation_id: str,
         states: list[str],
-    ) -> list[TaskNode]:
+    ) -> list[Task]:
         if not states:
             return []
         query = (
@@ -168,11 +168,11 @@ class TasksMixin:
         except Exception as exc:
             print(exc)
             return []
-        out: list[TaskNode] = []
+        out: list[Task] = []
         for row in result.get("bindings", []):
             raw = row.get("task_doc")
             if raw:
-                out.append(TaskNode.from_raw_dict(raw))
+                out.append(Task.from_raw_dict(raw))
         return out
 
     async def get_task(self, task_id: str) -> Task | None:
@@ -183,5 +183,4 @@ class TasksMixin:
             return None
         if not raw:
             return None
-        node = TaskNode.from_raw_dict(raw)
-        return Task.from_task_node(node)
+        return Task.from_raw_dict(raw)

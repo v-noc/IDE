@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage
 from app.db.async_terminus_client import WOQLQuery as WQ
 from app.agent.workflows.base import BaseWorkflow
 from app.agent.context.graph_traversal import GraphTraversal
-from app.agent.models.task_status import TaskStatus
+from app.core.model.conversation_nodes import Task
 
 
 class DescriptionGeneratorWorkflow(BaseWorkflow):
@@ -23,7 +23,7 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         # "up" (leaf -> parent) | "down" (parent -> leaf)
         direction: str = "down",
         max_depth: int = 5,
-        task_status: TaskStatus | None = None,
+        task_status: Task | None = None,
         **kwargs,
     ):
         if self.graph is None:

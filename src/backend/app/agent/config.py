@@ -1,7 +1,5 @@
 import os
 from functools import lru_cache
-from typing import Literal
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,10 +16,6 @@ class AgentConfig(BaseSettings):
 
     # VectorLink
     vectorlink_url: str = "http://localhost:8080"
-
-    # Conversation store
-    conversation_store_backend: Literal["memory", "sqlite"] = "memory"
-    conversation_store_sqlite_path: str = "data/agent_conversations.sqlite3"
 
     model_config = SettingsConfigDict(
         env_prefix="AGENT_",

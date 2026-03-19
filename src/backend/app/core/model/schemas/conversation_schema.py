@@ -6,8 +6,10 @@ from typing import Optional
 from app.core.model.conversation_nodes import (
     ConversationNode,
     MessageNode,
-    SubTaskNode,
-    TaskNode,
+    SubTask,
+    Task,
+    _coerce_subtask_state,
+    _coerce_task_state,
 )
 from .base import BaseSchema, TerminusBase
 
@@ -98,14 +100,14 @@ class TaskSchema(BaseSchema):
     sub_task_count: int
 
     @staticmethod
-    def from_pydantic(node: TaskNode) -> "TaskSchema":
+    def from_pydantic(node: Task) -> "TaskSchema":
         return TaskSchema(
             _id=node.id,
             name=node.name,
             description=node.description,
             conversation=node.conversation_id,
             message=node.message_id,
-            state=node.state,
+            state=node.state.value,
             progress=node.progress,
             progress_message=node.progress_message,
             workflow_name=node.workflow_name,
@@ -119,16 +121,16 @@ class TaskSchema(BaseSchema):
             updated_at=node.updated_at,
         )
 
-    def to_pydantic(self) -> TaskNode:
+    def to_pydantic(self) -> Task:
         conv = self.conversation
         msg = self.message
-        return TaskNode(
+        return Task(
             id=self._id,
             name=self.name,
             description=self.description,
             conversation_id=conv if isinstance(conv, str) else getattr(conv, "_id", ""),
             message_id=msg if isinstance(msg, str) else getattr(msg, "_id", ""),
-            state=self.state,
+            state=_coerce_task_state(self.state),
             progress=float(self.progress or 0.0),
             progress_message=self.progress_message or "",
             workflow_name=self.workflow_name,
@@ -155,13 +157,13 @@ class SubTaskSchema(TerminusBase):
     touched_node_ids_json: str
 
     @staticmethod
-    def from_pydantic(node: SubTaskNode) -> "SubTaskSchema":
+    def from_pydantic(node: SubTask) -> "SubTaskSchema":
         return SubTaskSchema(
             _id=node.id,
             task=node.task_id,
             name=node.name,
             description=node.description,
-            state=node.state,
+            state=node.state.value,
             sequence=node.sequence,
             started_at=node.started_at,
             finished_at=node.finished_at,
@@ -171,14 +173,14 @@ class SubTaskSchema(TerminusBase):
             updated_at=node.updated_at,
         )
 
-    def to_pydantic(self) -> SubTaskNode:
+    def to_pydantic(self) -> SubTask:
         parent = self.task
-        return SubTaskNode(
+        return SubTask(
             id=self._id,
             task_id=parent if isinstance(parent, str) else getattr(parent, "_id", ""),
             name=self.name,
             description=self.description,
-            state=self.state,
+            state=_coerce_subtask_state(self.state),
             sequence=int(self.sequence or 0),
             started_at=self.started_at,
             finished_at=self.finished_at,

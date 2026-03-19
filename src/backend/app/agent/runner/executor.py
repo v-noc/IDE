@@ -4,15 +4,14 @@ import uuid
 
 from app.agent.runner.task_manager import TaskManager
 from app.agent.workflows.base import BaseWorkflow
-from app.agent.models.conversation import (
+from app.agent.conversation_store import ConversationStore
+from app.core.model.conversation_domain import (
     ConversationMessage,
-    MessageRole,
     TaskPart,
-    TaskState as ConversationTaskState,
     TextPart,
 )
-from app.agent.models.conversation_store import ConversationStore
-from app.agent.models.task_status import TaskStatus
+from app.core.model.conversation_enums import MessageRole, TaskState as ConversationTaskState
+from app.core.model.conversation_nodes import Task
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
@@ -60,18 +59,20 @@ class AgentExecutor:
         # 1. Auto-create conversation if standalone
         if conversation_id is None:
             title, description = await self._generate_title(workflow, kwargs)
-            conversation_id = self.store.create_conversation(
-                title, description)
+            conversation_id = await self.store.create_conversation(
+                title, description
+            )
+
+        async def _on_status(status: Task) -> None:
+            await self._update_task_part(
+                conversation_id, task_id, status
+            )
 
         # 2. Submit task and attach a timeline message to the conversation
         task_id = self.task_manager.submit(
             name=f"workflow:{workflow.name}",
             coro_factory=workflow.run,
-            on_status_update=lambda status: self._update_task_part(
-                conversation_id,
-                task_id,
-                status,
-            ),
+            on_status_update=_on_status,
             **kwargs,
         )
 
@@ -81,7 +82,7 @@ class AgentExecutor:
             workflow_name=workflow.name,
             workflow_params=kwargs,
         )
-        self.store.add_message(
+        await self.store.add_message(
             conversation_id,
             ConversationMessage(
                 id=str(uuid.uuid4()),
@@ -91,7 +92,7 @@ class AgentExecutor:
         )
         self._task_part_templates[task_id] = task_part
         # Push initial state after the message has been written.
-        self._update_task_part(
+        await self._update_task_part(
             conversation_id,
             task_id,
             self.task_manager.get_status(task_id),
@@ -157,12 +158,12 @@ class AgentExecutor:
             # Never block workflow scheduling on title generation issues.
             return fallback_title, fallback_description
 
-    def _update_task_part(
+    async def _update_task_part(
         self,
         conversation_id: str,
         task_id: str,
-        task_status: TaskStatus | None,
-    ):
+        task_status: Task | None,
+    ) -> None:
         """Update existing TaskPart container for one workflow task."""
         if task_status is None:
             return
@@ -180,5 +181,5 @@ class AgentExecutor:
                 "finished_at": task_status.finished_at,
             }
         )
-        self.store.upsert_task_part(conversation_id, updated_part)
+        await self.store.upsert_task_part(conversation_id, updated_part)
         self._task_part_templates[task_id] = updated_part

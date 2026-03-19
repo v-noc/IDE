@@ -1,6 +1,6 @@
 from app.agent.context.graph_traversal import GraphTraversal
 from app.agent.workflows.description_gen import DescriptionGeneratorWorkflow
-from app.agent.models.task_status import TaskStatus
+from app.core.model.conversation_nodes import Task
 from app.core.model.schemas import DocumentSchema
 from datetime import datetime, timezone
 from terminusdb_client.woqlquery.woql_query import Doc
@@ -19,7 +19,7 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
         node_id: str | None = None,
         direction: str = "down",
         max_depth: int = 5,
-        task_status: TaskStatus | None = None,
+        task_status: Task | None = None,
         **kwargs,
     ):
         # Documentation starts only after description phase finishes.

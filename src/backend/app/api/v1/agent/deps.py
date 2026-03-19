@@ -1,7 +1,7 @@
 
 from fastapi import Request
 from app.agent.runner.executor import AgentExecutor
-from app.agent.models.conversation_store import ConversationStore
+from app.agent.conversation_store import ConversationStore
 
 
 def get_agent_executor(request: Request) -> AgentExecutor:

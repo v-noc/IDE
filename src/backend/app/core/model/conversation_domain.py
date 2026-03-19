@@ -1,15 +1,14 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Literal, Union
+"""Conversation UI/message models (parts, messages, aggregates)."""
+
+from __future__ import annotations
+
 from datetime import datetime
-from enum import Enum
+from typing import Literal, Optional, Union
 
-from app.agent.models.task import SubTask, TaskState
+from pydantic import BaseModel, Field
 
-
-class MessageRole(str, Enum):
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
+from app.core.model.conversation_enums import MessageRole, TaskState
+from app.core.model.conversation_nodes import ConversationNode, SubTask
 
 
 class TextPart(BaseModel):
@@ -54,7 +53,6 @@ class TaskPart(BaseModel):
     workflow_params: Optional[dict] = None
 
 
-# Union of all part types
 MessagePart = Union[TextPart, ToolCallPart, EventPart, TaskPart]
 
 
@@ -64,20 +62,49 @@ class ConversationMessage(BaseModel):
     parts: list[MessagePart]
     sequence: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    token_count: Optional[int] = None          # tokens used by this message
-    model: Optional[str] = None                # which LLM generated this
+    token_count: Optional[int] = None
+    model: Optional[str] = None
 
 
 class ConversationSummary(BaseModel):
     id: str
     title: str
-    description: str = ""                 # LLM-generated summary
+    description: str = ""
     created_at: datetime
     updated_at: datetime
     message_count: int = 0
-    has_active_task: bool = False          # quick flag for UI
+    has_active_task: bool = False
+
+    @classmethod
+    def from_conversation_node(
+        cls, node: ConversationNode
+    ) -> "ConversationSummary":
+        return cls(
+            id=node.id,
+            title=node.name,
+            description=node.description,
+            created_at=node.created_at,
+            updated_at=node.updated_at,
+            message_count=node.message_count,
+            has_active_task=node.has_active_task,
+        )
 
 
 class Conversation(ConversationSummary):
     messages: list[ConversationMessage] = Field(default_factory=list)
     metadata: dict = Field(default_factory=dict)
+
+    @classmethod
+    def from_conversation_node(
+        cls,
+        node: ConversationNode,
+        *,
+        messages: list[ConversationMessage],
+        metadata: dict,
+    ) -> "Conversation":
+        summary = ConversationSummary.from_conversation_node(node)
+        return cls(
+            **summary.model_dump(),
+            messages=messages,
+            metadata=metadata,
+        )

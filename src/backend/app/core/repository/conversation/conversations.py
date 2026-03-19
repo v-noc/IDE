@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from app.agent.models.conversation import Conversation, ConversationSummary
+from app.core.model.conversation_domain import Conversation, ConversationSummary
 from app.core.model.conversation_nodes import ConversationNode
 from app.core.model.schemas.conversation_schema import ConversationSchema
 
@@ -58,16 +58,8 @@ class ConversationsMixin:
             meta = json.loads(conv.metadata_json or "{}")
         except json.JSONDecodeError:
             meta = {}
-        return Conversation(
-            id=conv.id,
-            title=conv.name,
-            description=conv.description,
-            created_at=conv.created_at,
-            updated_at=conv.updated_at,
-            message_count=conv.message_count,
-            has_active_task=conv.has_active_task,
-            messages=messages,
-            metadata=meta,
+        return Conversation.from_conversation_node(
+            conv, messages=messages, metadata=meta
         )
 
     async def _get_conversation_node(
@@ -100,14 +92,5 @@ class ConversationsMixin:
                 nodes = nodes[idx + 1:]
         cap = max(1, limit)
         return [
-            ConversationSummary(
-                id=n.id,
-                title=n.name,
-                description=n.description,
-                created_at=n.created_at,
-                updated_at=n.updated_at,
-                message_count=n.message_count,
-                has_active_task=n.has_active_task,
-            )
-            for n in nodes[:cap]
+            ConversationSummary.from_conversation_node(n) for n in nodes[:cap]
         ]
