@@ -244,7 +244,9 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             if hasattr(node, "documents"):
                 for document_id in set(getattr(node, "documents") or set()):
                     queries.append(
-                        WQ().add_triple(node_id, "documents", document_id)
+                        WQ().opt(
+                            WQ().add_triple(node_id, "documents", document_id)
+                        )
                     )
 
             if queries:
