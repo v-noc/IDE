@@ -1,15 +1,37 @@
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { agentConversationHydrationQueryOptions } from "@/services/agent";
 import { useConversationStore } from "../store/useConversationStore";
+import { useAgentUiStore } from "../store/useAgentUiStore";
 import { selectMessageText } from "../store/selectors/conversationSelectors";
 import { useShallow } from "zustand/react/shallow";
+import { useAgentChatSession } from "../live";
+import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { AgentChatInput } from "./AgentChatInput";
 import { WalkthroughView } from "./WalkthroughView/WalkthroughView";
+import {
+  MessageList,
+  messageItemFromWire,
+  type MessageItemProps,
+} from "./messages";
 
 interface AgentSidebarProps {
   className?: string;
 }
 
 export function AgentSidebar({ className }: AgentSidebarProps) {
+  const backendConversationId = useAgentUiStore((s) => s.backendConversationId);
+  useAgentChatSession(backendConversationId);
+
+  const wire = useAgentLiveStore((s) => s.wire);
+  const activeStreams = useAgentLiveStore((s) => s.activeStreams);
+
+  const hydrationQuery = useQuery(
+    agentConversationHydrationQueryOptions(backendConversationId),
+  );
+  const isLiveLoading =
+    Boolean(backendConversationId) && hydrationQuery.isPending;
+
   const [viewMode, setViewMode, currentConversation] = useConversationStore(
     useShallow((state) => [
       state.viewMode,
@@ -18,7 +40,32 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
     ]),
   );
 
-  const messages = currentConversation?.messages;
+  const isLive =
+    Boolean(backendConversationId) &&
+    wire?.id === backendConversationId;
+
+  const streamingPlaceholderIds = new Set(
+    [...activeStreams].map((sid) => `stream:${sid}`),
+  );
+
+  let listMessages: MessageItemProps[] = [];
+  if (isLive && wire) {
+    listMessages = wire.messages.map((m) =>
+      messageItemFromWire(m, {
+        streaming: streamingPlaceholderIds.has(m.id),
+      }),
+    );
+  } else if (currentConversation?.messages?.length) {
+    listMessages = currentConversation.messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      text: selectMessageText(m.parts),
+    }));
+  }
+
+  const title = isLive
+    ? (wire?.title ?? "Loading…")
+    : (currentConversation?.title ?? "No conversation selected");
 
   return (
     <aside
@@ -31,36 +78,32 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             AI Cognitive Replay
+            {isLive ? (
+              <span className="ml-2 font-normal normal-case text-primary">
+                · Live
+              </span>
+            ) : null}
           </p>
-          <p className="mt-1 truncate text-xs text-foreground">
-            {currentConversation?.title ?? "No conversation selected"}
-          </p>
+          <p className="mt-1 truncate text-xs text-foreground">{title}</p>
         </div>
       </div>
 
       <div className="flex-1 space-y-4 overflow-auto p-4">
         {viewMode === "chat" ? (
           <section className="space-y-2">
-            {messages && messages.length > 0 ? (
-              messages.map((message) => (
-                <article
-                  key={message.id}
-                  className="rounded-md border border-border bg-muted/40 p-3"
-                >
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {message.role}
-                  </p>
-                  <p className="text-xs leading-relaxed text-foreground">
-                    {selectMessageText(message.parts) || "No text content."}
-                  </p>
-                </article>
-              ))
-            ) : (
+            {isLiveLoading ? (
               <p className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-                No messages in this conversation.
+                Loading conversation…
               </p>
+            ) : (
+              <MessageList messages={listMessages} />
             )}
           </section>
+        ) : isLive ? (
+          <p className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+            Walkthrough mode is available for local demo conversations only.
+            Select a fixture chat or switch to Chat.
+          </p>
         ) : (
           <WalkthroughView conversation={currentConversation} />
         )}

@@ -2,7 +2,6 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -27,37 +26,39 @@ interface SocketProviderProps {
 }
 
 export function SocketProvider({ children }: SocketProviderProps) {
+  const [socket, setSocket] = useState<Socket<
+    ServerToClientEvents,
+    ClientToServerEvents
+  > | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const socket = createSocket();
-    socketRef.current = socket;
+    const s = createSocket();
+    setSocket(s);
 
     const onConnect = () => {
-      console.log("🔌 Socket connected:", socket.id);
       setIsConnected(true);
     };
 
-    const onDisconnect = (reason: string) => {
-      console.log("🔌 Socket disconnected:", reason);
+    const onDisconnect = () => {
       setIsConnected(false);
     };
 
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-
-    setIsConnected(socket.connected);
+    s.on("connect", onConnect);
+    s.on("disconnect", onDisconnect);
+    setIsConnected(s.connected);
 
     return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
+      s.off("connect", onConnect);
+      s.off("disconnect", onDisconnect);
       disconnectSocket();
+      setSocket(null);
+      setIsConnected(false);
     };
   }, []);
 
   return (
-    <SocketContext.Provider value={{ socket: socketRef.current, isConnected }}>
+    <SocketContext.Provider value={{ socket, isConnected }}>
       {children}
     </SocketContext.Provider>
   );

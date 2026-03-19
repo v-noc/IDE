@@ -26,4 +26,22 @@ export const useProjectRoom = (projectId: string | undefined) => {
       console.log(`📦 Left project room: ${projectId}`);
     };
   }, [socket, isConnected, projectId]);
-}
+};
+
+/**
+ * Join `conv:{conversationId}` for agent JSON patches and stream events.
+ */
+export const useConversationRoom = (
+  conversationId: string | undefined | null,
+) => {
+  const { socket, isConnected } = useSocketContext();
+  useEffect(() => {
+    if (!socket || !isConnected || !conversationId) return;
+
+    socket.emit("join_conversation", conversationId);
+
+    return () => {
+      socket.emit("leave_conversation", conversationId);
+    };
+  }, [socket, isConnected, conversationId]);
+};

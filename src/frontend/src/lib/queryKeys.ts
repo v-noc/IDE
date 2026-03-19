@@ -45,6 +45,16 @@ const queryKeys = {
     list: (nodeKey: string, projectKey?: string) => [...queryKeys.documents.all, 'list', nodeKey, projectKey ?? ''] as const,
     detail: (docId: string) => [...queryKeys.documents.all, 'detail', docId] as const,
   },
+  agent: {
+    all: ["agent"] as const,
+    conversations: {
+      all: () => [...queryKeys.agent.all, "conversations"] as const,
+      list: (limit: number) =>
+        [...queryKeys.agent.conversations.all(), "list", limit] as const,
+      detail: (id: string) =>
+        [...queryKeys.agent.conversations.all(), "detail", id] as const,
+    },
+  },
   versioning: {
     all: ['versioning'] as const,
     branches: (projectId: string, branch?: string | null, ref?: string | null) =>
