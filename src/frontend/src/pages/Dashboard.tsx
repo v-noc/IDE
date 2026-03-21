@@ -19,6 +19,8 @@ import { SidebarDialogs } from "@/features/Dashboard/components/SidebarDialogs";
 import VersioningPanel from "@/features/Dashboard/features/Versioning/components/VersioningPanel";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import AgentOverlay from "@/features/Dashboard/features/Agent";
+import { useAgentChatSession } from "@/features/Dashboard/features/Agent/live";
+import { useAgentUiStore } from "@/features/Dashboard/features/Agent/store/useAgentUiStore";
 import VersioningStatusBanner from "@/features/Dashboard/features/Versioning/components/VersioningStatusBanner";
 
 /**
@@ -35,9 +37,14 @@ const Dashboard = () => {
   const tabStack = useTabStore(useShallow(selectTabStack));
   const isVersioningOpen = useVersioningStore((s) => s.isOpen);
 
+  const backendConversationId = useAgentUiStore((s) => s.backendConversationId);
+  const agentProjectId = useProjectStore((s) => s.projectData?.id ?? "");
+
   // Socket and Data Sync hooks
   useSocketSync();
   useProjectRoom(projectId);
+  /** One subscription only — every tab mounts AgentSidebar; duplicate listeners break JSON patches. */
+  useAgentChatSession(backendConversationId, agentProjectId);
 
   // Transformation hooks
   useGroupFlattening();

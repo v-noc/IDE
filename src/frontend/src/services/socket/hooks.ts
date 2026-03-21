@@ -1,31 +1,37 @@
-import { useEffect } from 'react';
-import { useSocketContext } from './SocketProvider';
+import { useEffect } from "react";
+import { useSocketContext } from "./SocketProvider";
 
 export const useSocket = () => {
   const { socket, isConnected } = useSocketContext();
   return { socket, isConnected };
 };
 
-
 /**
- * Join a project-specific room to receive updates
+ * Join a project-specific room to receive updates.
+ * Re-joins on every socket `connect` (reconnect); do not rely only on React `isConnected`
+ * to avoid missing the first join when state lags the handshake.
  */
 export const useProjectRoom = (projectId: string | undefined) => {
-  const { socket, isConnected } = useSocketContext();
+  const { socket } = useSocketContext();
   useEffect(() => {
-    console.log("Socket connected:", socket);
-    console.log("Is connected:", isConnected);
-    console.log("Project ID:", projectId);
-    if (!socket || !isConnected || !projectId) return;
+    if (!socket || !projectId) return;
 
-    socket.emit("join_project", projectId);
-    console.log(`📦 Joined project room: ${projectId}`);
+    const join = () => {
+      if (socket.connected) {
+        socket.emit("join_project", projectId);
+      }
+    };
+
+    join();
+    socket.on("connect", join);
 
     return () => {
-      socket.emit("leave_project", projectId);
-      console.log(`📦 Left project room: ${projectId}`);
+      socket.off("connect", join);
+      if (socket.connected) {
+        socket.emit("leave_project", projectId);
+      }
     };
-  }, [socket, isConnected, projectId]);
+  }, [socket, projectId]);
 };
 
 /**
@@ -34,14 +40,24 @@ export const useProjectRoom = (projectId: string | undefined) => {
 export const useConversationRoom = (
   conversationId: string | undefined | null,
 ) => {
-  const { socket, isConnected } = useSocketContext();
+  const { socket } = useSocketContext();
   useEffect(() => {
-    if (!socket || !isConnected || !conversationId) return;
+    if (!socket || !conversationId) return;
 
-    socket.emit("join_conversation", conversationId);
+    const join = () => {
+      if (socket.connected) {
+        socket.emit("join_conversation", conversationId);
+      }
+    };
+
+    join();
+    socket.on("connect", join);
 
     return () => {
-      socket.emit("leave_conversation", conversationId);
+      socket.off("connect", join);
+      if (socket.connected) {
+        socket.emit("leave_conversation", conversationId);
+      }
     };
-  }, [socket, isConnected, conversationId]);
+  }, [socket, conversationId]);
 };

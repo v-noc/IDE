@@ -3,15 +3,32 @@ import type { ServerToClientEvents, ClientToServerEvents } from "./types";
 
 let socket: Socket<ServerToClientEvents, ClientToServerEvents> | null = null;
 
+/**
+ * Browsers cannot connect to 0.0.0.0 — normalize to localhost.
+ * Also align socket origin with API origin when VITE_SOCKET_URL is unset.
+ */
+function normalizeBrowserOrigin(raw: string): string {
+  const trimmed = raw.replace(/\/$/, "");
+  try {
+    const u = new URL(trimmed);
+    if (u.hostname === "0.0.0.0") {
+      u.hostname = "localhost";
+    }
+    return u.origin;
+  } catch {
+    return trimmed;
+  }
+}
+
 function socketOrigin(): string {
   const explicit = import.meta.env.VITE_SOCKET_URL as string | undefined;
   if (explicit?.trim()) {
-    return explicit.replace(/\/$/, "");
+    return normalizeBrowserOrigin(explicit.trim());
   }
   const api = import.meta.env.VITE_API_BASE_URL as string | undefined;
   if (api?.startsWith("http")) {
     try {
-      return new URL(api).origin;
+      return normalizeBrowserOrigin(new URL(api).origin);
     } catch {
       /* fall through */
     }
@@ -24,17 +41,16 @@ function socketOrigin(): string {
 
 /** Path must match FastAPI `mount("/ws", ...)` + Socket.IO (see backend `SocketIOMount`). */
 function socketPath(): string {
-  return (
-    (import.meta.env.VITE_SOCKET_IO_PATH as string | undefined)?.replace(
-      /\/?$/,
-      "",
-    ) || "/ws/socket.io"
+  const fromEnv = (import.meta.env.VITE_SOCKET_IO_PATH as string | undefined)?.replace(
+    /\/?$/,
+    "",
   );
+  return fromEnv || "/ws/socket.io";
 }
 
 const getConfig = () => ({
   url: socketOrigin(),
-  path: `${socketPath()}/`,
+  path: socketPath(),
 });
 
 export const createSocket = (): Socket<ServerToClientEvents, ClientToServerEvents> => {
@@ -47,6 +63,7 @@ export const createSocket = (): Socket<ServerToClientEvents, ClientToServerEvent
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionAttempts: 5,
+    autoConnect: true,
   });
 
   return socket;

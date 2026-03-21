@@ -4,14 +4,9 @@ import { useVersioningStore } from "@/features/Dashboard/features/Versioning/sto
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { agentConversationHydrationQueryOptions } from "@/services/agent";
 import { useAgentUiStore } from "../store/useAgentUiStore";
-import { useAgentChatSession } from "../live";
 import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { AgentChatInput } from "./AgentChatInput";
-import {
-  MessageList,
-  messageItemFromWire,
-  type MessageItemProps,
-} from "./messages";
+import { ChatContainer } from "./chat";
 
 interface AgentSidebarProps {
   className?: string;
@@ -23,8 +18,6 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
   const branch = useVersioningStore((s) => s.branch);
   const ref = useVersioningStore((s) => s.checkedOutCommitId);
   const compareTo = useVersioningStore((s) => s.compareToCommitId);
-
-  useAgentChatSession(backendConversationId, projectId);
 
   const wire = useAgentLiveStore((s) => s.wire);
   const activeStreams = useAgentLiveStore((s) => s.activeStreams);
@@ -48,14 +41,7 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
     [...activeStreams].map((sid) => `stream:${sid}`),
   );
 
-  let listMessages: MessageItemProps[] = [];
-  if (isLive && wire) {
-    listMessages = wire.messages.map((m) =>
-      messageItemFromWire(m, {
-        streaming: streamingPlaceholderIds.has(m.id),
-      }),
-    );
-  }
+  const listMessages = isLive && wire ? wire.messages : [];
 
   const title = !backendConversationId
     ? "New chat"
@@ -90,14 +76,16 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
             <p className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
               Loading conversation…
             </p>
-          ) : listMessages.length === 0 ? (
-            <p className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-              {backendConversationId
-                ? "No messages yet."
-                : "New chat — your conversation is created when you send the first message."}
-            </p>
           ) : (
-            <MessageList messages={listMessages} />
+            <ChatContainer
+              messages={listMessages}
+              streamingMessageIds={streamingPlaceholderIds}
+              emptyLabel={
+                backendConversationId
+                  ? "No messages yet."
+                  : "New chat — your conversation is created when you send the first message."
+              }
+            />
           )}
         </section>
       </div>

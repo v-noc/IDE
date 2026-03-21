@@ -8,11 +8,11 @@ import { useSocketContext } from "./SocketProvider";
  * Call this once at app level (e.g., in Dashboard layout).
  */
 export function useSocketSync() {
-  const { socket, isConnected } = useSocketContext();
+  const { socket } = useSocketContext();
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    if (!socket) return;
 
     // When code is updated (from backend processing or another user)
     const onCodeUpdated = (data: { element_id: string }) => {
@@ -48,5 +48,5 @@ export function useSocketSync() {
       socket.off("logs:new", onLogsNew);
       socket.off("project:updated", onProjectUpdated);
     };
-  }, [socket, isConnected, queryClient])
+  }, [socket, queryClient]);
 }

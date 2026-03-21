@@ -1,7 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useEffectEvent } from "@/lib/react/useEffectEvent";
-import queryKeys from "@/lib/queryKeys";
 import { useConversationRoom, useSocket } from "@/services/socket";
 import type {
   ConversationPatchPayload,
@@ -20,7 +19,7 @@ export function useAgentConversationSocket(
   conversationId: string | null,
   projectId: string,
 ) {
-  const { socket, isConnected } = useSocket();
+  const { socket } = useSocket();
   const queryClient = useQueryClient();
 
   useConversationRoom(conversationId ?? undefined);
@@ -51,7 +50,7 @@ export function useAgentConversationSocket(
   });
 
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    if (!socket) return;
 
     const patch = (p: ConversationPatchPayload) => onPatch(p);
     const start = (p: StreamStartPayload) => onStreamStart(p);
@@ -72,21 +71,61 @@ export function useAgentConversationSocket(
       socket.off("stream:end", end);
       socket.off("stream:error", err);
     };
-    // Handlers are `useEffectEvent` — stable; only re-bind when socket / connectivity changes.
-  }, [socket, isConnected]);
+    // Handlers are `useEffectEvent` — stable; bind as soon as the client instance exists.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onPatch/onStream* are EffectEvents
+  }, [socket]);
 
   const patchFailed = useAgentLiveStore((s) => s.patchApplyFailed);
 
   useEffect(() => {
     if (!patchFailed || !conversationId || !projectId) return;
     void queryClient.invalidateQueries({
-      queryKey: [
-        ...queryKeys.agent.conversations.all(),
-        "detail",
-        projectId,
-        conversationId,
-      ],
+      predicate: (q) => {
+        const k = q.queryKey;
+        return (
+          Array.isArray(k) &&
+          k[0] === "agent" &&
+          k[1] === "conversations" &&
+          k[2] === "detail" &&
+          k[3] === projectId &&
+          k[4] === conversationId
+        );
+      },
     });
     useAgentLiveStore.getState().clearPatchFailure();
   }, [patchFailed, conversationId, projectId, queryClient]);
+
+  const sawDisconnect = useRef(false);
+  useEffect(() => {
+    if (!socket || !conversationId || !projectId) return;
+
+    const onDisconnect = () => {
+      sawDisconnect.current = true;
+    };
+
+    const onConnect = () => {
+      if (!sawDisconnect.current) return;
+      sawDisconnect.current = false;
+      void queryClient.invalidateQueries({
+        predicate: (q) => {
+          const k = q.queryKey;
+          return (
+            Array.isArray(k) &&
+            k[0] === "agent" &&
+            k[1] === "conversations" &&
+            k[2] === "detail" &&
+            k[3] === projectId &&
+            k[4] === conversationId
+          );
+        },
+      });
+    };
+
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect", onConnect);
+    return () => {
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect", onConnect);
+    };
+  }, [socket, conversationId, projectId, queryClient]);
 }

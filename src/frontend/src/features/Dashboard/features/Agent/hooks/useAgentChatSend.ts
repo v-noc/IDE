@@ -45,18 +45,8 @@ export function useAgentChatSend() {
       });
     },
     onSuccess: () => {
-      const projectId = useProjectStore.getState().projectData?.id;
-      const cid = useAgentUiStore.getState().backendConversationId;
-      if (projectId && cid) {
-        void queryClient.invalidateQueries({
-          queryKey: [
-            ...queryKeys.agent.conversations.all(),
-            "detail",
-            projectId,
-            cid,
-          ],
-        });
-      }
+      // Sidebar summaries only. Conversation detail stays live via `conversation:patch`
+      // and the live store; refetching detail here races with streaming and wipes placeholders.
       void queryClient.invalidateQueries({
         queryKey: queryKeys.agent.conversations.all(),
       });

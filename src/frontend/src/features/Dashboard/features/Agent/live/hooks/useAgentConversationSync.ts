@@ -47,6 +47,9 @@ export function useAgentConversationSync(
     if (!conversationId) return;
     const data = query.data;
     if (!data || data.id !== conversationId) return;
+    const { activeStreams } = useAgentLiveStore.getState();
+    // Hydration from REST must not clobber in-flight streams (placeholder + patch indices).
+    if (activeStreams.size > 0) return;
     useAgentLiveStore.getState().setWire(data);
   }, [conversationId, query.dataUpdatedAt]);
 }
