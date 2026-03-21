@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { WireMessage } from "@/types/agent";
+import { AssistantMarkdown } from "./Markdown";
 import { wireMessagePlainText } from "./wireText";
 
 export interface MessageItemProps {
@@ -30,9 +31,17 @@ export function MessageItem({
         {role}
         {streaming ? " · streaming" : ""}
       </p>
-      <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">
-        {text || (streaming ? "…" : "No text content.")}
-      </p>
+      {role === "assistant" ? (
+        text || streaming ? (
+          <AssistantMarkdown text={text || (streaming ? "…" : "")} />
+        ) : (
+          <p className="text-xs leading-relaxed text-muted-foreground">No text content.</p>
+        )
+      ) : (
+        <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">
+          {text || (streaming ? "…" : "No text content.")}
+        </p>
+      )}
     </article>
   );
 }

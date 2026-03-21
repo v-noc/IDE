@@ -172,7 +172,7 @@ class AgentExecutor:
             "model": resolved_model,
             "provider": resolved_provider,
         }
-        print(f"payload: {payload}")
+
         if task_status is not None:
             payload["task_id"] = task_status.id
         if client_ref:

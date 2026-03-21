@@ -123,6 +123,17 @@ export function AgentOverlay() {
           className="absolute left-0 top-0 h-full w-2 -translate-x-1 cursor-col-resize"
         />
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={startNewChat}
+            aria-label="Start new chat"
+            title="New chat"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          >
+            <Plus size={14} />
+          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button
