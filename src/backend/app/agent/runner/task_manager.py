@@ -68,7 +68,8 @@ class TaskManager:
                 result = await coro_factory(**run_kwargs)
                 status.state = TaskState.COMPLETED
                 status.result_json = (
-                    json.dumps(result, default=str) if result is not None else None
+                    json.dumps(
+                        result, default=str) if result is not None else None
                 )
             except asyncio.CancelledError:
                 status.state = TaskState.CANCELLED
@@ -76,6 +77,7 @@ class TaskManager:
                 status.state = TaskState.FAILED
                 status.error = str(e)
             finally:
+
                 status.finished_at = datetime.utcnow()
                 if reporter_task:
                     reporter_task.cancel()

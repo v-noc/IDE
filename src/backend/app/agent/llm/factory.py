@@ -8,14 +8,17 @@ class LLMFactory:
     def __init__(self, config: AgentConfig):
         self.config = config
         self._providers: dict[str, type[LLMProvider]] = {}
+        self._provider_defaults: dict[str, dict] = {}
 
     def register_provider(
         self,
         name: str,
         provider_cls: type[LLMProvider],
-
+        **defaults,
     ):
         self._providers[name] = provider_cls
+        if defaults:
+            self._provider_defaults[name] = defaults
 
     def create(
         self,
@@ -27,8 +30,9 @@ class LLMFactory:
         provider = provider or self.config.default_provider  # e.g. "openai"
         model = model or self.config.default_model            # e.g. "gpt-4o"
         provider_cls = self._providers[provider]
+        merged = {**self._provider_defaults.get(provider, {}), **kwargs}
 
-        return provider_cls(model=model, **kwargs)
+        return provider_cls(model=model, **merged)
 
     def list_available(self) -> list[dict]:
         """List registered providers and their supported models."""

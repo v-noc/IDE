@@ -39,11 +39,13 @@ async def lifespan(app: FastAPI):
     llm_factory = LLMFactory(agent_settings)
     if agent_settings.openai_api_key:
         llm_factory.register_provider(
-            "openai", OpenAIProvider(api_key=agent_settings.openai_api_key)
+            "openai",
+            OpenAIProvider,
+            api_key=agent_settings.openai_api_key,
         )
     task_manager = TaskManager()
 
-    # 4. Create the Executor (per-request conversation store uses project DB via Depends)
+    # 4. AgentExecutor (conversation store injected per request via Depends)
     executor = AgentExecutor(
         task_manager=task_manager,
         llm_factory=llm_factory,

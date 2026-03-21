@@ -75,19 +75,24 @@ class AgentExecutor:
         return out
 
     def _resolve_llm(self, completion_params: ChatCompletionParams | None):
-        params = completion_params or ChatCompletionParams()
-        model = params.model or agent_settings.default_model
-        provider_name = params.provider or agent_settings.default_provider
-        extra = params.provider_create_kwargs()
-        mt = extra.get("max_tokens")
-        if mt is not None and mt > agent_settings.max_total_tokens:
-            extra["max_tokens"] = agent_settings.max_total_tokens
-        llm = self.llm_factory.create(
-            provider=provider_name,
-            model=model,
-            **extra,
-        )
-        return llm, model, provider_name
+        try:
+            params = completion_params or ChatCompletionParams()
+            model = params.model or agent_settings.default_model
+            provider_name = params.provider or agent_settings.default_provider
+            extra = params.provider_create_kwargs()
+            mt = extra.get("max_tokens")
+            if mt is not None and mt > agent_settings.max_total_tokens:
+                extra["max_tokens"] = agent_settings.max_total_tokens
+            llm = self.llm_factory.create(
+                provider=provider_name,
+                model=model,
+                **extra,
+            )
+            return llm, model, provider_name
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise e
 
     async def handle_chat_message(
         self,
@@ -152,6 +157,7 @@ class AgentExecutor:
         client_ref: str | None = None,
     ) -> None:
         buffer = self.stream_registry.get(stream_id)
+
         if buffer is None:
             logger.error("Missing stream buffer for stream_id=%s", stream_id)
             return
@@ -166,6 +172,7 @@ class AgentExecutor:
             "model": resolved_model,
             "provider": resolved_provider,
         }
+        print(f"payload: {payload}")
         if task_status is not None:
             payload["task_id"] = task_status.id
         if client_ref:
@@ -303,7 +310,8 @@ class AgentExecutor:
             ConversationMessage(
                 id=str(uuid.uuid4()),
                 role=MessageRole.ASSISTANT,
-                parts=[TextPart(text=f"Starting {workflow.name}..."), task_part],
+                parts=[
+                    TextPart(text=f"Starting {workflow.name}..."), task_part],
             ),
         )
         self._task_part_templates[task_id] = task_part

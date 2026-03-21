@@ -4,7 +4,7 @@ from typing import AsyncIterator
 from langchain_core.messages import BaseMessage
 
 
-class OpenAIProvider(LLMProvider, ):
+class OpenAIProvider(LLMProvider):
     name = "openai"
 
     MODEL_CONTEXTS = {
@@ -14,7 +14,7 @@ class OpenAIProvider(LLMProvider, ):
         "gpt-3.5-turbo": 16_385,
     }
 
-    def __init__(self, model: str = "gpt-4o", **kwargs):
+    def __init__(self, model: str = "gpt-4o-mini", **kwargs):
         self.model = model
         self._llm = ChatOpenAI(model=model, **kwargs)
 
