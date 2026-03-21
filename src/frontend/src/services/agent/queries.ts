@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import { isAgentPreviewConversationId } from "@/features/Dashboard/features/Agent/constants/agentPreviewConversation";
 import queryKeys from "@/lib/queryKeys";
 import { agentApi } from "./api";
 
@@ -40,6 +41,8 @@ export const agentConversationHydrationQueryOptions = (
     ),
     queryFn: () =>
       agentApi.hydrateConversation(projectId, conversationId!, messageLimit),
-    enabled: Boolean(projectId && conversationId),
+    enabled: Boolean(
+      projectId && conversationId && !isAgentPreviewConversationId(conversationId),
+    ),
     staleTime: 10_000,
   });

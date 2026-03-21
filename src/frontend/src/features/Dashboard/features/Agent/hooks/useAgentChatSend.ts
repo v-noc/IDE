@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import queryKeys from "@/lib/queryKeys";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { agentApi } from "@/services/agent/api";
 import { useSocket } from "@/services/socket";
+import { isAgentPreviewConversationId } from "../constants/agentPreviewConversation";
 import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { useAgentUiStore } from "../store/useAgentUiStore";
 
@@ -23,6 +25,12 @@ export function useAgentChatSend() {
       }
 
       let cid = useAgentUiStore.getState().backendConversationId;
+      if (isAgentPreviewConversationId(cid)) {
+        toast.message("Exit the UI sample", {
+          description: "Start a new chat or pick a real conversation to send messages.",
+        });
+        throw new Error("Cannot send while viewing the local UI sample.");
+      }
       if (!cid) {
         const meta = await agentApi.createConversation(projectId, {
           title: "New conversation",

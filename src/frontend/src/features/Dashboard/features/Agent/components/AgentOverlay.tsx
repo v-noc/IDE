@@ -9,6 +9,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AGENT_UI_PREVIEW_CONVERSATION_ID,
+  createAgentUiPreviewWire,
+} from "../constants/agentPreviewConversation";
+import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { AgentSidebar } from "./AgentSidebar";
 import { useAgentOverlayStore } from "../store/useAgentOverlayStore";
 import { useAgentUiStore } from "../store/useAgentUiStore";
@@ -106,6 +111,11 @@ export function AgentOverlay() {
     setBackendConversationId(null);
   };
 
+  const loadUiSample = () => {
+    useAgentLiveStore.getState().setWire(createAgentUiPreviewWire());
+    setBackendConversationId(AGENT_UI_PREVIEW_CONVERSATION_ID);
+  };
+
   return (
     <div className="pointer-events-none absolute inset-0 z-30">
       <div
@@ -123,6 +133,16 @@ export function AgentOverlay() {
           className="absolute left-0 top-0 h-full w-2 -translate-x-1 cursor-col-resize"
         />
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={loadUiSample}
+            title="Load local markdown + task fixture (no API)"
+            className="h-7 px-2 text-[10px] font-medium"
+          >
+            Sample
+          </Button>
           <Button
             type="button"
             variant="ghost"

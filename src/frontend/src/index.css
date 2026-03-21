@@ -168,3 +168,81 @@
   background-color: rgb(255 255 255 / 0.06);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
 }
+
+/*
+ * Agent chat markdown: Tailwind preflight removes list bullets and heading sizes.
+ * Scope fixes under .agent-markdown only.
+ */
+@layer components {
+  .agent-markdown {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: inherit;
+  }
+
+  .agent-markdown :where(h1) {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0.85rem 0 0.4rem;
+    line-height: 1.35;
+  }
+
+  .agent-markdown :where(h2) {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0.75rem 0 0.35rem;
+    line-height: 1.35;
+  }
+
+  .agent-markdown :where(h3) {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0.65rem 0 0.3rem;
+    line-height: 1.35;
+  }
+
+  .agent-markdown :where(ul) {
+    list-style-type: disc;
+    list-style-position: outside;
+    margin: 0.4rem 0;
+    padding-left: 1.35rem;
+  }
+
+  .agent-markdown :where(ol) {
+    list-style-type: decimal;
+    list-style-position: outside;
+    margin: 0.4rem 0;
+    padding-left: 1.35rem;
+  }
+
+  .agent-markdown :where(li) {
+    margin: 0.2rem 0;
+    display: list-item;
+  }
+
+  .agent-markdown :where(ul ul, ol ol, ul ol, ol ul) {
+    margin: 0.2rem 0;
+  }
+
+  .agent-markdown :where(blockquote) {
+    border-left-width: 3px;
+    padding-left: 0.75rem;
+    margin: 0.5rem 0;
+  }
+
+  .agent-markdown :where(hr) {
+    margin: 0.85rem 0;
+  }
+
+  .agent-markdown :where(p) {
+    margin: 0.35rem 0;
+  }
+
+  .agent-markdown :where(p:first-child) {
+    margin-top: 0;
+  }
+
+  .agent-markdown :where(p:last-child) {
+    margin-bottom: 0;
+  }
+}

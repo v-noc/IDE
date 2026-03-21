@@ -7,41 +7,72 @@ function firstTextPartIndex(parts: WireMessage["parts"]): number {
   return parts.findIndex((p) => wirePartType(p) === "text");
 }
 
+function isUserRole(role: string): boolean {
+  return role.toLowerCase() === "user";
+}
+
 export interface MessageBubbleProps {
   message: WireMessage;
   streaming?: boolean;
   className?: string;
 }
 
-export function MessageBubble({ message, streaming, className }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  streaming,
+  className,
+}: MessageBubbleProps) {
   const textIdx = firstTextPartIndex(message.parts);
+  const user = isUserRole(message.role);
 
   return (
-    <article
+    <div
       className={cn(
-        "rounded-md border border-border bg-muted/40 p-3",
-        streaming && "border-primary/40",
+        "flex w-full min-w-0",
+        user ? "justify-end" : "justify-start",
         className,
       )}
     >
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {message.role}
-        {streaming ? " · streaming" : ""}
-      </p>
-      <div className="flex flex-col gap-2">
-        {message.parts.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No content.</p>
-        ) : (
-          message.parts.map((part, index) => (
-            <PartRenderer
-              key={`${message.id}-part-${index}`}
-              part={part}
-              role={message.role}
-              streaming={streaming && index === textIdx}
-            />
-          ))
+      <article
+        className={cn(
+          "min-w-0  rounded-2xl px-3.5 py-2.5 ",
+          user
+            ? " text-primary-foreground"
+            : "rounded-bl-md border w-full border-border/80 bg-card text-card-foreground shadow-sm",
+          streaming && !user && "ring-1 ring-primary/35",
         )}
-      </div>
-    </article>
+      >
+        <p
+          className={cn(
+            "mb-1.5 text-[10px] font-semibold uppercase tracking-wide",
+            user ? "text-primary-foreground/75" : "text-muted-foreground",
+          )}
+        >
+          {user ? "You" : message.role === "system" ? "System" : "Assistant"}
+          {streaming && !user ? " · streaming" : ""}
+        </p>
+        <div className="flex flex-col gap-2.5">
+          {message.parts.length === 0 ? (
+            <p
+              className={cn(
+                "text-xs",
+                user ? "text-primary-foreground/85" : "text-muted-foreground",
+              )}
+            >
+              No content.
+            </p>
+          ) : (
+            message.parts.map((part, index) => (
+              <PartRenderer
+                key={`${message.id}-part-${index}`}
+                part={part}
+                role={message.role}
+                streaming={streaming && index === textIdx}
+              />
+            ))
+          )}
+        </div>
+      </article>
+    </div>
   );
 }

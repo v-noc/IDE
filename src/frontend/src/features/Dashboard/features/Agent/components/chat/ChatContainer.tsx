@@ -29,7 +29,7 @@ export function ChatContainer({
   }
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("space-y-3", className)}>
       {messages.map((m) => (
         <MessageBubble
           key={m.id}

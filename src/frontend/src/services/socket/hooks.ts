@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { isAgentPreviewConversationId } from "@/features/Dashboard/features/Agent/constants/agentPreviewConversation";
 import { useSocketContext } from "./SocketProvider";
 
 export const useSocket = () => {
@@ -42,7 +43,9 @@ export const useConversationRoom = (
 ) => {
   const { socket } = useSocketContext();
   useEffect(() => {
-    if (!socket || !conversationId) return;
+    if (!socket || !conversationId || isAgentPreviewConversationId(conversationId)) {
+      return;
+    }
 
     const join = () => {
       if (socket.connected) {

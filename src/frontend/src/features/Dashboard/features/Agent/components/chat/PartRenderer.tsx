@@ -3,7 +3,7 @@ import type { WireMessagePart, WireTextPart } from "@/types/agent";
 import { wirePartType } from "./partTypes";
 import { TextPart } from "./parts/TextPart";
 import { ToolCallPart, type ToolCallWirePart } from "./parts/ToolCallPart";
-import { TaskPart, type TaskWirePart } from "./parts/TaskPart";
+import { TaskPart, type TaskWirePart } from "./parts/task";
 import { UnknownPart } from "./parts/UnknownPart";
 
 export interface PartRendererProps {
@@ -16,8 +16,8 @@ function isTextPart(p: WireMessagePart): p is WireTextPart {
   return (
     typeof p === "object" &&
     p !== null &&
-    (p as WireTextPart).type === "text" &&
-    typeof (p as WireTextPart).text === "string"
+    typeof (p as WireTextPart).text === "string" &&
+    String((p as { type?: unknown }).type).toLowerCase() === "text"
   );
 }
 
@@ -25,7 +25,7 @@ function isToolCallPart(p: WireMessagePart): p is ToolCallWirePart {
   return (
     typeof p === "object" &&
     p !== null &&
-    (p as ToolCallWirePart).type === "tool_call" &&
+    String((p as { type?: unknown }).type).toLowerCase() === "tool_call" &&
     typeof (p as ToolCallWirePart).tool_name === "string"
   );
 }
@@ -34,7 +34,7 @@ function isTaskPart(p: WireMessagePart): p is TaskWirePart {
   return (
     typeof p === "object" &&
     p !== null &&
-    (p as TaskWirePart).type === "task" &&
+    String((p as { type?: unknown }).type).toLowerCase() === "task" &&
     typeof (p as TaskWirePart).task_id === "string"
   );
 }

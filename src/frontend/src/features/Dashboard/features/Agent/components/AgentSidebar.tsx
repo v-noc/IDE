@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { agentConversationHydrationQueryOptions } from "@/services/agent";
+import { isAgentPreviewConversationId } from "../constants/agentPreviewConversation";
 import { useAgentUiStore } from "../store/useAgentUiStore";
 import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { AgentChatInput } from "./AgentChatInput";
@@ -31,8 +32,12 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
       compareTo,
     ),
   );
+  /** Disabled queries (local preview id) stay `isPending` with no fetch — do not treat as loading. */
+  const isPreview = isAgentPreviewConversationId(backendConversationId);
   const isLiveLoading =
-    Boolean(backendConversationId) && hydrationQuery.isPending;
+    Boolean(backendConversationId) &&
+    !isPreview &&
+    hydrationQuery.isPending;
 
   const isLive =
     Boolean(backendConversationId) && wire?.id === backendConversationId;

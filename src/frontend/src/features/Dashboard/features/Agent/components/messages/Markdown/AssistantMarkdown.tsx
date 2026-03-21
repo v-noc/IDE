@@ -123,7 +123,12 @@ export interface AssistantMarkdownProps {
 /** Renders assistant message body as GitHub-flavored Markdown. */
 export function AssistantMarkdown({ text, className }: AssistantMarkdownProps) {
   return (
-    <div className={cn("text-foreground [&>*:first-child]:mt-0", className)}>
+    <div
+      className={cn(
+        "agent-markdown text-foreground [&>*:first-child]:mt-0",
+        className,
+      )}
+    >
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
         {text}
       </ReactMarkdown>

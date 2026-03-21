@@ -7,9 +7,14 @@ export interface TextPartProps {
   streaming?: boolean;
 }
 
+function markdownRole(role: string): boolean {
+  const r = role.toLowerCase();
+  return r === "assistant" || r === "system";
+}
+
 export function TextPart({ part, role, streaming }: TextPartProps) {
   const text = part.text;
-  const isAssistant = role === "assistant";
+  const isAssistant = markdownRole(role);
 
   if (isAssistant) {
     if (!text && !streaming) {
@@ -31,7 +36,7 @@ export function TextPart({ part, role, streaming }: TextPartProps) {
   }
 
   return (
-    <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground">
+    <p className="whitespace-pre-wrap text-xs leading-relaxed text-primary-foreground">
       {text || (streaming ? "…" : "No text content.")}
     </p>
   );
