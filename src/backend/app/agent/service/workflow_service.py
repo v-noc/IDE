@@ -35,6 +35,9 @@ class WorkflowService:
     def llm_factory(self):
         return self._llm.factory
 
+    async def join_task(self, task_id: str) -> None:
+        await self._tasks.join(task_id)
+
     async def run(
         self,
         workflow: BaseWorkflow,
@@ -43,10 +46,22 @@ class WorkflowService:
         conversation_id: str | None = None,
         **params,
     ) -> tuple[str, str]:
+        workflow_params = dict(params)
+        workflow_title = workflow_params.pop("conversation_title", None)
+        workflow_description = workflow_params.pop(
+            "conversation_description", None
+        )
+
         # 1. Ensure conversation exists
         if conversation_id is None:
-            title, desc = await generate_conversation_title(
-                self._llm, workflow, params
+            gen_title, gen_desc = await generate_conversation_title(
+                self._llm, workflow, workflow_params
+            )
+            title = (
+                (workflow_title or "").strip() or gen_title
+            )
+            desc = (
+                (workflow_description or "").strip() or gen_desc
             )
             conversation_id = await store.create_conversation(
                 title, desc
@@ -66,16 +81,16 @@ class WorkflowService:
             name=f"workflow:{workflow.name}",
             coro_factory=workflow.run,
             on_status_update=_on_status,
-            **params,
+            **workflow_params,
         )
         task_id_holder.append(task_id)
 
         # 4. Write timeline message
         task_part = TaskPart(
             task_id=task_id,
-            title=f"{workflow.name}: {params.get('node_id', '')}",
+            title=f"{workflow.name}: {workflow_params.get('node_id', '')}",
             workflow_name=workflow.name,
-            workflow_params=params,
+            workflow_params=workflow_params,
         )
         await store.add_message(
             conversation_id,

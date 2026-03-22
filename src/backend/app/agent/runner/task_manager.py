@@ -95,6 +95,12 @@ class TaskManager:
     def get_status(self, task_id: str) -> Optional[Task]:
         return self._tasks.get(task_id)
 
+    async def join(self, task_id: str) -> None:
+        """Wait until a submitted background task has finished."""
+        atask = self._asyncio_tasks.get(task_id)
+        if atask:
+            await atask
+
     def cancel(self, task_id: str) -> bool:
         atask = self._asyncio_tasks.get(task_id)
         if atask and not atask.done():

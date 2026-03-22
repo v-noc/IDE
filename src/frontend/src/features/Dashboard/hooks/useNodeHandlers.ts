@@ -81,6 +81,7 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
       case 'manage-group':
       case 'add-call':
       case 'prompt-builder':
+      case 'start-workflow':
       case 'edit-virtual':
         openModal(action as any, node as AnyNodeTree);
         break;

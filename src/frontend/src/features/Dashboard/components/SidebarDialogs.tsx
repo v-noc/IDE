@@ -1,4 +1,5 @@
 import { useSidebarModalStore } from "@/features/Dashboard/store/useSidebarModalStore";
+import { StartWorkflowDialog } from "@/features/Dashboard/features/Agent/components/StartWorkflowDialog";
 import GroupDialog from "./GroupDialog";
 import SelectNodeDialog from "./SelectNodeDialog";
 import PromptBuilder from "@/components/PromptBuilder/PromptBuilder";
@@ -69,6 +70,13 @@ export function SidebarDialogs() {
         open={activeModal === "prompt-builder"}
         onOpenChange={(open) => !open && closeModal()}
         rootNode={targetNode as ContainerNodeTree}
+        projectId={projectData?.id ?? ""}
+      />
+
+      <StartWorkflowDialog
+        open={activeModal === "start-workflow"}
+        onOpenChange={(open) => !open && closeModal()}
+        targetNode={targetNode}
         projectId={projectData?.id ?? ""}
       />
     </>

@@ -7,6 +7,7 @@ type ModalType =
   | 'manage-group'
   | 'add-call'
   | 'prompt-builder'
+  | 'start-workflow'
   | 'edit-virtual-folder'
   | 'select-node'
   | null;

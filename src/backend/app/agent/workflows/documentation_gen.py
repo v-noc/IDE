@@ -22,6 +22,10 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
         task_status: Task | None = None,
         **kwargs,
     ):
+        self._consume_llm_options(kwargs)
+        kwargs.pop("description_mode", None)
+        documentation_mode = kwargs.pop("documentation_mode", "upsert")
+
         # Documentation starts only after description phase finishes.
         if task_status:
             task_status.progress = 0.0
@@ -51,11 +55,22 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
         documentation_values: dict[str, str] = {}
         processed_nodes: dict[str, object] = {}
 
+        client = self.graph.repos.client if self.graph else None
+
         total = len(execution_nodes)
         for index, tree_node in enumerate(execution_nodes):
             current_node_id = getattr(tree_node, "id", None)
             if not current_node_id:
                 continue
+
+            if documentation_mode == "insert_only" and client:
+                doc_id = self._documentation_doc_id(current_node_id)
+                try:
+                    existing = await client.get_documents([doc_id])
+                    if existing and (existing[0].get("data") or "").strip():
+                        continue
+                except Exception:
+                    pass
 
             node_doc = self._tree_node_to_prompt_doc(tree_node)
             node_doc["code_content_data"] = await self.graph.get_code_content(

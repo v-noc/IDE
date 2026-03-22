@@ -17,6 +17,10 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         self.graph = graph
         self.llm_factory = llm_factory
 
+    def _consume_llm_options(self, kwargs: dict) -> None:
+        self._invoke_model = kwargs.pop("model", None) or "gpt-4o-mini"
+        self._invoke_provider = kwargs.pop("provider", None)
+
     async def run(
         self,
         node_id: str | None = None,
@@ -26,6 +30,8 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         task_status: Task | None = None,
         **kwargs,
     ):
+        self._consume_llm_options(kwargs)
+        description_mode = kwargs.pop("description_mode", "always")
         if self.graph is None:
             raise ValueError(
                 "GraphTraversal is required for description workflow."
@@ -43,6 +49,12 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             max_depth=max_depth,
         )
         execution_nodes = self._ordered_nodes(roots=roots, direction=direction)
+        if description_mode == "skip_if_present":
+            execution_nodes = [
+                n
+                for n in execution_nodes
+                if not (getattr(n, "description", None) or "").strip()
+            ]
 
         total = len(execution_nodes)
         if total == 0:
@@ -149,7 +161,9 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         }
 
     async def _invoke_llm(self, prompt: str) -> str:
-        llm = self.llm_factory.create(model="gpt-4o-mini")
+        model = getattr(self, "_invoke_model", None) or "gpt-4o-mini"
+        provider = getattr(self, "_invoke_provider", None)
+        llm = self.llm_factory.create(provider=provider, model=model)
         response = await llm.invoke([HumanMessage(content=prompt)])
         content = getattr(response, "content", "")
         if isinstance(content, str):
