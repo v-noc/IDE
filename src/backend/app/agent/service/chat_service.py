@@ -125,3 +125,65 @@ class ChatService:
             logger.exception("chat:response failed")
             await self._streams.emit_error(handle, str(e))
             raise
+
+    async def _emit_user_patch(
+        self, cid, msg, mid, meta
+    ) -> None:
+        wire = conversation_message_to_wire(
+            msg.model_copy(
+                update={
+                    "id": mid or msg.id,
+                    "sequence": meta.message_count - 1,
+                }
+            )
+        )
+        patches = (
+            ConversationPatchBuilder()
+            .add_message_wire(wire)
+            .message_count(meta.message_count)
+            .build()
+        )
+        await emit_conversation_patch(cid, patches)
+
+    async def _persist_assistant(
+        self, store, cid, text, model
+    ) -> str:
+        aid = str(uuid.uuid4())
+        msg = ConversationMessage(
+            id=aid,
+            role=MessageRole.ASSISTANT,
+            parts=[TextPart(text=text)],
+            model=model,
+        )
+        saved = await store.add_message(cid, msg)
+        return saved or aid
+
+    async def _emit_assistant_patch(
+        self, store, cid, text, final_id
+    ) -> None:
+        meta = await store.get_conversation_metadata(cid)
+        if meta is None:
+            return
+        idx = meta.message_count - 1
+        patches = (
+            ConversationPatchBuilder()
+            .finalize_assistant_text_part(
+                idx, text, message_id=final_id, sequence=idx
+            )
+            .message_count(meta.message_count)
+            .build()
+        )
+        await emit_conversation_patch(cid, patches)
+
+    @staticmethod
+    def _to_langchain(messages):
+        out = []
+        for m in messages:
+            text = "\n".join(
+                p.text for p in m.parts if isinstance(p, TextPart)
+            )
+            if m.role == MessageRole.USER:
+                out.append(HumanMessage(content=text))
+            elif m.role == MessageRole.ASSISTANT:
+                out.append(AIMessage(content=text))
+        return out
