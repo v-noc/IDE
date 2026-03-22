@@ -37,7 +37,7 @@ export function MessageBubble({
         className={cn(
           "min-w-0  rounded-2xl px-3.5 py-2.5 ",
           user
-            ? " text-primary-foreground"
+            ? " text-black"
             : "rounded-bl-md border w-full border-border/80 bg-card text-card-foreground shadow-sm",
           streaming && !user && "ring-1 ring-primary/35",
         )}
@@ -45,7 +45,7 @@ export function MessageBubble({
         <p
           className={cn(
             "mb-1.5 text-[10px] font-semibold uppercase tracking-wide",
-            user ? "text-primary-foreground/75" : "text-muted-foreground",
+            user ? "text-black/65 " : "text-muted-foreground",
           )}
         >
           {user ? "You" : message.role === "system" ? "System" : "Assistant"}

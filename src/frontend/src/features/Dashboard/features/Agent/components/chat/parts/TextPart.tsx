@@ -19,7 +19,9 @@ export function TextPart({ part, role, streaming }: TextPartProps) {
   if (isAssistant) {
     if (!text && !streaming) {
       return (
-        <p className="text-xs leading-relaxed text-muted-foreground">No text content.</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          No text content.
+        </p>
       );
     }
     return (
@@ -36,7 +38,7 @@ export function TextPart({ part, role, streaming }: TextPartProps) {
   }
 
   return (
-    <p className="whitespace-pre-wrap text-xs leading-relaxed text-primary-foreground">
+    <p className="whitespace-pre-wrap text-xs leading-relaxed text-black">
       {text || (streaming ? "…" : "No text content.")}
     </p>
   );
