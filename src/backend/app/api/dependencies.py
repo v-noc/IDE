@@ -1,5 +1,6 @@
+from app.agent.llm.gateway import LLMGateway
 from typing import Optional
-from fastapi import Depends, Header, HTTPException, Query, status
+from fastapi import Depends, Header, HTTPException, Query, Request, status
 from app.agent.conversation_store import TerminusConversationStore
 from app.core.services.project_service import ProjectService
 from app.core.services.code_element_service import CodeElementService
@@ -15,6 +16,8 @@ from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
 from app.db.context import RequestDbContext, ProjectUoW
+from app.agent.service.chat_service import ChatService
+from app.agent.service.workflow_service import WorkflowService
 
 
 def get_project_service(
@@ -127,3 +130,32 @@ def get_project_conversation_store(
 ) -> TerminusConversationStore:
     repo = uow.get_project_repos().conversation_repo
     return TerminusConversationStore(repo)
+
+
+def get_llm_gateway(request: Request) -> LLMGateway:
+    factory = getattr(request.app.state, "llm_factory", None)
+    if factory is None:
+        raise RuntimeError("llm_factory not initialized on app.state")
+    return LLMGateway(llm_factory=factory)
+
+
+def get_chat_service(request: Request) -> ChatService:
+    tm = getattr(request.app.state, "task_manager", None)
+    sm = getattr(request.app.state, "stream_manager", None)
+    if tm is None or sm is None:
+        raise RuntimeError("task_manager or stream_manager not on app.state")
+    return ChatService(
+        task_manager=tm,
+        llm_gateway=get_llm_gateway(request),
+        stream_manager=sm,
+    )
+
+
+def get_workflow_service(request: Request) -> WorkflowService:
+    tm = getattr(request.app.state, "task_manager", None)
+    if tm is None:
+        raise RuntimeError("task_manager not initialized on app.state")
+    return WorkflowService(
+        task_manager=tm,
+        llm_gateway=get_llm_gateway(request),
+    )

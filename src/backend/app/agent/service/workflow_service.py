@@ -5,7 +5,7 @@ import logging
 from app.agent.conversation_store import ConversationStore
 from app.agent.llm.gateway import LLMGateway
 from app.agent.runner.task_manager import TaskManager
-from app.agent.services.title_generator import generate_conversation_title
+from app.agent.service.title_generator import generate_conversation_title
 from app.agent.workflows.base import BaseWorkflow
 from app.core.model.conversation_domain import (
     ConversationMessage,
@@ -30,6 +30,10 @@ class WorkflowService:
         self._tasks = task_manager
         self._llm = llm_gateway
         self._task_part_cache: dict[str, TaskPart] = {}
+
+    @property
+    def llm_factory(self):
+        return self._llm.factory
 
     async def run(
         self,

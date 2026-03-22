@@ -1,11 +1,10 @@
 # agent/streaming/manager.py
 
 import uuid
-import asyncio
 import logging
 from dataclasses import dataclass
 
-from app.agent.realtime import emit_to_conversation
+from app.agent.streaming import emit_to_conversation
 from app.agent.runner.stream_buffer import StreamRegistry
 
 logger = logging.getLogger(__name__)

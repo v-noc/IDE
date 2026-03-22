@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from app.agent.conversation_store import ConversationStore
 from app.agent.llm.gateway import LLMGateway
 from app.agent.streaming.manager import StreamManager, StreamHandle
-from app.agent.realtime import (
+from app.agent.streaming import (
     conversation_message_to_wire,
     emit_conversation_patch,
 )

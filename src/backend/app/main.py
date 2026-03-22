@@ -8,7 +8,8 @@ from app.agent.config import settings as agent_settings
 from app.agent.runner.task_manager import TaskManager
 from app.agent.llm.factory import LLMFactory
 from app.agent.llm.providers.openai_provider import OpenAIProvider
-from app.agent.runner.executor import AgentExecutor
+from app.agent.runner.stream_buffer import StreamRegistry
+from app.agent.streaming.manager import StreamManager
 
 from .api import root
 from .db.client import get_terminus_client, close_db_client
@@ -44,21 +45,17 @@ async def lifespan(app: FastAPI):
             api_key=agent_settings.openai_api_key,
         )
     task_manager = TaskManager()
+    stream_registry = StreamRegistry()
+    stream_manager = StreamManager(stream_registry)
 
-    # 4. AgentExecutor (conversation store injected per request via Depends)
-    executor = AgentExecutor(
-        task_manager=task_manager,
-        llm_factory=llm_factory,
-    )
-
-    # Attach to app state for dependency injection to use later
-    app.state.agent_executor = executor
+    app.state.llm_factory = llm_factory
     app.state.task_manager = task_manager
+    app.state.stream_manager = stream_manager
     app.state.watcher_service = watcher_service
 
     # Init Socket Manager (creates the server instance)
     socket_manager = get_socket_manager()
-    socket_manager.bind_stream_registry(executor.stream_registry)
+    socket_manager.bind_stream_registry(stream_registry)
     print("🔌 Socket.IO server initialized and ready")
 
     yield

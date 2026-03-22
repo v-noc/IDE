@@ -18,6 +18,11 @@ class LLMGateway:
     def __init__(self, llm_factory):
         self._factory = llm_factory
 
+    @property
+    def factory(self):
+        """Underlying LLMFactory (for workflow construction)."""
+        return self._factory
+
     def resolve(
         self, params: ChatCompletionParams | None = None
     ) -> ResolvedLLM:
