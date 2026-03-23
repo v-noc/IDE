@@ -1,11 +1,10 @@
-# agent/workflows/traversal_helpers.py
+# app/agent/workflows/traversal_helpers.py
 
 from collections import deque
 from typing import Any
 
 
 def collect_levels(roots: list[Any]) -> list[list[Any]]:
-    """BFS level-order collection. Shared across workflows."""
     if not roots:
         return []
     levels: list[list[Any]] = []
@@ -29,9 +28,7 @@ def collect_levels(roots: list[Any]) -> list[list[Any]]:
     return levels
 
 
-def ordered_nodes(
-    roots: list[Any], direction: str
-) -> list[Any]:
+def ordered_nodes(roots: list[Any], direction: str) -> list[Any]:
     levels = collect_levels(roots)
     if direction == "up":
         levels = list(reversed(levels))

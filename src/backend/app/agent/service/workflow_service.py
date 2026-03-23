@@ -1,4 +1,5 @@
 
+from typing import Any
 import uuid
 import logging
 
@@ -47,22 +48,19 @@ class WorkflowService:
         **params,
     ) -> tuple[str, str]:
         workflow_params = dict(params)
-        workflow_title = workflow_params.pop("conversation_title", None)
+        workflow_title = workflow_params.pop(
+            "conversation_title", None
+        )
         workflow_description = workflow_params.pop(
             "conversation_description", None
         )
 
-        # 1. Ensure conversation exists
         if conversation_id is None:
             gen_title, gen_desc = await generate_conversation_title(
                 self._llm, workflow, workflow_params
             )
-            title = (
-                (workflow_title or "").strip() or gen_title
-            )
-            desc = (
-                (workflow_description or "").strip() or gen_desc
-            )
+            title = (workflow_title or "").strip() or gen_title
+            desc = (workflow_description or "").strip() or gen_desc
             conversation_id = await store.create_conversation(
                 title, desc
             )
@@ -73,10 +71,12 @@ class WorkflowService:
         async def _on_status(status: Task) -> None:
             if task_id_holder:
                 await self._sync_task_part(
-                    store, conversation_id, task_id_holder[0], status
+                    store,
+                    conversation_id,
+                    task_id_holder[0],
+                    status,
                 )
 
-        # 3. Submit
         task_id = self._tasks.submit(
             name=f"workflow:{workflow.name}",
             coro_factory=workflow.run,
@@ -85,12 +85,121 @@ class WorkflowService:
         )
         task_id_holder.append(task_id)
 
-        # 4. Write timeline message
         task_part = TaskPart(
             task_id=task_id,
-            title=f"{workflow.name}: {workflow_params.get('node_id', '')}",
+            title=(
+                f"{workflow.name}: "
+                f"{workflow_params.get('node_id', '')}"
+            ),
             workflow_name=workflow.name,
             workflow_params=workflow_params,
+        )
+
+        await store.add_message(
+            conversation_id,
+            ConversationMessage(
+                id=str(uuid.uuid4()),
+                role=MessageRole.ASSISTANT,
+                parts=[
+                    TextPart(
+                        text=f"Starting {workflow.name}..."
+                    ),
+                    task_part,
+                ],
+            ),
+        )
+        self._task_part_cache[task_id] = task_part
+
+        initial = self._tasks.get_status(task_id)
+        await self._sync_task_part(
+            store, conversation_id, task_id, initial
+        )
+
+        return conversation_id, task_id
+
+    # -- batch workflow (non-blocking) ------------------------------------
+
+    async def run_batch(
+        self,
+        steps: list[dict[str, Any]],
+        *,
+        workflow_factory: Any,  # callable(step) -> BaseWorkflow
+        store: ConversationStore,
+        conversation_id: str | None = None,
+        conversation_title: str | None = None,
+        conversation_description: str | None = None,
+    ) -> tuple[str, str]:
+        """
+        Submit an entire batch as ONE background task.
+        Steps run sequentially inside the background task.
+        Returns immediately.
+        """
+        if conversation_id is None:
+            title = (conversation_title or "").strip() or "Batch workflow"
+            desc = (
+                (conversation_description or "").strip()
+                or "Running multiple workflow steps"
+            )
+            conversation_id = await store.create_conversation(
+                title, desc
+            )
+
+        task_id_holder: list[str] = []
+
+        async def _on_status(status: Task) -> None:
+            if task_id_holder:
+                await self._sync_task_part(
+                    store,
+                    conversation_id,
+                    task_id_holder[0],
+                    status,
+                )
+
+        async def _batch_runner(task_status: Task | None = None):
+            """Runs inside TaskManager as a single background task."""
+            from app.agent.runner.task_context import TaskContext
+
+            ctx = (
+                TaskContext(task_status)
+                if task_status
+                else TaskContext.noop()
+            )
+            total = len(steps)
+            results = []
+
+            for i, step in enumerate(steps):
+                workflow = workflow_factory(step)
+                step_st = ctx.subtask(
+                    name=f"step:{workflow.name}",
+                    subtask_id=f"step-{i}",
+                )
+                step_st.start(
+                    f"Running {workflow.name} ({i + 1}/{total})"
+                )
+                try:
+                    result = await workflow.execute(
+                        TaskContext.noop(), **step["params"]
+                    )
+                    results.append(result)
+                    step_st.complete(f"Completed {workflow.name}")
+                except Exception as exc:
+                    step_st.fail(str(exc))
+                    raise
+
+            return {"batch_results": results}
+
+        task_id = self._tasks.submit(
+            name="workflow:batch",
+            coro_factory=_batch_runner,
+            on_status_update=_on_status,
+        )
+        task_id_holder.append(task_id)
+
+        task_part = TaskPart(
+            task_id=task_id,
+            title="Batch workflow",
+            workflow_name="batch",
+            workflow_params={"step_count": len(steps)},
         )
         await store.add_message(
             conversation_id,
@@ -98,20 +207,21 @@ class WorkflowService:
                 id=str(uuid.uuid4()),
                 role=MessageRole.ASSISTANT,
                 parts=[
-                    TextPart(text=f"Starting {workflow.name}..."),
+                    TextPart(text="Starting batch workflow..."),
                     task_part,
                 ],
             ),
         )
         self._task_part_cache[task_id] = task_part
 
-        # 5. Push initial state
         initial = self._tasks.get_status(task_id)
         await self._sync_task_part(
             store, conversation_id, task_id, initial
         )
 
         return conversation_id, task_id
+
+    # -- internal ---------------------------------------------------------
 
     async def _sync_task_part(
         self,
@@ -128,7 +238,7 @@ class WorkflowService:
         updated = base.model_copy(
             update={
                 "state": ConversationTaskState(status.state.value),
-                "progress": status.progress,
+                "progress": status.computed_progress,
                 "description": status.progress_message or "",
                 "started_at": status.started_at,
                 "finished_at": status.finished_at,
