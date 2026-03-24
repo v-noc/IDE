@@ -13,7 +13,13 @@ from app.core.model.schemas.conversation_schema import (
 )
 from app.db.async_terminus_client import WOQLQuery as WQ
 
-from ._common import new_doc_id, parts_from_json, parts_to_json, utcnow
+from ._common import (
+    new_doc_id,
+    parts_from_json,
+    parts_to_json,
+    terminus_ids_match,
+    utcnow,
+)
 
 if TYPE_CHECKING:
     from app.db.async_terminus_client import AsyncClient
@@ -148,7 +154,7 @@ class MessagesMixin:
         if not raw or "MessageSchema" not in str(raw.get("@type", "")):
             return False
         node = MessageNode.from_raw_dict(raw)
-        if node.conversation_id != conversation_id:
+        if not terminus_ids_match(node.conversation_id, conversation_id):
             return False
         now = utcnow()
         if isinstance(message.role, MessageRole):

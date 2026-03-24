@@ -25,6 +25,28 @@ def new_doc_id(class_name: str) -> str:
     return f"{class_name}/{uuid.uuid4()}"
 
 
+def terminus_doc_id_tail(doc_id: str) -> str:
+    """Segment after the last `/`, or the full string (bare ids, URLs)."""
+    s = (doc_id or "").strip()
+    if not s:
+        return s
+    return s.rsplit("/", 1)[-1]
+
+
+def terminus_ids_match(a: str, b: str) -> bool:
+    """
+    True if two Terminus document ids refer to the same document.
+
+    TerminusDB uses `ClassName/<uuid>` while in-memory code often holds
+    bare UUIDs; message parts and API payloads may use either form.
+    """
+    if a == b:
+        return True
+    if not a or not b:
+        return False
+    return terminus_doc_id_tail(a) == terminus_doc_id_tail(b)
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 

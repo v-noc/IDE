@@ -8,7 +8,10 @@ from app.core.model.conversation_domain import (
     ConversationSummary,
     TaskPart,
 )
-from app.core.repository.conversation import ConversationRepo
+from app.core.repository.conversation import (
+    ConversationRepo,
+    terminus_ids_match,
+)
 
 
 class ConversationStore(Protocol):
@@ -127,9 +130,8 @@ class TerminusConversationStore:
 
         for message in reversed(conv.messages):
             for idx, part in enumerate(message.parts):
-                if (
-                    isinstance(part, TaskPart)
-                    and part.task_id == task_part.task_id
+                if isinstance(part, TaskPart) and terminus_ids_match(
+                    part.task_id, task_part.task_id
                 ):
                     new_parts = list(message.parts)
                     new_parts[idx] = task_part

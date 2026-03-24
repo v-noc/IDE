@@ -1,3 +1,5 @@
+# app/agent/workflows/description_gen.py
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,7 +24,11 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
     name = "description_generator"
     description = "Generate descriptions recursively from a tree"
 
-    def __init__(self, graph: GraphTraversal | None = None, llm_factory=None):
+    def __init__(
+        self,
+        graph: GraphTraversal | None = None,
+        llm_factory=None,
+    ):
         self.graph = graph
         self.llm_factory = llm_factory
 
@@ -46,6 +52,8 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         max_depth = kwargs.get("max_depth", 5)
         description_mode = kwargs.pop("description_mode", "always")
 
+        ctx.update_progress(0.0, "Building tree...")
+
         roots = await self.graph.build_tree(
             node_id=node_id,
             node_types=_NODE_TYPES,
@@ -57,7 +65,9 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             nodes = [
                 n
                 for n in nodes
-                if not (getattr(n, "description", None) or "").strip()
+                if not (
+                    getattr(n, "description", None) or ""
+                ).strip()
             ]
 
         if not nodes:
@@ -76,12 +86,15 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
                 await self.graph.get_code_content(nid)
             )
 
-            # --- subtask ---
+            node_name = node_doc.get("name", nid)
+
+            # -- register subtask --
             st = ctx.subtask(
-                name=node_doc.get("name", nid),
+                name=node_name,
                 subtask_id=nid,
+                touched_node_ids=[nid],
             )
-            st.start(f"Generating description for {node_doc.get('name', nid)}")
+            st.start(f"Generating description for {node_name}")
 
             child_descs = self._gather_child_values(
                 tree_node, generated, attr="description"
@@ -92,14 +105,13 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             )
 
             try:
-                text = await self._invoke_llm(prompt)
+                # text = await self._invoke_llm(prompt)
+                text = "test"
                 generated[nid] = text
                 node_updates[nid] = tree_node.model_copy(
                     update={"description": text}
                 )
-                st.complete(
-                    f"Done: {node_doc.get('name', nid)}"
-                )
+                st.complete(f"Done: {node_name}")
             except Exception as exc:
                 st.fail(str(exc))
                 raise
@@ -113,16 +125,18 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             "description_results": generated,
         }
 
-    # -- helpers shared with DocumentationGeneratorWorkflow ---------------
+    # -- shared helpers ---------------------------------------------------
 
     def _read_llm_options(self, kwargs: dict) -> None:
-        self._invoke_model = kwargs.pop("model", None) or "gpt-4o-mini"
+        self._invoke_model = (
+            kwargs.pop("model", None) or "gpt-4o-mini"
+        )
         self._invoke_provider = kwargs.pop("provider", None)
 
     @staticmethod
     def _tree_node_to_prompt_doc(tree_node: Any) -> dict:
-        node_type = (
-            tree_node.__class__.__name__.replace("TreeNode", "Schema")
+        node_type = tree_node.__class__.__name__.replace(
+            "TreeNode", "Schema"
         )
         return {
             "@id": getattr(tree_node, "id", None),
@@ -138,15 +152,15 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         attr: str = "description",
     ) -> list[str]:
         """
-        Collect values for children, preferring freshly generated
-        values over what's on the tree node.
+        Collect child values, preferring freshly generated
+        values over the tree node's original attribute.
         """
         values: list[str] = []
         for child in getattr(tree_node, "children", []) or []:
             child_id = getattr(child, "id", None)
             if not child_id:
                 continue
-            # Freshly generated takes priority
+            # Freshly generated wins
             val = generated_values.get(child_id)
             if not val:
                 val = getattr(child, attr, None)
@@ -156,7 +170,9 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
 
     @staticmethod
     def _extract_code_context(node_doc: dict) -> str:
-        node_type = (node_doc.get("@type") or "").replace("Schema", "")
+        node_type = (
+            (node_doc.get("@type") or "").replace("Schema", "")
+        )
         if node_type not in {"File", "Function", "Class"}:
             return ""
         code = node_doc.get("code_content_data")
@@ -181,22 +197,30 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         )
         return (
             "Task: description\n"
-            "Write a concise technical description of this node.\n"
+            "Write a concise technical description of this "
+            "node.\n"
             "Use child descriptions for context and avoid "
             "repetition.\n\n"
             f"Node id: {node_doc.get('@id')}\n"
             f"Node type: {node_doc.get('@type')}\n"
             f"Node name: {node_doc.get('name')}\n"
-            f"Current description: {node_doc.get('description', '')}\n"
-            f"\nCode context:\n{code_ctx}\n\n"
+            f"Current description: "
+            f"{node_doc.get('description', '')}\n\n"
+            f"Code context:\n{code_ctx}\n\n"
             f"Child descriptions:\n{child_ctx}\n"
         )
 
     async def _invoke_llm(self, prompt: str) -> str:
-        model = getattr(self, "_invoke_model", None) or "gpt-4o-mini"
+        model = (
+            getattr(self, "_invoke_model", None) or "gpt-4o-mini"
+        )
         provider = getattr(self, "_invoke_provider", None)
-        llm = self.llm_factory.create(provider=provider, model=model)
-        response = await llm.invoke([HumanMessage(content=prompt)])
+        llm = self.llm_factory.create(
+            provider=provider, model=model
+        )
+        response = await llm.invoke(
+            [HumanMessage(content=prompt)]
+        )
         content = getattr(response, "content", "")
         if isinstance(content, str):
             return content.strip()

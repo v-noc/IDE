@@ -29,9 +29,14 @@ class TaskManager:
         on_status_update: Optional[
             Callable[[Task], Union[None, Any]]
         ] = None,
+        *,
+        task_id: Optional[str] = None,
         **kwargs,
     ) -> str:
-        task_id = str(uuid.uuid4())
+        tid = task_id if task_id is not None else str(uuid.uuid4())
+        if tid in self._tasks:
+            raise ValueError(f"task_id already in use: {tid!r}")
+        task_id = tid
         now = datetime.now(timezone.utc)
         status = Task(
             id=task_id,
@@ -50,7 +55,9 @@ class TaskManager:
                 if inspect.isawaitable(out):
                     await out
             except Exception:
-                logger.debug("status callback error", exc_info=True)
+                logger.debug(
+                    "status callback error", exc_info=True
+                )
 
         async def _wrapper():
             status.state = TaskState.RUNNING
@@ -69,6 +76,8 @@ class TaskManager:
 
             try:
                 run_kwargs = dict(kwargs)
+                # TaskManager injects task_status; task_context
+                # is passed through from the caller's kwargs.
                 run_kwargs.setdefault("task_status", status)
                 result = await coro_factory(**run_kwargs)
                 status.state = TaskState.COMPLETED

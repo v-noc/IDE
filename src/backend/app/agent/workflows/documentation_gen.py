@@ -1,3 +1,4 @@
+# app/agent/workflows/documentation_gen.py
 
 from __future__ import annotations
 
@@ -15,7 +16,9 @@ from app.agent.workflows.traversal_helpers import ordered_nodes
 
 class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
     name = "documentation_generator"
-    description = "Generate documentation recursively from a tree"
+    description = (
+        "Generate documentation recursively from a tree"
+    )
 
     def __init__(
         self,
@@ -27,7 +30,9 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
     async def execute(self, ctx: TaskContext, **kwargs) -> dict:
         self._read_llm_options(kwargs)
         kwargs.pop("description_mode", None)
-        documentation_mode = kwargs.pop("documentation_mode", "upsert")
+        documentation_mode = kwargs.pop(
+            "documentation_mode", "upsert"
+        )
 
         node_id = kwargs.get("node_id")
         direction = kwargs.get("direction", "down")
@@ -51,7 +56,6 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
 
         persistence = NodePersistence(self.graph)
 
-        # Filter if insert_only
         if documentation_mode == "insert_only":
             filtered = []
             for n in nodes:
@@ -72,7 +76,6 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
         doc_values: dict[str, str] = {}
         processed_nodes: dict[str, Any] = {}
 
-        total = len(nodes)
         for index, tree_node in enumerate(nodes):
             nid = getattr(tree_node, "id", None)
             if not nid:
@@ -82,28 +85,29 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
             node_doc["code_content_data"] = (
                 await self.graph.get_code_content(nid)
             )
+            node_name = node_doc.get("name", nid)
 
             st = ctx.subtask(
-                name=node_doc.get("name", nid), subtask_id=nid
+                name=node_name,
+                subtask_id=nid,
+                touched_node_ids=[nid],
             )
-            st.start(
-                f"Generating documentation for "
-                f"{node_doc.get('name', nid)}"
-            )
+            st.start(f"Generating documentation for {node_name}")
 
+            # Use freshly generated docs for child context
             child_docs = self._gather_child_values(
                 tree_node, doc_values, attr="description"
             )
+            # Use tree descriptions for child descriptions
             child_descs = self._gather_child_values(
                 tree_node, {}, attr="description"
             )
 
             prompt = self._build_documentation_prompt(
                 node_doc=node_doc,
-                node_description=getattr(
-                    tree_node, "description", ""
-                )
-                or "",
+                node_description=(
+                    getattr(tree_node, "description", "") or ""
+                ),
                 child_documentations=child_docs,
                 child_descriptions=child_descs,
             )
@@ -112,13 +116,15 @@ class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
                 text = await self._invoke_llm(prompt)
                 doc_values[nid] = text
                 processed_nodes[nid] = tree_node
-                st.complete(f"Done: {node_doc.get('name', nid)}")
+                st.complete(f"Done: {node_name}")
             except Exception as exc:
                 st.fail(str(exc))
                 raise
 
-        upserted_ids = await persistence.flush_documentation_batch(
-            doc_values, processed_nodes
+        upserted_ids = (
+            await persistence.flush_documentation_batch(
+                doc_values, processed_nodes
+            )
         )
 
         return {
