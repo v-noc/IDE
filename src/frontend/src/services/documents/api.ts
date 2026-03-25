@@ -6,6 +6,8 @@ export interface DocumentData {
   name: string;
   description: string;
   data: string;
+  /** Markdown export for AI / text consumers; may mirror editor JSON until optimized. */
+  markdown: string;
   created_at: string;
   updated_at: string;
   status?: "added" | "removed" | "modified" | "unchanged" | "none";
@@ -24,6 +26,7 @@ export interface UpdateDocumentRequest {
   name?: string;
   description?: string;
   data?: string;
+  markdown?: string;
 }
 
 function buildQueryString(params: Record<string, string>): string {
@@ -41,6 +44,7 @@ interface BackendDocumentRaw {
   name: string;
   description: string;
   data: string;
+  markdown?: string;
   created_at: string;
   updated_at: string;
   status?: "added" | "removed" | "modified" | "unchanged" | "none";
@@ -59,6 +63,7 @@ const mapBackendDocument = (d: BackendDocumentRaw): DocumentData => {
     name: d.name,
     description: d.description,
     data: d.data,
+    markdown: d.markdown ?? "",
     created_at: d.created_at,
     updated_at: d.updated_at,
     status: d.status,
@@ -121,6 +126,7 @@ export const documentsApi = {
       name: payload.name,
       description: payload.description,
       data: payload.data,
+      markdown: payload.markdown,
     };
     const qs = buildQueryString({ document_id: payload.id, project_id: projectId });
     const response = await api(`${API_ROUTES.DOCUMENTS}${qs}`, {

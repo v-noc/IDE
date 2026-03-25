@@ -96,6 +96,7 @@ class DocumentSchema(DocumentTemplate):
     name: str
     description: str
     data: str
+    markdown: str
     created_at: datetime
     updated_at: datetime
 
@@ -106,6 +107,7 @@ class DocumentSchema(DocumentTemplate):
             name=document.name,
             description=document.description,
             data=document.data,
+            markdown=document.markdown,
             created_at=document.created_at,
             updated_at=document.updated_at,
         )
@@ -116,6 +118,7 @@ class DocumentSchema(DocumentTemplate):
             name=self.name,
             description=self.description,
             data=self.data,
+            markdown=self.markdown,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

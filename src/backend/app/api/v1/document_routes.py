@@ -26,6 +26,7 @@ class UpdateDocumentRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1)
     description: Optional[str] = Field(None, min_length=1)
     data: Optional[str] = None
+    markdown: Optional[str] = None
 
 
 @router.post(
@@ -73,6 +74,8 @@ async def update_document(
         existing.description = request.description
     if request.data is not None:
         existing.data = request.data
+    if request.markdown is not None:
+        existing.markdown = request.markdown
 
     response = await document_service.update(existing)
 
@@ -131,8 +134,9 @@ async def get_documents_for_node(
             for compare_doc in compare_by_id.values():
                 merged_documents.append(
                     DocumentResponse(
-                        **compare_doc.model_dump(exclude={"data"}),
+                        **compare_doc.model_dump(exclude={"data", "markdown"}),
                         data="",
+                        markdown="",
                         status="removed",
                         compare_to=compare_doc,
                     )

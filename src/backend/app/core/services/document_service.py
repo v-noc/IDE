@@ -41,6 +41,7 @@ class DocumentService:
             name=name,
             description=description,
             data="",
+            markdown="",
         )
 
         created = await repos.document_repo.create_nodes(document, singular_name="document", plural_name="documents")

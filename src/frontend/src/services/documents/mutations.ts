@@ -57,6 +57,9 @@ export const useUpdateDocument = (nodeId: string, projectId: string) => {
               // Update fields from server response (source of truth)
               // Only update fields that were provided in the mutation
               ...(variables.data !== undefined && { data: updatedDocument.data }),
+              ...(variables.markdown !== undefined && {
+                markdown: updatedDocument.markdown,
+              }),
               ...(variables.name !== undefined && { name: updatedDocument.name }),
               ...(variables.description !== undefined && {
                 description: updatedDocument.description,

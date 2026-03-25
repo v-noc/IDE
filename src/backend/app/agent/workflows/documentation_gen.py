@@ -15,6 +15,8 @@ from app.agent.workflows.traversal_helpers import ordered_nodes
 
 
 class DocumentationGeneratorWorkflow(DescriptionGeneratorWorkflow):
+    """Recursive doc generation; persisted as markdown with empty ``data`` (see ``NodePersistence``)."""
+
     name = "documentation_generator"
     description = (
         "Generate documentation recursively from a tree"

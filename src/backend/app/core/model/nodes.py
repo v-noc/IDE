@@ -64,6 +64,10 @@ class BaseNode(BaseModel):
 
 class DocumentNode(BaseNode):
     data: str = Field(..., description="The data of the document.")
+    markdown: str = Field(
+        default="",
+        description="Markdown representation (e.g. for AI); may duplicate structured data until optimized.",
+    )
 
     @staticmethod
     def from_raw_dict(raw_dict):
@@ -71,6 +75,7 @@ class DocumentNode(BaseNode):
         return DocumentNode(
             **base.model_dump(),
             data=raw_dict["data"],
+            markdown=raw_dict.get("markdown", "") or "",
         )
 
 

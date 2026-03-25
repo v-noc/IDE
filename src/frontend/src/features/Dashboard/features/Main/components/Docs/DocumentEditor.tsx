@@ -4,7 +4,7 @@ import { codeBlockOptions } from "@blocknote/code-block";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
-import { BlockNoteSchema } from "@blocknote/core";
+import { BlockNoteSchema, type PartialBlock } from "@blocknote/core";
 
 import {
   SuggestionMenuController,
@@ -19,6 +19,42 @@ import { useUpdateDocument } from "@/services/documents";
 import type { DocumentData } from "@/services/documents";
 import { VersionDiffExtension } from "./Version";
 import { useDocumentDiff } from "./hooks/useDocumentDiff";
+
+/** Non-empty BlockNote JSON block array, or null to fall back to markdown / empty. */
+function parseBlockNoteJsonBlocks(trimmedJson: string): PartialBlock[] | null {
+  try {
+    const parsed: unknown = JSON.parse(trimmedJson);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return null;
+    }
+    const valid = parsed.every(
+      (block: unknown) =>
+        block &&
+        typeof block === "object" &&
+        block !== null &&
+        "id" in block,
+    );
+    return valid ? (parsed as PartialBlock[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Stable key for skip-reload: prefer JSON blocks when valid, else markdown, else empty. */
+function documentContentFingerprint(jsonSource: string, markdownSource: string): string {
+  const jt = (jsonSource ?? "").trim();
+  if (jt) {
+    const blocks = parseBlockNoteJsonBlocks(jt);
+    if (blocks) {
+      return `j:${JSON.stringify(blocks)}`;
+    }
+  }
+  const mt = (markdownSource ?? "").trim();
+  if (mt) {
+    return `m:${mt}`;
+  }
+  return "e";
+}
 
 export interface DocumentEditorProps {
   /**
@@ -88,23 +124,29 @@ export function DocumentEditor({
     document,
     versionDiff,
   });
-  const editorData = isDiffActive
+  const jsonSource = isDiffActive
     ? (document?.compare_to?.data ?? document?.data ?? "")
     : (document?.data ?? "");
+  const markdownSource = isDiffActive
+    ? (document?.compare_to?.markdown ?? document?.markdown ?? "")
+    : (document?.markdown ?? "");
 
   // Debounced save function
   const saveDocumentDebounced = useMemo(
     () =>
       debounce(
-        (payload: { id: string; node_id: string; data: string }) => {
+        (payload: { id: string; node_id: string; data: string; markdown: string }) => {
           if (autoSave && nodeId && projectId) {
-            // Update lastAppliedDataRef to the data we're about to save
-            // This prevents reloading when cache updates with the same content
-            lastAppliedDataRef.current = payload.data;
+            // Match fingerprint logic in the load effect to avoid a reload flash after save
+            lastAppliedDataRef.current = documentContentFingerprint(
+              payload.data,
+              payload.markdown,
+            );
             updateMutation.mutate({
               id: payload.id,
               node_id: payload.node_id,
               data: payload.data,
+              markdown: payload.markdown,
             });
           }
         },
@@ -129,81 +171,39 @@ export function DocumentEditor({
       return;
     }
 
-    const data = editorData;
-
-    // Skip if we've already applied this exact content
-    // Compare by value, not reference, to handle cache updates with same content
-    if (lastAppliedDataRef.current === data) return;
-
-    // Also check if the content is semantically the same (normalized JSON comparison)
-    // This handles cases where cache updates might have slightly different formatting
-    if (lastAppliedDataRef.current && data) {
-      try {
-        const currentParsed = JSON.parse(lastAppliedDataRef.current);
-        const newParsed = JSON.parse(data);
-        // Deep equality check for JSON content
-        if (JSON.stringify(currentParsed) === JSON.stringify(newParsed)) {
-          // Content is the same, just update the ref and skip reloading
-          lastAppliedDataRef.current = data;
-          return;
-        }
-      } catch {
-        // If parsing fails, fall through to normal comparison
-      }
-    }
+    const fingerprint = documentContentFingerprint(jsonSource, markdownSource);
+    if (lastAppliedDataRef.current === fingerprint) return;
 
     applyingRemoteContent.current = true;
 
     const loadContent = async () => {
       try {
-        // Handle empty or whitespace-only data before parsing
-        const trimmed = (data ?? "").trim();
-        if (!trimmed) {
-          editor.replaceBlocks(editor.document, []);
-          lastAppliedDataRef.current = data;
+        const trimmedJson = (jsonSource ?? "").trim();
+        const blocksFromJson = trimmedJson
+          ? parseBlockNoteJsonBlocks(trimmedJson)
+          : null;
+
+        if (blocksFromJson) {
+          editor.replaceBlocks(editor.document, blocksFromJson);
+          lastAppliedDataRef.current = fingerprint;
           return;
         }
 
-        // Parse JSON (BlockNote blocks)
-        const parsedDocument = JSON.parse(trimmed);
-
-        // Validate that parsedDocument is an array of blocks
-        if (Array.isArray(parsedDocument)) {
-          // Validate blocks have required structure (if array is not empty)
-          if (parsedDocument.length === 0) {
-            // Empty content - clear editor
-            editor.replaceBlocks(editor.document, []);
-            lastAppliedDataRef.current = data;
-
-            return;
-          }
-
-          const isValidBlocks = parsedDocument.every(
-            (block: unknown) =>
-              block &&
-              typeof block === "object" &&
-              block !== null &&
-              "id" in block,
-          );
-
-          if (isValidBlocks) {
-            // Replace all blocks at once - BlockNote handles the replacement
-            editor.replaceBlocks(editor.document, parsedDocument);
-            lastAppliedDataRef.current = data;
-            return;
-          }
+        const trimmedMd = (markdownSource ?? "").trim();
+        if (trimmedMd) {
+          const mdBlocks = editor.tryParseMarkdownToBlocks(trimmedMd);
+          editor.replaceBlocks(editor.document, mdBlocks);
+          lastAppliedDataRef.current = fingerprint;
+          return;
         }
 
-        // If JSON parsing fails or invalid format, clear editor
-        console.error("Invalid block format, clearing editor");
         editor.replaceBlocks(editor.document, []);
-        lastAppliedDataRef.current = "";
-      } catch (jsonErr) {
-        // If JSON parsing fails, treat as empty and clear editor
-        console.error("Error parsing document JSON:", jsonErr);
+        lastAppliedDataRef.current = fingerprint;
+      } catch (err) {
+        console.error("Error loading document content:", err);
         try {
           editor.replaceBlocks(editor.document, []);
-          lastAppliedDataRef.current = "";
+          lastAppliedDataRef.current = fingerprint;
         } catch (clearErr) {
           console.error("Error clearing editor:", clearErr);
           lastAppliedDataRef.current = null;
@@ -217,13 +217,21 @@ export function DocumentEditor({
     };
 
     loadContent();
-  }, [editor, document, document?.id, document?.data, document?.compare_to?.data, editorData]);
+  }, [
+    editor,
+    document,
+    document?.id,
+    jsonSource,
+    markdownSource,
+    isDiffActive,
+  ]);
 
   // Handle content changes
   const handleChange = async (currentEditor: typeof editor) => {
     if (applyingRemoteContent.current) return;
 
     const jsonData = JSON.stringify(currentEditor.document);
+    const markdown = currentEditor.blocksToMarkdownLossy(currentEditor.document);
 
     // Call onChange callback immediately
     onChange?.(jsonData);
@@ -234,6 +242,7 @@ export function DocumentEditor({
         id: document.id,
         node_id: nodeId,
         data: jsonData,
+        markdown,
       });
     }
   };

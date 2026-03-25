@@ -6,7 +6,7 @@ type DocumentsProps = {
    * Document to edit. Can be DocumentType or legacy format { id, data }.
    * If undefined, shows empty state.
    */
-  document?: DocumentData | { id: string; data?: string } | null;
+  document?: DocumentData | { id: string; data?: string; markdown?: string } | null;
 
   /**
    * Callback when document content changes.
@@ -29,8 +29,20 @@ type DocumentsProps = {
  * @deprecated Consider using DocumentEditor directly for new code.
  */
 const Documents = ({ document, onChange, nodeId }: DocumentsProps) => {
-  // Convert legacy format to DocumentType
-  const doc: DocumentData | null = document;
+  const doc: DocumentData | null =
+    !document
+      ? null
+      : "name" in document
+        ? document
+        : {
+            id: document.id,
+            name: "",
+            description: "",
+            data: document.data ?? "",
+            markdown: "markdown" in document ? (document.markdown ?? "") : "",
+            created_at: "",
+            updated_at: "",
+          };
 
   return (
     <DocumentEditor
