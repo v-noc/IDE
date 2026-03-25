@@ -17,6 +17,7 @@ from app.api.v1.conversations.schemas import (
     subtask_to_wire,
     task_to_wire,
 )
+from app.core.repository.conversation._common import task_document_lookup_ids
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -70,13 +71,18 @@ async def list_subtasks(
     repo=Depends(get_conversation_repo),
     tm: TaskManager = Depends(get_task_manager),
 ) -> PaginatedItems:
-    if await repo.get_task(task_id) is None:
-        if tm.get_status(task_id) is None:
+    t = await repo.get_task(task_id)
+    if t is None:
+        in_memory = any(
+            tm.get_status(cand) is not None
+            for cand in task_document_lookup_ids(task_id)
+        )
+        if not in_memory:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, detail="Task not found"
             )
         return PaginatedItems(items=[], next_cursor=None, has_more=False)
-    rows = await repo.get_subtasks(task_id, cursor=cursor, limit=limit + 1)
+    rows = await repo.get_subtasks(t.id, cursor=cursor, limit=limit + 1)
     has_more = len(rows) > limit
     page = rows[:limit]
     next_c = page[-1].sequence + 1 if has_more and page else None

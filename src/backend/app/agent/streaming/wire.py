@@ -26,6 +26,10 @@ def _part_to_wire(part: MessagePart) -> dict[str, Any]:
             "state": part.state.value,
             "progress": part.progress,
             "sub_tasks": [st.model_dump(mode="json") for st in part.sub_tasks],
+            "sub_task_count": max(
+                int(part.sub_task_count or 0),
+                len(part.sub_tasks),
+            ),
             "workflow_name": part.workflow_name,
         }
     if isinstance(part, ToolCallPart):

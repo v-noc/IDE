@@ -38,11 +38,12 @@ class TaskPersistence:
 
     async def create_task(self, task: Task) -> str:
         schema = TaskSchema.from_pydantic(task)
-        raw = schema._obj_to_dict()[0]
-        await self._client.query(
-            WQ().insert_document(Doc(raw)),
+
+        await self._client.insert_document(
+            schema,
             commit_msg=f"Create task {task.id}",
         )
+
         return task.id
 
     async def update_task_state(
@@ -108,21 +109,20 @@ class TaskPersistence:
         if not subtasks:
             return
 
-        queries = []
+        documents = []
         for st in subtasks:
             schema = SubTaskSchema.from_pydantic(
                 st.model_copy(update={"task_id": task_id})
             )
             raw = schema._obj_to_dict()[0]
-            queries.append(WQ().insert_document(Doc(raw)))
+            documents.append(raw)
 
-        await self._client.query(
-            WQ().woql_and(*queries),
+        await self._client.insert_document(
+            documents,
             commit_msg=(
                 f"Flush {len(subtasks)} subtasks for task {task_id}"
             ),
         )
-
     # -- helpers -----------------------------------------------------------
 
     @staticmethod
@@ -136,5 +136,5 @@ class TaskPersistence:
         if isinstance(value, float):
             return WQ().string(str(value))
         if isinstance(value, datetime):
-            return WQ().string(value.isoformat())
+            return value
         return WQ().string(str(value))

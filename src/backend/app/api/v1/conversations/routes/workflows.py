@@ -37,6 +37,7 @@ class RunWorkflowRequest(BaseModel):
     workflow_name: str
     params: dict[str, Any]
     conversation_id: Optional[str] = None
+    # Persisted on the Task row (display name / notes), not the conversation thread.
     conversation_title: Optional[str] = None
     conversation_description: Optional[str] = None
 
@@ -55,6 +56,7 @@ class WorkflowBatchStep(BaseModel):
 class RunWorkflowBatchRequest(BaseModel):
     steps: list[WorkflowBatchStep]
     conversation_id: Optional[str] = None
+    # Labels the batch parent Task; chat title/description are always LLM-generated.
     conversation_title: Optional[str] = None
     conversation_description: Optional[str] = None
 
@@ -162,17 +164,9 @@ async def run_workflow_batch(
     try:
         # Prepare steps with cleaned params
         steps = []
-        for i, step in enumerate(req.steps):
+        for step in req.steps:
             params = dict(step.params or {})
             params.pop("mode", None)  # legacy cleanup
-
-            # Only first step gets conversation metadata
-            if i == 0:
-                if req.conversation_title:
-                    params["conversation_title"] = req.conversation_title
-                if req.conversation_description:
-                    params["conversation_description"] = req.conversation_description
-
             steps.append({
                 "workflow_name": step.workflow_name,
                 "params": params,

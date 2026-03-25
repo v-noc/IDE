@@ -34,13 +34,16 @@ class EventPart(BaseModel):
 
 class TaskPart(BaseModel):
     """
-    A task embedded inside a conversation message.
-    Expands into a sub-task timeline with status + touched nodes.
+    Marker in the message timeline for a workflow run.
+
+    Persist a minimal row: ``task_id`` must match the Task document ``@id`` in
+    Terminus (e.g. ``TaskSchema/<uuid>``). Title, state, and progress are filled
+    when serving messages by loading the linked ``Task`` (see repository hydrate).
     """
 
     type: Literal["task"] = "task"
     task_id: str
-    title: str
+    title: str = ""
     description: str = ""
     state: TaskState = TaskState.PENDING
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -48,6 +51,8 @@ class TaskPart(BaseModel):
     finished_at: Optional[datetime] = None
     progress: float = 0.0
     sub_tasks: list[SubTask] = Field(default_factory=list)
+    # Mirrors Task.sub_task_count when known; used when sub_tasks are not embedded.
+    sub_task_count: int = 0
     touched_node_ids: list[str] = Field(default_factory=list)
     workflow_name: Optional[str] = None
     workflow_params: Optional[dict] = None

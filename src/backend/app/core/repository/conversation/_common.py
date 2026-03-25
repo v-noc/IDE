@@ -33,6 +33,33 @@ def terminus_doc_id_tail(doc_id: str) -> str:
     return s.rsplit("/", 1)[-1]
 
 
+def task_document_lookup_ids(task_id: str) -> list[str]:
+    """
+    Terminus task document ids may be stored as `TaskSchema/<uuid>` while clients
+    sometimes pass a bare UUID. Return candidates to try with get_document / WOQL.
+    """
+    s = (task_id or "").strip()
+    if not s:
+        return []
+    out: list[str] = []
+    if "/" in s:
+        out.append(s)
+        tail = terminus_doc_id_tail(s)
+        prefixed = f"TaskSchema/{tail}" if tail else ""
+        if prefixed and prefixed not in out:
+            out.append(prefixed)
+    else:
+        out.append(f"TaskSchema/{s}")
+        out.append(s)
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for x in out:
+        if x not in seen:
+            seen.add(x)
+            ordered.append(x)
+    return ordered
+
+
 def terminus_ids_match(a: str, b: str) -> bool:
     """
     True if two Terminus document ids refer to the same document.

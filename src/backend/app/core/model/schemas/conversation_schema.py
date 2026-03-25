@@ -85,8 +85,8 @@ class MessageSchema(TerminusBase):
 
 
 class TaskSchema(BaseSchema):
-    conversation: ConversationSchema
-    message: MessageSchema
+    conversation: Optional[ConversationSchema]
+    message: Optional[MessageSchema]
     state: str
     progress: float
     progress_message: str
@@ -105,7 +105,7 @@ class TaskSchema(BaseSchema):
             name=node.name,
             description=node.description,
             conversation=node.conversation_id,
-            message=node.message_id,
+            message=f"MessageSchema/{node.message_id}" if node.message_id else None,
             state=node.state.value,
             progress=node.progress,
             progress_message=node.progress_message,
@@ -147,7 +147,7 @@ class TaskSchema(BaseSchema):
 
 
 class SubTaskSchema(TerminusBase):
-    task: TaskSchema
+    task: Optional[TaskSchema]
     name: str
     description: str
     state: str

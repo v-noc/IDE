@@ -105,8 +105,8 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
             )
 
             try:
-                # text = await self._invoke_llm(prompt)
-                text = "test"
+                text = await self._invoke_llm(prompt)
+
                 generated[nid] = text
                 node_updates[nid] = tree_node.model_copy(
                     update={"description": text}
@@ -211,6 +211,7 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         )
 
     async def _invoke_llm(self, prompt: str) -> str:
+
         model = (
             getattr(self, "_invoke_model", None) or "gpt-4o-mini"
         )

@@ -13,7 +13,12 @@ from app.core.model.schemas.conversation_schema import (
 )
 from app.db.async_terminus_client import WOQLQuery as WQ
 
-from ._common import TERMINAL_TASK_STATES, new_doc_id, utcnow
+from ._common import (
+    TERMINAL_TASK_STATES,
+    new_doc_id,
+    task_document_lookup_ids,
+    utcnow,
+)
 
 if TYPE_CHECKING:
     from app.db.async_terminus_client import AsyncClient
@@ -176,14 +181,15 @@ class TasksMixin:
         return out
 
     async def get_task(self, task_id: str) -> Task | None:
-        try:
-            raw = await self.client.get_document(task_id)
-        except Exception as exc:
-            print(exc)
-            return None
-        if not raw:
-            return None
-        return Task.from_raw_dict(raw)
+        for doc_id in task_document_lookup_ids(task_id):
+            try:
+                raw = await self.client.get_document(doc_id)
+            except Exception as exc:
+                print(exc)
+                continue
+            if raw:
+                return Task.from_raw_dict(raw)
+        return None
 
     async def list_tasks_for_conversation(
         self,

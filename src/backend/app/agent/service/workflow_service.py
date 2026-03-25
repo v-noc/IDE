@@ -12,9 +12,11 @@ from app.agent.runner.task_context import TaskContext
 from app.agent.runner.task_manager import TaskManager
 from app.agent.runner.task_persistence import TaskPersistence
 from app.agent.service.title_generator import (
+    generate_batch_conversation_title,
     generate_conversation_title,
 )
 from app.agent.workflows.base import BaseWorkflow
+from app.core.repository.conversation._common import new_doc_id
 from app.core.model.conversation_domain import (
     ConversationMessage,
     TaskPart,
@@ -69,35 +71,26 @@ class WorkflowService:
         **params,
     ) -> tuple[str, str]:
         workflow_params = dict(params)
-        wf_title = workflow_params.pop("conversation_title", None)
-        wf_desc = workflow_params.pop(
-            "conversation_description", None
-        )
+        # API fields are misnamed: these label the workflow run (Task), not the chat.
+        task_label = (workflow_params.pop(
+            "conversation_title", None) or "").strip()
+        task_summary = (
+            workflow_params.pop("conversation_description", None) or ""
+        ).strip()
 
-        # 1. Ensure conversation
+        # 1. Ensure conversation (LLM metadata for the thread, same idea as batch)
         if conversation_id is None:
             gen_title, gen_desc = await generate_conversation_title(
                 self._llm, workflow, workflow_params
             )
-            title = (wf_title or "").strip() or gen_title
-            desc = (wf_desc or "").strip() or gen_desc
             conversation_id = await store.create_conversation(
-                title, desc
+                gen_title, gen_desc
             )
 
-        # 2. Write timeline message with TaskPart (id must match TaskManager)
+        # 2. Timeline: text + TaskPart ref (task_id == Task document @id)
         message_id = str(uuid.uuid4())
-        task_id = str(uuid.uuid4())
-
-        task_part = TaskPart(
-            task_id=task_id,
-            title=(
-                f"{workflow.name}: "
-                f"{workflow_params.get('node_id', '')}"
-            ),
-            workflow_name=workflow.name,
-            workflow_params=workflow_params,
-        )
+        task_id = new_doc_id("TaskSchema")
+        task_part = TaskPart(task_id=task_id)
         await store.add_message(
             conversation_id,
             ConversationMessage(
@@ -110,6 +103,19 @@ class WorkflowService:
                     task_part,
                 ],
             ),
+        )
+
+        task_display_name = task_label or f"workflow:{workflow.name}"
+        task_display_desc = task_summary
+
+        await self._create_task_in_db(
+            task_id=task_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            workflow=workflow,
+            workflow_params=workflow_params,
+            name=task_display_name,
+            description=task_display_desc,
         )
 
         # 3. Create TaskContext (WorkflowService owns it)
@@ -156,18 +162,16 @@ class WorkflowService:
         task_id_holder.append(task_id)
         self._task_contexts[task_id] = ctx
 
-        # 5. Prime cache / confirm TaskPart row (message already has task_id)
-        self._task_part_cache[task_id] = task_part
-        await store.upsert_task_part(conversation_id, task_part)
-
-        # 6. Persist Task document to DB immediately (PENDING)
-        await self._create_task_in_db(
+        # In-memory / stream: keep human task label; persisted message is ref-only.
+        self._task_part_cache[task_id] = TaskPart(
             task_id=task_id,
-            conversation_id=conversation_id,
-            message_id=message_id,
-            workflow=workflow,
-            workflow_params=workflow_params,
+            title=task_display_name,
+            workflow_name=workflow.name,
         )
+        if not self._db_client:
+            await store.upsert_task_part(
+                conversation_id, self._task_part_cache[task_id]
+            )
 
         # 7. Push initial state
         initial = self._tasks.get_status(task_id)
@@ -194,28 +198,27 @@ class WorkflowService:
         Submit an entire batch as ONE background task.
         Steps run sequentially inside the background task.
         Returns immediately with (conversation_id, parent_task_id).
+
+        ``conversation_title`` / ``conversation_description`` (API name) set the
+        **batch task** label in Terminus, not the chat thread; thread metadata
+        is always LLM-generated when creating a new conversation.
         """
         if conversation_id is None:
-            title = (
-                (conversation_title or "").strip()
-                or "Batch workflow"
-            )
-            desc = (
-                (conversation_description or "").strip()
-                or "Running multiple workflow steps"
+            gen_title, gen_desc = await generate_batch_conversation_title(
+                self._llm, steps
             )
             conversation_id = await store.create_conversation(
-                title, desc
+                gen_title, gen_desc
             )
 
+        task_label = (conversation_title or "").strip()
+        task_summary = (conversation_description or "").strip()
+        task_display_name = task_label or "Batch workflow"
+        task_display_desc = task_summary
+
         message_id = str(uuid.uuid4())
-        task_id = str(uuid.uuid4())
-        task_part = TaskPart(
-            task_id=task_id,
-            title="Batch workflow",
-            workflow_name="batch",
-            workflow_params={"step_count": len(steps)},
-        )
+        task_id = new_doc_id("TaskSchema")
+        task_part = TaskPart(task_id=task_id)
         await store.add_message(
             conversation_id,
             ConversationMessage(
@@ -226,6 +229,16 @@ class WorkflowService:
                     task_part,
                 ],
             ),
+        )
+
+        await self._create_task_in_db(
+            task_id=task_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            workflow=None,
+            workflow_params={"step_count": len(steps)},
+            name=task_display_name,
+            description=task_display_desc,
         )
 
         ctx = TaskContext()
@@ -299,17 +312,15 @@ class WorkflowService:
         task_id_holder.append(task_id)
         self._task_contexts[task_id] = ctx
 
-        self._task_part_cache[task_id] = task_part
-        await store.upsert_task_part(conversation_id, task_part)
-
-        await self._create_task_in_db(
+        self._task_part_cache[task_id] = TaskPart(
             task_id=task_id,
-            conversation_id=conversation_id,
-            message_id=message_id,
-            workflow=None,
-            workflow_params={"step_count": len(steps)},
-            name="workflow:batch",
+            title=task_display_name,
+            workflow_name="batch",
         )
+        if not self._db_client:
+            await store.upsert_task_part(
+                conversation_id, self._task_part_cache[task_id]
+            )
 
         return conversation_id, task_id
 
@@ -324,15 +335,20 @@ class WorkflowService:
         workflow: BaseWorkflow | None,
         workflow_params: dict,
         name: str | None = None,
+        description: str = "",
     ) -> None:
         if not self._db_client:
             return
         import json
 
         persistence = TaskPersistence(self._db_client)
+        default_name = (
+            f"workflow:{workflow.name}" if workflow else "workflow:batch"
+        )
         task_doc = Task(
             id=task_id,
-            name=name or f"workflow:{workflow.name}" if workflow else "workflow:batch",
+            name=(name or default_name).strip() or default_name,
+            description=description,
             conversation_id=conversation_id,
             message_id=message_id,
             state=TaskState.PENDING,
@@ -341,6 +357,7 @@ class WorkflowService:
                 workflow_params, default=str
             ),
         )
+
         try:
             await persistence.create_task(task_doc)
         except Exception:
@@ -408,10 +425,13 @@ class WorkflowService:
             return
         base = self._task_part_cache.get(
             task_id,
-            TaskPart(task_id=task_id, title=status.name),
+            TaskPart(task_id=task_id),
         )
+        snaps = list(subtask_snapshots or [])
+        st_count = int(getattr(status, "sub_task_count", 0) or 0)
         updated = base.model_copy(
             update={
+                "title": base.title or status.name,
                 "state": ConversationTaskState(
                     status.state.value
                 ),
@@ -419,7 +439,30 @@ class WorkflowService:
                 "description": status.progress_message or "",
                 "started_at": status.started_at,
                 "finished_at": status.finished_at,
+                "sub_tasks": snaps,
+                "sub_task_count": max(len(snaps), st_count),
             }
         )
-        await store.upsert_task_part(conversation_id, updated)
         self._task_part_cache[task_id] = updated
+
+        if self._db_client:
+            persistence = TaskPersistence(self._db_client)
+            try:
+                await persistence.update_task_state(
+                    task_id,
+                    state=status.state,
+                    progress=status.progress,
+                    progress_message=status.progress_message,
+                    error=status.error,
+                    result_json=status.result_json,
+                    started_at=status.started_at,
+                    finished_at=status.finished_at,
+                    sub_task_count=max(len(snaps), st_count),
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to persist live task state for %s", task_id
+                )
+            return
+
+        await store.upsert_task_part(conversation_id, updated)

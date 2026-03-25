@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.core.model.conversation_domain import ConversationMessage
+from app.core.model.conversation_domain import (
+    ConversationMessage,
+    TaskPart,
+)
 from app.core.model.conversation_enums import MessageRole
 from app.core.model.conversation_nodes import MessageNode
 from app.core.model.schemas.conversation_schema import (
@@ -27,6 +30,44 @@ if TYPE_CHECKING:
 
 class MessagesMixin:
     client: "AsyncClient"
+
+    async def _hydrate_task_parts(
+        self, messages: list[ConversationMessage]
+    ) -> None:
+        """Merge Task document fields into ``TaskPart`` rows (ref-in-message pattern)."""
+        for mi, msg in enumerate(messages):
+            new_parts: list = []
+            changed = False
+            for p in msg.parts:
+                if isinstance(p, TaskPart):
+                    doc = await self.get_task(p.task_id)
+                    if doc is not None:
+                        desc = (
+                            (doc.progress_message or "").strip()
+                            or (doc.description or "").strip()
+                            or p.description
+                        )
+                        new_parts.append(
+                            p.model_copy(
+                                update={
+                                    "title": doc.name or p.title,
+                                    "description": desc,
+                                    "state": doc.state,
+                                    "progress": doc.progress,
+                                    "started_at": doc.started_at or p.started_at,
+                                    "finished_at": doc.finished_at or p.finished_at,
+                                    "sub_task_count": doc.sub_task_count,
+                                    "workflow_name": doc.workflow_name or p.workflow_name,
+                                }
+                            )
+                        )
+                        changed = True
+                    else:
+                        new_parts.append(p)
+                else:
+                    new_parts.append(p)
+            if changed:
+                messages[mi] = msg.model_copy(update={"parts": new_parts})
 
     async def add_message(
         self,
@@ -119,6 +160,7 @@ class MessagesMixin:
                     model=node.model_name,
                 )
             )
+        await self._hydrate_task_parts(out)
         return out
 
     async def get_message(self, message_id: str) -> ConversationMessage | None:
@@ -131,7 +173,7 @@ class MessagesMixin:
             return None
         node = MessageNode.from_raw_dict(raw)
         parts = parts_from_json(node.parts_json)
-        return ConversationMessage(
+        msg = ConversationMessage(
             id=node.id,
             role=MessageRole(node.role),
             parts=parts,
@@ -140,6 +182,9 @@ class MessagesMixin:
             token_count=node.token_count,
             model=node.model_name,
         )
+        buf = [msg]
+        await self._hydrate_task_parts(buf)
+        return buf[0]
 
     async def update_message(
         self,
