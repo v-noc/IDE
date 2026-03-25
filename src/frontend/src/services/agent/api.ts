@@ -7,6 +7,7 @@ import type {
   SendMessageResponse,
   WireConversation,
   WireMessage,
+  WireSubTask,
 } from "@/types/agent";
 
 const Q = (params: Record<string, string | number | undefined>) => {
@@ -93,6 +94,22 @@ export const agentApi = {
         method: "POST",
         body: payload,
       },
+      projectId,
+    ),
+
+  listTaskSubtasks: (
+    projectId: string,
+    taskId: string,
+    cursor = 0,
+    limit = 200,
+  ) =>
+    agentFetch<PaginatedResponse<WireSubTask>>(
+      `/tasks/subtasks${Q({
+        task_id: taskId,
+        cursor,
+        limit,
+      })}`,
+      {},
       projectId,
     ),
 };

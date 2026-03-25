@@ -7,6 +7,16 @@ export interface WireTextPart {
   text: string;
 }
 
+/** Sub-task row from `GET /tasks/subtasks` or embedded in a task message part. */
+export interface WireSubTask {
+  id?: string;
+  name?: string;
+  title?: string;
+  description?: string;
+  state?: string;
+  sequence?: number;
+}
+
 export type WireMessagePart = WireTextPart | Record<string, unknown>;
 
 export interface WireMessage {

@@ -46,3 +46,24 @@ export const agentConversationHydrationQueryOptions = (
     ),
     staleTime: 10_000,
   });
+
+export const agentTaskSubtasksQueryOptions = (
+  projectId: string,
+  taskId: string,
+  branch: string | null | undefined,
+  ref: string | null | undefined,
+  compareTo: string | null | undefined,
+  enabled: boolean,
+) =>
+  queryOptions({
+    queryKey: queryKeys.agent.taskSubtasks(
+      projectId,
+      taskId,
+      branch,
+      ref,
+      compareTo,
+    ),
+    queryFn: () => agentApi.listTaskSubtasks(projectId, taskId),
+    enabled: Boolean(projectId && taskId && enabled),
+    staleTime: 5_000,
+  });

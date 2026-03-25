@@ -21,17 +21,11 @@ export interface WorkflowBatchStepWire {
   params: Record<string, unknown>;
 }
 
-export interface RunWorkflowBatchRequest {
+/** Dialog payload: each step is started with `POST .../workflows/run` in order, reusing `conversation_id`. */
+export interface StartAgentWorkflowsPayload {
   steps: WorkflowBatchStepWire[];
-  conversation_id?: string | null;
   conversation_title?: string | null;
   conversation_description?: string | null;
-}
-
-export interface RunWorkflowBatchResponse {
-  conversation_id: string;
-  task_ids: string[];
-  status: string;
 }
 
 export interface RunWorkflowRequest {

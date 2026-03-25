@@ -1,17 +1,22 @@
+import { useQuery } from "@tanstack/react-query";
 import type { LucideIcon } from "lucide-react";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { isAgentPreviewTaskId } from "@/features/Dashboard/features/Agent/constants/agentPreviewConversation";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import { cn } from "@/lib/utils";
+import { agentTaskSubtasksQueryOptions } from "@/services/agent";
 import { resolveTaskIcon } from "./taskIcons";
 import { TaskStatusDot } from "./TaskStatusDot";
 import { TaskSubTaskList } from "./TaskSubTaskList";
 import { toVisualStatus } from "./taskStatus";
-import type { TaskWirePart } from "./types";
+import type { TaskSubWire, TaskWirePart } from "./types";
 
 function defaultExpanded(part: TaskWirePart): boolean {
   const main = toVisualStatus(part.state);
@@ -99,10 +104,48 @@ function TaskPartHeader({
 }
 
 export function TaskPart({ part }: { part: TaskWirePart }) {
+  const projectId = useProjectStore((s) => s.projectData?.id ?? "");
+  const branch = useVersioningStore((s) => s.branch);
+  const ref = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareTo = useVersioningStore((s) => s.compareToCommitId);
+
+  const embeddedSubTasks: TaskSubWire[] = useMemo(
+    () => part.sub_tasks ?? [],
+    [part.sub_tasks],
+  );
+  const expectSubtasks = useMemo(
+    () => embeddedSubTasks.length > 0 || (part.sub_task_count ?? 0) > 0,
+    [embeddedSubTasks.length, part.sub_task_count],
+  );
+
+  const fetchEnabled =
+    Boolean(projectId) && !isAgentPreviewTaskId(part.task_id);
+
+  const subtasksQuery = useQuery(
+    agentTaskSubtasksQueryOptions(
+      projectId,
+      part.task_id,
+      branch,
+      ref,
+      compareTo,
+      fetchEnabled,
+    ),
+  );
+
+  const subTasks: TaskSubWire[] = useMemo(() => {
+    const rows = subtasksQuery.data?.items;
+    if (subtasksQuery.isSuccess && rows && rows.length > 0) {
+      return rows;
+    }
+    return embeddedSubTasks;
+  }, [embeddedSubTasks, subtasksQuery.data?.items, subtasksQuery.isSuccess]);
+
+  const listLoading =
+    fetchEnabled && subtasksQuery.isPending && embeddedSubTasks.length === 0;
+
   const MainIcon = resolveTaskIcon(part.icon);
   const mainStatus = toVisualStatus(part.state);
-  const subTasks = part.sub_tasks ?? [];
-  const expandable = subTasks.length > 0;
+  const expandable = expectSubtasks || subTasks.length > 0;
 
   const [open, setOpen] = useState(() => defaultExpanded(part));
 
@@ -134,7 +177,11 @@ export function TaskPart({ part }: { part: TaskWirePart }) {
         open={open}
       />
       <CollapsibleContent>
-        <TaskSubTaskList taskId={part.task_id} subTasks={subTasks} />
+        <TaskSubTaskList
+          taskId={part.task_id}
+          subTasks={subTasks}
+          loading={listLoading}
+        />
       </CollapsibleContent>
     </Collapsible>
   );

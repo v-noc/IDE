@@ -198,7 +198,7 @@ class DescriptionGeneratorWorkflow(BaseWorkflow):
         return (
             "Task: description\n"
             "Write a concise technical description of this "
-            "node.\n"
+            "node in 1-5 sentences.\n"
             "Use child descriptions for context and avoid "
             "repetition.\n\n"
             f"Node id: {node_doc.get('@id')}\n"

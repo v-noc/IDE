@@ -12,6 +12,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAgentUiStore } from "@/features/Dashboard/features/Agent/store/useAgentUiStore";
 import { useAgentOverlayStore } from "@/features/Dashboard/features/Agent/store/useAgentOverlayStore";
@@ -26,16 +32,17 @@ import type { AnyNodeTree } from "@/types/project";
 import type {
   DescriptionWorkflowMode,
   DocumentationWorkflowMode,
-  RunWorkflowBatchRequest,
+  RunWorkflowRequest,
+  StartAgentWorkflowsPayload,
   WorkflowBatchStepWire,
   WorkflowModelId,
 } from "@/types/agent/workflows";
 import { WORKFLOW_MODEL_OPTIONS } from "@/types/agent/workflows";
 
-type Scope = "description" | "documentation" | "both";
+type WorkflowKind = "description" | "documentation";
 
 function buildWorkflowSteps(args: {
-  scope: Scope;
+  kind: WorkflowKind;
   nodeId: string;
   descriptionModel: WorkflowModelId;
   documentationModel: WorkflowModelId;
@@ -49,28 +56,28 @@ function buildWorkflowSteps(args: {
     direction: args.direction,
     max_depth: args.maxDepth,
   };
-  const steps: WorkflowBatchStepWire[] = [];
-  if (args.scope === "description" || args.scope === "both") {
-    steps.push({
-      workflow_name: "description_generator",
-      params: {
-        ...base,
-        model: args.descriptionModel,
-        description_mode: args.descriptionMode,
+  if (args.kind === "description") {
+    return [
+      {
+        workflow_name: "description_generator",
+        params: {
+          ...base,
+          model: args.descriptionModel,
+          description_mode: args.descriptionMode,
+        },
       },
-    });
+    ];
   }
-  if (args.scope === "documentation" || args.scope === "both") {
-    steps.push({
+  return [
+    {
       workflow_name: "documentation_generator",
       params: {
         ...base,
         model: args.documentationModel,
         documentation_mode: args.documentationMode,
       },
-    });
-  }
-  return steps;
+    },
+  ];
 }
 
 interface StartWorkflowDialogProps {
@@ -95,7 +102,8 @@ export function StartWorkflowDialog({
     (s) => s.setBackendConversationId,
   );
 
-  const [scope, setScope] = useState<Scope>("both");
+  const [workflowKind, setWorkflowKind] =
+    useState<WorkflowKind>("description");
   const [conversationTitle, setConversationTitle] = useState("");
   const [conversationDescription, setConversationDescription] = useState("");
   const [descriptionModel, setDescriptionModel] =
@@ -112,7 +120,7 @@ export function StartWorkflowDialog({
   const nodeId = targetNode.id;
 
   const resetForm = () => {
-    setScope("both");
+    setWorkflowKind("description");
     setConversationTitle("");
     setConversationDescription("");
     setDescriptionModel("gpt-4o-mini");
@@ -123,15 +131,28 @@ export function StartWorkflowDialog({
     setMaxDepth(5);
   };
 
-  const batchMutation = useMutation({
-    mutationFn: (body: RunWorkflowBatchRequest) =>
-      agentWorkflowsApi.runBatch(projectId, body),
+  const startWorkflowsMutation = useMutation({
+    mutationFn: async (body: StartAgentWorkflowsPayload) => {
+      const step = body.steps[0];
+      if (!step) {
+        throw new Error("No workflow step");
+      }
+      const title = (body.conversation_title ?? "").trim();
+      const description = (body.conversation_description ?? "").trim();
+      const req: RunWorkflowRequest = {
+        workflow_name: step.workflow_name,
+        params: step.params,
+      };
+      if (title) req.conversation_title = title;
+      if (description) req.conversation_description = description;
+      return agentWorkflowsApi.run(projectId, req);
+    },
     onSuccess: async (data) => {
-      toast.success("Workflows started");
+      toast.success("Workflow started");
       const cid = data.conversation_id;
       setBackendConversationId(cid);
       setAgentOpen(true);
-      await queryClient.prefetchQuery(
+      void queryClient.prefetchQuery(
         agentConversationHydrationQueryOptions(
           projectId,
           cid,
@@ -153,15 +174,15 @@ export function StartWorkflowDialog({
           ? JSON.stringify(err.body) || err.message
           : err instanceof Error
             ? err.message
-            : "Failed to start workflows";
+            : "Failed to start workflow";
       toast.error(msg);
     },
   });
 
-  const payload = useMemo((): RunWorkflowBatchRequest | null => {
+  const payload = useMemo((): StartAgentWorkflowsPayload | null => {
     if (!nodeId) return null;
     const steps = buildWorkflowSteps({
-      scope,
+      kind: workflowKind,
       nodeId,
       descriptionModel,
       documentationModel,
@@ -170,7 +191,7 @@ export function StartWorkflowDialog({
       direction,
       maxDepth,
     });
-    const body: RunWorkflowBatchRequest = { steps };
+    const body: StartAgentWorkflowsPayload = { steps };
     const t = conversationTitle.trim();
     const d = conversationDescription.trim();
     if (t) body.conversation_title = t;
@@ -178,7 +199,7 @@ export function StartWorkflowDialog({
     return body;
   }, [
     nodeId,
-    scope,
+    workflowKind,
     descriptionModel,
     documentationModel,
     descriptionMode,
@@ -191,10 +212,10 @@ export function StartWorkflowDialog({
 
   const handleSubmit = () => {
     if (!payload?.steps.length) {
-      toast.error("Select at least one workflow step");
+      toast.error("Could not build workflow request");
       return;
     }
-    batchMutation.mutate(payload);
+    startWorkflowsMutation.mutate(payload);
   };
 
   return (
@@ -214,31 +235,24 @@ export function StartWorkflowDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-2">
-          <div className="space-y-2">
-            <Label>Run</Label>
-            <RadioGroup
-              value={scope}
-              onValueChange={(v) => setScope(v as Scope)}
-              className="flex flex-col gap-2"
-            >
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="description" id="wf-scope-desc" />
-                <span>Update descriptions only</span>
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="documentation" id="wf-scope-doc" />
-                <span>Documentation only</span>
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <RadioGroupItem value="both" id="wf-scope-both" />
-                <span>Descriptions then documentation</span>
-              </label>
-            </RadioGroup>
-          </div>
+          <Tabs
+            value={workflowKind}
+            onValueChange={(v) => setWorkflowKind(v as WorkflowKind)}
+            className="gap-4"
+          >
+            <TabsList className="grid h-auto w-full grid-cols-2 p-1">
+              <TabsTrigger value="description" className="py-2">
+                Descriptions
+              </TabsTrigger>
+              <TabsTrigger value="documentation" className="py-2">
+                Documentation
+              </TabsTrigger>
+            </TabsList>
 
-          {(scope === "description" || scope === "both") && (
-            <div className="space-y-3 rounded-md border border-border/60 p-3">
-              <p className="text-sm font-medium">Descriptions</p>
+            <TabsContent
+              value="description"
+              className="space-y-3 rounded-md border border-border/60 p-3"
+            >
               <div className="space-y-2">
                 <Label htmlFor="wf-desc-model">Model</Label>
                 <select
@@ -278,12 +292,12 @@ export function StartWorkflowDialog({
                   </label>
                 </RadioGroup>
               </div>
-            </div>
-          )}
+            </TabsContent>
 
-          {(scope === "documentation" || scope === "both") && (
-            <div className="space-y-3 rounded-md border border-border/60 p-3">
-              <p className="text-sm font-medium">Documentation</p>
+            <TabsContent
+              value="documentation"
+              className="space-y-3 rounded-md border border-border/60 p-3"
+            >
               <div className="space-y-2">
                 <Label htmlFor="wf-doc-model">Model</Label>
                 <select
@@ -320,8 +334,8 @@ export function StartWorkflowDialog({
                   </label>
                 </RadioGroup>
               </div>
-            </div>
-          )}
+            </TabsContent>
+          </Tabs>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
@@ -388,9 +402,9 @@ export function StartWorkflowDialog({
           <Button
             type="button"
             onClick={handleSubmit}
-            disabled={batchMutation.isPending || !nodeId}
+            disabled={startWorkflowsMutation.isPending || !nodeId}
           >
-            {batchMutation.isPending ? "Starting…" : "Start"}
+            {startWorkflowsMutation.isPending ? "Starting…" : "Start"}
           </Button>
         </DialogFooter>
       </DialogContent>

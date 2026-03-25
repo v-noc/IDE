@@ -7,6 +7,11 @@ export function isAgentPreviewConversationId(id: string | null | undefined): boo
   return id === AGENT_UI_PREVIEW_CONVERSATION_ID;
 }
 
+/** Preview task parts use synthetic ids; skip real task HTTP calls. */
+export function isAgentPreviewTaskId(taskId: string | null | undefined): boolean {
+  return Boolean(taskId && taskId.startsWith("preview-"));
+}
+
 const SAMPLE_MARKDOWN = `## Markdown check
 
 **Bold**, *italic*, and \`inline code\`.
@@ -70,6 +75,7 @@ export function createAgentUiPreviewWire(): WireConversation {
           state: "running",
           icon: "sparkles",
           workflow_name: "workflow:build",
+          sub_task_count: 1,
           sub_tasks: [
             {
               title: "Scan environment",
@@ -93,6 +99,7 @@ export function createAgentUiPreviewWire(): WireConversation {
             state: "running",
             icon: "sparkles",
             workflow_name: "workflow:build",
+            sub_task_count: 1,
             sub_tasks: [
               {
                 title: "Scan environment",

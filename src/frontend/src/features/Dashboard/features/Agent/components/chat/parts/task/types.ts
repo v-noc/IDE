@@ -1,4 +1,5 @@
 export interface TaskSubWire {
+  id?: string;
   title?: string;
   /** Backend `SubTask` wire uses `name`. */
   name?: string;
@@ -17,4 +18,6 @@ export interface TaskWirePart {
   /** Optional Lucide icon name (e.g. "sparkles", "cpu"). */
   icon?: string;
   sub_tasks?: TaskSubWire[];
+  /** Hint when sub-tasks exist in DB but are not embedded in the part. */
+  sub_task_count?: number;
 }

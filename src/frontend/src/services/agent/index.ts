@@ -4,4 +4,5 @@ export * from "./socket";
 export {
   agentConversationHydrationQueryOptions,
   agentConversationSummariesQueryOptions,
+  agentTaskSubtasksQueryOptions,
 } from "./queries";

@@ -82,6 +82,22 @@ const queryKeys = {
           compareTo ?? "",
         ] as const,
     },
+    taskSubtasks: (
+      projectId: string,
+      taskId: string,
+      branch?: string | null,
+      ref?: string | null,
+      compareTo?: string | null,
+    ) =>
+      [
+        ...queryKeys.agent.all,
+        "task-subtasks",
+        projectId,
+        taskId,
+        branch ?? "main",
+        ref ?? "",
+        compareTo ?? "",
+      ] as const,
   },
   versioning: {
     all: ['versioning'] as const,
