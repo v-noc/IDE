@@ -1,11 +1,28 @@
-import { Pause, Play, SkipBack, SkipForward, Square } from "lucide-react";
+import {
+  PanelBottom,
+  PanelRight,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  Square,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
+import { useAgentOverlayStore } from "../../store/useAgentOverlayStore";
 import { useWalkthroughStore } from "../store/useWalkthroughStore";
 
 const SPEEDS = [0.5, 1, 1.5, 2] as const;
 
-export function WalkthroughPlaybackBar() {
+export type WalkthroughPlaybackPlacement = "sidebar" | "floating";
+
+interface WalkthroughPlaybackBarProps {
+  placement?: WalkthroughPlaybackPlacement;
+}
+
+export function WalkthroughPlaybackBar({
+  placement = "sidebar",
+}: WalkthroughPlaybackBarProps) {
   const [
     status,
     currentStepIndex,
@@ -15,6 +32,7 @@ export function WalkthroughPlaybackBar() {
     timeline,
     elapsedMs,
     controls,
+    setPlaybackDetached,
   ] = useWalkthroughStore(
     useShallow((s) => [
       s.status,
@@ -25,8 +43,11 @@ export function WalkthroughPlaybackBar() {
       s.timeline,
       s.elapsedMs,
       s.controls,
+      s.setPlaybackDetached,
     ]),
   );
+
+  const setAgentOpen = useAgentOverlayStore((s) => s.setOpen);
 
   const totalMs = timeline?.totalDuration ?? 0;
   const progressPct =
@@ -51,8 +72,13 @@ export function WalkthroughPlaybackBar() {
     );
   }
 
+  const shellClass =
+    placement === "floating"
+      ? "space-y-2 rounded-lg border border-border bg-background/95 p-3 shadow-lg backdrop-blur-sm"
+      : "space-y-2 rounded-md border border-border bg-muted/20 p-3";
+
   return (
-    <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
+    <div className={shellClass}>
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         Walkthrough
       </p>
@@ -137,6 +163,33 @@ export function WalkthroughPlaybackBar() {
               {value}x
             </button>
           ))}
+          {placement === "sidebar" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setPlaybackDetached(true);
+                setAgentOpen(false);
+              }}
+              className="ml-0.5 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Detach walkthrough bar to canvas"
+              title="Detach to canvas"
+            >
+              <PanelBottom size={12} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setPlaybackDetached(false);
+                setAgentOpen(true);
+              }}
+              className="ml-0.5 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Attach walkthrough bar to sidebar"
+              title="Attach to sidebar"
+            >
+              <PanelRight size={12} />
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@ import {
 } from "../constants/agentPreviewConversation";
 import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { AgentSidebar } from "./AgentSidebar";
+import { useWalkthroughStore } from "../walkthrough/store/useWalkthroughStore";
 import { useAgentOverlayStore } from "../store/useAgentOverlayStore";
 import { useAgentUiStore } from "../store/useAgentUiStore";
 import { useShallow } from "zustand/react/shallow";
@@ -40,6 +41,8 @@ function formatUpdatedAt(iso: string) {
 
 export function AgentOverlay() {
   const { isOpen, setOpen } = useAgentOverlayStore();
+  const playbackDetached = useWalkthroughStore((s) => s.playbackDetached);
+  const panelOpen = isOpen && !playbackDetached;
   const [backendConversationId, setBackendConversationId] = useAgentUiStore(
     useShallow((s) => [s.backendConversationId, s.setBackendConversationId]),
   );
@@ -122,7 +125,7 @@ export function AgentOverlay() {
         className="pointer-events-auto absolute bottom-24 right-0 top-0 h-full transition-transform duration-200"
         style={{
           width,
-          transform: isOpen ? "translateX(0)" : "translateX(100%)",
+          transform: panelOpen ? "translateX(0)" : "translateX(100%)",
         }}
       >
         <div

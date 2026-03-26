@@ -59,6 +59,10 @@ export interface WalkthroughStoreState {
 
   controls: WalkthroughControls | null;
 
+  /** When true, agent sidebar is hidden and the playback bar is shown on the canvas. */
+  playbackDetached: boolean;
+  setPlaybackDetached: (detached: boolean) => void;
+
   setStatus: (status: EngineStatus) => void;
   setWalkthrough: (wt: Walkthrough | null) => void;
   setTimeline: (timeline: WalkthroughTimeline | null) => void;
@@ -116,6 +120,9 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
       codeAnchorLayoutEpoch: 0,
 
       controls: null,
+
+      playbackDetached: false,
+      setPlaybackDetached: (detached) => set({ playbackDetached: detached }),
 
       setStatus: (status) => set({ status }),
 
@@ -213,6 +220,7 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
           forcedCodeOpen: {},
           codeAnchorLayoutEpoch: 0,
           controls: null,
+          playbackDetached: false,
         }),
     }),
     { name: "walkthrough-store" },

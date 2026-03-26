@@ -9,12 +9,14 @@ import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { AgentChatInput } from "./AgentChatInput";
 import { ChatContainer } from "./chat";
 import { WalkthroughPlaybackBar } from "../walkthrough/components/WalkthroughPlaybackBar";
+import { useWalkthroughStore } from "../walkthrough/store/useWalkthroughStore";
 
 interface AgentSidebarProps {
   className?: string;
 }
 
 export function AgentSidebar({ className }: AgentSidebarProps) {
+  const playbackDetached = useWalkthroughStore((s) => s.playbackDetached);
   const backendConversationId = useAgentUiStore((s) => s.backendConversationId);
   const projectId = useProjectStore((s) => s.projectData?.id ?? "");
   const branch = useVersioningStore((s) => s.branch);
@@ -97,7 +99,7 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
       </div>
 
       <div className="border-t border-border space-y-3 p-3">
-        <WalkthroughPlaybackBar />
+        {!playbackDetached ? <WalkthroughPlaybackBar /> : null}
         <AgentChatInput />
       </div>
     </aside>

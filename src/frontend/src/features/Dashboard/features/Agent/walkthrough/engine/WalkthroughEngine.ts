@@ -132,6 +132,7 @@ export class WalkthroughEngine {
 
       if (!signal.aborted) {
         this.setStatus("complete");
+        this.clearVisualChrome();
       }
     } finally {
       if (signal.aborted && this.interruptKind === "pause") {
@@ -154,9 +155,8 @@ export class WalkthroughEngine {
     this.currentExecutor = null;
     this.stepIndex = 0;
     this.elapsedMs = 0;
-    this.store.getState().setPopover(null);
     this.store.getState().setElapsedMs(0);
-    this.store.getState().clearForcedCodeOpen();
+    this.clearVisualChrome();
     this.setStatus("idle");
   }
 
@@ -316,5 +316,13 @@ export class WalkthroughEngine {
   private setStatus(status: EngineStatus): void {
     this.status = status;
     this.store.getState().setStatus(status);
+  }
+
+  /** Clears popover, spotlight, code highlights, and forced code panels. */
+  private clearVisualChrome(): void {
+    this.store.getState().setPopover(null);
+    this.store.getState().setSpotlightNodeId(null);
+    this.store.getState().clearHighlightStore();
+    this.store.getState().clearForcedCodeOpen();
   }
 }
