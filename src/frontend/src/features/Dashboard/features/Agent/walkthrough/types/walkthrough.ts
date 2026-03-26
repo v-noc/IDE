@@ -1,28 +1,27 @@
-interface Walkthrough {
+/** Root walkthrough document */
+export interface Walkthrough {
   meta: WalkthroughMeta;
   steps: WalkthroughStep[];
 }
 
-interface WalkthroughMeta {
+export interface WalkthroughMeta {
   id: string;
   title: string;
   description?: string;
   version: number;
 }
 
-interface WalkthroughStep {
+export interface WalkthroughStep {
   id: string;
   actions: Action[];
   popover?: PopoverConfig;
 }
 
-interface ActionBase {
+export interface ActionBase {
   duration?: number;
-
-
 }
 
-type Action =
+export type Action =
   | FocusNodeAction
   | ExpandNodeAction
   | CollapseNodeAction
@@ -35,140 +34,122 @@ type Action =
   | CreateTabAction
   | WaitAction;
 
-// ─── Individual Action Types ───────────────────────────
-
-interface FocusNodeAction extends ActionBase {
+export interface FocusNodeAction extends ActionBase {
   type: "focus-node";
   nodeId: string;
 }
 
-interface ExpandNodeAction extends ActionBase {
+export interface ExpandNodeAction extends ActionBase {
   type: "expand-node";
   nodeId: string;
 }
 
-interface CollapseNodeAction extends ActionBase {
+export interface CollapseNodeAction extends ActionBase {
   type: "collapse-node";
   nodeId: string;
 }
 
-/** Toggle the code view ON for a node (distinct from expand which shows children) */
-interface ShowCodeAction extends ActionBase {
+export interface ShowCodeAction extends ActionBase {
   type: "show-code";
   nodeId: string;
 }
 
-/** Toggle the code view OFF for a node */
-interface CloseCodeAction extends ActionBase {
+export interface CloseCodeAction extends ActionBase {
   type: "close-code";
   nodeId: string;
 }
 
-interface HighlightCodeAction extends ActionBase {
+export interface HighlightCodeAction extends ActionBase {
   type: "highlight-code";
   nodeId: string;
   lines: LineRange[];
   style?: HighlightStyle;
 }
 
-interface ClearHighlightAction extends ActionBase {
+export interface ClearHighlightAction extends ActionBase {
   type: "clear-highlight";
-  nodeId?: string;           // if omitted, clear ALL highlights
+  nodeId?: string;
 }
 
-interface PanCanvasAction extends ActionBase {
+export interface PanCanvasAction extends ActionBase {
   type: "pan-canvas";
-  to: { nodeId: string };    // pan + center on this node
+  to: { nodeId: string };
 }
 
-interface SelectNodeAction extends ActionBase {
+export interface SelectNodeAction extends ActionBase {
   type: "select-node";
   nodeId: string;
   selectionType: "primary" | "secondary" | "promote";
 }
 
-interface CreateTabAction extends ActionBase {
+export interface CreateTabAction extends ActionBase {
   type: "create-tab";
-  nodeId: string;            // the call node whose target becomes the tab
+  nodeId: string;
 }
 
-interface WaitAction extends ActionBase {
+export interface WaitAction extends ActionBase {
   type: "wait";
-  ms: number;                // explicit wait duration (overrides ActionBase.duration)
+  ms: number;
 }
 
-interface LineRange {
-  from: number;              // 1-based line number
-  to: number;                // 1-based, inclusive
-  label?: string;            // optional inline annotation text
+export interface LineRange {
+  from: number;
+  to: number;
+  label?: string;
 }
 
-type HighlightStyle = "default" | "warning" | "added" | "removed" | "emphasis";
+export type HighlightStyle = "default" | "warning" | "added" | "removed" | "emphasis";
 
-interface PopoverConfig {
+export interface PopoverConfig {
   title?: string;
-  body: string;                        // markdown or plain text — displayed with typewriter effect
+  body: string;
   anchor: PopoverAnchor;
-  side?: "top" | "bottom" | "left" | "right";   // preferred placement
+  side?: "top" | "bottom" | "left" | "right";
 }
 
-type PopoverAnchor =
+export type PopoverAnchor =
   | { type: "node"; nodeId: string }
   | { type: "code-line"; nodeId: string; line: number }
   | { type: "viewport-center" }
   | { type: "coordinates"; x: number; y: number };
 
 /** Pre-computed timeline for the entire walkthrough */
-interface WalkthroughTimeline {
-  totalDuration: number;              // total walkthrough duration in ms
+export interface WalkthroughTimeline {
+  totalDuration: number;
   steps: StepTimeline[];
 }
 
-interface StepTimeline {
+export interface StepTimeline {
   stepIndex: number;
   stepId: string;
-  startMs: number;                    // absolute start time of this step
-  endMs: number;                      // absolute end time of this step
-  actionsDuration: number;            // total duration of all actions
-  typewriterDuration: number;         // duration of typewriter animation
-  actions: ActionTimeline[];          // per-action timing
+  startMs: number;
+  endMs: number;
+  actionsDuration: number;
+  typewriterDuration: number;
+  actions: ActionTimeline[];
 }
 
-interface ActionTimeline {
+export interface ActionTimeline {
   actionIndex: number;
-  startMs: number;                    // relative to step start
-  endMs: number;                      // relative to step start
-  duration: number;                   // this action's duration
+  startMs: number;
+  endMs: number;
+  duration: number;
 }
 
 /** Resolved position within the walkthrough timeline */
-interface TimelinePosition {
+export interface TimelinePosition {
   stepIndex: number;
   phase: "actions" | "typewriter" | "post-pause";
-  actionIndex?: number;               // if phase is "actions"
-  actionElapsedMs?: number;           // how far into the current action
-  charIndex?: number;                 // if phase is "typewriter" — which character to show up to
+  actionIndex?: number;
+  actionElapsedMs?: number;
+  charIndex?: number;
 }
 
+export type EngineStatus = "idle" | "running" | "paused" | "complete";
 
-/** Context passed to every handler — provides access to adapters + stores */
-interface ActionContext {
-  adapter: CanvasAdapter;
-  signal: AbortSignal;
-  cleanup: CleanupStack;
-}
-
-/** Return type: handlers can optionally return a teardown function */
-type ActionHandler<T extends Action = Action> = (
-  action: T,
-  ctx: ActionContext,
-) => Promise<void>;
-
-type EngineStatus = "idle" | "running" | "paused" | "complete";
-
-interface TypewriterState {
-  fullText: string;          // the complete text to display
-  visibleText: string;       // currently revealed portion
-  isTyping: boolean;         // animation in progress
-  charIndex: number;         // current position
+export interface TypewriterState {
+  fullText: string;
+  visibleText: string;
+  isTyping: boolean;
+  charIndex: number;
 }
