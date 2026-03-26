@@ -150,6 +150,7 @@ const EnhancedNode = memo(function EnhancedNode({
 
           {nodeCode.showCode && nodeCode.hasCode ? (
             <NodeCodeView
+              nodeId={data.nodeId}
               code={nodeCode.code}
               fileName={nodeCode.fileName}
               language={nodeCode.language}

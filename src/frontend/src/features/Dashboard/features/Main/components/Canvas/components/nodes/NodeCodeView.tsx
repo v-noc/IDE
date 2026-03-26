@@ -2,6 +2,7 @@ import React, { memo, lazy, Suspense, useState } from "react";
 import { Save, Copy, Check, Maximize2 } from "lucide-react";
 import { DiffEditor } from "@monaco-editor/react";
 import { CodeViewDialog } from "./CodeViewDialog";
+import { useWalkthroughMonaco } from "./useWalkthroughMonaco";
 
 // Lazy load Monaco Editor
 const CodeEditor = lazy(() => import("@/components/CodeEditor"));
@@ -15,6 +16,8 @@ function CodeEditorSkeleton() {
 }
 
 interface NodeCodeViewProps {
+  /** Canvas node id — used for walkthrough Monaco highlights and line popover anchors. */
+  nodeId?: string;
   code: string;
   fileName: string;
   language: string;
@@ -33,6 +36,7 @@ interface NodeCodeViewProps {
 }
 
 export const NodeCodeView = memo(function NodeCodeView({
+  nodeId,
   code,
   fileName,
   language,
@@ -51,6 +55,10 @@ export const NodeCodeView = memo(function NodeCodeView({
 }: NodeCodeViewProps) {
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const { onMount: walkthroughMonacoOnMount } = useWalkthroughMonaco(
+    nodeId,
+    showDiff,
+  );
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -165,8 +173,10 @@ export const NodeCodeView = memo(function NodeCodeView({
               value={code}
               onChange={onChange}
               isLoading={isLoading}
+              onMount={walkthroughMonacoOnMount}
               options={{
                 minimap: { enabled: false },
+                glyphMargin: true,
                 readOnly: false,
                 scrollBeyondLastLine: false,
                 fontSize: 12,

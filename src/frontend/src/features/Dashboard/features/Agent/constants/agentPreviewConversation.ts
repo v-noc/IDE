@@ -10,13 +10,17 @@ export const AGENT_PREVIEW_WALKTHROUGH_FILE_NODE_ID =
 export const AGENT_PREVIEW_WALKTHROUGH_FUNCTION_NODE_ID =
   "FunctionSchema/11b1c19e-faa5-44f1-836a-c1ef80d43c87";
 
-/** Two-step tour embedded in the Sample conversation (file → function). */
+/**
+ * Sample tour: file node, function node, then Monaco line highlights (lines 3–5 and line 4).
+ * Line numbers assume a typical small function body (e.g. declaration on line 2, body from line 3).
+ */
 export const AGENT_PREVIEW_CANVAS_WALKTHROUGH: Walkthrough = {
   meta: {
     id: "preview-canvas-two-step",
     title: "Canvas quick tour",
-    description: "Sample two-step walkthrough for the UI preview fixture.",
-    version: 1,
+    description:
+      "Sample walkthrough: file, function, then inline code highlights with line-anchored popovers.",
+    version: 2,
   },
   steps: [
     {
@@ -33,7 +37,7 @@ export const AGENT_PREVIEW_CANVAS_WALKTHROUGH: Walkthrough = {
       ],
       popover: {
         title: "File node",
-        body: "Placeholder: this file sits in your project tree. Use the walkthrough bar (Canvas tab) to play or step through.",
+        body: "This file sits in your project tree. Use the walkthrough bar on the Canvas tab to play or step through.",
         anchor: {
           type: "node",
           nodeId: AGENT_PREVIEW_WALKTHROUGH_FILE_NODE_ID,
@@ -56,10 +60,60 @@ export const AGENT_PREVIEW_CANVAS_WALKTHROUGH: Walkthrough = {
       ],
       popover: {
         title: "Function node",
-        body: "Placeholder: follow-up stop on the target function. Swap node ids in agentPreviewConversation.ts to match your graph.",
+        body: "This is the target function. Next we open its code and spotlight part of the body in the Monaco editor.",
         anchor: {
           type: "node",
           nodeId: AGENT_PREVIEW_WALKTHROUGH_FUNCTION_NODE_ID,
+        },
+        side: "right",
+      },
+    },
+    {
+      id: "preview-step-function-lines-3-5",
+      actions: [
+        { type: "clear-highlight" },
+        {
+          type: "focus-node",
+          nodeId: AGENT_PREVIEW_WALKTHROUGH_FUNCTION_NODE_ID,
+        },
+        {
+          type: "show-code",
+          nodeId: AGENT_PREVIEW_WALKTHROUGH_FUNCTION_NODE_ID,
+        },
+        {
+          type: "highlight-code",
+          nodeId: AGENT_PREVIEW_WALKTHROUGH_FUNCTION_NODE_ID,
+          lines: [{ from: 3, to: 5 }],
+        },
+      ],
+      popover: {
+        title: "Function body (lines 3–5)",
+        body: "The walkthrough highlights the first lines of the function body. Monaco decorations mark the range; the amber frame tracks it while you scroll.",
+        anchor: {
+          type: "code-line",
+          nodeId: AGENT_PREVIEW_WALKTHROUGH_FUNCTION_NODE_ID,
+          line: 4,
+        },
+        side: "right",
+      },
+    },
+    {
+      id: "preview-step-function-line-4",
+      actions: [
+        { type: "clear-highlight" },
+        {
+          type: "highlight-code",
+          nodeId: AGENT_PREVIEW_WALKTHROUGH_FUNCTION_NODE_ID,
+          lines: [{ from: 4, to: 4 }],
+        },
+      ],
+      popover: {
+        title: "Line 4",
+        body: "A narrower highlight on a single line. The popover anchor follows this line in the editor viewport.",
+        anchor: {
+          type: "code-line",
+          nodeId: AGENT_PREVIEW_WALKTHROUGH_FUNCTION_NODE_ID,
+          line: 4,
         },
         side: "right",
       },
@@ -138,7 +192,7 @@ export function createAgentUiPreviewWire(): WireConversation {
             tour_id: "preview-canvas-two-step",
             title: "Guided canvas tour",
             description:
-              "Two stops: focus the sample file node, then the sample function node. Load the tour, switch to Canvas, and press play.",
+              "File and function nodes, then Monaco highlights on lines 3–5 and line 4 with popovers. Load the tour, open Canvas, press play.",
             icon: "map",
             workflow_name: "walkthrough:canvas-preview",
             walkthrough: AGENT_PREVIEW_CANVAS_WALKTHROUGH,

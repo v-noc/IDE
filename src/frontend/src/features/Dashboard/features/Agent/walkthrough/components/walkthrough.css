@@ -56,3 +56,24 @@
     opacity: 0;
   }
 }
+
+/* Monaco walkthrough: spotlight rect + whole-line decorations (see useWalkthroughMonaco) */
+.walkthrough-monaco-spotlight {
+  position: absolute;
+  z-index: 10;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 2px solid rgba(251, 191, 36, 0.95);
+  border-radius: 4px;
+  background: rgba(251, 191, 36, 0.08);
+  transition:
+    top 0.15s ease-out,
+    height 0.15s ease-out,
+    left 0.15s ease-out,
+    width 0.15s ease-out,
+    opacity 0.15s ease-out;
+}
+
+.monaco-editor .walkthrough-monaco-line-deco {
+  background-color: rgba(251, 191, 36, 0.2) !important;
+}

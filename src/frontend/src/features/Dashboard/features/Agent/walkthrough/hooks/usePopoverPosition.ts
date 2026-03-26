@@ -13,6 +13,26 @@ function safeCssId(id: string): string {
 }
 
 /** Midpoint on the node/canvas rect edge — Radix positions content on `side` with `sideOffset` beyond this point. */
+/** Anchor point on a small rect (e.g. one editor line) for Radix `side`. */
+function edgePointFromAnchorRect(
+  rect: DOMRect,
+  side: "top" | "bottom" | "left" | "right",
+): { x: number; y: number } {
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  switch (side) {
+    case "top":
+      return { x: cx, y: rect.top };
+    case "bottom":
+      return { x: cx, y: rect.bottom };
+    case "left":
+      return { x: rect.left, y: cy };
+    case "right":
+    default:
+      return { x: rect.right, y: cy };
+  }
+}
+
 function edgePointFromRect(
   rect: DOMRect,
   side: "top" | "bottom" | "left" | "right",
@@ -56,6 +76,8 @@ export interface PopoverAnchorPosition {
 export function usePopoverPosition(
   anchor: PopoverAnchor,
   preferredSide: "top" | "bottom" | "left" | "right" | undefined,
+  /** When set, recomputes `code-line` anchors after Monaco scroll/layout. */
+  codeAnchorLayoutEpoch?: number,
 ): PopoverAnchorPosition {
   const reactFlow = useReactFlow();
 
@@ -76,6 +98,15 @@ export function usePopoverPosition(
         return { ...edgePointFromRect(rect, side), side };
       }
       case "code-line": {
+        const marker = document.querySelector<HTMLElement>(
+          `[data-walkthrough-code-anchor][data-node-id="${safeCssId(anchor.nodeId)}"][data-line="${anchor.line}"]`,
+        );
+        if (marker) {
+          const r = marker.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            return { ...edgePointFromAnchorRect(r, side), side };
+          }
+        }
         const el = document.querySelector<HTMLElement>(
           `.react-flow__node[data-id="${safeCssId(anchor.nodeId)}"]`,
         );
@@ -99,5 +130,5 @@ export function usePopoverPosition(
       default:
         return { ...viewportCenter(), side: "bottom" };
     }
-  }, [anchor, preferredSide, reactFlow]);
+  }, [anchor, preferredSide, reactFlow, codeAnchorLayoutEpoch]);
 }

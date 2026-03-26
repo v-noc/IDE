@@ -19,10 +19,15 @@ export function PopoverLayer() {
   const visible = useWalkthroughStore((s) => s.popoverVisible);
   const visibleText = useWalkthroughStore((s) => s.typewriter.visibleText);
   const isTyping = useWalkthroughStore((s) => s.typewriter.isTyping);
+  const codeAnchorLayoutEpoch = useWalkthroughStore(
+    (s) => s.codeAnchorLayoutEpoch,
+  );
 
+  const anchor = popover?.anchor ?? VIEWPORT_CENTER_ANCHOR;
   const { x, y, side } = usePopoverPosition(
-    popover?.anchor ?? VIEWPORT_CENTER_ANCHOR,
+    anchor,
     popover?.side,
+    anchor.type === "code-line" ? codeAnchorLayoutEpoch : undefined,
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);

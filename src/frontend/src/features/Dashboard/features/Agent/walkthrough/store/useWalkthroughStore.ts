@@ -51,6 +51,12 @@ export interface WalkthroughStoreState {
   /** Node ids whose inline code panel is forced open by the walkthrough adapter. */
   forcedCodeOpen: Record<string, boolean>;
 
+  /**
+   * Bumped when an inline Monaco line anchor moves (scroll/layout) so PopoverLayer
+   * can re-read viewport coordinates for `code-line` anchors.
+   */
+  codeAnchorLayoutEpoch: number;
+
   controls: WalkthroughControls | null;
 
   setStatus: (status: EngineStatus) => void;
@@ -78,6 +84,8 @@ export interface WalkthroughStoreState {
   setForcedCodeOpen: (nodeId: string, open: boolean) => void;
   clearForcedCodeOpen: () => void;
 
+  bumpCodeAnchorLayoutEpoch: () => void;
+
   setControls: (controls: WalkthroughControls | null) => void;
 
   reset: () => void;
@@ -104,6 +112,9 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
       highlights: new Map(),
 
       forcedCodeOpen: {},
+
+      codeAnchorLayoutEpoch: 0,
+
       controls: null,
 
       setStatus: (status) => set({ status }),
@@ -179,6 +190,9 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
 
       clearForcedCodeOpen: () => set({ forcedCodeOpen: {} }),
 
+      bumpCodeAnchorLayoutEpoch: () =>
+        set((s) => ({ codeAnchorLayoutEpoch: s.codeAnchorLayoutEpoch + 1 })),
+
       setControls: (controls) => set({ controls }),
 
       reset: () =>
@@ -197,6 +211,7 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
           spotlightNodeId: null,
           highlights: new Map(),
           forcedCodeOpen: {},
+          codeAnchorLayoutEpoch: 0,
           controls: null,
         }),
     }),
