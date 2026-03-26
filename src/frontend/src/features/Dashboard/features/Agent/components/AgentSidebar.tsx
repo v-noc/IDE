@@ -8,6 +8,7 @@ import { useAgentUiStore } from "../store/useAgentUiStore";
 import { useAgentLiveStore } from "../live/store/useAgentLiveStore";
 import { AgentChatInput } from "./AgentChatInput";
 import { ChatContainer } from "./chat";
+import { WalkthroughPlaybackBar } from "../walkthrough/components/WalkthroughPlaybackBar";
 
 interface AgentSidebarProps {
   className?: string;
@@ -95,7 +96,8 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
         </section>
       </div>
 
-      <div className="border-t border-border p-3">
+      <div className="border-t border-border space-y-3 p-3">
+        <WalkthroughPlaybackBar />
         <AgentChatInput />
       </div>
     </aside>

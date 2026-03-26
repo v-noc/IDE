@@ -1,0 +1,71 @@
+/* Spotlight: dim chrome + non-target nodes (see SpotlightOverlay) */
+.walkthrough-focus-active .react-flow__edges,
+.walkthrough-focus-active .react-flow__background,
+.walkthrough-focus-active .react-flow__controls {
+  opacity: 0.18;
+  transition: opacity 180ms ease;
+}
+
+.react-flow__node.walkthrough-dimmed {
+  opacity: 0.16 !important;
+  filter: blur(0.4px) saturate(0.7);
+  transition:
+    opacity 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease;
+}
+
+.react-flow__node.walkthrough-highlighted {
+  opacity: 1 !important;
+  filter: none !important;
+  z-index: 50 !important;
+  transform: scale(1.03);
+  box-shadow:
+    0 0 0 3px rgba(251, 191, 36, 0.95),
+    0 0 22px rgba(251, 191, 36, 0.45);
+  transition:
+    opacity 180ms ease,
+    filter 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.walkthrough-popover {
+  z-index: 60;
+  max-width: min(360px, 90vw);
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow:
+    0 10px 40px rgba(15, 23, 42, 0.15),
+    0 2px 8px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+}
+
+.walkthrough-popover__title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(15 23 42);
+}
+
+.walkthrough-popover__body {
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgb(51 65 85);
+  white-space: pre-wrap;
+}
+
+.walkthrough-popover__cursor {
+  display: inline-block;
+  margin-left: 1px;
+  animation: walkthrough-cursor-blink 1s step-end infinite;
+  color: rgb(251 191 36);
+}
+
+@keyframes walkthrough-cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}

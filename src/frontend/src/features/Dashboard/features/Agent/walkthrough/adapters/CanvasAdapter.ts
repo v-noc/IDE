@@ -17,6 +17,11 @@ export interface CanvasAdapter {
   collapseNode(nodeId: string): void;
   isNodeExpanded(nodeId: string): boolean;
 
+  /** Open inline code panel for a node (walkthrough-driven). */
+  showCode(nodeId: string): void;
+  /** Close inline code panel for a node. */
+  closeCode(nodeId: string): void;
+
   highlightLines(
     nodeId: string,
     lines: LineRange[],

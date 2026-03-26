@@ -70,8 +70,13 @@ export class WalkthroughEngine {
   }
 
   async play(): Promise<void> {
-    if (this.status === "running" || !this.walkthrough || !this.timeline) {
-      return;
+    if (this.status === "running") return;
+    if (!this.walkthrough || !this.timeline) return;
+
+    if (this.status === "complete") {
+      this.stepIndex = 0;
+      this.elapsedMs = 0;
+      this.store.getState().setElapsedMs(0);
     }
 
     this.speed = Math.max(0.05, this.store.getState().speed);
@@ -151,6 +156,7 @@ export class WalkthroughEngine {
     this.elapsedMs = 0;
     this.store.getState().setPopover(null);
     this.store.getState().setElapsedMs(0);
+    this.store.getState().clearForcedCodeOpen();
     this.setStatus("idle");
   }
 

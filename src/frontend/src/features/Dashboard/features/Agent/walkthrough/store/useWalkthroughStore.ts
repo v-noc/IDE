@@ -11,6 +11,18 @@ import type {
   WalkthroughTimeline,
 } from "../types/walkthrough";
 
+export interface WalkthroughControls {
+  load: (walkthrough: Walkthrough) => void;
+  play: () => Promise<void>;
+  pause: () => void;
+  stop: () => void;
+  next: () => Promise<void>;
+  prev: () => Promise<void>;
+  seekToStep: (stepId: string) => Promise<void>;
+  seekToTime: (ms: number) => Promise<void>;
+  setSpeed: (speed: number) => void;
+}
+
 const initialTypewriter: TypewriterState = {
   fullText: "",
   visibleText: "",
@@ -36,6 +48,11 @@ export interface WalkthroughStoreState {
   spotlightNodeId: string | null;
   highlights: Map<string, { lines: LineRange[]; style?: HighlightStyle }>;
 
+  /** Node ids whose inline code panel is forced open by the walkthrough adapter. */
+  forcedCodeOpen: Record<string, boolean>;
+
+  controls: WalkthroughControls | null;
+
   setStatus: (status: EngineStatus) => void;
   setWalkthrough: (wt: Walkthrough | null) => void;
   setTimeline: (timeline: WalkthroughTimeline | null) => void;
@@ -57,6 +74,11 @@ export interface WalkthroughStoreState {
     style?: HighlightStyle,
   ) => void;
   clearHighlightStore: (nodeId?: string) => void;
+
+  setForcedCodeOpen: (nodeId: string, open: boolean) => void;
+  clearForcedCodeOpen: () => void;
+
+  setControls: (controls: WalkthroughControls | null) => void;
 
   reset: () => void;
 }
@@ -81,6 +103,9 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
       spotlightNodeId: null,
       highlights: new Map(),
 
+      forcedCodeOpen: {},
+      controls: null,
+
       setStatus: (status) => set({ status }),
 
       setWalkthrough: (wt) =>
@@ -89,6 +114,7 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
           totalSteps: wt?.steps.length ?? 0,
           currentStepIndex: 0,
           currentStepId: wt?.steps[0]?.id ?? null,
+          forcedCodeOpen: {},
         }),
 
       setTimeline: (timeline) => set({ timeline }),
@@ -140,6 +166,21 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
           return { highlights: next };
         }),
 
+      setForcedCodeOpen: (nodeId, open) =>
+        set((state) => {
+          const next = { ...state.forcedCodeOpen };
+          if (open) {
+            next[nodeId] = true;
+          } else {
+            delete next[nodeId];
+          }
+          return { forcedCodeOpen: next };
+        }),
+
+      clearForcedCodeOpen: () => set({ forcedCodeOpen: {} }),
+
+      setControls: (controls) => set({ controls }),
+
       reset: () =>
         set({
           status: "idle",
@@ -155,6 +196,8 @@ export const useWalkthroughStore = create<WalkthroughStoreState>()(
           typewriter: { ...initialTypewriter },
           spotlightNodeId: null,
           highlights: new Map(),
+          forcedCodeOpen: {},
+          controls: null,
         }),
     }),
     { name: "walkthrough-store" },

@@ -1,7 +1,7 @@
 import React from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import CanvasView from "./components/CanvasView";
-// import useProjectStore from "@/features/Dashboard/store/useProjectStore";,
+import { WalkthroughProvider } from "@/features/Dashboard/features/Agent/walkthrough/components/WalkthroughProvider";
 
 interface CanvasProps {
   tabId: string;
@@ -9,11 +9,10 @@ interface CanvasProps {
 }
 
 const Canvas: React.FC<CanvasProps> = ({ tabId, projectId }) => {
-  // const { selectedNode, projectData, focusedNode } = useProjectStore();
-
   return (
     <ReactFlowProvider>
       <CanvasView tabId={tabId} projectId={projectId} />
+      <WalkthroughProvider tabId={tabId} />
     </ReactFlowProvider>
   );
 };

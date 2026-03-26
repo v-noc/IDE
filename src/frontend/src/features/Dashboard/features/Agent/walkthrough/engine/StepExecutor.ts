@@ -5,12 +5,19 @@ import { getDefaultDuration } from "../types/duration";
 import { abortableSleep } from "./abortableSleep";
 import { CleanupStack } from "./CleanupStack";
 
+const BUFFER_TICK_MS = 48;
+
 export interface StepExecutorContext {
   registry: ActionHandlerRegistry;
   adapter: CanvasAdapter;
   signal: AbortSignal;
   speed: number;
   skipDuration?: boolean;
+  /**
+   * Called at the authored boundary of each action for timeline UI.
+   * `elapsedInAction` is 0 at the action start (timeline frozen here until handler finishes),
+   * then advances during the optional buffer phase, then equals `actionDuration` at end.
+   */
   onActionProgress?: (actionIndex: number, elapsedInAction: number) => void;
 }
 
@@ -39,6 +46,7 @@ export class StepExecutor {
    * When `upToIndex < 0`, runs nothing.
    */
   async runUpTo(upToIndex: number): Promise<void> {
+    if (upToIndex < 0 || this.step.actions.length === 0) return;
     const last = Math.min(upToIndex, this.step.actions.length - 1);
     for (let i = 0; i <= last; i++) {
       await this.runActionAtIndex(i, true);
@@ -59,7 +67,10 @@ export class StepExecutor {
         ? (action as WaitAction).ms
         : (action.duration ?? getDefaultDuration(action.type));
 
-    const startTime = performance.now();
+    // Timeline stays at action start until the handler promise settles (freeze during slow work).
+    onActionProgress?.(i, 0);
+
+    const handlerStart = performance.now();
 
     const handler = registry.get(action.type);
     if (handler) {
@@ -72,15 +83,44 @@ export class StepExecutor {
 
     if (signal.aborted) return;
 
+    const handlerWallMs = performance.now() - handlerStart;
+
     const skip = forceSkipDuration || skipDuration;
-    if (!skip) {
-      const elapsed = performance.now() - startTime;
-      const remaining = actionDuration / speed - elapsed;
-      if (remaining > 0) {
-        await abortableSleep(remaining, signal);
-      }
+    if (skip) {
+      onActionProgress?.(i, actionDuration);
+      return;
     }
 
-    onActionProgress?.(i, actionDuration);
+    const minWallMs = actionDuration / speed;
+    const bufferMs = Math.max(0, minWallMs - handlerWallMs);
+
+    if (bufferMs <= 0) {
+      onActionProgress?.(i, actionDuration);
+    } else {
+      await this.runBufferWithProgress(
+        bufferMs,
+        signal,
+        (frac) => onActionProgress?.(i, frac * actionDuration),
+      );
+    }
+  }
+
+  /** Advance buffer in small ticks so the timeline can move during intentional pacing only. */
+  private async runBufferWithProgress(
+    bufferMs: number,
+    signal: AbortSignal,
+    onFrac: (frac: number) => void,
+  ): Promise<void> {
+    if (bufferMs <= 0) return;
+
+    let elapsed = 0;
+    while (elapsed < bufferMs) {
+      if (signal.aborted) return;
+      const chunk = Math.min(BUFFER_TICK_MS, bufferMs - elapsed);
+      await abortableSleep(chunk, signal);
+      elapsed += chunk;
+      onFrac(Math.min(1, elapsed / bufferMs));
+    }
+    onFrac(1);
   }
 }

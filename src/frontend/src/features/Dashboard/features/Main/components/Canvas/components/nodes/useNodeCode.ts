@@ -4,6 +4,7 @@ import { useEditableCode } from "@/features/Dashboard/features/Main/components/C
 import { useCodeDiff } from "@/features/Dashboard/features/Main/components/Code/useCodeDiff";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useWalkthroughStore } from "@/features/Dashboard/features/Agent/walkthrough/store/useWalkthroughStore";
 
 export interface UseNodeCodeOptions {
   nodeId: string;
@@ -13,6 +14,9 @@ export interface UseNodeCodeOptions {
 
 export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions) {
   const [showCode, setShowCode] = useState(false);
+  const walkthroughForcesCode = useWalkthroughStore(
+    (s) => Boolean(nodeId && s.forcedCodeOpen[nodeId]),
+  );
   const { projectData } = useProjectStore();
   const projectId = projectData?.id;
 
@@ -25,8 +29,10 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
   // For call nodes, use the target's node type, otherwise use the node's type
   const effectiveNodeType = nodeType === "call" ? "call" : nodeType;
 
+  const revealCode = showCode || walkthroughForcesCode;
+
   const { data: codeData } = useCode(
-    showCode && shouldFetchCode ? effectiveNodeId : undefined,
+    revealCode && shouldFetchCode ? effectiveNodeId : undefined,
     effectiveNodeType,
     projectId
   );
@@ -64,7 +70,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
   const toggleCode = () => setShowCode((prev) => !prev);
 
   return {
-    showCode,
+    showCode: revealCode,
     toggleCode,
     hasCode,
     code: editorValue,
