@@ -30,31 +30,18 @@
     box-shadow 180ms ease;
 }
 
-.walkthrough-popover {
-  z-index: 60;
-  max-width: min(360px, 90vw);
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  box-shadow:
-    0 10px 40px rgba(15, 23, 42, 0.15),
-    0 2px 8px rgba(15, 23, 42, 0.08);
-  pointer-events: none;
-}
-
 .walkthrough-popover__title {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: rgb(15 23 42);
 }
 
 .walkthrough-popover__body {
   font-size: 12px;
   line-height: 1.45;
-  color: rgb(51 65 85);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .walkthrough-popover__cursor {

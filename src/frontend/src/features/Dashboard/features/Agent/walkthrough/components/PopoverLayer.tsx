@@ -1,8 +1,18 @@
-import { useWalkthroughStore } from "../store/useWalkthroughStore";
-import { usePopoverPosition } from "../hooks/usePopoverPosition";
-import type { PopoverAnchor } from "../types/walkthrough";
+import { useLayoutEffect, useRef } from "react";
 
-const VIEWPORT_CENTER_ANCHOR: PopoverAnchor = { type: "viewport-center" };
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@/components/ui/popover";
+
+import {
+  usePopoverPosition,
+  WALKTHROUGH_POPOVER_GAP,
+} from "../hooks/usePopoverPosition";
+import { useWalkthroughStore } from "../store/useWalkthroughStore";
+
+const VIEWPORT_CENTER_ANCHOR = { type: "viewport-center" };
 
 export function PopoverLayer() {
   const popover = useWalkthroughStore((s) => s.popover);
@@ -10,34 +20,57 @@ export function PopoverLayer() {
   const visibleText = useWalkthroughStore((s) => s.typewriter.visibleText);
   const isTyping = useWalkthroughStore((s) => s.typewriter.isTyping);
 
-  const position = usePopoverPosition(
+  const { x, y, side } = usePopoverPosition(
     popover?.anchor ?? VIEWPORT_CENTER_ANCHOR,
     popover?.side,
   );
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [visibleText]);
+
   if (!popover || !visible) return null;
 
   return (
-    <div
-      className="walkthrough-popover"
-      style={{
-        position: "fixed",
-        left: position.x,
-        top: position.y,
-        transform: "translate(-50%, -50%)",
-      }}
-    >
-      {popover.title ? (
-        <h3 className="walkthrough-popover__title">{popover.title}</h3>
-      ) : null}
-      <div className="walkthrough-popover__body">
-        {visibleText}
-        {isTyping ? (
-          <span className="walkthrough-popover__cursor" aria-hidden>
-            ▊
-          </span>
+    <Popover open modal={false} onOpenChange={() => {}}>
+      <PopoverAnchor asChild>
+        <span
+          aria-hidden
+          className="pointer-events-none fixed block h-px w-px"
+          style={{ left: x, top: y }}
+        />
+      </PopoverAnchor>
+      <PopoverContent
+        side={side}
+        align="center"
+        sideOffset={WALKTHROUGH_POPOVER_GAP}
+        collisionPadding={12}
+        className="z-[60] flex w-[min(360px,calc(100vw-24px))] min-w-0 max-w-[min(360px,calc(100vw-24px))] flex-col gap-0 overflow-hidden p-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
+        {popover.title ? (
+          <h3 className="walkthrough-popover__title text-popover-foreground shrink-0 border-b px-4 pt-3 pb-2">
+            {popover.title}
+          </h3>
         ) : null}
-      </div>
-    </div>
+        <div
+          ref={scrollRef}
+          className="min-h-0 max-h-[min(280px,42vh)] overflow-y-auto overflow-x-hidden px-4 py-3"
+        >
+          <p className="walkthrough-popover__body text-popover-foreground m-0 max-w-full break-words">
+            {visibleText}
+            {isTyping ? (
+              <span className="walkthrough-popover__cursor" aria-hidden>
+                ▊
+              </span>
+            ) : null}
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

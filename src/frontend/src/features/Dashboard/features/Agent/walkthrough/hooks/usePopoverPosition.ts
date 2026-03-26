@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { useReactFlow } from "@xyflow/react";
 import type { PopoverAnchor } from "../types/walkthrough";
 
-const GAP = 12;
+/** Space between anchor (node edge) and popover content; keep in sync with PopoverContent `sideOffset`. */
+export const WALKTHROUGH_POPOVER_GAP = 12;
 
 function safeCssId(id: string): string {
   if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
@@ -11,20 +12,21 @@ function safeCssId(id: string): string {
   return id.replace(/["\\]/g, "\\$&");
 }
 
-function offsetFromRect(
+/** Midpoint on the node/canvas rect edge — Radix positions content on `side` with `sideOffset` beyond this point. */
+function edgePointFromRect(
   rect: DOMRect,
   side: "top" | "bottom" | "left" | "right",
 ): { x: number; y: number } {
   switch (side) {
     case "top":
-      return { x: rect.left + rect.width / 2, y: rect.top - GAP };
+      return { x: rect.left + rect.width / 2, y: rect.top };
     case "bottom":
-      return { x: rect.left + rect.width / 2, y: rect.bottom + GAP };
+      return { x: rect.left + rect.width / 2, y: rect.bottom };
     case "left":
-      return { x: rect.left - GAP, y: rect.top + rect.height / 2 };
+      return { x: rect.left, y: rect.top + rect.height / 2 };
     case "right":
     default:
-      return { x: rect.right + GAP, y: rect.top + rect.height / 2 };
+      return { x: rect.right, y: rect.top + rect.height / 2 };
   }
 }
 
@@ -42,50 +44,60 @@ function viewportCenter(): { x: number; y: number } {
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 }
 
+export interface PopoverAnchorPosition {
+  x: number;
+  y: number;
+  side: "top" | "bottom" | "left" | "right";
+}
+
 /**
- * Resolves popover anchor to viewport coordinates (absolute positioning).
+ * Resolves a Radix Popover anchor point (viewport px) and which side content opens on.
  */
 export function usePopoverPosition(
   anchor: PopoverAnchor,
   preferredSide: "top" | "bottom" | "left" | "right" | undefined,
-): { x: number; y: number } {
+): PopoverAnchorPosition {
   const reactFlow = useReactFlow();
 
   return useMemo(() => {
-    const side = preferredSide ?? "right";
+    const side =
+      preferredSide ??
+      (anchor.type === "viewport-center" || anchor.type === "coordinates"
+        ? "bottom"
+        : "right");
 
     switch (anchor.type) {
       case "node": {
         const el = document.querySelector<HTMLElement>(
           `.react-flow__node[data-id="${safeCssId(anchor.nodeId)}"]`,
         );
-        if (!el) return viewportCenter();
+        if (!el) return { ...viewportCenter(), side };
         const rect = el.getBoundingClientRect();
-        return offsetFromRect(rect, side);
+        return { ...edgePointFromRect(rect, side), side };
       }
       case "code-line": {
         const el = document.querySelector<HTMLElement>(
           `.react-flow__node[data-id="${safeCssId(anchor.nodeId)}"]`,
         );
-        if (!el) return viewportCenter();
+        if (!el) return { ...viewportCenter(), side };
         const rect = el.getBoundingClientRect();
-        return offsetFromRect(rect, side);
+        return { ...edgePointFromRect(rect, side), side };
       }
       case "viewport-center":
-        return viewportCenter();
+        return { ...viewportCenter(), side };
       case "coordinates": {
         try {
           const p = reactFlow.flowToScreenPosition({
             x: anchor.x,
             y: anchor.y,
           });
-          return p;
+          return { ...p, side };
         } catch {
-          return { x: anchor.x, y: anchor.y };
+          return { x: anchor.x, y: anchor.y, side };
         }
       }
       default:
-        return viewportCenter();
+        return { ...viewportCenter(), side: "bottom" };
     }
   }, [anchor, preferredSide, reactFlow]);
 }
