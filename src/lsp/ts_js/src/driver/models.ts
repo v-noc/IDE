@@ -1,6 +1,8 @@
 /**
  * JSON shapes returned to the backend — aligned with `vnoc_lsp_python.models`.
  */
+import type { CallFrameStackWire } from "./call_resolver/frame";
+
 export type NodePosition = {
   line: number;
   column: number;
@@ -40,4 +42,9 @@ export type ParseFileResult = {
 export type InitializeResult = {
   status: "ok";
   extensions: string[];
+};
+
+/** `resolve_calls` RPC — mirrors Python `CallFrameStack.model_dump`. */
+export type ResolveCallsResult = {
+  call_frame_stack: CallFrameStackWire;
 };

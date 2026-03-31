@@ -104,7 +104,7 @@ async function dispatch(
             message: "file_path and calls[] are required",
           };
         }
-        return { ok: true, value: mockDriver.resolveCalls(p) };
+        return { ok: true, value: getTsJsDriver().resolveCalls(p) };
       }
       case "read_or_inject_file_id": {
         const p = obj as unknown as ReadFileParams;

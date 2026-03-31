@@ -1,22 +1,7 @@
-import type {
-  ReadFileParams,
-  ReadFolderParams,
-  ResolveCallsParams,
-} from "./types";
+import type { ReadFileParams, ReadFolderParams } from "./types";
 
 /** Stubs for RPC methods not implemented in the TS/JS driver yet. */
 export const mockDriver = {
-  resolveCalls(params: ResolveCallsParams) {
-    void params;
-    return {
-      call_frame_stack: {
-        target_qname: "root",
-        target_id: "root",
-        children: [] as unknown[],
-      },
-    };
-  },
-
   readOrInjectFileId(params: ReadFileParams) {
     void params;
     return { file_id: "mock-file-id", modified: false };
