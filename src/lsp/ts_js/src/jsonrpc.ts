@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { getTsJsDriver } from "./driver";
 import { mockDriver } from "./mockDriver";
 import type {
   InitializeParams,
@@ -81,7 +82,7 @@ async function dispatch(
             message: "project_path is required",
           };
         }
-        return { ok: true, value: mockDriver.initialize(p) };
+        return { ok: true, value: getTsJsDriver().initialize(p) };
       }
       case "parse_file": {
         const p = obj as unknown as ParseFileParams;
@@ -92,7 +93,7 @@ async function dispatch(
             message: "file_path and content are required",
           };
         }
-        return { ok: true, value: mockDriver.parseFile(p) };
+        return { ok: true, value: getTsJsDriver().parseFile(p) };
       }
       case "resolve_calls": {
         const p = obj as unknown as ResolveCallsParams;
@@ -148,7 +149,11 @@ async function dispatch(
 
 export async function handleJsonRpcBody(
   raw: unknown,
-): Promise<JsonRpcSuccess | JsonRpcError | JsonRpcSuccess[] | JsonRpcError[]> {
+): Promise<
+  | JsonRpcSuccess
+  | JsonRpcError
+  | Array<JsonRpcSuccess | JsonRpcError>
+> {
   if (Array.isArray(raw)) {
     const out = await Promise.all(raw.map((r) => handleSingle(r)));
     return out;

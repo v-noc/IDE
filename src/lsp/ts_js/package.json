@@ -7,10 +7,11 @@
     "start": "bun run src/index.ts"
   },
   "dependencies": {
-    "hono": "^4.7.5"
+    "hono": "^4.7.5",
+    "ts-morph": "^27.0.2",
+    "typescript": "^5.8.2"
   },
   "devDependencies": {
-    "@types/bun": "^1.2.8",
-    "typescript": "^5.8.2"
+    "@types/bun": "^1.2.8"
   }
 }

@@ -1,32 +1,11 @@
 import type {
-  InitializeParams,
-  ParseFileParams,
   ReadFileParams,
   ReadFolderParams,
   ResolveCallsParams,
 } from "./types";
 
-/**
- * Placeholder implementations — replace with real TS/JS driver logic later.
- * Return shapes mirror `PythonDriverService` in `vnoc_lsp_python.service`.
- */
+/** Stubs for RPC methods not implemented in the TS/JS driver yet. */
 export const mockDriver = {
-  initialize(params: InitializeParams) {
-    void params;
-    return {
-      status: "ok" as const,
-      extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
-    };
-  },
-
-  parseFile(params: ParseFileParams) {
-    return {
-      nodes: [] as unknown[],
-      content: params.content,
-      modified: false,
-    };
-  },
-
   resolveCalls(params: ResolveCallsParams) {
     void params;
     return {
