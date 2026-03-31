@@ -14,6 +14,7 @@ members = [
     "backend",
     "v-noc",
     "vn-logger",
+    "vnoc-lsp-python",
 ]
 
 [[package]]
@@ -265,6 +266,12 @@ test = [
     { name = "pytest-asyncio" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiofiles", specifier = ">=25.1.0" },
@@ -300,6 +307,12 @@ requires-dist = [
     { name = "uvicorn" },
     { name = "vn-logger", editable = "src/vn_logger" },
     { name = "watchdog", specifier = ">=6.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-asyncio", specifier = ">=1.1.0" },
 ]
 
 [[package]]
@@ -2198,8 +2211,20 @@ dependencies = [
     { name = "pydantic", extra = ["email"] },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "pydantic", extras = ["email"], specifier = ">=2.11.7" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-asyncio", specifier = ">=1.1.0" },
+]
 
 [[package]]
 name = "vn-logger"
@@ -2211,6 +2236,31 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "loguru", specifier = ">=0.7.3" }]
+
+[[package]]
+name = "vnoc-lsp-python"
+version = "0.1.0"
+source = { editable = "src/lsp/py" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "fastapi-jsonrpc" },
+    { name = "jedi" },
+    { name = "libcst" },
+    { name = "parso" },
+    { name = "pydantic" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "fastapi-jsonrpc", specifier = ">=3.4.1" },
+    { name = "jedi", specifier = ">=0.19.2" },
+    { name = "libcst", specifier = ">=1.7.0" },
+    { name = "parso", specifier = ">=0.8.5" },
+    { name = "pydantic", specifier = ">=2.11.0" },
+    { name = "uvicorn", specifier = ">=0.35.0" },
+]
 
 [[package]]
 name = "watchdog"
