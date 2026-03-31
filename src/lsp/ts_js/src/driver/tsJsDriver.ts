@@ -10,9 +10,16 @@ import {
   resolveCallHierarchyForNode,
   toCallFrameStackWire,
 } from "./call_resolver";
+import * as fileFolderIds from "./fileFolderIds";
 import { injectIdsIntoSource } from "./idInjector";
 import type { InitializeResult, ParseFileResult, ResolveCallsResult } from "./models";
-import type { InitializeParams, ParseFileParams, ResolveCallsParams } from "../types";
+import type {
+  InitializeParams,
+  ParseFileParams,
+  ReadFileParams,
+  ReadFolderParams,
+  ResolveCallsParams,
+} from "../types";
 
 function writeIfModified(filePath: string, content: string): void {
   try {
@@ -119,6 +126,17 @@ export class TsJsDriver {
     }
 
     return { call_frame_stack: toCallFrameStackWire(merged) };
+  }
+
+  readOrInjectFileId(params: ReadFileParams): { file_id: string; modified: boolean } {
+    return fileFolderIds.readOrInjectFileId(params.file_path);
+  }
+
+  readOrInjectFolderId(params: ReadFolderParams): {
+    folder_id: string;
+    modified: boolean;
+  } {
+    return fileFolderIds.readOrInjectFolderId(params.folder_path);
   }
 
   parseFile(params: ParseFileParams): ParseFileResult {

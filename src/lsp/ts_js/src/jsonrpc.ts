@@ -115,7 +115,7 @@ async function dispatch(
             message: "file_path is required",
           };
         }
-        return { ok: true, value: mockDriver.readOrInjectFileId(p) };
+        return { ok: true, value: getTsJsDriver().readOrInjectFileId(p) };
       }
       case "read_or_inject_folder_id": {
         const p = obj as unknown as ReadFolderParams;
@@ -126,7 +126,7 @@ async function dispatch(
             message: "folder_path is required",
           };
         }
-        return { ok: true, value: mockDriver.readOrInjectFolderId(p) };
+        return { ok: true, value: getTsJsDriver().readOrInjectFolderId(p) };
       }
       case "shutdown":
         return { ok: true, value: mockDriver.shutdown(obj) };
