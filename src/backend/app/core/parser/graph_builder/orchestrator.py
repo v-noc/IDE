@@ -22,7 +22,7 @@ from app.core.parser.graph_builder.progress import ProgressTracker
 from app.core.repository import Repositories
 from app.core.socket.manager import get_socket_manager
 from app.api.dependencies import ProjectUoW
-from app.core.parser.driver_manager import DriverManager
+from app.core.parser.drivers import DriverManager, tracked_file_extensions
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,7 @@ class GraphBuilderOrchestrator:
         self.file_scanner = FileScanner(
             self.project_path,
             ignore_file_name=ignore_file_name,
+            extensions=tracked_file_extensions(),
         )
         self.change_detector = ChangeDetector(self.repos, self.driver_manager)
 
@@ -105,7 +106,7 @@ class GraphBuilderOrchestrator:
 
         tracker.reset()
 
-        await self.driver_manager.get_driver()
+        await self.driver_manager.warmup_drivers()
 
         self.phase_processor.project_node = self.project_node
         project_id = self.project_node.id

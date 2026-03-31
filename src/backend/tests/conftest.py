@@ -96,7 +96,7 @@ def python_lsp_rpc_url():
 
 @pytest.fixture
 def monkeypatch_vnoc_lsp_python_url(python_lsp_rpc_url, monkeypatch):
-    """Set ``VNOC_LSP_PYTHON_URL`` so :class:`~app.core.parser.driver_manager.DriverManager` uses the test LSP."""
+    """Set ``VNOC_LSP_PYTHON_URL`` so :class:`~app.core.parser.drivers.DriverManager` uses the test LSP."""
     monkeypatch.setenv("VNOC_LSP_PYTHON_URL", python_lsp_rpc_url)
     return python_lsp_rpc_url
 

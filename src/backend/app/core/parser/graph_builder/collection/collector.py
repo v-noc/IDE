@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import aiofiles
 from app.core.model.nodes import ProjectNode, FileNode
-from app.core.parser.driver_manager import DriverManager
+from app.core.parser.drivers import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
@@ -128,7 +128,7 @@ class Collector:
             # 3. Parse via language driver (inject IDs + AST + optional MRO)
             try:
                 with tracker.timer("collector.process_file.scan_ast"):
-                    driver = await self.driver_manager.get_driver()
+                    driver = await self.driver_manager.get_driver(str(abs_path))
                     parse_result = await driver.parse_file(
                         str(abs_path), content, resolve_mro=True
                     )

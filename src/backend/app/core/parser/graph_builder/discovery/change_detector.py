@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from app.core.model.schemas import FileSchema, FolderSchema
 
-from app.core.parser.driver_manager import DriverManager
+from app.core.parser.drivers import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.model.nodes import FileNode, FolderNode
@@ -78,12 +78,12 @@ class ChangeDetector:
         self.driver_manager = driver_manager
 
     async def _get_or_create_file_id(self, file_path: str) -> str:
-        driver = await self.driver_manager.get_driver()
+        driver = await self.driver_manager.get_driver(file_path)
         result = await driver.read_or_inject_file_id(file_path)
         return result.file_id
 
     async def _get_or_create_folder_id(self, folder_path: str) -> str:
-        driver = await self.driver_manager.get_driver()
+        driver = await self.driver_manager.get_driver_for_folder(folder_path)
         result = await driver.read_or_inject_folder_id(folder_path)
         return result.folder_id
 

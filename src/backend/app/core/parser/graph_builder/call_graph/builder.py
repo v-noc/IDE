@@ -4,7 +4,7 @@ from typing import Any, List
 
 from app.core.model.nodes import ProjectNode
 from app.core.repository import Repositories
-from app.core.parser.driver_manager import DriverManager
+from app.core.parser.drivers import DriverManager
 from app.core.parser.graph_builder.call_graph.models import ScopeSyncResult
 from app.core.parser.jedi_adapter.call_resolver.call_resolver import CallFrameStack
 from app.core.builder.tree_builder import TreeBuilder
@@ -39,7 +39,7 @@ class CallChainBuilder:
 
         if calls:
             try:
-                driver = await self.driver_manager.get_driver()
+                driver = await self.driver_manager.get_driver(str(file_path))
                 result = await driver.resolve_calls(str(file_path), calls)
                 merged_stack = result.call_frame_stack
             except Exception:

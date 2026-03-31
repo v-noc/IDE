@@ -1,4 +1,4 @@
-"""JSON-RPC 2.0 HTTP client for a remote language driver (Python LSP process)."""
+"""JSON-RPC 2.0 HTTP client for a remote language driver (Python or ts_js LSP process)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.core.parser.ast.models import BaseNode
-from app.core.parser.driver_protocol import (
+from app.core.parser.drivers.protocol import (
     CallFrameResult,
     FileIdResult,
     FolderIdResult,
@@ -34,10 +34,17 @@ class JsonRpcLanguageDriver:
     Implements LanguageDriver over HTTP POST {url} with JSON-RPC 2.0 payloads.
     """
 
-    def __init__(self, rpc_url: str, timeout: float = 120.0):
+    def __init__(
+        self,
+        rpc_url: str,
+        *,
+        language: str = "python",
+        timeout: float = 120.0,
+    ):
         self._url = rpc_url.rstrip("/")
         if not self._url.endswith("/rpc"):
             self._url = f"{self._url}/rpc"
+        self._language = language
         self._timeout = timeout
         self._client: Optional[httpx.AsyncClient] = None
         self._id_counter = itertools.count(1)
@@ -80,7 +87,7 @@ class JsonRpcLanguageDriver:
             "initialize",
             {
                 "project_path": project_path,
-                "language": "python",
+                "language": self._language,
                 "config": config or {},
             },
         )

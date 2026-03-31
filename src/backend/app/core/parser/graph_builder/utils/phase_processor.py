@@ -10,7 +10,7 @@ from app.core.parser.graph_builder.analysis.body_parser import BodyParser
 from app.core.parser.graph_builder.collection.collector import Collector, CollectionResult
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
-from app.core.parser.driver_manager import DriverManager
+from app.core.parser.drivers import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
 from app.core.parser.graph_builder.collection.structure_batch import StructureBatchPlan

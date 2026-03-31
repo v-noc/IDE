@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from app.core.parser.driver_manager import DriverManager
+from app.core.parser.drivers import DriverManager
 from app.core.parser.graph_builder.discovery.change_detector import ChangeDetector
 from app.core.parser.graph_builder.discovery.scanner import FileScanner
-from app.core.services.file_service import FileService
+
 from tests.unit.parser.analyzer.hierarchy.conftest import _build_and_get_tree
 
 

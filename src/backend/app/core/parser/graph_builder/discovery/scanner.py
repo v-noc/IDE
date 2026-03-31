@@ -7,7 +7,7 @@ from typing import Dict, Iterable, List, Optional, Set
 import pathspec
 import tomllib
 
-from app.core.parser.driver_config import python_file_extensions
+from app.core.parser.drivers.config import python_file_extensions
 
 logger = logging.getLogger(__name__)
 

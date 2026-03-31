@@ -1,4 +1,4 @@
-"""In-process Python driver: same behavior as legacy imports, implements LanguageDriver."""
+"""In-process Python driver: parso/jedi/libcst, implements LanguageDriver."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from app.core.parser.ast.models import BaseNode, ClassNode as ASTClassNode
 from app.core.parser.ast.scanner import scan_with_meta
-from app.core.parser.driver_protocol import (
+from app.core.parser.drivers.protocol import (
     CallFrameResult,
     FileIdResult,
     FolderIdResult,

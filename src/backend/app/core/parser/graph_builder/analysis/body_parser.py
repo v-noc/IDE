@@ -10,7 +10,7 @@ from app.core.parser.ast.models import (
     FunctionNode as ASTFunctionNode
 )
 from app.core.model.nodes import FileNode, ProjectNode, FunctionNode, ClassNode
-from app.core.parser.driver_manager import DriverManager
+from app.core.parser.drivers import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
 
@@ -137,7 +137,9 @@ class BodyParser:
 
         # 3. Parse AST (Phase 2: no MRO)
         try:
-            driver = await self.call_chain_builder.driver_manager.get_driver()
+            driver = await self.call_chain_builder.driver_manager.get_driver(
+                str(file_path)
+            )
             parse_result = await driver.parse_file(
                 str(file_path), content, resolve_mro=False
             )
