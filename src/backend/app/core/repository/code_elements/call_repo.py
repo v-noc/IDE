@@ -180,6 +180,67 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             print(f"Batch operation failed: {exc}")
             return False
 
+    async def flush_call_batch_chunked(
+        self,
+        inserts: List[CallNode],
+        deletes: List[str],
+        moves: List[Tuple[str, str, str]],
+        *,
+        chunk_size: int = 5000,
+    ) -> bool:
+        """
+        Edge case: same semantics as _flush_batch_combined, but splits work so the DB
+        does not get one giant WOQL. Inserts use create() in chunks; deletes and moves
+        are separate chunked queries. Order: inserts, then deletes, then moves.
+        """
+        if not inserts and not deletes and not moves:
+            return True
+
+        insert_ids = {n.id for n in inserts}
+
+        for i in range(0, len(inserts), chunk_size):
+            chunk = inserts[i : i + chunk_size]
+            result = await self.create(chunk)
+            if result is None:
+                return False
+
+        for i in range(0, len(deletes), chunk_size):
+            chunk = deletes[i : i + chunk_size]
+            ok = await self.batch_delete_calls(chunk)
+            if not ok:
+                return False
+
+        for i in range(0, len(moves), chunk_size):
+            chunk = moves[i : i + chunk_size]
+            queries = []
+            for item_id, new_parent_id, child_type in chunk:
+                field = CALL_CHILD_TYPE_TO_FIELD.get(child_type, "call_children")
+                is_new_item = item_id in insert_ids
+                if is_new_item:
+                    queries.append(WQ().add_triple(new_parent_id, field, item_id))
+                else:
+                    queries.append(
+                        WQ().woql_and(
+                            WQ().opt(
+                                WQ().triple("v:old_parent", field, item_id)
+                                .delete_triple("v:old_parent", field, item_id)
+                            ),
+                            WQ().add_triple(new_parent_id, field, item_id),
+                        )
+                    )
+            if not queries:
+                continue
+            combined = WQ().woql_and(*queries)
+            try:
+                await self.client.query(
+                    combined,
+                    commit_msg=f"Batch moves chunk: {len(chunk)} moves",
+                )
+            except Exception as exc:
+                print(f"Batch move chunk failed: {exc}")
+                return False
+        return True
+
     async def get_direct_children(self, call_site_id: str, child_type: str):
         query = WQ().select("v:child_doc", "v:target_doc").woql_and(
             WQ().eq("v:call_site", call_site_id).

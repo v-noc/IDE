@@ -56,6 +56,36 @@ class BodyParser:
 
         )
 
+    def _single_flush_exceeds_batch(
+        self,
+        inserts: List[Any],
+        deletes: List[str],
+        moves: List[Tuple[str, str, str]],
+    ) -> bool:
+        """Edge case: one flush has more than batch_size ops in a single dimension."""
+        return (
+            len(inserts) > self.batch_size
+            or len(deletes) > self.batch_size
+            or len(moves) > self.batch_size
+        )
+
+    async def _apply_call_flush(
+        self,
+        inserts: List[Any],
+        deletes: List[str],
+        moves: List[Tuple[str, str, str]],
+    ) -> None:
+        if not inserts and not deletes and not moves:
+            return
+        if self._single_flush_exceeds_batch(inserts, deletes, moves):
+            await self.repos.call_repo.flush_call_batch_chunked(
+                inserts, deletes, moves, chunk_size=5000
+            )
+        else:
+            await self.repos.call_repo._flush_batch_combined(
+                inserts, deletes, moves
+            )
+
     async def _flush_buffers(self) -> None:
         """Flush all buffered inserts, deletes, and moves to the database."""
         async with self._batch_lock:
@@ -67,7 +97,7 @@ class BodyParser:
             self._insert_buffer.clear()
             self._delete_buffer.clear()
             self._move_buffer.clear()
-        await self.repos.call_repo._flush_batch_combined(inserts, deletes, moves)
+        await self._apply_call_flush(inserts, deletes, moves)
 
     async def _add_batch(
         self,
@@ -101,9 +131,7 @@ class BodyParser:
             else:
                 to_insert = to_delete = to_move = []
         if to_insert or to_delete or to_move:
-            await self.repos.call_repo._flush_batch_combined(
-                to_insert, to_delete, to_move
-            )
+            await self._apply_call_flush(to_insert, to_delete, to_move)
 
     async def flush_buffers(self) -> None:
         """Flush any remaining buffered operations. Call after all files are processed."""
