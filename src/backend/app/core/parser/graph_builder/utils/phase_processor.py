@@ -1,8 +1,7 @@
 """Processes collection and analysis phases."""
 from dataclasses import dataclass, field
 import logging
-from pathlib import Path
-from typing import List
+from typing import List, Tuple
 import asyncio
 
 from app.core.model.nodes import FileNode, ProjectNode
@@ -16,6 +15,37 @@ from app.core.parser.graph_builder.performance import tracker
 from app.core.parser.graph_builder.collection.structure_batch import StructureBatchPlan
 
 logger = logging.getLogger(__name__)
+
+# Default cap for UTF-8 size of file contents per TerminusDB commit (payload safety).
+_DEFAULT_MAX_CONTENT_BYTES_PER_FLUSH = 4 * 1024 * 1024
+
+
+def _chunk_file_content_pairs(
+    pairs: List[Tuple[str, str]],
+    max_items: int,
+    max_bytes: int,
+) -> List[List[Tuple[str, str]]]:
+    """Split (file_id, content) pairs so each chunk is bounded by count and UTF-8 byte size."""
+    if not pairs:
+        return []
+    chunks: List[List[Tuple[str, str]]] = []
+    current: List[Tuple[str, str]] = []
+    cur_bytes = 0
+    for _fid, text in pairs:
+        b = len(text.encode("utf-8"))
+        if current:
+            over_items = len(current) >= max_items
+            # New chunk if adding would exceed byte budget, unless this row alone exceeds max_bytes
+            over_bytes = cur_bytes + b > max_bytes and b <= max_bytes
+            if over_items or over_bytes:
+                chunks.append(current)
+                current = []
+                cur_bytes = 0
+        current.append((_fid, text))
+        cur_bytes += b
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 @dataclass
@@ -40,7 +70,9 @@ class PhaseProcessor:
         max_concurrent_files: int = 50,
         max_concurrent_db: int = 100,
         file_timeout: float = 10*60.0,
-        batch_size: int = 100,
+        batch_size: int = 4000,
+        max_content_bytes_per_flush: int = _DEFAULT_MAX_CONTENT_BYTES_PER_FLUSH,
+        max_queries_per_code_flush: int = 2000,
     ):
         self.project_node = project_node
         self.project_path = project_path
@@ -53,6 +85,66 @@ class PhaseProcessor:
         self._db_semaphore = asyncio.Semaphore(max_concurrent_db)
         self._file_timeout = file_timeout
         self._batch_size = batch_size
+        self._max_content_bytes_per_flush = max_content_bytes_per_flush
+        self._max_queries_per_code_flush = max_queries_per_code_flush
+
+    async def _flush_code_element_buffer(
+        self,
+        buffer: List[Tuple[CollectionResult, FileNode]],
+        change_set: ChangeSet,
+    ) -> None:
+        """Merge a batch of collection results and flush to TerminusDB (bounded payload)."""
+        if not buffer:
+            return
+        structure_batch_plan = StructureBatchPlan()
+        content_inserts: List[Tuple[str, str]] = []
+        content_updates: List[Tuple[str, str]] = []
+        for result, file_node in buffer:
+            structure_batch_plan.extend(result.structure_batch_plan)
+            if result.content and file_node:
+                file_id = file_node.id
+                is_new = any(tp.id == file_id for tp in change_set.new_files)
+                if is_new:
+                    content_inserts.append((file_id, result.content))
+                else:
+                    content_updates.append((file_id, result.content))
+
+        content_pairs = content_inserts + content_updates
+        has_structure = bool(
+            structure_batch_plan.insert
+            or structure_batch_plan.update
+            or structure_batch_plan.delete
+            or structure_batch_plan.move
+        )
+        if not has_structure and not content_pairs:
+            return
+
+        logger.info(
+            "Code DB flush: scope_insert=%d scope_update=%d scope_delete=%d "
+            "move=%d code_content_rows=%d",
+            len(structure_batch_plan.insert),
+            len(structure_batch_plan.update),
+            len(structure_batch_plan.delete),
+            len(structure_batch_plan.move),
+            len(content_pairs),
+        )
+
+        # content_chunks = _chunk_file_content_pairs(
+        #     content_pairs,
+        #     max_items=max(1, self._batch_size),
+        #     max_bytes=max(1, self._max_content_bytes_per_flush),
+        # )
+        # if not content_chunks:
+        #     content_chunks = [[]]
+
+        await self.repos.code_element_repo.flush_batch(
+            structure_batch_plan.insert,
+            structure_batch_plan.update,
+            content_pairs,
+            structure_batch_plan.delete,
+            structure_batch_plan.move,
+            max_queries_per_commit=self._max_queries_per_code_flush,
+        )
 
     async def process_collection_phase(
         self,
@@ -111,48 +203,31 @@ class PhaseProcessor:
                     return None
 
         file_nodes = await self.repos.structure_repo.get_by_ids(files_to_process)
-        async with asyncio.TaskGroup() as tg:
-            tasks = [
-                tg.create_task(_process_single_file(node))
-                for node in file_nodes
-            ]
+        tasks = [
+            asyncio.create_task(_process_single_file(node))
+            for node in file_nodes
+        ]
 
-        structure_batch_plan = StructureBatchPlan()
-        results = []  # (file_node, content) for Phase 2
-        content_inserts = []  # (file_id, content) for new files
-        content_updates = []  # (file_id, content) for modified files
+        results: List = []  # (file_node, content) for Phase 2
+        pending: List[Tuple[CollectionResult, FileNode]] = []
 
-        for task in tasks:
-            task_result = task.result()
+        for done in asyncio.as_completed(tasks):
+            task_result = await done
             if task_result is None:
                 continue
             result, file_node = task_result
             if result is None:
                 continue
-            structure_batch_plan.extend(result.structure_batch_plan)
             if result.file_node:
                 results.append((result.file_node, result.content))
-            if result.content and file_node:
-                file_id = file_node.id
-                is_new = any(tp.id == file_id for tp in change_set.new_files)
-                if is_new:
-                    content_inserts.append((file_id, result.content))
-                else:
-                    content_updates.append((file_id, result.content))
+            pending.append((result, file_node))
+            if len(pending) >= self._batch_size:
+                await self._flush_code_element_buffer(pending, change_set)
+                pending.clear()
 
-        await self.repos.code_element_repo.flush_batch(
-            structure_batch_plan.insert,
-            structure_batch_plan.update,
-            content_inserts + content_updates,
-            structure_batch_plan.delete,
-            structure_batch_plan.move,
-        )
-        # await self.repos.code_element_repo.update_batch(structure_batch_plan.update)
+        if pending:
+            await self._flush_code_element_buffer(pending, change_set)
 
-        # Batch insert/update CodeContent (extends flush pattern, single API call)
-        # await self.repos.structure_repo.flush_content_batch(content_inserts, content_updates)
-
-        # Return (file_node, content) for Phase 2 to avoid duplicate file reads
         return results
 
     async def process_analysis_phase(
@@ -169,7 +244,7 @@ class PhaseProcessor:
             self.project_node,
             self.repos,
             self.driver_manager,
-            batch_size=5000,
+            batch_size=self._batch_size,
             progress_tracker=progress_tracker,
         )
 

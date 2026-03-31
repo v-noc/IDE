@@ -102,7 +102,7 @@ class FileScanner:
                 if any(lower.endswith(ext) for ext in self._extensions):
                     file_path = root_path / file
                     rel_path = file_path.relative_to(self.project_path)
-                    print(f"rel_path: {rel_path}")
+
                     if self._is_ignored(rel_path):
                         continue
 

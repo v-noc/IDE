@@ -2,6 +2,8 @@ import logging
 from pathlib import Path
 from typing import Any, List
 
+import httpx
+
 from app.core.model.nodes import ProjectNode
 from app.core.repository import Repositories
 from app.core.parser.drivers import DriverManager
@@ -42,7 +44,13 @@ class CallChainBuilder:
                 driver = await self.driver_manager.get_driver(str(file_path))
                 result = await driver.resolve_calls(str(file_path), calls)
                 merged_stack = result.call_frame_stack
-            except Exception:
+            except Exception as e:
+                if isinstance(e, httpx.ReadError):
+                    logger.error(
+                        "Call hierarchy: ts_js RPC connection closed while reading response for %s "
+                        "(server restart, timeout, or overload under parallel resolve_calls).",
+                        file_path,
+                    )
                 logger.exception(
                     "Call hierarchy resolution failed in %s", file_path
                 )

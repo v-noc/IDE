@@ -46,7 +46,7 @@ class GraphBuilderOrchestrator:
         ignore_file_name: str = ".gitignore",
         max_concurrent_files: int = 50,
         max_concurrent_db: int = 100,
-        batch_size: int = 100,
+        batch_size: int = 5000,
     ):
         self.project_node = project_node
         self.project_path = project_node.path
@@ -214,7 +214,7 @@ class GraphBuilderOrchestrator:
 
         # Phase 2: Analysis (Body parsing and call chain building)
         logger.info("Starting Phase 2: Analysis")
-        print("Starting Phase 2: Analysis", flush=True)
+
         progress_tracker.start_phase("analyzing")
         # Total entities is set from discovery phase (functions_found + classes_found)
         # Total files for analysis is the number of collection results
@@ -222,8 +222,11 @@ class GraphBuilderOrchestrator:
         await progress_tracker.emit(force=True)
 
         try:
-            # Phase 2 refactoring is deferred.
-            # We pass None for call_sync_service as we removed SyncService.
+            # Phase 2: call graph uses the same JsonRpc driver as Phase 1 (ts_js for .ts/.js).
+            logger.info(
+                "Phase 2: analyzing %d files (call resolution via language driver)",
+                len(collection_results),
+            )
             await self.phase_processor.process_analysis_phase(
                 collection_results, progress_tracker
             )

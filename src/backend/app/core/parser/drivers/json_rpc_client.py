@@ -1,4 +1,4 @@
-"""JSON-RPC 2.0 HTTP client for a remote language driver (Python or ts_js LSP process)."""
+"""JSON-RPC 2.0 HTTP client for a remote language driver (Python or ts_js)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,9 @@ from app.core.parser.drivers.protocol import (
     ParseResult,
     parse_symbol_list,
 )
-from app.core.parser.jedi_adapter.call_resolver.call_resolver import CallFrameStack
+from app.core.parser.jedi_adapter.call_resolver.call_resolver import (
+    CallFrameStack,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,9 @@ class JsonRpcLanguageDriver:
         if self._client and not self._client.is_closed:
             await self._client.aclose()
 
-    async def _call(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    async def _call(
+        self, method: str, params: Optional[Dict[str, Any]] = None
+    ) -> Any:
         client = await self._client_()
         req_id = next(self._id_counter)
         payload: Dict[str, Any] = {
@@ -68,8 +72,34 @@ class JsonRpcLanguageDriver:
         }
         if params is not None:
             payload["params"] = params
-        r = await client.post(self._url, json=payload)
-        r.raise_for_status()
+        if self._language == "typescript":
+            extra = ""
+            if params:
+                fp = params.get("file_path")
+                if isinstance(fp, str):
+                    extra += f" file={fp}"
+                if method == "resolve_calls":
+                    calls = params.get("calls")
+                    if isinstance(calls, list):
+                        extra += f" calls={len(calls)}"
+                if method == "parse_file":
+                    c = params.get("content")
+                    if isinstance(c, str):
+                        extra += f" bytes={len(c.encode('utf-8'))}"
+            logger.info(
+                "ts_js RPC -> %s id=%s%s", method, req_id, extra
+            )
+        try:
+            r = await client.post(self._url, json=payload)
+        except httpx.HTTPError as e:
+            logger.error(
+                "RPC HTTP failure url=%s method=%s id=%s: %s",
+                self._url,
+                method,
+                req_id,
+                e,
+            )
+            raise
         body = r.json()
         if body.get("error"):
             err = body["error"]
@@ -128,7 +158,9 @@ class JsonRpcLanguageDriver:
         )
         return FileIdResult.model_validate(raw)
 
-    async def read_or_inject_folder_id(self, folder_path: str) -> FolderIdResult:
+    async def read_or_inject_folder_id(
+        self, folder_path: str
+    ) -> FolderIdResult:
         raw = await self._call(
             "read_or_inject_folder_id", {"folder_path": folder_path}
         )

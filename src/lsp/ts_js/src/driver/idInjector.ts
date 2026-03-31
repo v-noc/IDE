@@ -25,10 +25,14 @@ function ensureJsDocId(node: JSDocableNode): boolean {
   const first = docs[0];
   const prev = first.getInnerText().trimEnd();
   const merged = prev ? `${prev}\n\nID: ${id}` : `ID: ${id}`;
-  first.remove();
-  node.insertJsDoc(0, { description: merged });
+  // Avoid `first.remove()` + `insertJsDoc`: ts-morph can throw
+  // "children of the old and new trees were expected to have the same count"
+  // on some files. `set` with tags uses replaceWithText and stays consistent.
+  first.set({ description: merged, tags: [] });
   return true;
 }
+
+
 
 function collectJsDocTargets(sf: SourceFile): JSDocableNode[] {
   const out: JSDocableNode[] = [];

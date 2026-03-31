@@ -55,6 +55,26 @@ function asObject(params: unknown): Record<string, unknown> | null {
   return null;
 }
 
+/** One-line context for logs (file path, call count, etc.). */
+function summarizeRpcParams(method: string, params: unknown): string {
+  const obj = asObject(params);
+  if (!obj) return "";
+  const parts: string[] = [];
+  if (typeof obj.project_path === "string") {
+    parts.push(`project=${obj.project_path}`);
+  }
+  if (typeof obj.file_path === "string") {
+    parts.push(`file=${obj.file_path}`);
+  }
+  if (method === "resolve_calls" && Array.isArray(obj.calls)) {
+    parts.push(`calls=${obj.calls.length}`);
+  }
+  if (method === "parse_file" && typeof obj.content === "string") {
+    parts.push(`bytes=${obj.content.length}`);
+  }
+  return parts.length ? ` ${parts.join(" ")}` : "";
+}
+
 async function dispatch(
   method: string,
   params: unknown,
@@ -178,10 +198,17 @@ async function handleSingle(
     return err(INVALID_REQUEST, "method is required", id);
   }
 
+  const t0 = performance.now();
   const result = await dispatch(req.method, req.params);
+  const ms = Math.round(performance.now() - t0);
+  const summary = summarizeRpcParams(req.method, req.params);
   if (!result.ok) {
+    console.warn(
+      `[ts_js] ${req.method}${summary} ${ms}ms error: ${result.message}`,
+    );
     return err(result.code, result.message, id);
   }
+  console.log(`[ts_js] ${req.method}${summary} ${ms}ms`);
   return ok(result.value, id);
 }
 

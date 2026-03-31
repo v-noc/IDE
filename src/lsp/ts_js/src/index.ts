@@ -3,7 +3,7 @@ import { jsonRpcPost } from "./jsonrpc";
 
 function parseArgs(argv: string[]) {
   let host = "127.0.0.1";
-  let port = 0;
+  let port = 9001;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--host" && argv[i + 1]) {

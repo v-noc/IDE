@@ -79,6 +79,12 @@ class BodyParser:
         inserts = inserts or []
         moves = moves or []
         deletes = deletes or []
+
+        print(
+            f"batch size: {len(self._insert_buffer)+len(self._move_buffer)+len(self._delete_buffer)}")
+        print(f"inserts: {len(inserts)}")
+        print(f"moves: {len(moves)}")
+        print(f"deletes: {len(deletes)}")
         if not inserts and not moves and not deletes:
             return
         async with self._batch_lock:
@@ -210,6 +216,7 @@ class BodyParser:
         items = self._traverse_and_collect(
             nodes, current_scope, node_map, file_path, source
         )
+        print(f"started processing {len(items)} nodes in file {file_path}")
 
         async def _process_one(node: any, fp: Path, src: str, calls: List[Any]):
             if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
@@ -232,7 +239,7 @@ class BodyParser:
                 self.progress_tracker.increment_entity_processed()
                 self.progress_tracker.clear_current_function()
 
-        semaphore = asyncio.Semaphore(3)
+        semaphore = asyncio.Semaphore(1)
 
         async def bounded_process(n, fp, s, c):
             async with semaphore:

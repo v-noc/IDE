@@ -111,8 +111,22 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
     async def move_batch(self, moves: List[Tuple[str, str, str]]):
         return await self.move_batch_by_type(moves, child_type_to_field=CODE_CHILD_TYPE_TO_FIELD)
 
-    async def flush_batch(self, insert: List[FunctionNode | ClassNode], code_update: List[FunctionNode | ClassNode], update_content: List[Tuple[str, str]], delete: List[str], move: List[Tuple[str, str, str]]):
-        if not insert and not update_content and not delete and not move:
+    async def flush_batch(
+        self,
+        insert: List[FunctionNode | ClassNode],
+        code_update: List[FunctionNode | ClassNode],
+        update_content: List[Tuple[str, str]],
+        delete: List[str],
+        move: List[Tuple[str, str, str]],
+        max_queries_per_commit: int | None = None,
+    ):
+        if (
+            not insert
+            and not code_update
+            and not update_content
+            and not delete
+            and not move
+        ):
             return True
 
         queries = []
@@ -248,12 +262,27 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
         if not queries:
             return True
 
-        combined = WQ().woql_and(*queries)
+        limit = max_queries_per_commit or len(queries)
+        if limit <= 0:
+            limit = len(queries)
 
-        try:
-            result = await self.client.query(combined, commit_msg=f"Batch: {len(insert)} inserts, {len(delete)} deletes, {len(move)} moves")
-            print(result)
-            return True
-        except Exception as exc:
-            print(f"Batch operation failed: {exc}")
-            return False
+        total_chunks = (len(queries) + limit - 1) // limit
+        ok = True
+        for start in range(0, len(queries), limit):
+            chunk = queries[start : start + limit]
+            chunk_no = start // limit + 1
+            combined = WQ().woql_and(*chunk)
+            try:
+                result = await self.client.query(
+                    combined,
+                    commit_msg=(
+                        f"code_element batch {chunk_no}/{total_chunks}: "
+                        f"{len(chunk)} ops ({len(insert)} inserts, {len(delete)} deletes, {len(move)} moves)"
+                    ),
+                )
+                print(result)
+            except Exception as exc:
+                print(f"Batch operation failed: {exc}")
+                ok = False
+                break
+        return ok
