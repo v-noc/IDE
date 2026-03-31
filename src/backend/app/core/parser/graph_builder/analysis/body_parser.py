@@ -10,12 +10,10 @@ from app.core.parser.ast.models import (
     FunctionNode as ASTFunctionNode
 )
 from app.core.model.nodes import FileNode, ProjectNode, FunctionNode, ClassNode
-from app.core.parser.ast.scanner import scan
-from app.core.parser.jedi_adapter.manager import JediProjectManager
+from app.core.parser.driver_manager import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
 
-# IMPORT YOUR NEW BUILDER
 from app.core.parser.graph_builder.call_graph.builder import CallChainBuilder
 
 from app.core.model.schemas import CallSchema, CodeElementGroupSchema, CallGroupSchema
@@ -28,7 +26,7 @@ class BodyParser:
         self,
         project_node: ProjectNode,
         repos: Repositories,
-        jedi_manager: JediProjectManager,
+        driver_manager: DriverManager,
         batch_size: int = 1000,
         progress_tracker=None,
     ):
@@ -44,11 +42,10 @@ class BodyParser:
         self._delete_buffer: List[str] = []
         self._batch_lock = asyncio.Lock()
 
-        # Initialize the NEW Builder here
         self.call_chain_builder = CallChainBuilder(
             project_node=project_node,
             repos=repos,
-            jedi_manager=jedi_manager
+            driver_manager=driver_manager,
         )
 
     def _should_flush(self) -> bool:
@@ -138,12 +135,13 @@ class BodyParser:
             except OSError:
                 return
 
-        # 3. Scan AST
-        loop = asyncio.get_event_loop()
+        # 3. Parse AST (Phase 2: no MRO)
         try:
-            nodes, processed_content = await loop.run_in_executor(
-                None, scan, content, str(file_path)
+            driver = await self.call_chain_builder.driver_manager.get_driver()
+            parse_result = await driver.parse_file(
+                str(file_path), content, resolve_mro=False
             )
+            nodes, processed_content = parse_result.nodes, parse_result.content
         except Exception:
             return
 

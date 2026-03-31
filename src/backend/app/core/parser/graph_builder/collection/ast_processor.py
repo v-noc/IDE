@@ -14,7 +14,6 @@ from app.core.model.schemas import (
 from app.core.parser.ast.models import BaseNode
 from app.core.parser.ast.models import ClassNode as ASTClassNode
 from app.core.parser.ast.models import FunctionNode as ASTFunctionNode
-from app.core.parser.jedi_adapter.resolver import MROResolver
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.collection.structure_batch import StructureBatchPlan
 
@@ -22,9 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class ASTProcessor:
-    def __init__(self, repos: Repositories, mro_resolver: Optional[MROResolver] = None):
+    def __init__(self, repos: Repositories):
         self.repos = repos
-        self.mro_resolver = mro_resolver
 
     async def sync_content(
         self,
@@ -274,9 +272,9 @@ class ASTProcessor:
                 if progress_tracker:
                     progress_tracker.increment_discovery(node_type)
 
-                mro = []
-                if isinstance(node, ASTClassNode) and self.mro_resolver and content:
-                    mro = self._resolve_mro(node, file_path, content)
+                mro: List[str] = list(node.base_classes) if isinstance(
+                    node, ASTClassNode
+                ) else []
 
                 node_data = {"qname": qname, "type": node_type, "mro": mro}
 
@@ -321,34 +319,6 @@ class ASTProcessor:
                         result_list,
                         progress_tracker,
                     )
-
-    def _resolve_mro(
-        self, node: ASTClassNode, file_path: str, content: str
-    ) -> List[str]:
-        try:
-            name_column = self._get_name_column(content, node)
-            return self.mro_resolver.resolve_mro(
-                file_path=file_path,
-                source=content,
-                line=node.position.line,
-                column=name_column + (len(node.name)),
-            )
-        except Exception as e:
-            logger.error(f"Failed to resolve MRO for {node.name}: {e}")
-            return []
-
-    def _get_name_column(self, content: str, node: BaseNode) -> int:
-        line_index = node.position.line - 1
-        if line_index < 0:
-            return node.position.column
-        lines = content.splitlines()
-        if line_index >= len(lines):
-            return node.position.column
-        line = lines[line_index]
-        name_idx = line.find(node.name)
-        if name_idx == -1:
-            return node.position.column
-        return name_idx
 
     def _compute_checksum(self, node: BaseNode) -> str:
         data = node.model_dump(exclude={"id", "children"})

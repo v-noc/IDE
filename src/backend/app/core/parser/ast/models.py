@@ -31,3 +31,5 @@ class FunctionNode(BaseNode):
 
 class ClassNode(BaseNode):
     type: Literal["class"] = "class"
+    # Filled by the language driver when resolve_mro is true (Phase 1 collection).
+    base_classes: List[str] = Field(default_factory=list)

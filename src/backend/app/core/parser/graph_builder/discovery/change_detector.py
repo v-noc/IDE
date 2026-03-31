@@ -7,10 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from app.core.model.schemas import FileSchema, FolderSchema
 
-from .file_tracker import FileTracker
-from .folder_tracker import (
-    FolderTracker,
-)
+from app.core.parser.driver_manager import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.model.nodes import FileNode, FolderNode
@@ -76,30 +73,19 @@ class ChangeSet:
 
 
 class ChangeDetector:
-    def __init__(self, repos: Repositories):
+    def __init__(self, repos: Repositories, driver_manager: DriverManager):
         self.repos = repos
-        self.file_tracker = FileTracker()
-        self.folder_tracker = FolderTracker()
+        self.driver_manager = driver_manager
 
     async def _get_or_create_file_id(self, file_path: str) -> str:
-        """
-        Ensure a FileID exists (via FileTracker) and return it.
-        Runs in a thread because FileTracker uses libcst + disk IO.
-        """
-        return await asyncio.to_thread(
-            self.file_tracker.process_file,
-            Path(file_path),
-        )
+        driver = await self.driver_manager.get_driver()
+        result = await driver.read_or_inject_file_id(file_path)
+        return result.file_id
 
     async def _get_or_create_folder_id(self, folder_path: str) -> str:
-        """
-        Ensure a FolderID exists (via FolderTracker) and return it.
-        Runs in a thread because FolderTracker touches the filesystem.
-        """
-        return await asyncio.to_thread(
-            self.folder_tracker.ensure_tracking,
-            Path(folder_path),
-        )
+        driver = await self.driver_manager.get_driver()
+        result = await driver.read_or_inject_folder_id(folder_path)
+        return result.folder_id
 
     @staticmethod
     def _extract_child_id(child: Any) -> Optional[str]:

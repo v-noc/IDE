@@ -1,6 +1,9 @@
 import shutil
+from pathlib import Path
+
 import pytest
 
+from app.core.parser.driver_manager import DriverManager
 from app.core.parser.graph_builder.discovery.change_detector import ChangeDetector
 from app.core.parser.graph_builder.discovery.scanner import FileScanner
 from app.core.services.file_service import FileService
@@ -17,8 +20,8 @@ async def test_new_folder_file_detection(setup_structure_project):
     )
     scan_result = file_scanner.scan()
 
-    change_detector = ChangeDetector(repos)
-    change_set = await change_detector.detect_changes(scan_result, project_node.db_name)
+    change_detector = ChangeDetector(repos, DriverManager(Path(project_path)))
+    change_set = await change_detector.detect_changes(scan_result)
 
     assert len(change_set.new_folders) == 3
     assert len(change_set.new_files) == 9
@@ -43,8 +46,8 @@ async def test_deleted_folder_file_detection(setup_structure_project):
     )
     scan_result = file_scanner.scan()
 
-    change_detector = ChangeDetector(repos)
-    change_set = await change_detector.detect_changes(scan_result, project_node.db_name)
+    change_detector = ChangeDetector(repos, DriverManager(Path(project_path)))
+    change_set = await change_detector.detect_changes(scan_result)
     assert not change_set.has_changes()
 
     shutil.rmtree(project_path / "app")
@@ -56,8 +59,8 @@ async def test_deleted_folder_file_detection(setup_structure_project):
     )
     scan_result = file_scanner.scan()
 
-    change_detector = ChangeDetector(repos)
-    change_set = await change_detector.detect_changes(scan_result, project_node.db_name)
+    change_detector = ChangeDetector(repos, DriverManager(Path(project_path)))
+    change_set = await change_detector.detect_changes(scan_result)
     assert change_set.has_changes()
 
     assert len(change_set.deleted_folders) == 1
@@ -87,8 +90,8 @@ async def test_modified_folder_file_detection(setup_structure_project):
     )
     scan_result = file_scanner.scan()
 
-    change_detector = ChangeDetector(repos)
-    change_set = await change_detector.detect_changes(scan_result, project_node.db_name)
+    change_detector = ChangeDetector(repos, DriverManager(Path(project_path)))
+    change_set = await change_detector.detect_changes(scan_result)
 
     assert change_set.has_changes()
 
@@ -117,8 +120,8 @@ async def test_folder_rename_detection(setup_structure_project):
     )
     scan_result = file_scanner.scan()
 
-    change_detector = ChangeDetector(repos)
-    change_set = await change_detector.detect_changes(scan_result, project_node.db_name)
+    change_detector = ChangeDetector(repos, DriverManager(Path(project_path)))
+    change_set = await change_detector.detect_changes(scan_result)
 
     assert change_set.has_changes()
 
@@ -148,8 +151,8 @@ async def test_folder_move_detection(setup_structure_project):
     )
     scan_result = file_scanner.scan()
 
-    change_detector = ChangeDetector(repos)
-    change_set = await change_detector.detect_changes(scan_result, project_node.db_name)
+    change_detector = ChangeDetector(repos, DriverManager(Path(project_path)))
+    change_set = await change_detector.detect_changes(scan_result)
 
     assert change_set.has_changes()
     assert len(change_set.modified_files) == 0
@@ -169,8 +172,8 @@ async def test_folder_move_detection(setup_structure_project):
     )
     scan_result = file_scanner.scan()
 
-    change_detector = ChangeDetector(repos)
-    change_set = await change_detector.detect_changes(scan_result, project_node.db_name)
+    change_detector = ChangeDetector(repos, DriverManager(Path(project_path)))
+    change_set = await change_detector.detect_changes(scan_result)
 
     assert change_set.has_changes()
     assert len(change_set.moved_folders) == 1

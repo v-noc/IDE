@@ -10,7 +10,7 @@ from app.core.parser.graph_builder.analysis.body_parser import BodyParser
 from app.core.parser.graph_builder.collection.collector import Collector, CollectionResult
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
-from app.core.parser.jedi_adapter.manager import JediProjectManager
+from app.core.parser.driver_manager import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
 from app.core.parser.graph_builder.collection.structure_batch import StructureBatchPlan
@@ -36,7 +36,7 @@ class PhaseProcessor:
         project_path: str,
         repos: Repositories,
         collector: Collector,
-        jedi_manager: JediProjectManager,
+        driver_manager: DriverManager,
         max_concurrent_files: int = 50,
         max_concurrent_db: int = 100,
         file_timeout: float = 10*60.0,
@@ -46,7 +46,7 @@ class PhaseProcessor:
         self.project_path = project_path
         self.repos = repos
         self.collector = collector
-        self.jedi_manager = jedi_manager
+        self.driver_manager = driver_manager
 
         # Concurrency control
         self._file_semaphore = asyncio.Semaphore(max_concurrent_files)
@@ -168,7 +168,7 @@ class PhaseProcessor:
         body_parser = BodyParser(
             self.project_node,
             self.repos,
-            self.jedi_manager,
+            self.driver_manager,
             batch_size=5000,
             progress_tracker=progress_tracker,
         )
