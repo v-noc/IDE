@@ -1,12 +1,15 @@
 """
-Environment-driven settings and extension lists for language drivers.
+Language driver URLs — read via :func:`app.config.settings.get_settings` so values
+from ``.env`` are picked up the same way as other app settings (raw ``os.environ``
+does not include entries that only exist in the env file).
 """
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import List, Optional
+
+from app.config.settings import get_settings
 
 
 @dataclass(frozen=True)
@@ -20,8 +23,9 @@ class DriverSettings:
 
 
 def load_driver_settings() -> DriverSettings:
-    py = os.environ.get("VNOC_LSP_PYTHON_URL", "").strip() or None
-    ts = os.environ.get("VNOC_LSP_TS_JS_URL", "").strip() or None
+    s = get_settings()
+    py = (s.VNOC_LSP_PYTHON_URL or "").strip() or None
+    ts = (s.VNOC_LSP_TS_JS_URL or "").strip() or None
     return DriverSettings(python_rpc_url=py, ts_js_rpc_url=ts)
 
 

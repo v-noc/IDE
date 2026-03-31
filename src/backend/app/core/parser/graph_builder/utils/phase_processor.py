@@ -85,7 +85,7 @@ class PhaseProcessor:
                     progress_tracker.set_current_file(file_node.path)
                     await progress_tracker.emit()
                 try:
-
+                    print(f"processing file: {file_node.path}")
                     result = await asyncio.wait_for(
                         self.collector.process_file(
                             file_node, checksum, progress_tracker=progress_tracker),

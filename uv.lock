@@ -270,6 +270,7 @@ test = [
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "vnoc-lsp-python" },
 ]
 
 [package.metadata]
@@ -313,6 +314,7 @@ requires-dist = [
 dev = [
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
+    { name = "vnoc-lsp-python", editable = "src/lsp/py" },
 ]
 
 [[package]]
