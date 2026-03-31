@@ -52,7 +52,7 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
     });
 
   const language = useMemo(
-    () => detectLanguage(data?.file_name || data?.file_path || ""),
+    () => detectLanguage((data?.file_path ?? data?.file_name) || ""),
     [data?.file_name, data?.file_path],
   );
 
