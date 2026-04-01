@@ -357,7 +357,7 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
     async def get_node_lineage(self, node_id: str) -> list[Any]:
         query = WQ().select("v:target_doc").woql_and(
             WQ().eq("v:node", node_id).
-            path("v:node", "(<function_children|<class_children)*", "v:parent").
+            path("v:node", "(<function_children|<class_children|<file_children|<folder_children|<structure_group|<code_element_group)*", "v:parent").
             read_document("v:parent", "v:target_doc")
         )
         try:
