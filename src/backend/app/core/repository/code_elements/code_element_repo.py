@@ -1,11 +1,19 @@
 from datetime import datetime, timezone
 
-from typing import Union, List, Tuple
+from typing import Any, Union, List, Tuple
 import uuid
 from terminusdb_client.woqlquery.woql_query import Doc, WOQLQuery as WQ
 
 from app.core.model.nodes import ClassNode, FunctionNode
-from app.core.model.schemas import ClassSchema, CodeContentSchema, CodePositionSchema, FunctionSchema
+from app.core.model.schemas import (
+    CallGroupSchema,
+    CallSchema,
+    ClassSchema,
+    CodeContentSchema,
+    CodeElementGroupSchema,
+    CodePositionSchema,
+    FunctionSchema,
+)
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
     CODE_CHILD_TYPE_TO_FIELD,
@@ -14,6 +22,15 @@ from app.core.repository.utils import (
     build_path_field_name,
     parse_code_element_child,
 )
+
+_CODE_DESCENDANT_SCHEMA_BY_KIND = {
+    "function": FunctionSchema.__name__,
+    "class": ClassSchema.__name__,
+    "call": CallSchema.__name__,
+    "code_element_group": CodeElementGroupSchema.__name__,
+    "call_group": CallGroupSchema.__name__,
+}
+_ALL_CODE_DESCENDANT_SCHEMAS = list(_CODE_DESCENDANT_SCHEMA_BY_KIND.values())
 from app.db.async_terminus_client import AsyncClient
 
 # Define a type for elements handled here
@@ -99,6 +116,42 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
             parse_code_element_child,
             allowed_path_fields=CODE_ELEMENT_FIELDS,
         )
+
+    async def get_descendants_paginated(
+        self,
+        parent_id: str,
+        child_types: list[str],
+        depth_start: int | None = None,
+        depth_max: int | None = None,
+    ) -> tuple[list[Any], bool]:
+        """
+        Descendants of ``parent_id`` along code edges. Path depth uses WOQL
+        ``{depth_start, depth_max}`` (omit both for ``+``).
+        """
+        if child_types:
+            filtered = [
+                n
+                for k in child_types
+                if (n := _CODE_DESCENDANT_SCHEMA_BY_KIND.get(k)) is not None
+            ]
+            if not filtered:
+                return [], False
+        else:
+            filtered = list(_ALL_CODE_DESCENDANT_SCHEMAS)
+
+        field_name = build_path_field_name(
+            child_types, CODE_ELEMENT_FIELDS, type_to_field=CODE_CHILD_TYPE_TO_FIELD
+        )
+        nodes = await self.get_children_by_path(
+            parent_id,
+            field_name,
+            parse_code_element_child,
+            filtered_types=filtered,
+            allowed_path_fields=CODE_ELEMENT_FIELDS,
+            depth_start=depth_start,
+            depth_max=depth_max,
+        )
+        return nodes, False
 
     async def move_item(self, new_parent_id: str, item_id: str, child_type: str):
         return await self.move_item_by_type(

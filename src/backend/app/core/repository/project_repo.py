@@ -10,6 +10,23 @@ from slugify import slugify
 from app.core.repository.utils import parse_structure_child
 from app.core.model.schemas import FileSchema, FolderSchema, FunctionSchema, ClassSchema, CallSchema, CodeElementGroupSchema, CallGroupSchema, StructureGroupSchema
 
+# Full flat graph for TreeBuilder / graph jobs; structure-only for initial dashboard load.
+PROJECT_FULL_GRAPH_TYPES = frozenset({
+    FileSchema.__name__,
+    FolderSchema.__name__,
+    FunctionSchema.__name__,
+    ClassSchema.__name__,
+    CallSchema.__name__,
+    CodeElementGroupSchema.__name__,
+    CallGroupSchema.__name__,
+    StructureGroupSchema.__name__,
+})
+PROJECT_STRUCTURE_TYPES = frozenset({
+    FileSchema.__name__,
+    FolderSchema.__name__,
+    StructureGroupSchema.__name__,
+})
+
 
 class ProjectRepo():
     def __init__(self, client: AsyncClient):
@@ -132,23 +149,26 @@ class ProjectRepo():
             updated_at=old_project["updated_at"],
         )
 
-    async def get_children(self, exclude_types: list[str] = [], include_commit_id: bool = False):
-        inlcude_type = [FileSchema.__name__, FolderSchema.__name__, FunctionSchema.__name__, ClassSchema.__name__,
-                        CallSchema.__name__, CodeElementGroupSchema.__name__, CallGroupSchema.__name__, StructureGroupSchema.__name__]
-        filtered_types = set(inlcude_type) - set(exclude_types)
+    async def _query_documents_by_schema_types(
+        self,
+        include_types: frozenset[str],
+        exclude_types: list[str],
+        include_commit_id: bool,
+    ):
+        filtered_types = set(include_types) - set(exclude_types)
+        if not filtered_types:
+            return [], None
 
         try:
             query = WQ().select("v:doc").woql_and(
                 WQ().triple("v:uri", "rdf:type", "v:type"),
+                WQ().member(
+                    "v:type",
+                    [f"@schema:{t}" for t in filtered_types],
+                ),
                 WQ().read_document("v:uri", "v:doc"),
-                WQ.woql_and(
-                    WQ().member("v:type", [
-                        f"@schema:{t}" for t in filtered_types]))
-
             )
-
             result, version = await self.client.query(query, get_data_version=True)
-
             children = []
             for doc in [row["doc"] for row in result["bindings"]]:
                 if doc.get("@type") == "FolderSchema" and doc.get("is_root") == "true":
@@ -157,8 +177,23 @@ class ProjectRepo():
 
             if include_commit_id:
                 return children, version
-
             return children, None
         except Exception as e:
             print(e)
             return [], None
+
+    async def get_structure(self, exclude_types: list[str] = [], include_commit_id: bool = False):
+        """Folders, files, and structure groups only (no functions/classes/calls)."""
+        return await self._query_documents_by_schema_types(
+            PROJECT_STRUCTURE_TYPES,
+            exclude_types,
+            include_commit_id,
+        )
+
+    async def get_children(self, exclude_types: list[str] = [], include_commit_id: bool = False):
+        """All graph document types used by TreeBuilder (minus exclude_types)."""
+        return await self._query_documents_by_schema_types(
+            PROJECT_FULL_GRAPH_TYPES,
+            exclude_types,
+            include_commit_id,
+        )

@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, Query
-from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, Body, Query, status
+from pydantic import BaseModel
+from typing import Any, Dict, Optional
 
 from app.api.dependencies import (
     ProjectUoW,
     get_code_element_service,
+    get_project_node,
     get_project_uow,
 )
+from app.core.model.nodes import ProjectNode
 from app.core.watcher.service import WatcherService, get_watcher_service
 from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
@@ -14,6 +17,19 @@ from app.core.services import CodeElementService
 
 
 router = APIRouter()
+
+
+class CodeDescendantsResponse(BaseModel):
+    """Lazy-loaded code nodes under a parent within optional path depth bounds."""
+
+    nodes: list[dict[str, Any]]
+    has_next_page: bool = False
+
+
+def _parse_child_type_query(raw: Optional[str]) -> list[str]:
+    if not raw or not raw.strip():
+        return []
+    return [p.strip() for p in raw.split(",") if p.strip()]
 
 
 @router.post("/write-code")
@@ -109,3 +125,49 @@ async def get_code(
     return code_details
 
 
+@router.get("/descendants", response_model=CodeDescendantsResponse)
+async def get_code_descendants(
+    parent_id: str = Query(
+        ...,
+        description="Anchor document id (e.g. FileSchema/…, ClassSchema/…)",
+    ),
+    depth_start: Optional[int] = Query(
+        None,
+        ge=1,
+        description="Minimum path hops from parent (WOQL path times lower bound)",
+    ),
+    depth_max: Optional[int] = Query(
+        None,
+        ge=1,
+        description="Maximum path hops from parent (WOQL path times upper bound)",
+    ),
+    child_types: Optional[str] = Query(
+        None,
+        description="Comma-separated kinds: function,class,call,code_element_group,call_group",
+    ),
+    project_node: ProjectNode = Depends(get_project_node),
+    code_element_service: CodeElementService = Depends(get_code_element_service),
+) -> CodeDescendantsResponse:
+    _ = project_node  # resolves project DB context (project_id query param)
+
+    if (
+        depth_start is not None
+        and depth_max is not None
+        and depth_start > depth_max
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="depth_start must be <= depth_max",
+        )
+
+    kinds = _parse_child_type_query(child_types)
+    compare_to = code_element_service.uow.has_compare_to()
+    nodes, has_next = await code_element_service.get_code_descendants(
+        parent_id,
+        kinds,
+        depth_start=depth_start,
+        depth_max=depth_max,
+        compare_to=compare_to,
+    )
+    serialized = [n.model_dump(mode="json") for n in nodes if hasattr(n, "model_dump")]
+    return CodeDescendantsResponse(nodes=serialized, has_next_page=has_next)

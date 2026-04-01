@@ -8,12 +8,17 @@ from app.core.builder.tree_builder import TreeBuilder
 from app.db.client import get_terminus_client
 
 from app.core.services.project_service import ProjectService
-from app.api.dependencies import ProjectUoW, get_project_service, get_project_service_with_uow, get_project_node
+from app.api.dependencies import (
+    ProjectUoW,
+    get_project_service,
+    get_project_service_with_uow,
+    get_project_node,
+)
 from pathlib import Path
 from app.core.watcher.service import WatcherService, get_watcher_service
 from loguru import logger
-import time
 from app.core.model.nodes import ProjectNode
+from app.core.model.schemas import StructureGroupSchema
 from app.db.async_terminus_client import AsyncClient
 from app.db.context import RequestDbContext
 
@@ -30,6 +35,10 @@ class UpdateProjectRequest(BaseModel):
 
 
 router = APIRouter()
+
+
+def _exclude_types_for_groups(exclude_groups: bool) -> list[str]:
+    return [StructureGroupSchema.__name__] if exclude_groups else []
 
 
 @router.post("/", response_model=ProjectTreeNode)
@@ -103,11 +112,19 @@ async def get_project(
 
     watcher_service.start_watching(project_node)
 
-    children, version = await project_service.get_children(include_commit_id=True)
+    exclude_types = _exclude_types_for_groups(exclude_groups)
+    children, version = await project_service.get_children(
+        exclude_types=exclude_types,
+        include_commit_id=True,
+    )
 
     compare_to_children = None
     if project_service.uow.has_compare_to():
-        compare_to_children, compare_to_version = await project_service.get_children(compare_to=True, include_commit_id=True)
+        compare_to_children, compare_to_version = await project_service.get_children(
+            exclude_types=exclude_types,
+            compare_to=True,
+            include_commit_id=True,
+        )
 
     tree_builder = TreeBuilder(children, compare_to_children)
     tree = tree_builder.build()
@@ -115,6 +132,42 @@ async def get_project(
     project_tree = ProjectTreeNode(
         **project_node.model_dump(), children=tree, version=version)
     return project_tree
+
+
+@router.get("/structure", response_model=ProjectTreeNode)
+async def get_project_structure(
+    project_node: ProjectNode = Depends(get_project_node),
+    exclude_groups: bool = Query(
+        False, description="Omit structure-group documents from the tree"
+    ),
+    project_service: ProjectService = Depends(get_project_service_with_uow),
+    watcher_service: WatcherService = Depends(get_watcher_service),
+) -> ProjectTreeNode:
+    """Load folder/file/(optional) structure-group shell only — no code elements."""
+    watcher_service.start_watching(project_node)
+
+    exclude_types = _exclude_types_for_groups(exclude_groups)
+    structure_nodes, version = await project_service.get_structure(
+        exclude_types=exclude_types,
+        include_commit_id=True,
+    )
+
+    compare_to_structure = None
+    if project_service.uow.has_compare_to():
+        compare_to_structure, _ = await project_service.get_structure(
+            exclude_types=exclude_types,
+            include_commit_id=True,
+            compare_to=True,
+        )
+
+    tree_builder = TreeBuilder(structure_nodes, compare_to_structure)
+    tree = tree_builder.build()
+
+    return ProjectTreeNode(
+        **project_node.model_dump(),
+        children=tree,
+        version=version,
+    )
 
 
 @router.get("/all", response_model=list[ProjectNode])

@@ -33,6 +33,26 @@ class CodeElementService():
     async def get_children(self, node_id: str):
         return await self.repos.code_element_repo.get_children(node_id, [])
 
+    async def get_code_descendants(
+        self,
+        parent_id: str,
+        child_types: list[str],
+        depth_start: int | None = None,
+        depth_max: int | None = None,
+        compare_to: bool = False,
+    ):
+        repos = (
+            self.uow.get_project_repos(use_compare_to=True)
+            if compare_to
+            else self.repos
+        )
+        return await repos.code_element_repo.get_descendants_paginated(
+            parent_id,
+            child_types,
+            depth_start=depth_start,
+            depth_max=depth_max,
+        )
+
     async def add_child(self, parent_node_id: str, child_node_id: str, child_type: Literal["function", "class", "call", "code_element_group", "call_group"]):
         return await self.repos.code_element_repo.move_item(parent_node_id, child_node_id, child_type)
 

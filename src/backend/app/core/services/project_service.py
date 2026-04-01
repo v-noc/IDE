@@ -29,6 +29,20 @@ class ProjectService():
     async def get_all(self):
         return await self.meta_repos.project_repo.get_all()
 
+    async def get_structure(
+        self,
+        exclude_types: list[str] = [],
+        include_commit_id: bool = False,
+        compare_to: Optional[bool] = False,
+    ):
+        project_repos = self.uow.get_project_repos()
+        if compare_to:
+            project_repos = self.uow.get_project_repos(use_compare_to=True)
+        return await project_repos.project_repo.get_structure(
+            exclude_types,
+            include_commit_id,
+        )
+
     async def get_children(self, exclude_types: list[str] = [],  include_commit_id: bool = False, compare_to: Optional[bool] = False):
         project_repos = self.uow.get_project_repos()
         if compare_to:

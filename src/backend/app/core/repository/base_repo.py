@@ -3,6 +3,7 @@ from typing import Any, Callable, Generic, Type, TypeVar
 
 from app.db.async_terminus_client import AsyncClient
 from app.db.async_terminus_client import WOQLQuery as WQ
+from app.core.repository.utils.child_raw import ensure_path_choice_grouped
 
 TNode = TypeVar("TNode")
 TSchema = TypeVar("TSchema")
@@ -206,16 +207,29 @@ class BaseRepo(Generic[TNode, TSchema]):
         parse_child: Callable[[dict[str, Any]], Any],
         filtered_types: list[str] | None = None,
         allowed_path_fields: tuple[str, ...] | None = None,
+        depth_start: int | None = None,
+        depth_max: int | None = None,
     ):
         if allowed_path_fields is not None:
             requested_fields = field_name.strip("()").split("|")
             if any(field not in allowed_path_fields for field in requested_fields):
                 return []
 
+        grouped = ensure_path_choice_grouped(field_name)
+        # Path times {n,m}: n–m edge traversals (terminusdb_client woql_core._phrase_parser).
+        if depth_start is None and depth_max is None:
+            path_pattern = f"{grouped}+"
+        else:
+            d0 = 1 if depth_start is None else depth_start
+            d1 = depth_max if depth_max is not None else d0
+            if d0 < 1 or d1 < d0:
+                return []
+            path_pattern = f"{grouped}{{{d0},{d1}}}"
+
         query_step = (
             WQ()
             .eq("v:start", parent_id)
-            .path("v:start", f"{field_name}+", "v:child")
+            .path("v:start", path_pattern, "v:child")
         )
         if filtered_types:
             schema_types = [
@@ -226,12 +240,8 @@ class BaseRepo(Generic[TNode, TSchema]):
                 .member("v:type", schema_types)
             )
 
-        query = (
-            WQ()
-            .select("v:child_doc")
-            .woql_and(
-                query_step.read_document("v:child", "v:child_doc")
-            )
+        query = WQ().select("v:child_doc").woql_and(
+            query_step.read_document("v:child", "v:child_doc")
         )
 
         try:
@@ -242,7 +252,6 @@ class BaseRepo(Generic[TNode, TSchema]):
             return []
 
         children = []
-        allowed_types = set(filtered_types or [])
         for child_raw in [row["child_doc"] for row in result["bindings"]]:
             node = parse_child(child_raw)
             if node is not None:
