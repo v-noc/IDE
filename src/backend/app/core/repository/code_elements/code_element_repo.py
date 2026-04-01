@@ -1,3 +1,4 @@
+from app.db.async_terminus_client import AsyncClient
 from datetime import datetime, timezone
 
 from typing import Any, Union, List, Tuple
@@ -31,7 +32,6 @@ _CODE_DESCENDANT_SCHEMA_BY_KIND = {
     "call_group": CallGroupSchema.__name__,
 }
 _ALL_CODE_DESCENDANT_SCHEMAS = list(_CODE_DESCENDANT_SCHEMA_BY_KIND.values())
-from app.db.async_terminus_client import AsyncClient
 
 # Define a type for elements handled here
 CodeNode = Union[FunctionNode, ClassNode]
@@ -117,19 +117,20 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
             allowed_path_fields=CODE_ELEMENT_FIELDS,
         )
 
-    async def get_descendants_paginated(
+    async def get_code_descendant_nodes(
         self,
         parent_id: str,
         child_types: list[str],
         depth_start: int | None = None,
         depth_max: int | None = None,
-        limit: int | None = None,
-        offset: int = 0,
-    ) -> tuple[list[Any], bool]:
+    ) -> tuple[list[Any], dict[str, dict[str, Any]]]:
         """
         Descendants of ``parent_id`` along code edges. Path depth uses WOQL
         ``{depth_start, depth_max}`` (omit both for ``+``). Result is deduped by
-        id, sorted by id, then sliced with ``offset`` / ``limit``.
+        id and sorted by id for stable tree building.
+
+        The second value maps callee document id -> raw document for
+        ``TreeBuilder`` (from the same WOQL query as descendants).
         """
         if child_types:
             filtered = [
@@ -138,14 +139,14 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
                 if (n := _CODE_DESCENDANT_SCHEMA_BY_KIND.get(k)) is not None
             ]
             if not filtered:
-                return [], False
+                return [], {}
         else:
             filtered = list(_ALL_CODE_DESCENDANT_SCHEMAS)
 
         field_name = build_path_field_name(
             child_types, CODE_ELEMENT_FIELDS, type_to_field=CODE_CHILD_TYPE_TO_FIELD
         )
-        nodes = await self.get_children_by_path(
+        nodes, target_lookup = await self.get_children_by_path(
             parent_id,
             field_name,
             parse_code_element_child,
@@ -153,6 +154,7 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
             allowed_path_fields=CODE_ELEMENT_FIELDS,
             depth_start=depth_start,
             depth_max=depth_max,
+            include_call_target_docs=True,
         )
         by_id: dict[str, Any] = {}
         for n in nodes:
@@ -162,14 +164,7 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
             if nid:
                 by_id[str(nid)] = n
         ordered = [by_id[k] for k in sorted(by_id.keys())]
-        if offset < 0:
-            offset = 0
-        if limit is None:
-            return ordered[offset:], False
-        end = offset + limit
-        page = ordered[offset:end]
-        has_next = end < len(ordered)
-        return page, has_next
+        return ordered, target_lookup
 
     async def move_item(self, new_parent_id: str, item_id: str, child_type: str):
         return await self.move_item_by_type(
@@ -340,7 +335,7 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
         total_chunks = (len(queries) + limit - 1) // limit
         ok = True
         for start in range(0, len(queries), limit):
-            chunk = queries[start : start + limit]
+            chunk = queries[start: start + limit]
             chunk_no = start // limit + 1
             combined = WQ().woql_and(*chunk)
             try:

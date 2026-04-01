@@ -8,6 +8,8 @@ export interface SimpleTreeNode {
   icon?: string;
   node_type: AnyNodeTree["node_type"];
   children?: AnyNodeTree[];
+  /** Backend lazy hints (structure shell); same as sidebar tree nodes. */
+  lazy_child_ids?: string[];
   target?: { id: string, node_type: AnyNodeTree["node_type"], description?: string };
   metadata?: Partial<NodeMetadata>;
   created_at?: string;

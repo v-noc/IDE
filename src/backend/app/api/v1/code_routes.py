@@ -14,16 +14,17 @@ from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
 
 from app.core.socket.manager import get_socket_manager
 from app.core.services import CodeElementService
+from app.core.builder.tree_builder import TreeBuilder
+from app.core.schemas.tree import AnyTreeNode
 
 
 router = APIRouter()
 
 
 class CodeDescendantsResponse(BaseModel):
-    """Lazy-loaded code nodes under a parent within optional path depth bounds."""
+    """Code subtree under ``parent_id``, same nested shape as project tree (TreeBuilder)."""
 
-    nodes: list[dict[str, Any]]
-    has_next_page: bool = False
+    children: list[dict[str, Any]]
 
 
 def _parse_child_type_query(raw: Optional[str]) -> list[str]:
@@ -145,13 +146,6 @@ async def get_code_descendants(
         None,
         description="Comma-separated kinds: function,class,call,code_element_group,call_group",
     ),
-    limit: int = Query(
-        5,
-        ge=1,
-        le=500,
-        description="Page size after dedupe/sort",
-    ),
-    offset: int = Query(0, ge=0, description="Offset into deduped sorted list"),
     project_node: ProjectNode = Depends(get_project_node),
     code_element_service: CodeElementService = Depends(get_code_element_service),
 ) -> CodeDescendantsResponse:
@@ -169,14 +163,30 @@ async def get_code_descendants(
 
     kinds = _parse_child_type_query(child_types)
     compare_to = code_element_service.uow.has_compare_to()
-    nodes, has_next = await code_element_service.get_code_descendants(
+    base_nodes, base_target_lookup = await code_element_service.get_code_descendants(
         parent_id,
         kinds,
         depth_start=depth_start,
         depth_max=depth_max,
-        limit=limit,
-        offset=offset,
-        compare_to=compare_to,
+        compare_to=False,
     )
-    serialized = [n.model_dump(mode="json") for n in nodes if hasattr(n, "model_dump")]
-    return CodeDescendantsResponse(nodes=serialized, has_next_page=has_next)
+    compare_nodes = None
+    merged_target_lookup = dict(base_target_lookup)
+    if compare_to:
+        compare_nodes, compare_target_lookup = await code_element_service.get_code_descendants(
+            parent_id,
+            kinds,
+            depth_start=depth_start,
+            depth_max=depth_max,
+            compare_to=True,
+        )
+        merged_target_lookup.update(compare_target_lookup)
+    else:
+        compare_nodes = None
+
+    tree_builder = TreeBuilder(
+        base_nodes, compare_nodes, target_lookup=merged_target_lookup
+    )
+    trees: list[AnyTreeNode] = tree_builder.build()
+    serialized = [n.model_dump(mode="json") for n in trees]
+    return CodeDescendantsResponse(children=serialized)

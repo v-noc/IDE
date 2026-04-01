@@ -1,7 +1,7 @@
 import aiofiles
 
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Any, Literal, Optional, Tuple
 from app.core.model.nodes import FunctionNode, ClassNode
 from app.core.model.properties import CodePosition
 from app.core.utils.code_utils import (
@@ -39,22 +39,18 @@ class CodeElementService():
         child_types: list[str],
         depth_start: int | None = None,
         depth_max: int | None = None,
-        limit: int | None = None,
-        offset: int = 0,
         compare_to: bool = False,
-    ):
+    ) -> Tuple[list[Any], dict[str, dict[str, Any]]]:
         repos = (
             self.uow.get_project_repos(use_compare_to=True)
             if compare_to
             else self.repos
         )
-        return await repos.code_element_repo.get_descendants_paginated(
+        return await repos.code_element_repo.get_code_descendant_nodes(
             parent_id,
             child_types,
             depth_start=depth_start,
             depth_max=depth_max,
-            limit=limit,
-            offset=offset,
         )
 
     async def add_child(self, parent_node_id: str, child_node_id: str, child_type: Literal["function", "class", "call", "code_element_group", "call_group"]):

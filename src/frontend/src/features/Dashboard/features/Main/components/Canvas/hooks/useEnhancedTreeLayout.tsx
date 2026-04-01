@@ -62,9 +62,20 @@ export const useEnhancedTreeLayout = ({
     const edges: Edge[] = [];
     const visitedNodeIds = new Set<string>();
 
-    // Helper to check expansion
+    const expandedSet = new Set(expandedNodeIds);
+    /**
+     * Empty expansion list: show full subtree (first paint / no sidebar toggles yet).
+     * After any id is tracked, only those nodes render their children—CanvasView expands
+     * the path to the focused node so the center subtree stays reachable.
+     */
+    const expansionBootstrapped = expandedNodeIds.length > 0;
+
     const isExpanded = (nodeId: string) =>
-      expandedNodeIds.length === 0 || expandedNodeIds.includes(nodeId);
+      !expansionBootstrapped || expandedSet.has(nodeId);
+
+    const canExpand = (node: SimpleTreeNode) =>
+      (node.children?.length ?? 0) > 0 ||
+      (node.lazy_child_ids?.length ?? 0) > 0;
 
     const mergeMetadata = (node: SimpleTreeNode): NodeMetadata | undefined => {
       const mapped = metadataMap.get(node.id);
@@ -108,7 +119,7 @@ export const useEnhancedTreeLayout = ({
           textColor: nodeStyle.textColor,
           iconColor: nodeStyle.iconColor,
           borderColor: nodeStyle.borderColor,
-          expandable: (node.children?.length ?? 0) > 0,
+          expandable: canExpand(node),
           expanded: isExpanded(nodeId),
           onToggle: () => toggleNodeExpansion(nodeId),
           metadata: mergeMetadata(node),
@@ -196,6 +207,6 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
-  }, [centerNode, expandedNodeIds, metadataMap]);
+  }, [centerNode, expandedNodeIds, metadataMap, toggleNodeExpansion]);
   return { initialNodes, initialEdges };
 };

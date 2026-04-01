@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { type ContainerNodeTree } from "@/types/project";
+import { type CallNodeTree, type ContainerNodeTree } from "@/types/project";
 import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu";
 import { NodeContent } from "./NodeContent";
 import { useTreeNodeState } from "../../hooks/useTreeNodeState";
@@ -22,8 +22,8 @@ export const TreeNode = ({
   childFilter,
   onSelect,
 }: TreeNodeProps) => {
-  const isOpen = useProjectStore(
-    (s) => (s.expandedNodeIds[tabId] ?? []).includes(node.id),
+  const isOpen = useProjectStore((s) =>
+    (s.expandedNodeIds[tabId] ?? []).includes(node.id),
   );
 
   const lazy = useLazyCodeChildren(node, isOpen);
@@ -65,7 +65,11 @@ export const TreeNode = ({
     <NodeContextMenu
       nodeId={node.id}
       nodeType={node.node_type}
-      manuallyCreated={(node as any).manually_created}
+      manuallyCreated={
+        node.node_type === "call"
+          ? (node as CallNodeTree).manually_created
+          : undefined
+      }
       onAction={onAction}
     >
       <NodeContent
@@ -80,9 +84,6 @@ export const TreeNode = ({
         handleSelectNode={handleSelectOverride}
         childFilter={childFilter}
         onSelect={onSelect}
-        showLoadMore={lazy.hasNextPage}
-        loadMorePending={lazy.isFetching}
-        onLoadMore={() => lazy.fetchNextPage()}
       />
     </NodeContextMenu>
   );

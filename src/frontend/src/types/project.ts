@@ -101,6 +101,8 @@ export interface GroupNode extends ContainerNode {
 
 export interface ContainerNodeTree extends ContainerNode {
   children: AnyNodeTree[]
+  /** Present on file/class/function/call/group from structure or descendants API. */
+  lazy_child_ids?: string[]
 }
 
 export interface CallNodeTree extends CallNode {

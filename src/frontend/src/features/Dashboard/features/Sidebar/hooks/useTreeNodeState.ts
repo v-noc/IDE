@@ -31,6 +31,7 @@ export function useTreeNodeState(
   const hasChildren = useMemo(() => {
     if (!node) return false;
     const children = node.children ?? [];
+
     if (children.some((child) => childFilter(child as ContainerNodeTree))) {
       return true;
     }

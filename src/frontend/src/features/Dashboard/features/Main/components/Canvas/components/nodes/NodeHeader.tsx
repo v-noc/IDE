@@ -51,10 +51,15 @@ export const NodeHeader = memo(function NodeHeader({
     >
       {expandable && (
         <button
-          onClick={() => {
+          type="button"
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse subtree" : "Expand subtree"}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
             onToggle?.();
           }}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${expanded ? "bg-slate-200/5" : "bg-slate-100/15"
+          className={`nodrag nopan flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${expanded ? "bg-slate-200/5" : "bg-slate-100/15"
             }`}
           style={{
             borderColor,
@@ -97,10 +102,14 @@ export const NodeHeader = memo(function NodeHeader({
 
       {hasCode && (
         <button
-          onClick={() => {
-            onCodeToggle?.()
+          type="button"
+          aria-label={showCode ? "Hide code" : "Show code"}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onCodeToggle?.();
           }}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${showCode ? "bg-slate-200/5" : "bg-slate-100/15"
+          className={`nodrag nopan flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${showCode ? "bg-slate-200/5" : "bg-slate-100/15"
             }`}
           style={{
             borderColor,

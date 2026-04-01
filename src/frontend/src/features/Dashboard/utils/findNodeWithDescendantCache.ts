@@ -1,14 +1,43 @@
-import type { InfiniteData, QueryClient } from "@tanstack/react-query";
-
-import { normalizeCodeDescendant } from "@/features/Dashboard/service/codeDescendants/normalizeDescendantNode";
+import type { QueryClient } from "@tanstack/react-query";
 import queryKeys from "@/lib/queryKeys";
 import type { CodeDescendantsResponse } from "@/services/code/api";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 
 import { findNodeByKey } from "./findNode";
 
+function rawNodeId(raw: Record<string, unknown>): string {
+  const id = raw.id ?? raw["@id"];
+  return typeof id === "string" ? id : "";
+}
+
+function findInDescendantForest(
+  roots: Record<string, unknown>[],
+  targetId: string,
+): AnyNodeTree | null {
+  for (const raw of roots) {
+    if (rawNodeId(raw) === targetId) {
+      return raw as unknown as AnyNodeTree;
+    }
+    const ch = raw.children;
+    if (Array.isArray(ch)) {
+      const objs = ch.filter(
+        (x): x is Record<string, unknown> =>
+          x != null && typeof x === "object" && !Array.isArray(x),
+      );
+      const hit = findInDescendantForest(objs, targetId);
+      if (hit) return hit;
+    }
+    const t = raw.target;
+    if (t && typeof t === "object" && !Array.isArray(t)) {
+      const hit = findInDescendantForest([t as Record<string, unknown>], targetId);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
 /**
- * Resolve a node from the structure tree, or from any cached `code.descendants` infinite query for this project.
+ * Resolve a node from the structure tree, or from any cached `code.descendants` query for this project.
  */
 export function findNodeByIdWithDescendantCache(
   queryClient: QueryClient,
@@ -35,16 +64,13 @@ export function findNodeByIdWithDescendantCache(
   });
 
   for (const q of queries) {
-    const data = q.state.data as
-      | InfiniteData<CodeDescendantsResponse>
-      | undefined;
-    if (!data?.pages?.length) continue;
-    for (const page of data.pages) {
-      for (const raw of page.nodes) {
-        const n = normalizeCodeDescendant(raw);
-        if (n.id === id) return n as AnyNodeTree;
-      }
-    }
+    const data = q.state.data as CodeDescendantsResponse | undefined;
+    if (!data?.children?.length) continue;
+    const hit = findInDescendantForest(
+      data.children as Record<string, unknown>[],
+      id,
+    );
+    if (hit) return hit;
   }
   return null;
 }

@@ -16,11 +16,13 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useQueryClient } from "@tanstack/react-query";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { SimpleTreeNode } from "./nodeUtils";
 import EnhancedNode from "./nodes/EnhancedNode";
 import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
-import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
+import { findNodeLineage } from "@/features/Dashboard/utils/findNode";
+import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/findNodeWithDescendantCache";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 
@@ -45,6 +47,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 }) => {
   void _projectId;
 
+  const queryClient = useQueryClient();
+
   const selectedNode = useProjectStore(
     useShallow((s) => s.selectedNode[tabId]),
   );
@@ -57,12 +61,15 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const toggleNodeExpansion = useProjectStore(
     useShallow((s) => s.toggleNodeExpansion),
   );
+  const expandNode = useProjectStore(useShallow((s) => s.expandNode));
+  const expandNodesBulk = useProjectStore(useShallow((s) => s.expandNodesBulk));
   const projectData = useProjectStore(useShallow((s) => s.projectData));
   const handleNodeSelection = useTabStore(
     useShallow((s) => s.handleNodeSelection),
   );
 
   const centerNode = selectedNode as SimpleTreeNode | null;
+  const projectKey = projectData?.id ?? "";
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   const layoutConfig = useMemo(
@@ -98,6 +105,21 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   useEffect(() => {
     syncDiffOverlay();
   }, [initialNodes, initialEdges]);
+
+  useEffect(() => {
+    if (!centerNode?.id) return;
+    if (projectData) {
+      const lineage = findNodeLineage(projectData, centerNode.id);
+      if (lineage?.length) {
+        expandNodesBulk(
+          tabId,
+          lineage.map((n) => n.id),
+        );
+        return;
+      }
+    }
+    expandNode(tabId, centerNode.id);
+  }, [centerNode?.id, projectData, tabId, expandNodesBulk, expandNode]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 
@@ -142,38 +164,44 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      const nodeKey = node.id;
-      if (projectData && nodeKey && reactFlowInstanceRef.current) {
-        const foundNode = findNodeByKey(projectData, nodeKey);
-        if (foundNode) {
-          reactFlowInstanceRef.current.setCenter(
-            node.position.x + (node.measured?.width || 0) / 2,
-            node.position.y + (node.measured?.height || 0) / 2,
-            {
-              zoom: 1,
-              duration: 300,
-            },
-          );
-        }
-      }
+      if (!reactFlowInstanceRef.current) return;
+      reactFlowInstanceRef.current.setCenter(
+        node.position.x + (node.measured?.width || 0) / 2,
+        node.position.y + (node.measured?.height || 0) / 2,
+        {
+          zoom: 1,
+          duration: 300,
+        },
+      );
     },
-    [projectData],
+    [],
   );
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const nodeKey = node.id;
-
-      if (projectData && nodeKey) {
-        const foundNode = findNodeByKey(projectData, nodeKey);
-        if (foundNode?.id && foundNode?.id !== centerNode?.id) {
-          handleNodeSelection(tabId, foundNode, "secondary");
-        } else {
-          handleNodeSelection(tabId, foundNode, "primary");
-        }
+      if (!nodeKey) return;
+      const foundNode = findNodeByIdWithDescendantCache(
+        queryClient,
+        projectData,
+        projectKey,
+        nodeKey,
+      );
+      if (!foundNode) return;
+      if (foundNode.id !== centerNode?.id) {
+        handleNodeSelection(tabId, foundNode, "secondary");
+      } else {
+        handleNodeSelection(tabId, foundNode, "primary");
       }
     },
-    [projectData, handleNodeSelection, tabId, centerNode],
+    [
+      queryClient,
+      projectData,
+      projectKey,
+      handleNodeSelection,
+      tabId,
+      centerNode?.id,
+    ],
   );
 
   return (
