@@ -6,6 +6,11 @@ export type CodeDescendantsResponse = {
   children: Record<string, unknown>[];
 };
 
+export type CodeLineageResponse = {
+  path_ids: string[];
+  tree: Record<string, unknown>[];
+};
+
 export interface CodeData {
   file_id: string;
   file_name: string;
@@ -66,5 +71,10 @@ export const codeApi = {
     return api(`${API_ROUTES.CODE_ELEMENTS}descendants${qs}`, {
       compareTo: opts?.compareTo ?? undefined,
     }) as Promise<CodeDescendantsResponse>;
+  },
+
+  getLineage: (projectId: string, targetId: string): Promise<CodeLineageResponse> => {
+    const qs = buildQueryString({ project_id: projectId, target_id: targetId });
+    return api(`${API_ROUTES.CODE_ELEMENTS}lineage${qs}`) as Promise<CodeLineageResponse>;
   },
 }

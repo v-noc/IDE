@@ -10,7 +10,7 @@ function rawNodeId(raw: Record<string, unknown>): string {
   return typeof id === "string" ? id : "";
 }
 
-function findInDescendantForest(
+export function findInDescendantForest(
   roots: Record<string, unknown>[],
   targetId: string,
 ): AnyNodeTree | null {

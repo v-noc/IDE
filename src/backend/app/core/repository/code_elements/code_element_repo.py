@@ -22,6 +22,7 @@ from app.core.repository.utils import (
     CODE_SET_FIELDS_TO_PRESERVE,
     build_path_field_name,
     parse_code_element_child,
+    parse_structure_child,
 )
 
 _CODE_DESCENDANT_SCHEMA_BY_KIND = {
@@ -352,3 +353,31 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
                 ok = False
                 break
         return ok
+
+    async def get_node_lineage(self, node_id: str) -> list[Any]:
+        query = WQ().select("v:target_doc").woql_and(
+            WQ().eq("v:node", node_id).
+            path("v:node", "(<function_children|<class_children)*", "v:parent").
+            read_document("v:parent", "v:target_doc")
+        )
+        try:
+            result = await self.client.query(query)
+            print(f"result: {result}")
+        except Exception as exc:
+            print(f"error-", exc)
+
+            return []
+
+        bindings = result.get("bindings") or []
+        docs: list[dict[str, Any]] = []
+        for row in bindings:
+            doc = row.get("target_doc")
+            if not isinstance(doc, dict):
+                continue
+
+            docs.append(parse_structure_child(doc))
+
+        if not docs:
+            return []
+
+        return docs

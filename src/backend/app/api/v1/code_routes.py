@@ -27,6 +27,13 @@ class CodeDescendantsResponse(BaseModel):
     children: list[dict[str, Any]]
 
 
+class CodeLineageResponse(BaseModel):
+    """Path from project root to ``target_id`` and nested spine built with TreeBuilder."""
+
+    path_ids: list[str]
+    tree: list[dict[str, Any]]
+
+
 def _parse_child_type_query(raw: Optional[str]) -> list[str]:
     if not raw or not raw.strip():
         return []
@@ -190,3 +197,20 @@ async def get_code_descendants(
     trees: list[AnyTreeNode] = tree_builder.build()
     serialized = [n.model_dump(mode="json") for n in trees]
     return CodeDescendantsResponse(children=serialized)
+
+
+@router.get("/lineage", response_model=CodeLineageResponse)
+async def get_code_lineage(
+    target_id: str = Query(
+        ...,
+        description="Document id to resolve from root (e.g. FunctionSchema/…, ClassSchema/…)",
+    ),
+    project_node: ProjectNode = Depends(get_project_node),
+    code_element_service: CodeElementService = Depends(get_code_element_service),
+) -> CodeLineageResponse:
+    _ = project_node
+    compare_to = code_element_service.uow.has_compare_to()
+    data = await code_element_service.get_target_lineage_tree(
+        target_id, compare_to=compare_to
+    )
+    return CodeLineageResponse(**data)

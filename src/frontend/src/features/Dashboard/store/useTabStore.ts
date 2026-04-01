@@ -2,9 +2,11 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type { TabData } from '@/types/tabs';
-import type { AnyNodeTree } from '@/types/project';
+import type { AnyNodeTree, ProjectNodeTree } from '@/types/project';
+import { queryClient } from '@/lib/queryClient';
+import { codeApi } from '@/services/code/api';
 import useProjectStore from './useProjectStore';
-import { findNodeLineage } from '../utils/findNode';
+import { resolveLineageFromPath } from '../utils/resolveLineageFromPath';
 
 export interface TabState {
   tabs: Record<string, TabData>;
@@ -138,7 +140,7 @@ const useTabStore = create<TabStore>()(
             if (existingChildId) return;
 
             const projectData = useProjectStore.getState().projectData;
-            const lineage = findNodeLineage(projectData, target.id);
+            const projectKey = projectData?.id ?? '';
 
             const newTabId = crypto.randomUUID();
             const newTab: TabData = {
@@ -149,25 +151,34 @@ const useTabStore = create<TabStore>()(
               childrenIds: [],
             };
 
-            // Add the tab
             get().addTab(newTab);
 
-            // Use the full node from projectData (via lineage) for selection if available
-            const fullTargetNode = lineage?.[lineage.length - 1] ?? target;
+            useProjectStore.getState().setSelectedNode(newTabId, target as AnyNodeTree);
+            useProjectStore.getState().pushFocus(newTabId, target as AnyNodeTree);
 
-            // Set selected node for the NEW tab
-            useProjectStore.getState().setSelectedNode(newTabId, fullTargetNode);
-
-            if (lineage && lineage.length > 0) {
-              // Initialize focus stack with lineage
-              useProjectStore.getState().pushFocusBulk(newTabId, lineage);
-
-              // Auto-expand folders/files/nodes in the lineage including target
-              const expandKeys = lineage.map((n: AnyNodeTree) => n.id);
-              useProjectStore.getState().expandNodesBulk(newTabId, expandKeys);
-            } else {
-              // Fallback
-              useProjectStore.getState().pushFocus(newTabId, target as any);
+            if (projectKey) {
+              void (async () => {
+                try {
+                  const { path_ids } = await codeApi.getLineage(projectKey, target.id);
+                  const lineage = await resolveLineageFromPath(
+                    queryClient,
+                    projectData as ProjectNodeTree | null,
+                    projectKey,
+                    path_ids,
+                  );
+                  if (lineage?.length) {
+                    const fullTargetNode = lineage[lineage.length - 1];
+                    useProjectStore.getState().clearFocus(newTabId);
+                    useProjectStore.getState().pushFocusBulk(newTabId, lineage);
+                    useProjectStore.getState().setSelectedNode(newTabId, fullTargetNode);
+                    useProjectStore
+                      .getState()
+                      .expandNodesBulk(newTabId, lineage.map((n: AnyNodeTree) => n.id));
+                  }
+                } catch {
+                  /* keep provisional target focus */
+                }
+              })();
             }
 
             // Note: Auto-activation removed based on user request "it wont be active if the user did not click on it"

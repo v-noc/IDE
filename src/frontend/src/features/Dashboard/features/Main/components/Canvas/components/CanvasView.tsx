@@ -21,7 +21,7 @@ import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { SimpleTreeNode } from "./nodeUtils";
 import EnhancedNode from "./nodes/EnhancedNode";
 import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
-import { findNodeLineage } from "@/features/Dashboard/utils/findNode";
+import { codeApi } from "@/services/code/api";
 import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/findNodeWithDescendantCache";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
@@ -108,18 +108,30 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   useEffect(() => {
     if (!centerNode?.id) return;
-    if (projectData) {
-      const lineage = findNodeLineage(projectData, centerNode.id);
-      if (lineage?.length) {
-        expandNodesBulk(
-          tabId,
-          lineage.map((n) => n.id),
-        );
-        return;
-      }
+    const nodeId = centerNode.id;
+    const pk = projectData?.id ?? "";
+    if (!pk) {
+      expandNode(tabId, nodeId);
+      return;
     }
-    expandNode(tabId, centerNode.id);
-  }, [centerNode?.id, projectData, tabId, expandNodesBulk, expandNode]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { path_ids } = await codeApi.getLineage(pk, nodeId);
+        if (cancelled) return;
+        if (path_ids?.length) {
+          expandNodesBulk(tabId, path_ids);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      if (!cancelled) expandNode(tabId, nodeId);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [centerNode?.id, projectData?.id, tabId, expandNodesBulk, expandNode]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 

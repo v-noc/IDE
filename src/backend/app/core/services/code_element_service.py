@@ -2,6 +2,8 @@ import aiofiles
 
 from datetime import datetime, timezone
 from typing import Any, Literal, Optional, Tuple
+
+from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import FunctionNode, ClassNode
 from app.core.model.properties import CodePosition
 from app.core.utils.code_utils import (
@@ -11,6 +13,20 @@ from app.core.utils.code_utils import (
 )
 
 from app.db.context import ProjectUoW
+
+
+def _lineage_docs_as_spine_flat(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Force a single-child chain so TreeBuilder yields one nested spine (no sibling payload)."""
+    flat: list[dict[str, Any]] = []
+    for i, d in enumerate(docs):
+        out = dict(d)
+        next_id = None
+        if i + 1 < len(docs):
+            nxt = docs[i + 1]
+            next_id = nxt.get("@id") or nxt.get("id")
+        out["children"] = [next_id] if next_id else []
+        flat.append(out)
+    return flat
 
 
 class CodeElementService():
@@ -32,6 +48,37 @@ class CodeElementService():
 
     async def get_children(self, node_id: str):
         return await self.repos.code_element_repo.get_children(node_id, [])
+
+    async def get_target_lineage_tree(
+        self, target_id: str, *, compare_to: bool = False
+    ) -> dict[str, Any]:
+        """Root→leaf document chain as path ids and nested tree (spine only)."""
+        repos = (
+            self.uow.get_project_repos(use_compare_to=True)
+            if compare_to
+            else self.repos
+        )
+        docs = await repos.code_element_repo.get_node_lineage(target_id)
+        if not docs:
+            return {"path_ids": [], "tree": []}
+
+        tree_builder = TreeBuilder(docs)
+        tree = tree_builder.build()
+
+        path_ids: list[str] = []
+
+        def collect_path_ids(node):
+            if node.id:
+                path_ids.append(node.id)
+            for child in node.children:
+                collect_path_ids(child)
+        for node in tree:
+            collect_path_ids(node)
+
+        return {
+            "path_ids": path_ids,
+            "tree": [n.model_dump(mode="json") for n in tree],
+        }
 
     async def get_code_descendants(
         self,
