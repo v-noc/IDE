@@ -123,10 +123,13 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
         child_types: list[str],
         depth_start: int | None = None,
         depth_max: int | None = None,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> tuple[list[Any], bool]:
         """
         Descendants of ``parent_id`` along code edges. Path depth uses WOQL
-        ``{depth_start, depth_max}`` (omit both for ``+``).
+        ``{depth_start, depth_max}`` (omit both for ``+``). Result is deduped by
+        id, sorted by id, then sliced with ``offset`` / ``limit``.
         """
         if child_types:
             filtered = [
@@ -151,7 +154,22 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
             depth_start=depth_start,
             depth_max=depth_max,
         )
-        return nodes, False
+        by_id: dict[str, Any] = {}
+        for n in nodes:
+            if n is None:
+                continue
+            nid = getattr(n, "id", None)
+            if nid:
+                by_id[str(nid)] = n
+        ordered = [by_id[k] for k in sorted(by_id.keys())]
+        if offset < 0:
+            offset = 0
+        if limit is None:
+            return ordered[offset:], False
+        end = offset + limit
+        page = ordered[offset:end]
+        has_next = end < len(ordered)
+        return page, has_next
 
     async def move_item(self, new_parent_id: str, item_id: str, child_type: str):
         return await self.move_item_by_type(

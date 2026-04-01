@@ -1,8 +1,11 @@
+import { useMemo } from "react";
 import { type ContainerNodeTree } from "@/types/project";
 import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu";
 import { NodeContent } from "./NodeContent";
 import { useTreeNodeState } from "../../hooks/useTreeNodeState";
 import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
+import { useLazyCodeChildren } from "@/features/Dashboard/service/codeDescendants";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 
 interface TreeNodeProps {
   node: ContainerNodeTree;
@@ -19,10 +22,32 @@ export const TreeNode = ({
   childFilter,
   onSelect,
 }: TreeNodeProps) => {
-  const { isOpen, isSelected, isActive, hasChildren } = useTreeNodeState(
-    node,
+  const isOpen = useProjectStore(
+    (s) => (s.expandedNodeIds[tabId] ?? []).includes(node.id),
+  );
+
+  const lazy = useLazyCodeChildren(node, isOpen);
+
+  const displayNode = useMemo((): ContainerNodeTree => {
+    const base = node.children ?? [];
+    const extra = lazy.loadedNodes;
+    if (!extra.length) return node;
+    return {
+      ...node,
+      children: [...base, ...extra],
+    };
+  }, [node, lazy.loadedNodes]);
+
+  const lazyMeta = useMemo(
+    () => ({ lazyHintCount: node.lazy_child_ids?.length ?? 0 }),
+    [node.lazy_child_ids],
+  );
+
+  const { isSelected, isActive, hasChildren } = useTreeNodeState(
+    displayNode,
     childFilter,
     tabId,
+    lazyMeta,
   );
 
   const { handleToggle, handleSelectNode, onAction } = useNodeHandlers(
@@ -44,7 +69,7 @@ export const TreeNode = ({
       onAction={onAction}
     >
       <NodeContent
-        node={node}
+        node={displayNode}
         tabId={tabId}
         isOpen={isOpen}
         isSelected={isSelected}
@@ -55,6 +80,9 @@ export const TreeNode = ({
         handleSelectNode={handleSelectOverride}
         childFilter={childFilter}
         onSelect={onSelect}
+        showLoadMore={lazy.hasNextPage}
+        loadMorePending={lazy.isFetching}
+        onLoadMore={() => lazy.fetchNextPage()}
       />
     </NodeContextMenu>
   );

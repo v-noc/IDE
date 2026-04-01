@@ -30,6 +30,22 @@ const queryKeys = {
   code: {
     all: ['code'] as const,
     detail: (elementId: string) => [...queryKeys.code.all, elementId] as const,
+    descendants: (
+      projectKey: string,
+      parentId: string,
+      branch?: string | null,
+      ref?: string | null,
+      compareTo?: string | null,
+    ) =>
+      [
+        ...queryKeys.code.all,
+        'descendants',
+        projectKey,
+        parentId,
+        branch ?? 'main',
+        ref ?? '',
+        compareTo ?? '',
+      ] as const,
   },
   logs: {
     all: ['logs'] as const,

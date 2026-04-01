@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useMemo } from "react";
 import { useParams } from "react-router-dom";
 
-import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/useProject";
+import { useGetProjectStructureTree } from "@/features/Dashboard/service/useProject";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
@@ -47,7 +47,7 @@ export function useSidebarData() {
   const showAffectedOnly = useVersioningStore((s) => s.showAffectedOnly);
   const projectKey = projectId ? `ProjectSchema/${projectId}` : "";
 
-  const { data, isLoading, isSuccess } = useGetProjectTreeWithKeyProject({
+  const { data, isLoading, isSuccess } = useGetProjectStructureTree({
     key: projectKey,
   });
 

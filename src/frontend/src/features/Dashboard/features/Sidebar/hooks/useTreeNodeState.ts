@@ -3,6 +3,11 @@ import useProjectStore from '@/features/Dashboard/store/useProjectStore';
 import type { ContainerNodeTree } from '@/types/project';
 import { useShallow } from 'zustand/react/shallow';
 
+export type TreeNodeLazyMeta = {
+  /** From API lazy_child_ids — children exist but not in structure payload. */
+  lazyHintCount: number;
+};
+
 /**
  * Core tree node state - selection, expansion, children.
  * Pure derived state, no side effects.
@@ -10,7 +15,8 @@ import { useShallow } from 'zustand/react/shallow';
 export function useTreeNodeState(
   node: ContainerNodeTree,
   childFilter: (node: ContainerNodeTree) => boolean = () => true,
-  tabId: string
+  tabId: string,
+  lazyMeta?: TreeNodeLazyMeta | null,
 ) {
   // Selective subscriptions - only re-render when these change
   const selectedNodeKey = useProjectStore((s) => s.selectedNode[tabId]?.id);
@@ -25,8 +31,12 @@ export function useTreeNodeState(
   const hasChildren = useMemo(() => {
     if (!node) return false;
     const children = node.children ?? [];
-    return children.some((child) => childFilter(child as ContainerNodeTree));
-  }, [node, childFilter]);
+    if (children.some((child) => childFilter(child as ContainerNodeTree))) {
+      return true;
+    }
+    if (lazyMeta && lazyMeta.lazyHintCount > 0) return true;
+    return false;
+  }, [node, childFilter, lazyMeta]);
 
   return {
     isOpen,

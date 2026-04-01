@@ -52,6 +52,8 @@ export const codeApi = {
       depthStart?: number;
       depthMax?: number;
       childTypes?: string;
+      limit?: number;
+      offset?: number;
       compareTo?: string | null;
     }
   ): Promise<CodeDescendantsResponse> => {
@@ -62,6 +64,8 @@ export const codeApi = {
     if (opts?.depthStart != null) params.depth_start = String(opts.depthStart);
     if (opts?.depthMax != null) params.depth_max = String(opts.depthMax);
     if (opts?.childTypes) params.child_types = opts.childTypes;
+    if (opts?.limit != null) params.limit = String(opts.limit);
+    if (opts?.offset != null) params.offset = String(opts.offset);
     const qs = buildQueryString(params);
     return api(`${API_ROUTES.CODE_ELEMENTS}descendants${qs}`, {
       compareTo: opts?.compareTo ?? undefined,

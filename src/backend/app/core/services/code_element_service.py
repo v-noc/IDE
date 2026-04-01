@@ -39,6 +39,8 @@ class CodeElementService():
         child_types: list[str],
         depth_start: int | None = None,
         depth_max: int | None = None,
+        limit: int | None = None,
+        offset: int = 0,
         compare_to: bool = False,
     ):
         repos = (
@@ -51,6 +53,8 @@ class CodeElementService():
             child_types,
             depth_start=depth_start,
             depth_max=depth_max,
+            limit=limit,
+            offset=offset,
         )
 
     async def add_child(self, parent_node_id: str, child_node_id: str, child_type: Literal["function", "class", "call", "code_element_group", "call_group"]):

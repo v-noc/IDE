@@ -145,6 +145,13 @@ async def get_code_descendants(
         None,
         description="Comma-separated kinds: function,class,call,code_element_group,call_group",
     ),
+    limit: int = Query(
+        5,
+        ge=1,
+        le=500,
+        description="Page size after dedupe/sort",
+    ),
+    offset: int = Query(0, ge=0, description="Offset into deduped sorted list"),
     project_node: ProjectNode = Depends(get_project_node),
     code_element_service: CodeElementService = Depends(get_code_element_service),
 ) -> CodeDescendantsResponse:
@@ -167,6 +174,8 @@ async def get_code_descendants(
         kinds,
         depth_start=depth_start,
         depth_max=depth_max,
+        limit=limit,
+        offset=offset,
         compare_to=compare_to,
     )
     serialized = [n.model_dump(mode="json") for n in nodes if hasattr(n, "model_dump")]

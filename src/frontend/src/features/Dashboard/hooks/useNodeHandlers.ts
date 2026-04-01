@@ -1,11 +1,12 @@
 import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
 import useTabStore from '@/features/Dashboard/store/useTabStore';
 import { useSidebarModalStore } from '@/features/Dashboard/store/useSidebarModalStore';
 import type { AnyNodeTree, CallNodeTree, ContainerNodeTree } from '@/types/project';
 import { useShallow } from 'zustand/react/shallow';
 import { useTreeNodeActions } from './useNodeAction';
-import { findNodeByKey } from '@/features/Dashboard/utils/findNode';
+import { findNodeByIdWithDescendantCache } from '@/features/Dashboard/utils/findNodeWithDescendantCache';
 import type { ProjectStore } from '@/features/Dashboard/store/useProjectStore';
 
 /**
@@ -13,6 +14,7 @@ import type { ProjectStore } from '@/features/Dashboard/store/useProjectStore';
  * All mutations dispatch to modal store or API.
  */
 export function useNodeHandlers(nodeId: string, tabId: string) {
+  const queryClient = useQueryClient();
   // Store actions
   const handleNodeSelection = useTabStore((s: any) => s.handleNodeSelection);
   const setSecondarySelectedNode = useProjectStore((s: any) => s.setSecondarySelectedNode);
@@ -24,10 +26,15 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
 
   // Helper to get fresh node from store for actions that need full object
   const getNode = useCallback(() => {
-    const projectData = useProjectStore.getState().projectData;
-    if (!projectData) return null;
-    return findNodeByKey(projectData, nodeId);
-  }, [nodeId]);
+    const { projectData } = useProjectStore.getState();
+    const projectKey = projectData?.id ?? '';
+    return findNodeByIdWithDescendantCache(
+      queryClient,
+      projectData,
+      projectKey,
+      nodeId,
+    );
+  }, [nodeId, queryClient]);
 
   const node = getNode();
   const { handleRemoveCall, handleDeleteGroup } = useTreeNodeActions(node as ContainerNodeTree);

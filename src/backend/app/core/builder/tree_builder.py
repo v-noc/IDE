@@ -1,6 +1,7 @@
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple, Type
 
 from pydantic import BaseModel
+from loguru import logger
 
 from app.core.schemas.tree import (
     AnyTreeNode,
@@ -49,6 +50,15 @@ GROUP_SCHEMA_TO_GROUP_TYPE = {
 STRUCTURE_CHILDREN = (FolderTreeNode, FileTreeNode, GroupTreeNode)
 CODE_CHILDREN = (ClassTreeNode, FunctionTreeNode, CallTreeNode, GroupTreeNode)
 CALL_CHILDREN = (CallTreeNode, GroupTreeNode)
+
+# Nodes that may have code (or group) children loaded lazily when not in the payload.
+_LAZY_CHILD_TRACKING_TYPES: Tuple[Type[Any], ...] = (
+    FileTreeNode,
+    ClassTreeNode,
+    FunctionTreeNode,
+    CallTreeNode,
+    GroupTreeNode,
+)
 
 
 class TreeBuilder:
@@ -365,6 +375,12 @@ class TreeBuilder:
                     parent.children.append(child)
                     self.parent_map[cid] = pid
                     referenced.add(cid)
+
+            if isinstance(parent, _LAZY_CHILD_TRACKING_TYPES):
+                attached_ids = {c.id for c in parent.children}
+                lazy = [cid for cid in cids if cid not in attached_ids]
+                if lazy:
+                    parent.lazy_child_ids = lazy
 
         # Phase 3: Link call targets
         for call_id, target_id in target_function_id_by_call.items():
