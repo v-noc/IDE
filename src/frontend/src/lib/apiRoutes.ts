@@ -1,5 +1,6 @@
 const API_ROUTES = {
     PROJECTS: '/projects/',
+    PROJECT_STRUCTURE: '/projects/structure',
     VIRTUAL_FOLDER: '/virtual-folders/',
     CODE_ELEMENTS: '/code-elements/',
     CONTAINER: '/containers/',

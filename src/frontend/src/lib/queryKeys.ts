@@ -10,6 +10,22 @@ const queryKeys = {
       compareTo?: string | null,
     ) =>
       [...queryKeys.projects.all, 'tree', id, branch ?? 'main', ref ?? '', compareTo ?? ''] as const,
+    structureTree: (
+      id: string,
+      branch?: string | null,
+      ref?: string | null,
+      compareTo?: string | null,
+      excludeGroups?: boolean,
+    ) =>
+      [
+        ...queryKeys.projects.all,
+        'structure',
+        id,
+        branch ?? 'main',
+        ref ?? '',
+        compareTo ?? '',
+        excludeGroups ? 'no-groups' : 'with-groups',
+      ] as const,
   },
   code: {
     all: ['code'] as const,

@@ -78,6 +78,7 @@ export function useSidebarData() {
 
   const nodesForFiltering = useMemo(() => {
     const nodes = (rawProjectData?.children as AnyNodeTree[]) ?? [];
+
     if (!showAffectedOnly) return nodes;
     return filterAffectedTree(nodes);
   }, [rawProjectData?.children, showAffectedOnly]);
@@ -89,6 +90,7 @@ export function useSidebarData() {
 
   // Derived filtered project data
   const filteredProjectData = useMemo(() => {
+
     if (!rawProjectData) return null;
     return {
       ...rawProjectData,

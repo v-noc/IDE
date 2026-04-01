@@ -40,7 +40,7 @@ const useTabStore = create<TabStore>()(
 
       addTab: (tab: TabData) =>
         set((state) => {
-          console.log("addTab", tab);
+
           state.tabs[tab.id] = tab;
           if (tab.parentId && state.tabs[tab.parentId]) {
             state.tabs[tab.parentId].childrenIds.push(tab.id);
