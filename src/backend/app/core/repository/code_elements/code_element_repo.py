@@ -362,7 +362,7 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
         )
         try:
             result = await self.client.query(query)
-            print(f"result: {result}")
+
         except Exception as exc:
             print(f"error-", exc)
 
