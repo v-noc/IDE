@@ -18,7 +18,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
 
   // Only fetch code for file, class, or function node types
   const shouldFetchCode =
-    nodeType === "file" || nodeType === "class" || nodeType === "function";
+    nodeType === "file" || nodeType === "class" || nodeType === "function" || nodeType === "call";
 
   // Fetch code dynamically for the node
   const effectiveNodeId = nodeType === "call" && targetKey ? targetKey : nodeId;
