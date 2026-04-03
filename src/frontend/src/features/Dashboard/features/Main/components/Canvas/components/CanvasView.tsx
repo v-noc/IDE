@@ -16,13 +16,20 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { SimpleTreeNode } from "./nodeUtils";
 import EnhancedNode from "./nodes/EnhancedNode";
 import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
 import { codeApi } from "@/services/code/api";
+import {
+  canLazyLoadCodeChildren,
+  getCodeDescendantsQueryOptions,
+} from "@/features/Dashboard/service/codeDescendants";
+import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/findNodeWithDescendantCache";
+import type { AnyNodeTree } from "@/types/project";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 
@@ -68,6 +75,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     useShallow((s) => s.handleNodeSelection),
   );
 
+  const branch = useVersioningStore((s) => s.branch);
+  const ref = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareTo = useVersioningStore((s) => s.compareToCommitId);
+
   const centerNode = selectedNode as SimpleTreeNode | null;
   const projectKey = projectData?.id ?? "";
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
@@ -86,12 +97,57 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     ? secondarySelectedNode
     : centerNode;
 
+  const lazyParentIds = useMemo(() => {
+    if (!projectData || !projectKey) return [];
+    const expandedSet = new Set(expandedNodeIds);
+    const expansionBootstrapped = expandedNodeIds.length > 0;
+    const layoutExpanded = (id: string) =>
+      !expansionBootstrapped || expandedSet.has(id);
+
+    const ids = new Set<string>();
+    for (const id of expandedNodeIds) {
+      const n = findNodeByKey(projectData, id);
+      if (n && canLazyLoadCodeChildren(n)) ids.add(id);
+    }
+    const cid = centerNode?.id;
+    if (cid && layoutExpanded(cid)) {
+      const n = findNodeByKey(projectData, cid);
+      if (n && canLazyLoadCodeChildren(n)) ids.add(cid);
+    }
+    return [...ids].sort();
+  }, [projectData, projectKey, expandedNodeIds, centerNode?.id]);
+
+  const descendantQueries = useQueries({
+    queries: lazyParentIds.map((parentId) => ({
+      ...getCodeDescendantsQueryOptions(
+        projectKey,
+        parentId,
+        branch,
+        ref,
+        compareTo,
+      ),
+      enabled: Boolean(projectKey),
+    })),
+  });
+
+  const lazyChildrenByParentId = useMemo(() => {
+    const m = new Map<string, AnyNodeTree[]>();
+    lazyParentIds.forEach((parentId, i) => {
+      const roots = descendantQueries[i]?.data?.children;
+      if (roots?.length) {
+        m.set(parentId, roots as unknown as AnyNodeTree[]);
+      }
+    });
+    return m;
+  }, [lazyParentIds, descendantQueries]);
+
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
     centerNode: centerNode,
     selectedNode: effectiveSelectedNode as SimpleTreeNode,
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
+    lazyChildrenByParentId,
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);

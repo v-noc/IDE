@@ -58,6 +58,7 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
     if (selectedNode?.id === nodeId) return;
 
     const node = getNode();
+
     if (!node) return;
     handleNodeSelection(tabId, node as AnyNodeTree, "primary");
   }, [nodeId, tabId, selectedNode, secondarySelectedNode, handleNodeSelection, setSecondarySelectedNode, getNode]);

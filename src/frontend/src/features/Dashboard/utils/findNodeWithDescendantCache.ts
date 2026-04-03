@@ -27,11 +27,7 @@ export function findInDescendantForest(
       const hit = findInDescendantForest(objs, targetId);
       if (hit) return hit;
     }
-    const t = raw.target;
-    if (t && typeof t === "object" && !Array.isArray(t)) {
-      const hit = findInDescendantForest([t as Record<string, unknown>], targetId);
-      if (hit) return hit;
-    }
+
   }
   return null;
 }
@@ -65,11 +61,14 @@ export function findNodeByIdWithDescendantCache(
 
   for (const q of queries) {
     const data = q.state.data as CodeDescendantsResponse | undefined;
+
     if (!data?.children?.length) continue;
+
     const hit = findInDescendantForest(
       data.children as Record<string, unknown>[],
       id,
     );
+
     if (hit) return hit;
   }
   return null;

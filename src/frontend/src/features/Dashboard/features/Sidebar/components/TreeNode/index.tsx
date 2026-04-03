@@ -6,6 +6,7 @@ import { useTreeNodeState } from "../../hooks/useTreeNodeState";
 import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
 import { useLazyCodeChildren } from "@/features/Dashboard/service/codeDescendants";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { mergeStructureAndLazyChildren } from "@/features/Dashboard/utils/mergeCodeTreeChildren";
 
 interface TreeNodeProps {
   node: ContainerNodeTree;
@@ -29,12 +30,10 @@ export const TreeNode = ({
   const lazy = useLazyCodeChildren(node, isOpen);
 
   const displayNode = useMemo((): ContainerNodeTree => {
-    const base = node.children ?? [];
-    const extra = lazy.loadedNodes;
-    if (!extra.length) return node;
+    if (!lazy.loadedNodes.length) return node;
     return {
       ...node,
-      children: [...base, ...extra],
+      children: mergeStructureAndLazyChildren(node.children, lazy.loadedNodes),
     };
   }, [node, lazy.loadedNodes]);
 

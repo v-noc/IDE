@@ -13,6 +13,7 @@ import type {
   NodeMetadata,
 } from "../components/nodes/EnhancedNode";
 import { getIcons } from "@/features/Dashboard/utils";
+import { mergeStructureAndLazyChildren } from "@/features/Dashboard/utils/mergeCodeTreeChildren";
 
 const EMPTY_METADATA_MAP = new Map<string, NodeMetadata>();
 
@@ -27,6 +28,8 @@ interface UseEnhancedTreeLayoutProps {
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
+  /** Lazy-loaded `/descendants` roots keyed by parent id (same cache as sidebar). */
+  lazyChildrenByParentId?: ReadonlyMap<string, AnyNodeTree[]>;
 }
 
 export const useEnhancedTreeLayout = ({
@@ -36,6 +39,7 @@ export const useEnhancedTreeLayout = ({
   toggleNodeExpansion,
   nodeMetadataMap,
   layoutConfig: _layoutConfig,
+  lazyChildrenByParentId,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
 
@@ -144,7 +148,11 @@ export const useEnhancedTreeLayout = ({
 
       // Process Children if expanded
       if (isExpanded(nodeId)) {
-        const childrenToRender: AnyNodeTree[] = [...(node.children ?? [])];
+        const lazyExtra = lazyChildrenByParentId?.get(nodeId);
+        const childrenToRender = mergeStructureAndLazyChildren(
+          node.children,
+          lazyExtra,
+        );
 
         if (childrenToRender.length === 0) {
           return;
