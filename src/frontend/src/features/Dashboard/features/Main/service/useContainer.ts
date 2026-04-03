@@ -23,7 +23,7 @@ const updateBasicInfo = async (containerId: string, projectId: string, basicInfo
 
 const updateTheme = async (containerId: string, projectId: string, theme: ThemeConfig) => {
   const response = await api(
-    `${API_ROUTES.CONTAINER}update-theme?container_id=${encodeURIComponent(containerId)}&{project_id=${encodeURIComponent(projectId)}}`,
+    `${API_ROUTES.CONTAINER}update-theme?container_id=${encodeURIComponent(containerId)}&project_id=${encodeURIComponent(projectId)}`,
     {
       method: "PUT",
       body: theme,

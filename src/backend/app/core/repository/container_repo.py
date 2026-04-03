@@ -23,16 +23,28 @@ class ContainerRepo:
 
     async def update_theme_config(self, container_id: str, theme_config: ThemeConfig):
         schema = ThemeConfigSchema.from_pydantic(theme_config)
-        query = WQ().woql_and(
-            WQ().triple(container_id, "theme_config", "v:old_theme_config"),
-            WQ().delete_document("v:old_theme_config"),
 
+        new_theme_config = schema._obj_to_dict()[0]
+        new_theme_config["@type"] = "ThemeConfigSchema"
+        new_theme_config["@linked-by"] = {
+            "@id": container_id,
+            "@property": "theme_config",
+        }
+        query = WQ().woql_and(
+            WQ().opt(
+                WQ().woql_and(
+                    WQ().triple(container_id, "theme_config", "v:old_theme_config"),
+                    WQ().delete_document("v:old_theme_config"),
+                ),
+            ),
             WQ().insert_document(
-                Doc(schema._obj_to_dict()[0]), "v:new_theme_config"),
+                Doc(new_theme_config), "v:new_theme_config"),
             WQ().update_triple(container_id, "theme_config", "v:new_theme_config"),
         )
+        print(theme_config, " ---- ", container_id)
         try:
-            await self.client.query(query, commit_msg=f"Updating theme config for container {container_id}")
+            result = await self.client.query(query, commit_msg=f"Updating theme config for container {container_id}")
+            print(result)
             return True
         except Exception as exc:
             print(exc)
