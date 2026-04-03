@@ -1,6 +1,5 @@
-from typing import List, Literal, Tuple, Union
+from typing import AbstractSet, Any, List, Literal, Optional, Tuple, Union
 
-from terminusdb_client.woqlquery.woql_query import Doc
 from app.db.async_terminus_client import WOQLQuery as WQ
 from app.core.model.nodes import CallNode
 from app.core.model.schemas.code_element_schema import CallSchema
@@ -118,126 +117,83 @@ class CallRepo(BaseRepo[CallNode, CallSchema]):
             allowed_path_fields=CALL_FIELDS,
         )
 
-    async def _flush_batch_combined(self, inserts: List[CallNode], deletes: List[str], moves: List[Tuple[str, str, str]]):
-        """Execute inserts, deletes, and moves in one atomic WOQL query."""
-        if not inserts and not deletes and not moves:
-            return True
-
+    def _woql_delete_calls_with_parent_cleanup(self, call_ids: List[str]) -> List[Any]:
         queries = []
-        for call_node in inserts:
-
-            # # or .dict() depending on your Pydantic version
-            call_dict = CallSchema.from_pydantic(
-                call_node)._obj_to_dict()[0]
-
-            queries.append(WQ().insert_document(Doc(call_dict)))
-
-        # Build delete operations (with parent cleanup)
-        for call_id in deletes:
+        for call_id in call_ids:
             queries.append(
                 WQ().woql_and(
                     WQ().opt(
-                        WQ().triple("v:parent", "call_children", call_id)
+                        WQ()
+                        .triple("v:parent", "call_children", call_id)
                         .delete_triple("v:parent", "call_children", call_id)
                     ),
-                    WQ().delete_document(call_id)
+                    WQ().delete_document(call_id),
                 )
             )
+        return queries
 
-        # Build move operations (remove from old parent, add to new)
+    def _woql_moves(
+        self,
+        moves: List[Tuple[str, str, str]],
+        insert_ids: AbstractSet[str],
+    ) -> List[Any]:
+        queries = []
         for item_id, new_parent_id, child_type in moves:
             field = CALL_CHILD_TYPE_TO_FIELD.get(child_type, "call_children")
-            is_new_item = False
-            for node in inserts:
-                if node.id == item_id:
-                    is_new_item = True
-                    break
-            if is_new_item:
+            if item_id in insert_ids:
                 queries.append(WQ().add_triple(new_parent_id, field, item_id))
             else:
                 queries.append(
                     WQ().woql_and(
                         WQ().opt(
-                            WQ().triple("v:old_parent", field, item_id)
+                            WQ()
+                            .triple("v:old_parent", field, item_id)
                             .delete_triple("v:old_parent", field, item_id)
                         ),
-                        WQ().add_triple(new_parent_id, field, item_id)
+                        WQ().add_triple(new_parent_id, field, item_id),
                     )
                 )
+        return queries
 
-        # Build insert operations
-        # Note: Convert Pydantic models to dicts compatible with WOQL
-
-        if not queries:
-            return True
-
-        combined = WQ().woql_and(*queries)
-
-        try:
-            await self.client.query(combined, commit_msg=f"Batch: {len(inserts)} inserts, {len(deletes)} deletes, {len(moves)} moves")
-            return True
-        except Exception as exc:
-            print(f"Batch operation failed: {exc}")
-            return False
-
-    async def flush_call_batch_chunked(
+    async def flush_delete_move_batch_chunked(
         self,
-        inserts: List[CallNode],
         deletes: List[str],
         moves: List[Tuple[str, str, str]],
         *,
+        insert_ids: Optional[AbstractSet[str]] = None,
         chunk_size: int = 5000,
     ) -> bool:
         """
-        Edge case: same semantics as _flush_batch_combined, but splits work so the DB
-        does not get one giant WOQL. Inserts use create() in chunks; deletes and moves
-        are separate chunked queries. Order: inserts, then deletes, then moves.
+        Delete and move operations in combined WOQL per chunk (up to chunk_size deletes
+        and chunk_size moves each round). Inserts are handled separately via create().
         """
-        if not inserts and not deletes and not moves:
+        if not deletes and not moves:
             return True
 
-        insert_ids = {n.id for n in inserts}
-
-        for i in range(0, len(inserts), chunk_size):
-            chunk = inserts[i : i + chunk_size]
-            result = await self.create(chunk)
-            if result is None:
-                return False
-
-        for i in range(0, len(deletes), chunk_size):
-            chunk = deletes[i : i + chunk_size]
-            ok = await self.batch_delete_calls(chunk)
-            if not ok:
-                return False
-
-        for i in range(0, len(moves), chunk_size):
-            chunk = moves[i : i + chunk_size]
-            queries = []
-            for item_id, new_parent_id, child_type in chunk:
-                field = CALL_CHILD_TYPE_TO_FIELD.get(child_type, "call_children")
-                is_new_item = item_id in insert_ids
-                if is_new_item:
-                    queries.append(WQ().add_triple(new_parent_id, field, item_id))
-                else:
-                    queries.append(
-                        WQ().woql_and(
-                            WQ().opt(
-                                WQ().triple("v:old_parent", field, item_id)
-                                .delete_triple("v:old_parent", field, item_id)
-                            ),
-                            WQ().add_triple(new_parent_id, field, item_id),
-                        )
-                    )
-            if not queries:
+        known_new_ids: AbstractSet[str] = insert_ids if insert_ids is not None else frozenset()
+        di, mi = 0, 0
+        while di < len(deletes) or mi < len(moves):
+            d_chunk = deletes[di : di + chunk_size]
+            di += len(d_chunk)
+            m_chunk = moves[mi : mi + chunk_size]
+            mi += len(m_chunk)
+            if not d_chunk and not m_chunk:
+                break
+            parts = self._woql_delete_calls_with_parent_cleanup(
+                d_chunk
+            ) + self._woql_moves(m_chunk, known_new_ids)
+            if not parts:
                 continue
-            combined = WQ().woql_and(*queries)
+            combined = WQ().woql_and(*parts)
             try:
                 await self.client.query(
                     combined,
-                    commit_msg=f"Batch moves chunk: {len(chunk)} moves",
+                    commit_msg=(
+                        f"Batch delete+move: {len(d_chunk)} deletes, {len(m_chunk)} moves"
+                    ),
                 )
             except Exception as exc:
-                print(f"Batch move chunk failed: {exc}")
+                print(f"Batch delete+move chunk failed: {exc}")
                 return False
         return True
 

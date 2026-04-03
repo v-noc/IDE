@@ -174,20 +174,17 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     reactFlowInstanceRef.current = instance;
   }, []);
 
-  const onNodeDoubleClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      if (!reactFlowInstanceRef.current) return;
-      reactFlowInstanceRef.current.setCenter(
-        node.position.x + (node.measured?.width || 0) / 2,
-        node.position.y + (node.measured?.height || 0) / 2,
-        {
-          zoom: 1,
-          duration: 300,
-        },
-      );
-    },
-    [],
-  );
+  const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (!reactFlowInstanceRef.current) return;
+    reactFlowInstanceRef.current.setCenter(
+      node.position.x + (node.measured?.width || 0) / 2,
+      node.position.y + (node.measured?.height || 0) / 2,
+      {
+        zoom: 1,
+        duration: 300,
+      },
+    );
+  }, []);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {

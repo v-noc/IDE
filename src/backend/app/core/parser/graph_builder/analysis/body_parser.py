@@ -9,16 +9,22 @@ from app.core.parser.ast.models import (
     ClassNode as ASTClassNode,
     FunctionNode as ASTFunctionNode
 )
-from app.core.model.nodes import FileNode, ProjectNode, FunctionNode, ClassNode
+from app.core.model.nodes import CallNode, FileNode, ProjectNode, FunctionNode, ClassNode
 from app.core.parser.drivers import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.performance import tracker
 
 from app.core.parser.graph_builder.call_graph.builder import CallChainBuilder
+from app.core.call_insert_order import toposort_calls_for_insert
 
 from app.core.model.schemas import CallSchema, CodeElementGroupSchema, CallGroupSchema
 
 logger = logging.getLogger(__name__)
+
+_INSERT_FLUSH_THRESHOLD = 50_000
+_DELETE_MOVE_FLUSH_THRESHOLD = 5_000
+_INSERT_CHUNK_SIZE = 60_000
+_DELETE_MOVE_CHUNK_SIZE = 5_000
 
 
 class BodyParser:
@@ -34,10 +40,13 @@ class BodyParser:
         self.project_path = Path(project_node.path)
         self.repos = repos
         self.progress_tracker = progress_tracker
-        self.batch_size = batch_size
+        self._insert_flush_threshold = _INSERT_FLUSH_THRESHOLD
+        self._delete_move_flush_threshold = _DELETE_MOVE_FLUSH_THRESHOLD
+        self._insert_chunk_size = _INSERT_CHUNK_SIZE
+        self._delete_move_chunk_size = _DELETE_MOVE_CHUNK_SIZE
 
         # Global batch buffers (shared across all files)
-        self._insert_buffer: List[Any] = []
+        self._insert_buffer: List[CallNode] = []
         self._move_buffer: List[Tuple[str, str, str]] = []
         self._delete_buffer: List[str] = []
         self._batch_lock = asyncio.Lock()
@@ -48,46 +57,23 @@ class BodyParser:
             driver_manager=driver_manager,
         )
 
-    def _should_flush(self) -> bool:
-        """True if any buffer has reached batch_size."""
-        return (
-            len(self._insert_buffer)+len(self._move_buffer) +
-            len(self._delete_buffer) >= self.batch_size
-
-        )
-
-    def _single_flush_exceeds_batch(
-        self,
-        inserts: List[Any],
-        deletes: List[str],
-        moves: List[Tuple[str, str, str]],
-    ) -> bool:
-        """Edge case: one flush has more than batch_size ops in a single dimension."""
-        return (
-            len(inserts) > self.batch_size
-            or len(deletes) > self.batch_size
-            or len(moves) > self.batch_size
-        )
-
-    async def _apply_call_flush(
-        self,
-        inserts: List[Any],
-        deletes: List[str],
-        moves: List[Tuple[str, str, str]],
-    ) -> None:
-        if not inserts and not deletes and not moves:
+    async def _flush_inserts(self, inserts: List[CallNode]) -> None:
+        if not inserts:
             return
-        if self._single_flush_exceeds_batch(inserts, deletes, moves):
-            await self.repos.call_repo.flush_call_batch_chunked(
-                inserts, deletes, moves, chunk_size=5000
-            )
-        else:
-            await self.repos.call_repo._flush_batch_combined(
-                inserts, deletes, moves
-            )
+
+        ordered = toposort_calls_for_insert(inserts)
+        for i in range(0, len(ordered), self._insert_chunk_size):
+            chunk = ordered[i: i + self._insert_chunk_size]
+            result = await self.repos.call_repo.create(chunk)
+            if result is None:
+                logger.error(
+                    "Call insert chunk failed (%s nodes starting at %s)",
+                    len(chunk),
+                    i,
+                )
 
     async def _flush_buffers(self) -> None:
-        """Flush all buffered inserts, deletes, and moves to the database."""
+        """Drain buffers: inserts first, then delete+move (independent of each other)."""
         async with self._batch_lock:
             if not self._insert_buffer and not self._delete_buffer and not self._move_buffer:
                 return
@@ -97,41 +83,77 @@ class BodyParser:
             self._insert_buffer.clear()
             self._delete_buffer.clear()
             self._move_buffer.clear()
-        await self._apply_call_flush(inserts, deletes, moves)
+
+        if inserts:
+            await self._flush_inserts(inserts)
+        if deletes or moves:
+            await self.repos.call_repo.flush_delete_move_batch_chunked(
+                deletes,
+                moves,
+                insert_ids=None,
+                chunk_size=self._delete_move_chunk_size,
+            )
 
     async def _add_batch(
         self,
-        inserts: List[Any] = None,
+        inserts: List[CallNode] = None,
         moves: List[Tuple[str, str, str]] = None,
         deletes: List[str] = None,
     ) -> None:
-        """Add inserts, moves, and deletes to buffers; flush if batch size reached."""
+        """Add to buffers; flush inserts and delete+move independently when thresholds hit."""
         inserts = inserts or []
         moves = moves or []
         deletes = deletes or []
 
-        print(
-            f"batch size: {len(self._insert_buffer)+len(self._move_buffer)+len(self._delete_buffer)}")
-        print(f"inserts: {len(inserts)}")
-        print(f"moves: {len(moves)}")
-        print(f"deletes: {len(deletes)}")
+        logger.debug(
+            "call batch buffer +%s inserts, +%s moves, +%s deletes (buf i/m/d=%s/%s/%s)",
+            len(inserts),
+            len(moves),
+            len(deletes),
+            len(self._insert_buffer),
+            len(self._move_buffer),
+            len(self._delete_buffer),
+        )
         if not inserts and not moves and not deletes:
             return
+
+        inserts_to_flush: List[CallNode] | None = None
+        dm_to_flush: Tuple[List[str], List[Tuple[str, str, str]]] | None = None
+
         async with self._batch_lock:
             self._insert_buffer.extend(inserts)
             self._move_buffer.extend(moves)
             self._delete_buffer.extend(deletes)
-            if self._should_flush():
-                to_insert = self._insert_buffer.copy()
-                to_delete = self._delete_buffer.copy()
-                to_move = self._move_buffer.copy()
+
+            if len(self._insert_buffer) >= self._insert_flush_threshold:
+                inserts_to_flush = self._insert_buffer.copy()
                 self._insert_buffer.clear()
+
+            if (
+                len(self._delete_buffer) >= self._delete_move_flush_threshold
+                or len(self._move_buffer) >= self._delete_move_flush_threshold
+            ):
+                dm_to_flush = (
+                    self._delete_buffer.copy(),
+                    self._move_buffer.copy(),
+                )
                 self._delete_buffer.clear()
                 self._move_buffer.clear()
-            else:
-                to_insert = to_delete = to_move = []
-        if to_insert or to_delete or to_move:
-            await self._apply_call_flush(to_insert, to_delete, to_move)
+
+        if inserts_to_flush:
+            await self._flush_inserts(inserts_to_flush)
+
+        if dm_to_flush:
+            deletes_f, moves_f = dm_to_flush
+            insert_ids = (
+                {n.id for n in inserts_to_flush} if inserts_to_flush else None
+            )
+            await self.repos.call_repo.flush_delete_move_batch_chunked(
+                deletes_f,
+                moves_f,
+                insert_ids=insert_ids,
+                chunk_size=self._delete_move_chunk_size,
+            )
 
     async def flush_buffers(self) -> None:
         """Flush any remaining buffered operations. Call after all files are processed."""

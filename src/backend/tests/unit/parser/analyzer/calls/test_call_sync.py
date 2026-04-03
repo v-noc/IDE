@@ -53,7 +53,7 @@ async def _build_and_get_tree(project_uow):
 
     project_service = ProjectService(project_uow)
 
-    children = await project_service.get_children()
+    children, _ = await project_service.get_children()
 
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
@@ -68,7 +68,7 @@ async def _resync_and_get_tree(project_uow):
 
     project_service = ProjectService(project_uow)
 
-    children = await project_service.get_children()
+    children, _ = await project_service.get_children()
     tree_builder = TreeBuilder(children)
     return tree_builder.build()
 
