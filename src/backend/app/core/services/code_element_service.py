@@ -15,20 +15,6 @@ from app.core.utils.code_utils import (
 from app.db.context import ProjectUoW
 
 
-def _lineage_docs_as_spine_flat(docs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Force a single-child chain so TreeBuilder yields one nested spine (no sibling payload)."""
-    flat: list[dict[str, Any]] = []
-    for i, d in enumerate(docs):
-        out = dict(d)
-        next_id = None
-        if i + 1 < len(docs):
-            nxt = docs[i + 1]
-            next_id = nxt.get("@id") or nxt.get("id")
-        out["children"] = [next_id] if next_id else []
-        flat.append(out)
-    return flat
-
-
 class CodeElementService():
     def __init__(self, uow: ProjectUoW):
         self.uow = uow

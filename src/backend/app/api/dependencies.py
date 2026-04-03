@@ -9,6 +9,7 @@ from app.core.services.group_service import GroupService
 from app.core.services.document_service import DocumentService
 from app.core.services.test_service import TestService
 from app.core.services.play_ground_service import PlayGroundService
+from app.core.services.container_service import ContainerService
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
@@ -36,6 +37,7 @@ async def get_project_node(
     project_id: str = Query(..., description="The ID of the project"),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectNode:
+    print("what is the project id", project_id)
     project = await project_service.get(project_id)
     if not project:
         raise HTTPException(
@@ -111,3 +113,9 @@ def get_play_ground_service(
     uow: ProjectUoW = Depends(get_project_uow),
 ) -> PlayGroundService:
     return PlayGroundService(uow)
+
+
+def get_container_service(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> ContainerService:
+    return ContainerService(uow)

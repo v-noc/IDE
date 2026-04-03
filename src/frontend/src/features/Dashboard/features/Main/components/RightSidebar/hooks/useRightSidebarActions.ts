@@ -43,8 +43,8 @@ export function useRightSidebarActions() {
   const setProjectData = useProjectStore((s) => s.setProjectData);
   const setSelectedNode = useProjectStore((s) => s.setSelectedNode);
 
-  const { mutate: updateBasicInfoApi } = useUpdateBasicInfo(selectedNode?.id ?? '');
-  const { mutate: updateThemeApi } = useUpdateTheme(selectedNode?.id ?? '');
+  const { mutate: updateBasicInfoApi } = useUpdateBasicInfo(selectedNode?.id ?? '', projectData?.id ?? '');
+  const { mutate: updateThemeApi } = useUpdateTheme(selectedNode?.id ?? '', projectData?.id ?? '');
 
   const updateTheme = useCallback((theme: ThemeConfig) => {
     if (!selectedNode || !projectData) return;
