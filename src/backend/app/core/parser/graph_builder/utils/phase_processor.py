@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 # Default cap for UTF-8 size of file contents per TerminusDB commit (payload safety).
 _DEFAULT_MAX_CONTENT_BYTES_PER_FLUSH = 4 * 1024 * 1024
 
+# Max concurrent AST analysis tasks in phase 2 (avoids scheduling one task per file at once).
+_ANALYSIS_PHASE_CONCURRENCY = 10
+
 
 def _chunk_file_content_pairs(
     pairs: List[Tuple[str, str]],
@@ -270,7 +273,7 @@ class PhaseProcessor:
                             await asyncio.wait_for(
                                 body_parser.process_ast(
                                     file_node, content=content),
-                                timeout=self._file_timeout,
+                                timeout=None,
                             )
 
                         # Clear current function when file is done
@@ -294,15 +297,16 @@ class PhaseProcessor:
                                 file_node.path)
                             await progress_tracker.emit()
 
-        # Execute in parallel (collection_results are (file_node, content) tuples)
-        async with asyncio.TaskGroup() as tg:
-            tasks = [
-                tg.create_task(_process_single_file_analysis(fn, content))
-                for fn, content in collection_results
-            ]
-
-        for task in tasks:
-            task.result()
+        # Execute in chunks (collection_results are (file_node, content) tuples)
+        for i in range(0, len(collection_results), _ANALYSIS_PHASE_CONCURRENCY):
+            chunk = collection_results[i: i + _ANALYSIS_PHASE_CONCURRENCY]
+            async with asyncio.TaskGroup() as tg:
+                tasks = [
+                    tg.create_task(_process_single_file_analysis(fn, content))
+                    for fn, content in chunk
+                ]
+            for task in tasks:
+                task.result()
 
         # Flush all buffered call operations (inserts, deletes, moves) in one final batch
         await body_parser.flush_buffers()

@@ -106,16 +106,17 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
     const ids = new Set<string>();
     for (const id of expandedNodeIds) {
-      const n = findNodeByKey(projectData, id);
-      if (n && canLazyLoadCodeChildren(n)) ids.add(id);
+      // const n = findNodeByKey(projectData, id);
+      ids.add(id);
     }
-    const cid = centerNode?.id;
+    const cid = effectiveSelectedNode?.id;
+
     if (cid && layoutExpanded(cid)) {
-      const n = findNodeByKey(projectData, cid);
-      if (n && canLazyLoadCodeChildren(n)) ids.add(cid);
+      // const n = findNodeByKey(projectData, cid);
+      ids.add(cid);
     }
     return [...ids].sort();
-  }, [projectData, projectKey, expandedNodeIds, centerNode?.id]);
+  }, [projectData, projectKey, expandedNodeIds, effectiveSelectedNode?.id]);
 
   const descendantQueries = useQueries({
     queries: lazyParentIds.map((parentId) => ({

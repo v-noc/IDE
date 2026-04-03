@@ -47,6 +47,7 @@ export const useEnhancedTreeLayout = ({
   void _layoutConfig;
 
   const { initialNodes, initialEdges } = useMemo(() => {
+    console.log("lazyChildrenByParentId", lazyChildrenByParentId);
     if (!centerNode) {
       return { initialNodes: [], initialEdges: [] };
     }
@@ -216,6 +217,7 @@ export const useEnhancedTreeLayout = ({
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
     // DO not add toggleNodeExpansion to the dependency array
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centerNode, expandedNodeIds, metadataMap]);
   return { initialNodes, initialEdges };
