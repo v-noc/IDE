@@ -45,12 +45,13 @@ async def clone_remote(
     remote_auth_dict = (
         request.remote_auth.model_dump() if request.remote_auth else None
     )
-    await client.clonedb(
+    result = await client.clonedb(
         clone_source=request.remote_url,
         newid=request.local_db_name,
         description=request.description,
         remote_auth=remote_auth_dict,
     )
+    print(f"result: {result}")
     return {"ok": True, "local_db": request.local_db_name}
 
 

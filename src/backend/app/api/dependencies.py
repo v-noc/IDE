@@ -37,8 +37,9 @@ async def get_project_node(
     project_id: str = Query(..., description="The ID of the project"),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectNode:
-    print("what is the project id", project_id)
+
     project = await project_service.get(project_id)
+
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -176,8 +176,8 @@ class DatabaseMixin:
             "label": newid,
             "comment": description,
         }
-
-        _finish_response(
+        print("clone db", self._clone_url(newid))
+        result = _finish_response(
             await self._session.post(
                 self._clone_url(newid),
                 headers=headers,
@@ -185,3 +185,5 @@ class DatabaseMixin:
                 auth=self._auth(),
             )
         )
+        print(f"result: {result}")
+        return result

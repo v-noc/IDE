@@ -148,6 +148,7 @@ class ProjectRepo():
         exclude_types: list[str],
         include_commit_id: bool,
     ):
+
         filtered_types = set(include_types) - set(exclude_types)
         if not filtered_types:
             return [], None

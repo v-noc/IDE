@@ -40,7 +40,8 @@ class CreateProjectRequest(BaseModel):
     def _remote_matches_mode(self):
         if self.remote is None:
             if self.remote_mode != "none":
-                raise ValueError("remote is required when remote_mode is not none")
+                raise ValueError(
+                    "remote is required when remote_mode is not none")
         elif self.remote_mode == "none":
             raise ValueError("remote_mode cannot be none when remote is set")
         return self
@@ -68,15 +69,16 @@ async def create_project(
 
     Optional ``remote`` + ``remote_mode`` integrate Terminus remotes (see OpenAPI field docs).
     """
-    project_root = Path(project.path)
-    if not project_root.exists():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "field": "path",
-                "message": f"Project path {project.path} does not exist",
-            },
-        )
+    if project.remote_mode != "clone":
+        project_root = Path(project.path)
+        if not project_root.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "field": "path",
+                    "message": f"Project path {project.path} does not exist",
+                },
+            )
 
     desc = project.description or ""
 
@@ -107,17 +109,18 @@ async def create_project(
                 path=project.path,
                 remote=rc,
             )
-
+        project_root = Path(project.path)
         uow = ProjectUoW(
             db,
             project_node,
             RequestDbContext(branch="main", ref=None),
         )
-        orchestrator = GraphBuilderOrchestrator(
-            project_node=project_node,
-            uow=uow,
-        )
-        await orchestrator.resync()
+        if project_root.exists():
+            orchestrator = GraphBuilderOrchestrator(
+                project_node=project_node,
+                uow=uow,
+            )
+            await orchestrator.resync()
 
     except FileNotFoundError as exc:
         raise HTTPException(
@@ -143,7 +146,7 @@ async def create_project(
         raise
 
     project_service.uow = uow
-    children, version = await project_service.get_children(include_commit_id=True)
+    children, version = await project_service.get_structure(include_commit_id=True)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
