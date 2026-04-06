@@ -22,6 +22,7 @@ export const NodeChildren = memo(function NodeChildren({
     const filtered = (node.children ?? []).filter((n) =>
       childFilter ? childFilter(n as ContainerNodeTree) : true,
     );
+    console.log("filtered", filtered);
     return sortNodeChildren(filtered as ContainerNodeTree[], node.node_type);
   }, [node.children, node.node_type, childFilter]);
 

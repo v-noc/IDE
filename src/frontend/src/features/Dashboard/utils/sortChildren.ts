@@ -11,7 +11,8 @@ export function sortNodeChildren(
   children: ContainerNodeTree[],
   parentType: string
 ): ContainerNodeTree[] {
-  if (parentType !== 'folder' && parentType !== 'project') {
+  console.log("parentType", parentType);
+  if (parentType !== 'folder' && parentType != undefined) {
     return children;
   }
 
@@ -20,6 +21,8 @@ export function sortNodeChildren(
     if (node.node_type === 'file') return 1;
     return 2;
   };
+
+  console.log("what is this thing");
 
   return [...children].sort((a, b) => {
     const rankDiff = getRank(a) - getRank(b);
