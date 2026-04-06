@@ -6,6 +6,7 @@ import type { FocusSlice } from './focusSlice';
 import type { UISlice } from './uiSlice';
 
 export interface DataSlice {
+  /** Structure-only tree (folders/files/groups). Code nodes live in react-query (`useLazyCodeChildren`). */
   projectData: ProjectNodeTree | null;
   setProjectData: (data: ProjectNodeTree | null) => void;
 }

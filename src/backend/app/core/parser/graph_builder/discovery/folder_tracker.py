@@ -11,10 +11,14 @@ class FolderTracker:
         self.folder_changes = []
 
     def ensure_tracking(self, folder_path: Path) -> str:
+        fid, _ = self.ensure_tracking_detailed(folder_path)
+        return fid
+
+    def ensure_tracking_detailed(self, folder_path: Path) -> tuple[str, bool]:
         """
         Ensure that the folder is tracked by creating a __init__.py file if it doesn't exist.
         Injects a 'FolderID' into the file's docstring.
-        Returns the FolderID.
+        Returns (FolderSchema/<uuid>, modified).
         """
         init_file = folder_path / "__init__.py"
 
@@ -26,8 +30,7 @@ class FolderTracker:
             content = init_file.read_text(encoding="utf-8")
         except Exception as e:
             logger.error(f"Failed to read {init_file}: {e}")
-            # Fallback to a new ID if we can't read file, but this is bad
-            return None
+            return str(uuid.uuid4()), False
 
         from app.core.parser.ast.id_injector import IDInjector
         import libcst as cst
@@ -40,19 +43,17 @@ class FolderTracker:
             existing_id = meta.get("FolderID")
             if existing_id:
                 folder_id = existing_id
-            else:
-                folder_id = str(uuid.uuid4())
+                return f"{FolderSchema.__name__}/{folder_id}", False
 
-                # Now ensure it is written
-                new_content, modified = inject_module_metadata(
-                    content, {"FolderID": folder_id})
+            folder_id = str(uuid.uuid4())
+            new_content, modified = inject_module_metadata(
+                content, {"FolderID": folder_id})
 
-                if modified:
+            if modified:
+                init_file.write_text(new_content, encoding="utf-8")
 
-                    init_file.write_text(new_content, encoding="utf-8")
-
-            return f"{FolderSchema.__name__}/{folder_id}"
+            return f"{FolderSchema.__name__}/{folder_id}", modified
 
         except Exception as e:
             logger.error(f"Error processing {init_file}: {e}")
-            return str(uuid.uuid4())
+            return str(uuid.uuid4()), False

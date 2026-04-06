@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Optional
 import asyncio
 
-from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
 from app.core.parser.graph_builder.collection.collector import Collector
 from app.core.parser.graph_builder.discovery.change_detector import (
@@ -23,6 +22,7 @@ from app.core.parser.graph_builder.progress import ProgressTracker
 from app.core.repository import Repositories
 from app.core.socket.manager import get_socket_manager
 from app.api.dependencies import ProjectUoW
+from app.core.parser.drivers import DriverManager, tracked_file_extensions
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class GraphBuilderOrchestrator:
         ignore_file_name: str = ".gitignore",
         max_concurrent_files: int = 50,
         max_concurrent_db: int = 100,
-        batch_size: int = 100,
+        batch_size: int = 5000,
     ):
         self.project_node = project_node
         self.project_path = project_node.path
@@ -63,34 +63,29 @@ class GraphBuilderOrchestrator:
 
         self.repos = self.uow.get_project_repos()
 
-        # Initialize Jedi Adapter
-        from app.core.parser.jedi_adapter.manager import JediProjectManager
-        self.jedi_manager = JediProjectManager(self.project_root)
+        self.driver_manager = DriverManager(self.project_root)
 
         # Initialize Discovery components
         self.file_scanner = FileScanner(
             self.project_path,
             ignore_file_name=ignore_file_name,
+            extensions=tracked_file_extensions(),
         )
-        self.change_detector = ChangeDetector(self.repos)
+        self.change_detector = ChangeDetector(self.repos, self.driver_manager)
 
         # Initialize Collection components
         self.collector = Collector(
             self.project_node,
             self.repos,
-            self.jedi_manager,
+            self.driver_manager,
         )
 
-        # Initialize Phase Processor
-        # PhaseProcessor also needs refactoring to remove ScopeManager
-        # For now, we update initialization to match what we have or
-        # remove incompatible args
         self.phase_processor = PhaseProcessor(
             self.project_node,
             self.project_path,
-            self.repos,  # Replaces scope_manager
+            self.repos,
             self.collector,
-            self.jedi_manager,
+            self.driver_manager,
             batch_size=self.batch_size,
             max_concurrent_db=max_concurrent_db,
             max_concurrent_files=self.max_concurrent_files,
@@ -110,6 +105,8 @@ class GraphBuilderOrchestrator:
         )
 
         tracker.reset()
+
+        await self.driver_manager.warmup_drivers()
 
         self.phase_processor.project_node = self.project_node
         project_id = self.project_node.id
@@ -217,7 +214,7 @@ class GraphBuilderOrchestrator:
 
         # Phase 2: Analysis (Body parsing and call chain building)
         logger.info("Starting Phase 2: Analysis")
-        print("Starting Phase 2: Analysis", flush=True)
+
         progress_tracker.start_phase("analyzing")
         # Total entities is set from discovery phase (functions_found + classes_found)
         # Total files for analysis is the number of collection results
@@ -225,8 +222,11 @@ class GraphBuilderOrchestrator:
         await progress_tracker.emit(force=True)
 
         try:
-            # Phase 2 refactoring is deferred.
-            # We pass None for call_sync_service as we removed SyncService.
+            # Phase 2: call graph uses the same JsonRpc driver as Phase 1 (ts_js for .ts/.js).
+            logger.info(
+                "Phase 2: analyzing %d files (call resolution via language driver)",
+                len(collection_results),
+            )
             await self.phase_processor.process_analysis_phase(
                 collection_results, progress_tracker
             )

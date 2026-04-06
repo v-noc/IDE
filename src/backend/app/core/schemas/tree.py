@@ -13,6 +13,10 @@ class CallTreeNode(CallNode):
     children: List["CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Call children.")
     target: Optional["ClassTreeNode | FunctionTreeNode"] = None
+    lazy_child_ids: List[str] = Field(
+        default_factory=list,
+        description="Child document ids not present in this tree payload (lazy load).",
+    )
 
 
 class ClassTreeNode(ClassNode):
@@ -22,6 +26,7 @@ class ClassTreeNode(ClassNode):
         default="unchanged", description="The status of the node.")
     children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Class children.")
+    lazy_child_ids: List[str] = Field(default_factory=list)
 
 
 class FunctionTreeNode(FunctionNode):
@@ -31,6 +36,7 @@ class FunctionTreeNode(FunctionNode):
         default="unchanged", description="The status of the node.")
     children: List["FunctionTreeNode | ClassTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="Function children.")
+    lazy_child_ids: List[str] = Field(default_factory=list)
 
 
 class FileTreeNode(FileNode):
@@ -43,6 +49,7 @@ class FileTreeNode(FileNode):
     )
     children: List["ClassTreeNode | FunctionTreeNode | CallTreeNode | GroupTreeNode"] = Field(
         default_factory=list, description="File children.")
+    lazy_child_ids: List[str] = Field(default_factory=list)
 
 
 class FolderTreeNode(FolderNode):
@@ -74,6 +81,7 @@ class GroupTreeNode(BaseGroupNode):
     children: List[
         "GroupTreeNode | FolderTreeNode | FileTreeNode | ClassTreeNode | FunctionTreeNode | CallTreeNode"
     ] = Field(default_factory=list, description="Group children.")
+    lazy_child_ids: List[str] = Field(default_factory=list)
 
 
 # A Union of all possible nodes in our tree response

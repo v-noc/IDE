@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
-from typing import Any, Callable, Generic, Type, TypeVar
+from typing import Any, Callable, Generic, Type, TypeVar, Union
 
 from app.db.async_terminus_client import AsyncClient
 from app.db.async_terminus_client import WOQLQuery as WQ
+from app.core.repository.utils.child_raw import ensure_path_choice_grouped
 
 TNode = TypeVar("TNode")
 TSchema = TypeVar("TSchema")
@@ -49,6 +50,8 @@ class BaseRepo(Generic[TNode, TSchema]):
             result = await self.client.insert_document(schemas, commit_msg=commit_msg)
 
         except Exception as exc:
+            from traceback import format_exc
+            print(format_exc())
             print("error inserting document", exc)
             return None
 
@@ -206,16 +209,30 @@ class BaseRepo(Generic[TNode, TSchema]):
         parse_child: Callable[[dict[str, Any]], Any],
         filtered_types: list[str] | None = None,
         allowed_path_fields: tuple[str, ...] | None = None,
-    ):
+        depth_start: int | None = None,
+        depth_max: int | None = None,
+        include_call_target_docs: bool = False,
+    ) -> Union[list[Any], tuple[list[Any], dict[str, dict[str, Any]]]]:
         if allowed_path_fields is not None:
             requested_fields = field_name.strip("()").split("|")
             if any(field not in allowed_path_fields for field in requested_fields):
-                return []
+                return [] if not include_call_target_docs else ([], {})
+
+        grouped = ensure_path_choice_grouped(field_name)
+        # Path times {n,m}: n–m edge traversals (terminusdb_client woql_core._phrase_parser).
+        if depth_start is None and depth_max is None:
+            path_pattern = f"{grouped}+"
+        else:
+            d0 = 1 if depth_start is None else depth_start
+            d1 = depth_max if depth_max is not None else d0
+            if d0 < 1 or d1 < d0:
+                return [] if not include_call_target_docs else ([], {})
+            path_pattern = f"{grouped}{{{d0},{d1}}}"
 
         query_step = (
             WQ()
             .eq("v:start", parent_id)
-            .path("v:start", f"{field_name}+", "v:child")
+            .path("v:start", path_pattern, "v:child")
         )
         if filtered_types:
             schema_types = [
@@ -226,28 +243,53 @@ class BaseRepo(Generic[TNode, TSchema]):
                 .member("v:type", schema_types)
             )
 
-        query = (
-            WQ()
-            .select("v:child_doc")
-            .woql_and(
-                query_step.read_document("v:child", "v:child_doc")
+        read_child = query_step.read_document("v:child", "v:child_doc")
+        if include_call_target_docs:
+            call_target_branch = WQ().opt(
+                WQ().woql_or(
+                    WQ().woql_and(
+                        WQ().triple(
+                            "v:child", "target_function", "v:callee_tf"),
+                        WQ().read_document("v:callee_tf", "v:target_doc"),
+                    ),
+                    WQ().woql_and(
+                        WQ().triple("v:child", "target_class", "v:callee_tc"),
+                        WQ().read_document("v:callee_tc", "v:target_doc"),
+                    ),
+                )
             )
-        )
+            query = WQ().select("v:child_doc", "v:target_doc").woql_and(
+                read_child,
+                call_target_branch,
+            )
+        else:
+            query = WQ().select("v:child_doc").woql_and(read_child)
 
         try:
             result = await self.client.query(query)
 
         except Exception as exc:
             print(exc)
-            return []
+            return [] if not include_call_target_docs else ([], {})
 
-        children = []
-        allowed_types = set(filtered_types or [])
-        for child_raw in [row["child_doc"] for row in result["bindings"]]:
-            node = parse_child(child_raw)
-            if node is not None:
-                children.append(node)
-        return children
+        children: list[Any] = []
+        target_lookup: dict[str, dict[str, Any]] = {}
+        for row in result["bindings"]:
+            child_raw = row.get("child_doc")
+            if child_raw:
+                node = parse_child(child_raw)
+                if node is not None:
+                    children.append(node)
+            if include_call_target_docs:
+                target_raw = row.get("target_doc")
+                if isinstance(target_raw, dict):
+                    tid = target_raw.get("@id")
+                    if tid and tid not in target_lookup:
+                        target_lookup[str(tid)] = target_raw
+
+        if not include_call_target_docs:
+            return children
+        return children, target_lookup
 
     async def move_item_by_type(
         self,

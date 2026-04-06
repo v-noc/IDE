@@ -16,11 +16,20 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { SimpleTreeNode } from "./nodeUtils";
 import EnhancedNode from "./nodes/EnhancedNode";
 import { useEnhancedTreeLayout } from "../hooks/useEnhancedTreeLayout";
+import { codeApi } from "@/services/code/api";
+import {
+  canLazyLoadCodeChildren,
+  getCodeDescendantsQueryOptions,
+} from "@/features/Dashboard/service/codeDescendants";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
+import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/findNodeWithDescendantCache";
+import type { AnyNodeTree } from "@/types/project";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 
@@ -45,6 +54,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 }) => {
   void _projectId;
 
+  const queryClient = useQueryClient();
+
   const selectedNode = useProjectStore(
     useShallow((s) => s.selectedNode[tabId]),
   );
@@ -57,12 +68,19 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const toggleNodeExpansion = useProjectStore(
     useShallow((s) => s.toggleNodeExpansion),
   );
+  const expandNode = useProjectStore(useShallow((s) => s.expandNode));
+  const expandNodesBulk = useProjectStore(useShallow((s) => s.expandNodesBulk));
   const projectData = useProjectStore(useShallow((s) => s.projectData));
   const handleNodeSelection = useTabStore(
     useShallow((s) => s.handleNodeSelection),
   );
 
+  const branch = useVersioningStore((s) => s.branch);
+  const ref = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareTo = useVersioningStore((s) => s.compareToCommitId);
+
   const centerNode = selectedNode as SimpleTreeNode | null;
+  const projectKey = projectData?.id ?? "";
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   const layoutConfig = useMemo(
@@ -79,12 +97,58 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     ? secondarySelectedNode
     : centerNode;
 
+  const lazyParentIds = useMemo(() => {
+    if (!projectData || !projectKey) return [];
+    const expandedSet = new Set(expandedNodeIds);
+    const expansionBootstrapped = expandedNodeIds.length > 0;
+    const layoutExpanded = (id: string) =>
+      !expansionBootstrapped || expandedSet.has(id);
+
+    const ids = new Set<string>();
+    for (const id of expandedNodeIds) {
+      // const n = findNodeByKey(projectData, id);
+      ids.add(id);
+    }
+    const cid = effectiveSelectedNode?.id;
+
+    if (cid && layoutExpanded(cid)) {
+      // const n = findNodeByKey(projectData, cid);
+      ids.add(cid);
+    }
+    return [...ids].sort();
+  }, [projectData, projectKey, expandedNodeIds, effectiveSelectedNode?.id]);
+
+  const descendantQueries = useQueries({
+    queries: lazyParentIds.map((parentId) => ({
+      ...getCodeDescendantsQueryOptions(
+        projectKey,
+        parentId,
+        branch,
+        ref,
+        compareTo,
+      ),
+      enabled: Boolean(projectKey),
+    })),
+  });
+
+  const lazyChildrenByParentId = useMemo(() => {
+    const m = new Map<string, AnyNodeTree[]>();
+    lazyParentIds.forEach((parentId, i) => {
+      const roots = descendantQueries[i]?.data?.children;
+      if (roots?.length) {
+        m.set(parentId, roots as unknown as AnyNodeTree[]);
+      }
+    });
+    return m;
+  }, [lazyParentIds, descendantQueries]);
+
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
     centerNode: centerNode,
     selectedNode: effectiveSelectedNode as SimpleTreeNode,
     expandedNodeIds,
     toggleNodeExpansion: (nodeId: string) => toggleNodeExpansion(tabId, nodeId),
     layoutConfig,
+    lazyChildrenByParentId,
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -98,6 +162,33 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   useEffect(() => {
     syncDiffOverlay();
   }, [initialNodes, initialEdges]);
+
+  useEffect(() => {
+    if (!centerNode?.id) return;
+    const nodeId = centerNode.id;
+    const pk = projectData?.id ?? "";
+    if (!pk) {
+      expandNode(tabId, nodeId);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { path_ids } = await codeApi.getLineage(pk, nodeId);
+        if (cancelled) return;
+        if (path_ids?.length) {
+          expandNodesBulk(tabId, path_ids);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      if (!cancelled) expandNode(tabId, nodeId);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [centerNode?.id, projectData?.id, tabId, expandNodesBulk, expandNode]);
 
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 
@@ -140,40 +231,43 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     reactFlowInstanceRef.current = instance;
   }, []);
 
-  const onNodeDoubleClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      const nodeKey = node.id;
-      if (projectData && nodeKey && reactFlowInstanceRef.current) {
-        const foundNode = findNodeByKey(projectData, nodeKey);
-        if (foundNode) {
-          reactFlowInstanceRef.current.setCenter(
-            node.position.x + (node.measured?.width || 0) / 2,
-            node.position.y + (node.measured?.height || 0) / 2,
-            {
-              zoom: 1,
-              duration: 300,
-            },
-          );
-        }
-      }
-    },
-    [projectData],
-  );
+  const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (!reactFlowInstanceRef.current) return;
+    reactFlowInstanceRef.current.setCenter(
+      node.position.x + (node.measured?.width || 0) / 2,
+      node.position.y + (node.measured?.height || 0) / 2,
+      {
+        zoom: 1,
+        duration: 300,
+      },
+    );
+  }, []);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const nodeKey = node.id;
-
-      if (projectData && nodeKey) {
-        const foundNode = findNodeByKey(projectData, nodeKey);
-        if (foundNode?.id && foundNode?.id !== centerNode?.id) {
-          handleNodeSelection(tabId, foundNode, "secondary");
-        } else {
-          handleNodeSelection(tabId, foundNode, "primary");
-        }
+      if (!nodeKey) return;
+      const foundNode = findNodeByIdWithDescendantCache(
+        queryClient,
+        projectData,
+        projectKey,
+        nodeKey,
+      );
+      if (!foundNode) return;
+      if (foundNode.id !== centerNode?.id) {
+        handleNodeSelection(tabId, foundNode, "secondary");
+      } else {
+        handleNodeSelection(tabId, foundNode, "primary");
       }
     },
-    [projectData, handleNodeSelection, tabId, centerNode],
+    [
+      queryClient,
+      projectData,
+      projectKey,
+      handleNodeSelection,
+      tabId,
+      centerNode?.id,
+    ],
   );
 
   return (

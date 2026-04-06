@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useMemo } from "react";
 import { useParams } from "react-router-dom";
 
-import { useGetProjectTreeWithKeyProject } from "@/features/Dashboard/service/useProject";
+import { useGetProjectStructureTree } from "@/features/Dashboard/service/useProject";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
@@ -47,7 +47,7 @@ export function useSidebarData() {
   const showAffectedOnly = useVersioningStore((s) => s.showAffectedOnly);
   const projectKey = projectId ? `ProjectSchema/${projectId}` : "";
 
-  const { data, isLoading, isSuccess } = useGetProjectTreeWithKeyProject({
+  const { data, isLoading, isSuccess } = useGetProjectStructureTree({
     key: projectKey,
   });
 
@@ -78,6 +78,7 @@ export function useSidebarData() {
 
   const nodesForFiltering = useMemo(() => {
     const nodes = (rawProjectData?.children as AnyNodeTree[]) ?? [];
+
     if (!showAffectedOnly) return nodes;
     return filterAffectedTree(nodes);
   }, [rawProjectData?.children, showAffectedOnly]);
@@ -89,6 +90,7 @@ export function useSidebarData() {
 
   // Derived filtered project data
   const filteredProjectData = useMemo(() => {
+
     if (!rawProjectData) return null;
     return {
       ...rawProjectData,

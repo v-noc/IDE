@@ -47,8 +47,7 @@ class AsyncClientAuthMixin:
         if key_type == "http_basic":
             username = remote_auth["username"]
             http_basic_creds = base64.b64encode(
-                f"{username}:{key}".encode("utf-8")
-            )
+                f"{username}:{key}".encode('utf-8')).decode('utf-8')
             return f"Basic {http_basic_creds}"
         elif key_type == "token":
             return f"Token {key}"

@@ -4,6 +4,7 @@ import {
   fetchProjects,
   createProject,
   deleteProject,
+  type CreateProjectPayload,
 } from "@/services/projectService";
 
 // React Query hooks (no changes needed here)
@@ -16,11 +17,7 @@ export const useProjects = () => {
 
 export const useCreateProject = () => {
   const queryClient = useQueryClient();
-  return useMutation<
-    ProjectNodeTree,
-    Error,
-    { name: string; description: string; path: string }
-  >({
+  return useMutation<ProjectNodeTree, Error, CreateProjectPayload>({
     mutationFn: createProject,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });

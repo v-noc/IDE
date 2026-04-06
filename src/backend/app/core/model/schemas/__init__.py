@@ -91,5 +91,5 @@ async def ensure_schema(
     await schema_obj.commit(
         client,
         f"Initialize schema for {title}",
-        full_replace=True,
+        full_replace=False,
     )

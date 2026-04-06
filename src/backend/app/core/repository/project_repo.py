@@ -3,12 +3,29 @@ from datetime import timezone
 from app.db.errors import DatabaseError
 from app.db.async_terminus_client import WOQLQuery as WQ
 from app.db.async_terminus_client import AsyncClient
-from app.core.model.schemas import ProjectSchema, ensure_schema
+from app.core.model.schemas import ProjectSchema
 from app.core.model import ProjectNode
-from slugify import slugify
 
+from app.core.repository.project_bootstrap import bootstrap_empty_project_database
 from app.core.repository.utils import parse_structure_child
 from app.core.model.schemas import FileSchema, FolderSchema, FunctionSchema, ClassSchema, CallSchema, CodeElementGroupSchema, CallGroupSchema, StructureGroupSchema
+
+# Full flat graph for TreeBuilder / graph jobs; structure-only for initial dashboard load.
+PROJECT_FULL_GRAPH_TYPES = frozenset({
+    FileSchema.__name__,
+    FolderSchema.__name__,
+    FunctionSchema.__name__,
+    ClassSchema.__name__,
+    CallSchema.__name__,
+    CodeElementGroupSchema.__name__,
+    CallGroupSchema.__name__,
+    StructureGroupSchema.__name__,
+})
+PROJECT_STRUCTURE_TYPES = frozenset({
+    FileSchema.__name__,
+    FolderSchema.__name__,
+    StructureGroupSchema.__name__,
+})
 
 
 class ProjectRepo():
@@ -35,25 +52,13 @@ class ProjectRepo():
             else:
                 raise e
 
-    async def create(self, name, description, path):
-
-        db_name = slugify(name)
-        clone_db = self.client.clone()
-
-        try:
-            await clone_db.create_database(db_name, label=db_name, description="V-NOC code analysis graph")
-        except DatabaseError as e:
-            if e.error_obj.get("api:error", {}).get("@type", "") == "api:DatabaseAlreadyExists":
-                db_name = f"{db_name}_{datetime.now().strftime("%Y%m%d%H%M%S")}"
-                await clone_db.create_database(db_name, label=db_name, description="V-NOC code analysis graph")
-            else:
-                raise e
-        print(f"clone_db--: {self.client.db} {clone_db.db}")
-        await ensure_schema(clone_db, f"{name} Schema", description, [f"{name} Team"])
-
-        init_folder = FolderSchema.create_init_folder()
-        await clone_db.insert_document(init_folder, commit_msg="Add __init__ global document theme folder")
-
+    async def register_project(
+        self,
+        name: str,
+        description: str,
+        path: str,
+        db_name: str,
+    ) -> ProjectNode:
         project = ProjectSchema(
             _id=f"{db_name}",
             name=name,
@@ -63,10 +68,8 @@ class ProjectRepo():
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
-
         await self.client.insert_document(project, commit_msg=f"Creating project {name}")
-
-        project_node = ProjectNode(
+        return ProjectNode(
             id=project._id,
             name=project.name,
             description=project.description,
@@ -75,7 +78,14 @@ class ProjectRepo():
             created_at=project.created_at,
             updated_at=project.updated_at,
         )
-        return project_node
+
+    async def create(self, name, description, path):
+        db_name = await bootstrap_empty_project_database(
+            self.client.clone(),
+            name,
+            description,
+        )
+        return await self.register_project(name, description, path, db_name)
 
     async def get_by_id(self, project_id: str):
         try:
@@ -132,23 +142,27 @@ class ProjectRepo():
             updated_at=old_project["updated_at"],
         )
 
-    async def get_children(self, exclude_types: list[str] = [], include_commit_id: bool = False):
-        inlcude_type = [FileSchema.__name__, FolderSchema.__name__, FunctionSchema.__name__, ClassSchema.__name__,
-                        CallSchema.__name__, CodeElementGroupSchema.__name__, CallGroupSchema.__name__, StructureGroupSchema.__name__]
-        filtered_types = set(inlcude_type) - set(exclude_types)
+    async def _query_documents_by_schema_types(
+        self,
+        include_types: frozenset[str],
+        exclude_types: list[str],
+        include_commit_id: bool,
+    ):
+
+        filtered_types = set(include_types) - set(exclude_types)
+        if not filtered_types:
+            return [], None
 
         try:
             query = WQ().select("v:doc").woql_and(
                 WQ().triple("v:uri", "rdf:type", "v:type"),
+                WQ().member(
+                    "v:type",
+                    [f"@schema:{t}" for t in filtered_types],
+                ),
                 WQ().read_document("v:uri", "v:doc"),
-                WQ.woql_and(
-                    WQ().member("v:type", [
-                        f"@schema:{t}" for t in filtered_types]))
-
             )
-
             result, version = await self.client.query(query, get_data_version=True)
-
             children = []
             for doc in [row["doc"] for row in result["bindings"]]:
                 if doc.get("@type") == "FolderSchema" and doc.get("is_root") == "true":
@@ -157,8 +171,23 @@ class ProjectRepo():
 
             if include_commit_id:
                 return children, version
-
-            return children
+            return children, None
         except Exception as e:
             print(e)
-            return []
+            return [], None
+
+    async def get_structure(self, exclude_types: list[str] = [], include_commit_id: bool = False):
+        """Folders, files, and structure groups only (no functions/classes/calls)."""
+        return await self._query_documents_by_schema_types(
+            PROJECT_STRUCTURE_TYPES,
+            exclude_types,
+            include_commit_id,
+        )
+
+    async def get_children(self, exclude_types: list[str] = [], include_commit_id: bool = False):
+        """All graph document types used by TreeBuilder (minus exclude_types)."""
+        return await self._query_documents_by_schema_types(
+            PROJECT_FULL_GRAPH_TYPES,
+            exclude_types,
+            include_commit_id,
+        )

@@ -303,13 +303,28 @@ class DocumentMixin:
                 )
                 new_doc.pop(0)
 
-        result = await self._session.post(
-            self._documents_url(branch_name=branch_name),
-            headers=headers,
-            params=params,
-            json=new_doc,
-            auth=self._auth(),
-        )
+        json_string = json.dumps(new_doc).encode("utf-8")
+        if compress != "never" and len(json_string) > compress:
+            headers.update(
+                {"Content-Encoding": "gzip", "Content-Type": "application/json"}
+            )
+
+            result = await self._session.post(
+                self._documents_url(),
+                headers=headers,
+                params=params,
+                data=gzip.compress(json_string),
+                auth=self._auth(),
+            )
+        else:
+
+            result = await self._session.post(
+                self._documents_url(),
+                headers=headers,
+                params=params,
+                json=new_doc,
+                auth=self._auth(),
+            )
 
         result = json.loads(_finish_response(result))
 

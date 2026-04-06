@@ -1,27 +1,50 @@
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
-from typing import Optional
-
-from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
-from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.builder.tree_builder import TreeBuilder
-from app.db.client import get_terminus_client
-
-from app.core.services.project_service import ProjectService
-from app.api.dependencies import ProjectUoW, get_project_service, get_project_service_with_uow, get_project_node
 from pathlib import Path
-from app.core.watcher.service import WatcherService, get_watcher_service
-from loguru import logger
-import time
+from typing import Literal, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field, model_validator
+from terminusdb_client.errors import InterfaceError
+
+from app.api.dependencies import (
+    ProjectUoW,
+    get_project_node,
+    get_project_service,
+    get_project_service_with_uow,
+)
+from app.api.schemas.terminus_remote import RemoteConfig
+from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.schemas.tree import AnyTreeNode, ProjectTreeNode
+from app.core.services.project_service import ProjectService
+from app.core.watcher.service import WatcherService, get_watcher_service
 from app.db.async_terminus_client import AsyncClient
+from app.db.client import get_terminus_client
 from app.db.context import RequestDbContext
+from app.db.errors import DatabaseError
+from app.core.model.schemas import StructureGroupSchema
+from loguru import logger
 
 
 class CreateProjectRequest(BaseModel):
     name: str = Field(..., min_length=3)
     description: Optional[str] = Field(default=None)
     path: str = Field(...)
+    remote: Optional[RemoteConfig] = None
+    remote_mode: Literal["none", "create_remote", "clone"] = Field(
+        default="none",
+        description="none: local only. create_remote: bootstrap on remote URL then clonedb locally. clone: full clone URL only.",
+    )
+
+    @model_validator(mode="after")
+    def _remote_matches_mode(self):
+        if self.remote is None:
+            if self.remote_mode != "none":
+                raise ValueError(
+                    "remote is required when remote_mode is not none")
+        elif self.remote_mode == "none":
+            raise ValueError("remote_mode cannot be none when remote is set")
+        return self
 
 
 class UpdateProjectRequest(BaseModel):
@@ -32,6 +55,10 @@ class UpdateProjectRequest(BaseModel):
 router = APIRouter()
 
 
+def _exclude_types_for_groups(exclude_groups: bool) -> list[str]:
+    return [StructureGroupSchema.__name__] if exclude_groups else []
+
+
 @router.post("/", response_model=ProjectTreeNode)
 async def create_project(
     project: CreateProjectRequest,
@@ -40,34 +67,60 @@ async def create_project(
 ) -> ProjectTreeNode:
     """Create a project graph from a local path.
 
-    Returns a `ProjectTreeNode` built from the analyzed source code if
-    successful.
-    Raises 400 when the provided path does not exist.
+    Optional ``remote`` + ``remote_mode`` integrate Terminus remotes (see OpenAPI field docs).
     """
-    project_root = Path(project.path)
-    if not project_root.exists():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "field": "path",
-                "message": f"Project path {project.path} does not exist",
-            },
-        )
+    if project.remote_mode != "clone":
+        project_root = Path(project.path)
+        if not project_root.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "field": "path",
+                    "message": f"Project path {project.path} does not exist",
+                },
+            )
+
+    desc = project.description or ""
 
     try:
-        project_node = await project_service.create(
-            name=project.name,
-            description=project.description or "",
-            path=project.path,
+        if project.remote_mode == "none":
+            project_node = await project_service.create(
+                name=project.name,
+                description=desc,
+                path=project.path,
+            )
+        elif project.remote_mode == "create_remote":
+            rc = project.remote
+            assert rc is not None
+            project_node = await project_service.create_with_remote_bootstrap(
+                local_client=db,
+                name=project.name,
+                description=desc,
+                path=project.path,
+                remote=rc,
+            )
+        else:
+            rc = project.remote
+            assert rc is not None
+            project_node = await project_service.create_from_remote_clone(
+                local_client=db,
+                name=project.name,
+                description=desc,
+                path=project.path,
+                remote=rc,
+            )
+        project_root = Path(project.path)
+        uow = ProjectUoW(
+            db,
+            project_node,
+            RequestDbContext(branch="main", ref=None),
         )
-        uow = ProjectUoW(db, project_node, RequestDbContext(
-            branch="main", ref=None))
-
-        orchestrator = GraphBuilderOrchestrator(
-            project_node=project_node,
-            uow=uow
-        )
-        await orchestrator.resync()
+        if project_root.exists():
+            orchestrator = GraphBuilderOrchestrator(
+                project_node=project_node,
+                uow=uow,
+            )
+            await orchestrator.resync()
 
     except FileNotFoundError as exc:
         raise HTTPException(
@@ -77,20 +130,28 @@ async def create_project(
                 "message": str(exc),
             },
         )
+    except InterfaceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"message": str(exc)},
+        )
+    except DatabaseError as exc:
+        logger.exception("Terminus database error during project create")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"message": str(exc)},
+        )
     except Exception as exc:
-        # Let the global exception handler return 500, but preserve traceback
         logger.exception(f"Failed to build project graph: {exc}")
         raise
 
     project_service.uow = uow
-    children = await project_service.get_children()
+    children, version = await project_service.get_structure(include_commit_id=True)
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
-
-    return project_tree
+    return ProjectTreeNode(**project_node.model_dump(), children=tree)
 
 
 @router.get("/", response_model=ProjectTreeNode)
@@ -103,12 +164,19 @@ async def get_project(
 
     watcher_service.start_watching(project_node)
 
-    children, version = await project_service.get_children(include_commit_id=True)
+    exclude_types = _exclude_types_for_groups(exclude_groups)
+    children, version = await project_service.get_children(
+        exclude_types=exclude_types,
+        include_commit_id=True,
+    )
 
     compare_to_children = None
     if project_service.uow.has_compare_to():
-        compare_to_children, compare_to_version = await project_service.get_children(compare_to=True, include_commit_id=True)
-        print(f"compare_to_version: {compare_to_version}")
+        compare_to_children, compare_to_version = await project_service.get_children(
+            exclude_types=exclude_types,
+            compare_to=True,
+            include_commit_id=True,
+        )
 
     tree_builder = TreeBuilder(children, compare_to_children)
     tree = tree_builder.build()
@@ -116,6 +184,42 @@ async def get_project(
     project_tree = ProjectTreeNode(
         **project_node.model_dump(), children=tree, version=version)
     return project_tree
+
+
+@router.get("/structure", response_model=ProjectTreeNode)
+async def get_project_structure(
+    project_node: ProjectNode = Depends(get_project_node),
+    exclude_groups: bool = Query(
+        False, description="Omit structure-group documents from the tree"
+    ),
+    project_service: ProjectService = Depends(get_project_service_with_uow),
+    watcher_service: WatcherService = Depends(get_watcher_service),
+) -> ProjectTreeNode:
+    """Load folder/file/(optional) structure-group shell only — no code elements."""
+    watcher_service.start_watching(project_node)
+
+    exclude_types = _exclude_types_for_groups(exclude_groups)
+    structure_nodes, version = await project_service.get_structure(
+        exclude_types=exclude_types,
+        include_commit_id=True,
+    )
+
+    compare_to_structure = None
+    if project_service.uow.has_compare_to():
+        compare_to_structure, _ = await project_service.get_structure(
+            exclude_types=exclude_types,
+            include_commit_id=True,
+            compare_to=True,
+        )
+
+    tree_builder = TreeBuilder(structure_nodes, compare_to_structure)
+    tree = tree_builder.build()
+
+    return ProjectTreeNode(
+        **project_node.model_dump(),
+        children=tree,
+        version=version,
+    )
 
 
 @router.get("/all", response_model=list[ProjectNode])

@@ -1,11 +1,20 @@
+from app.db.async_terminus_client import AsyncClient
 from datetime import datetime, timezone
 
-from typing import Union, List, Tuple
+from typing import Any, Union, List, Tuple
 import uuid
 from terminusdb_client.woqlquery.woql_query import Doc, WOQLQuery as WQ
 
 from app.core.model.nodes import ClassNode, FunctionNode
-from app.core.model.schemas import ClassSchema, CodeContentSchema, CodePositionSchema, FunctionSchema
+from app.core.model.schemas import (
+    CallGroupSchema,
+    CallSchema,
+    ClassSchema,
+    CodeContentSchema,
+    CodeElementGroupSchema,
+    CodePositionSchema,
+    FunctionSchema,
+)
 from app.core.repository.base_repo import BaseRepo
 from app.core.repository.utils import (
     CODE_CHILD_TYPE_TO_FIELD,
@@ -13,8 +22,17 @@ from app.core.repository.utils import (
     CODE_SET_FIELDS_TO_PRESERVE,
     build_path_field_name,
     parse_code_element_child,
+    parse_structure_child,
 )
-from app.db.async_terminus_client import AsyncClient
+
+_CODE_DESCENDANT_SCHEMA_BY_KIND = {
+    "function": FunctionSchema.__name__,
+    "class": ClassSchema.__name__,
+    "call": CallSchema.__name__,
+    "code_element_group": CodeElementGroupSchema.__name__,
+    "call_group": CallGroupSchema.__name__,
+}
+_ALL_CODE_DESCENDANT_SCHEMAS = list(_CODE_DESCENDANT_SCHEMA_BY_KIND.values())
 
 # Define a type for elements handled here
 CodeNode = Union[FunctionNode, ClassNode]
@@ -100,6 +118,55 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
             allowed_path_fields=CODE_ELEMENT_FIELDS,
         )
 
+    async def get_code_descendant_nodes(
+        self,
+        parent_id: str,
+        child_types: list[str],
+        depth_start: int | None = None,
+        depth_max: int | None = None,
+    ) -> tuple[list[Any], dict[str, dict[str, Any]]]:
+        """
+        Descendants of ``parent_id`` along code edges. Path depth uses WOQL
+        ``{depth_start, depth_max}`` (omit both for ``+``). Result is deduped by
+        id and sorted by id for stable tree building.
+
+        The second value maps callee document id -> raw document for
+        ``TreeBuilder`` (from the same WOQL query as descendants).
+        """
+        if child_types:
+            filtered = [
+                n
+                for k in child_types
+                if (n := _CODE_DESCENDANT_SCHEMA_BY_KIND.get(k)) is not None
+            ]
+            if not filtered:
+                return [], {}
+        else:
+            filtered = list(_ALL_CODE_DESCENDANT_SCHEMAS)
+
+        field_name = build_path_field_name(
+            child_types, CODE_ELEMENT_FIELDS, type_to_field=CODE_CHILD_TYPE_TO_FIELD
+        )
+        nodes, target_lookup = await self.get_children_by_path(
+            parent_id,
+            field_name,
+            parse_code_element_child,
+            filtered_types=filtered,
+            allowed_path_fields=CODE_ELEMENT_FIELDS,
+            depth_start=depth_start,
+            depth_max=depth_max,
+            include_call_target_docs=True,
+        )
+        by_id: dict[str, Any] = {}
+        for n in nodes:
+            if n is None:
+                continue
+            nid = getattr(n, "id", None)
+            if nid:
+                by_id[str(nid)] = n
+        ordered = [by_id[k] for k in sorted(by_id.keys())]
+        return ordered, target_lookup
+
     async def move_item(self, new_parent_id: str, item_id: str, child_type: str):
         return await self.move_item_by_type(
             new_parent_id,
@@ -111,8 +178,22 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
     async def move_batch(self, moves: List[Tuple[str, str, str]]):
         return await self.move_batch_by_type(moves, child_type_to_field=CODE_CHILD_TYPE_TO_FIELD)
 
-    async def flush_batch(self, insert: List[FunctionNode | ClassNode], code_update: List[FunctionNode | ClassNode], update_content: List[Tuple[str, str]], delete: List[str], move: List[Tuple[str, str, str]]):
-        if not insert and not update_content and not delete and not move:
+    async def flush_batch(
+        self,
+        insert: List[FunctionNode | ClassNode],
+        code_update: List[FunctionNode | ClassNode],
+        update_content: List[Tuple[str, str]],
+        delete: List[str],
+        move: List[Tuple[str, str, str]],
+        max_queries_per_commit: int | None = None,
+    ):
+        if (
+            not insert
+            and not code_update
+            and not update_content
+            and not delete
+            and not move
+        ):
             return True
 
         queries = []
@@ -248,12 +329,55 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
         if not queries:
             return True
 
-        combined = WQ().woql_and(*queries)
+        limit = max_queries_per_commit or len(queries)
+        if limit <= 0:
+            limit = len(queries)
 
+        total_chunks = (len(queries) + limit - 1) // limit
+        ok = True
+        for start in range(0, len(queries), limit):
+            chunk = queries[start: start + limit]
+            chunk_no = start // limit + 1
+            combined = WQ().woql_and(*chunk)
+            try:
+                result = await self.client.query(
+                    combined,
+                    commit_msg=(
+                        f"code_element batch {chunk_no}/{total_chunks}: "
+                        f"{len(chunk)} ops ({len(insert)} inserts, {len(delete)} deletes, {len(move)} moves)"
+                    ),
+                )
+                print(result)
+            except Exception as exc:
+                print(f"Batch operation failed: {exc}")
+                ok = False
+                break
+        return ok
+
+    async def get_node_lineage(self, node_id: str) -> list[Any]:
+        query = WQ().select("v:target_doc").woql_and(
+            WQ().eq("v:node", node_id).
+            path("v:node", "(<function_children|<class_children|<file_children|<folder_children|<structure_group|<code_element_group)*", "v:parent").
+            read_document("v:parent", "v:target_doc")
+        )
         try:
-            result = await self.client.query(combined, commit_msg=f"Batch: {len(insert)} inserts, {len(delete)} deletes, {len(move)} moves")
-            print(result)
-            return True
+            result = await self.client.query(query)
+
         except Exception as exc:
-            print(f"Batch operation failed: {exc}")
-            return False
+            print(f"error-", exc)
+
+            return []
+
+        bindings = result.get("bindings") or []
+        docs: list[dict[str, Any]] = []
+        for row in bindings:
+            doc = row.get("target_doc")
+            if not isinstance(doc, dict):
+                continue
+
+            docs.append(parse_structure_child(doc))
+
+        if not docs:
+            return []
+
+        return docs

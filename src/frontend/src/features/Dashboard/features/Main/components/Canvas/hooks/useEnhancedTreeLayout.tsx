@@ -13,6 +13,7 @@ import type {
   NodeMetadata,
 } from "../components/nodes/EnhancedNode";
 import { getIcons } from "@/features/Dashboard/utils";
+import { mergeStructureAndLazyChildren } from "@/features/Dashboard/utils/mergeCodeTreeChildren";
 
 const EMPTY_METADATA_MAP = new Map<string, NodeMetadata>();
 
@@ -27,6 +28,8 @@ interface UseEnhancedTreeLayoutProps {
   toggleNodeExpansion: (nodeId: string) => void;
   nodeMetadataMap?: Map<string, NodeMetadata>;
   layoutConfig?: Partial<typeof LAYOUT_CONFIG>;
+  /** Lazy-loaded `/descendants` roots keyed by parent id (same cache as sidebar). */
+  lazyChildrenByParentId?: ReadonlyMap<string, AnyNodeTree[]>;
 }
 
 export const useEnhancedTreeLayout = ({
@@ -36,6 +39,7 @@ export const useEnhancedTreeLayout = ({
   toggleNodeExpansion,
   nodeMetadataMap,
   layoutConfig: _layoutConfig,
+  lazyChildrenByParentId,
 }: UseEnhancedTreeLayoutProps) => {
   const metadataMap = nodeMetadataMap ?? EMPTY_METADATA_MAP;
 
@@ -43,6 +47,7 @@ export const useEnhancedTreeLayout = ({
   void _layoutConfig;
 
   const { initialNodes, initialEdges } = useMemo(() => {
+    console.log("lazyChildrenByParentId", lazyChildrenByParentId);
     if (!centerNode) {
       return { initialNodes: [], initialEdges: [] };
     }
@@ -62,9 +67,20 @@ export const useEnhancedTreeLayout = ({
     const edges: Edge[] = [];
     const visitedNodeIds = new Set<string>();
 
-    // Helper to check expansion
+    const expandedSet = new Set(expandedNodeIds);
+    /**
+     * Empty expansion list: show full subtree (first paint / no sidebar toggles yet).
+     * After any id is tracked, only those nodes render their children—CanvasView expands
+     * the path to the focused node so the center subtree stays reachable.
+     */
+    const expansionBootstrapped = expandedNodeIds.length > 0;
+
     const isExpanded = (nodeId: string) =>
-      expandedNodeIds.length === 0 || expandedNodeIds.includes(nodeId);
+      !expansionBootstrapped || expandedSet.has(nodeId);
+
+    const canExpand = (node: SimpleTreeNode) =>
+      (node.children?.length ?? 0) > 0 ||
+      (node.lazy_child_ids?.length ?? 0) > 0;
 
     const mergeMetadata = (node: SimpleTreeNode): NodeMetadata | undefined => {
       const mapped = metadataMap.get(node.id);
@@ -108,7 +124,7 @@ export const useEnhancedTreeLayout = ({
           textColor: nodeStyle.textColor,
           iconColor: nodeStyle.iconColor,
           borderColor: nodeStyle.borderColor,
-          expandable: (node.children?.length ?? 0) > 0,
+          expandable: canExpand(node),
           expanded: isExpanded(nodeId),
           onToggle: () => toggleNodeExpansion(nodeId),
           metadata: mergeMetadata(node),
@@ -133,7 +149,11 @@ export const useEnhancedTreeLayout = ({
 
       // Process Children if expanded
       if (isExpanded(nodeId)) {
-        const childrenToRender: AnyNodeTree[] = [...(node.children ?? [])];
+        const lazyExtra = lazyChildrenByParentId?.get(nodeId);
+        const childrenToRender = mergeStructureAndLazyChildren(
+          node.children,
+          lazyExtra,
+        );
 
         if (childrenToRender.length === 0) {
           return;
@@ -196,6 +216,9 @@ export const useEnhancedTreeLayout = ({
     );
 
     return { initialNodes: layoutedNodes, initialEdges: validEdges };
+    // DO not add toggleNodeExpansion to the dependency array
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centerNode, expandedNodeIds, metadataMap]);
   return { initialNodes, initialEdges };
 };

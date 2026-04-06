@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Dict, Iterable, List, Set
+from typing import Dict, Iterable, List
 
 from app.core.model.nodes import CallNode
 from app.core.model.schemas.code_element_schema import CallSchema
@@ -13,6 +13,16 @@ from .models import ScopeSyncResult
 class DiffCalculator:
     """Calculate full tree diff and return one batch ScopeSyncResult."""
 
+    def __init__(self) -> None:
+        self._pending_insert_by_id: Dict[str, CallNode] = {}
+
+    @staticmethod
+    def _embed_new_call_child(parent: CallNode, child_id: str) -> None:
+        if parent.children_by_type is None:
+            parent.children_by_type = {"call_children": set(), "call_group": set()}
+        parent.children_by_type["call_children"].add(child_id)
+        parent.children.add(child_id)
+
     def calculate_diff(
         self,
         *,
@@ -20,6 +30,7 @@ class DiffCalculator:
         new_tree: CallFrameStack,
         old_tree: List[AnyTreeNode],
     ) -> ScopeSyncResult:
+        self._pending_insert_by_id.clear()
         aggregate = ScopeSyncResult(
             parent_id=root_parent_id,
             added_target_ids=set(),
@@ -79,7 +90,13 @@ class DiffCalculator:
                 description=f"call::{new_call.target_qname}",
             )
             calls_to_create.append(created_node)
-            moves_to_execute.append((created_node.id, parent_id, "call"))
+            self._pending_insert_by_id[created_node.id] = created_node
+            if parent_id in self._pending_insert_by_id:
+                self._embed_new_call_child(
+                    self._pending_insert_by_id[parent_id], created_node.id
+                )
+            else:
+                moves_to_execute.append((created_node.id, parent_id, "call"))
             active_call_map[target_id] = created_node.id
 
         aggregate.added_target_ids.update(added)

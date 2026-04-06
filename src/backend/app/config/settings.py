@@ -1,7 +1,9 @@
 import os
 from functools import lru_cache
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -14,6 +16,10 @@ class Settings(BaseSettings):
     TERMINUS_DB: str
 
     LOG_LEVEL: str = "INFO"
+
+    # Optional JSON-RPC URLs for language drivers (loaded from the same .env as above).
+    VNOC_LSP_PYTHON_URL: Optional[str] = None
+    VNOC_LSP_TS_JS_URL: Optional[str] = None
 
     model_config = SettingsConfigDict(
         # Pydantic-Settings will automatically use the ENV_FILE env var if it exists.

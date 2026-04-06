@@ -3,11 +3,23 @@ import os
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Optional, Set
+from typing import Dict, Iterable, List, Optional, Set
 import pathspec
 import tomllib
 
+from app.core.parser.drivers.config import python_file_extensions
+
 logger = logging.getLogger(__name__)
+
+
+def _normalize_extensions(exts: Iterable[str]) -> tuple[str, ...]:
+    out: list[str] = []
+    for e in exts:
+        e = e.lower().strip()
+        if not e:
+            continue
+        out.append(e if e.startswith(".") else f".{e}")
+    return tuple(out) if out else (".py",)
 
 
 @dataclass
@@ -17,10 +29,19 @@ class ScanResult:
 
 
 class FileScanner:
-    def __init__(self, project_path: str, ignore_file_name: str = ".gitignore"):
+    def __init__(
+        self,
+        project_path: str,
+        ignore_file_name: str = ".gitignore",
+        *,
+        extensions: Optional[List[str]] = None,
+    ):
         self.project_path = Path(project_path)
         self.ignore_file_name = ignore_file_name
         self.spec = self._load_ignore_spec()
+        self._extensions = _normalize_extensions(
+            extensions if extensions is not None else python_file_extensions()
+        )
 
     def _load_ignore_spec(self) -> Optional[pathspec.PathSpec]:
         if self.ignore_file_name is None:
@@ -53,7 +74,9 @@ class FileScanner:
 
     def scan(self) -> ScanResult:
         """
-        Scan all .py files in the project directory and calculate their checksums.
+        Scan tracked source files (by extension) and calculate checksums.
+        Extensions default to the Python driver registry; pass `extensions` to
+        align with other language drivers later.
         Returns: ScanResult(files=Dict[path, checksum], folders=Set[absolute_path])
         """
         file_map: Dict[str, str] = {}
@@ -74,7 +97,9 @@ class FileScanner:
             ]
 
             for file in files:
-                if file.endswith(".py"):
+
+                lower = file.lower()
+                if any(lower.endswith(ext) for ext in self._extensions):
                     file_path = root_path / file
                     rel_path = file_path.relative_to(self.project_path)
 
@@ -97,6 +122,7 @@ class FileScanner:
         return ScanResult(files=file_map, folders=folder_set)
 
     def _is_ignored(self, rel_path: Path) -> bool:
+
         if self.spec:
             return self.spec.match_file(str(rel_path))
         return False

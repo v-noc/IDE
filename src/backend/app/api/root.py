@@ -7,6 +7,7 @@ from .v1 import document_routes
 from .v1 import test_routes
 from .v1 import play_ground_routes
 from .v1.versioning import router as versioning_router
+from .v1 import container_routes
 # from .v1 import call_routes
 from .v1 import group_routes
 
@@ -44,6 +45,9 @@ router.include_router(
 
 router.include_router(
     versioning_router, prefix="/versioning", tags=["versioning"])
+
+router.include_router(container_routes.router,
+                      prefix="/containers", tags=["containers"])
 
 # router.include_router(call_routes.router, prefix="/calls", tags=["calls"])
 

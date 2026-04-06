@@ -1,3 +1,10 @@
+import socket
+import tempfile
+import threading
+import time
+
+import httpx
+import pytest
 import pytest_asyncio
 
 from app.db.client import migrate_base
@@ -8,6 +15,90 @@ from app.db.context import ProjectUoW, RequestDbContext
 from app.core.services.project_service import ProjectService
 
 TEST_DB_NAME = "test_db"
+
+
+@pytest.fixture(scope="session")
+def python_lsp_rpc_url():
+    """Start the Python language driver (JSON-RPC at POST /rpc) for tests that opt in.
+
+    Same idea as ``jsonrpc_url`` in ``tests/e2e/vn_logger/conftest.py``: bind a
+    free port, run uvicorn in a daemon thread, wait until ``initialize`` responds.
+
+    Use only in tests that need the out-of-process driver::
+
+        def test_remote_parse(python_lsp_rpc_url, monkeypatch):
+            monkeypatch.setenv("VNOC_LSP_PYTHON_URL", python_lsp_rpc_url)
+            ...
+
+    Requires the workspace package ``vnoc-lsp-python`` (``uv sync``).
+    """
+    pytest.importorskip(
+        "vnoc_lsp_python",
+        reason="Install workspace package vnoc-lsp-python (uv sync)",
+    )
+    import uvicorn
+
+    from vnoc_lsp_python.server import build_app
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", 0))
+    _host, port = sock.getsockname()
+    sock.close()
+
+    app = build_app()
+    config = uvicorn.Config(
+        app,
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+    )
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+
+    base = f"http://127.0.0.1:{port}"
+    url = f"{base}/rpc"
+
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "initialize",
+        "params": {
+            "project_path": tempfile.gettempdir(),
+            "language": "python",
+            "config": {},
+        },
+        "id": 1,
+    }
+    deadline = time.time() + 20.0
+    while time.time() < deadline:
+        try:
+            r = httpx.post(url, json=payload, timeout=0.75)
+            data = r.json()
+            if (
+                r.status_code < 500
+                and isinstance(data, dict)
+                and "result" in data
+            ):
+                break
+        except Exception:
+            time.sleep(0.05)
+    else:
+        server.should_exit = True
+        thread.join(timeout=5.0)
+        pytest.fail("Python LSP server did not become ready in time")
+
+    try:
+        yield url
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10.0)
+
+
+@pytest.fixture
+def monkeypatch_vnoc_lsp_python_url(python_lsp_rpc_url, monkeypatch):
+    """Set ``VNOC_LSP_PYTHON_URL`` so :class:`~app.core.parser.drivers.DriverManager` uses the test LSP."""
+    monkeypatch.setenv("VNOC_LSP_PYTHON_URL", python_lsp_rpc_url)
+    return python_lsp_rpc_url
 
 
 @pytest_asyncio.fixture(scope="function")

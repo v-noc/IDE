@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogDescription,
@@ -7,38 +8,50 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { ContainerNodeTree, AnyNodeTree } from "@/types/project";
+import type { ContainerNodeTree, AnyNodeTree, ProjectNodeTree } from "@/types/project";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/findNodeWithDescendantCache";
 import { usePromptBuilder } from "./usePromptBuilder";
 import TreePane from "./TreePane";
 import SelectionDetailPane from "./SelectionDetailPane";
 import PreviewPane from "./PreviewPane";
+import { promptBuilderNodeKey } from "./nodeKey";
 
 interface PromptBuilderProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   rootNode: ContainerNodeTree;
-  projectId?: string;
 }
 
 const PromptBuilder = ({
   open,
   onOpenChange,
   rootNode,
-  projectId = "",
 }: PromptBuilderProps) => {
+  const queryClient = useQueryClient();
+  const projectData = useProjectStore((s) => s.projectData);
+  const projectKey = projectData?.id ?? "";
   const state = usePromptBuilder(rootNode);
 
   const selectedNode: AnyNodeTree | null = useMemo(() => {
+    if (!state.selectedNodeKey) return null;
     const walk = (n: AnyNodeTree): AnyNodeTree | null => {
-      if (n.id === state.selectedNodeKey) return n;
+      if (promptBuilderNodeKey(n) === state.selectedNodeKey) return n;
       for (const c of (n.children ?? []) as AnyNodeTree[]) {
         const found = walk(c);
         if (found) return found;
       }
       return null;
     };
-    return state.selectedNodeKey ? walk(rootNode as AnyNodeTree) : null;
-  }, [state.selectedNodeKey, rootNode]);
+    const fromSubtree = walk(rootNode as AnyNodeTree);
+    if (fromSubtree) return fromSubtree;
+    return findNodeByIdWithDescendantCache(
+      queryClient,
+      projectData as ProjectNodeTree | null,
+      projectKey,
+      state.selectedNodeKey,
+    );
+  }, [state.selectedNodeKey, rootNode, queryClient, projectData, projectKey]);
 
   const xml = state.generateXml();
 
@@ -75,11 +88,12 @@ const PromptBuilder = ({
                   <TreePane
                     root={rootNode}
                     checked={state.checked}
-                    expanded={state.expanded}
                     selectedNodeKey={state.selectedNodeKey}
                     onToggleChecked={state.toggleChecked}
-                    onToggleExpanded={state.toggleExpanded}
                     onSelect={state.setSelectedNodeKey}
+                    onLazyParentAccordionChange={
+                      state.onLazyParentAccordionChange
+                    }
                   />
                 </div>
               </div>
@@ -95,21 +109,31 @@ const PromptBuilder = ({
                   <div className="p-3">
                     <SelectionDetailPane
                       node={selectedNode}
-                      projectId={projectId}
                       checked={
-                        !!(selectedNode && state.checked[selectedNode.id])
+                        !!(
+                          selectedNode &&
+                          state.checked[promptBuilderNodeKey(selectedNode)]
+                        )
                       }
                       includeDocs={
-                        !!(selectedNode && state.includeDocs[selectedNode.id])
+                        !!(
+                          selectedNode &&
+                          state.includeDocs[promptBuilderNodeKey(selectedNode)]
+                        )
                       }
                       includeCode={
-                        !!(selectedNode && state.includeCode[selectedNode.id])
+                        !!(
+                          selectedNode &&
+                          state.includeCode[promptBuilderNodeKey(selectedNode)]
+                        )
                       }
                       onToggleDocs={() =>
-                        selectedNode && state.toggleIncludeDocs(selectedNode.id)
+                        selectedNode &&
+                        state.toggleIncludeDocs(promptBuilderNodeKey(selectedNode))
                       }
                       onToggleCode={() =>
-                        selectedNode && state.toggleIncludeCode(selectedNode.id)
+                        selectedNode &&
+                        state.toggleIncludeCode(promptBuilderNodeKey(selectedNode))
                       }
                       setDocumentsForNode={state.setDocumentsForNode}
                       setCodeForNode={state.setCodeForNode}

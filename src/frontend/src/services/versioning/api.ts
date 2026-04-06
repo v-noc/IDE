@@ -26,6 +26,13 @@ export interface Branch {
 }
 
 export type TerminusJsonDiff = Record<string, unknown> | unknown[];
+
+export type VersioningRemoteAuth = {
+  type: string;
+  username?: string | null;
+  key: string;
+};
+
 type VersioningRequestContext = {
   branch?: string;
   ref?: string;
@@ -65,7 +72,7 @@ export const versioningApi = {
       start,
       count,
     });
-    return api(`${API_ROUTES.VERSIONING}/commits${qs}`, { branch, ref });
+    return api(`${API_ROUTES.VERSIONING}/commits/${qs}`, { branch, ref });
   },
 
   getDiff: (
@@ -80,5 +87,41 @@ export const versioningApi = {
       before_commit_id: beforeCommitId,
     });
     return api(`${API_ROUTES.VERSIONING}/commits/diff${qs}`, context);
+  },
+
+  push: (
+    projectId: string,
+    body: {
+      remote?: string;
+      branch?: string | null;
+      remote_branch?: string | null;
+      remote_auth: VersioningRemoteAuth;
+    },
+    context?: VersioningRequestContext
+  ): Promise<Record<string, unknown>> => {
+    const qs = buildQueryString({ project_id: projectId });
+    return api(`${API_ROUTES.VERSIONING}/remotes/push${qs}`, {
+      method: "POST",
+      body,
+      ...context,
+    });
+  },
+
+  pull: (
+    projectId: string,
+    body: {
+      remote?: string;
+      branch?: string | null;
+      remote_branch?: string | null;
+      remote_auth: VersioningRemoteAuth;
+    },
+    context?: VersioningRequestContext
+  ): Promise<Record<string, unknown>> => {
+    const qs = buildQueryString({ project_id: projectId });
+    return api(`${API_ROUTES.VERSIONING}/remotes/pull${qs}`, {
+      method: "POST",
+      body,
+      ...context,
+    });
   },
 };

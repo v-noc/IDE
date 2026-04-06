@@ -23,11 +23,12 @@ const statusColors: Record<string, string> = {
   success: "#10b981",
 };
 
-const diffColors: Record<string, { bg: string; text: string; label: string }> = {
-  added: { bg: "bg-green-100", text: "text-green-700", label: "Added" },
-  removed: { bg: "bg-red-100", text: "text-red-700", label: "Removed" },
-  modified: { bg: "bg-blue-100", text: "text-blue-700", label: "Updated" },
-};
+const diffColors: Record<string, { bg: string; text: string; label: string }> =
+  {
+    added: { bg: "bg-green-100", text: "text-green-700", label: "Added" },
+    removed: { bg: "bg-red-100", text: "text-red-700", label: "Removed" },
+    modified: { bg: "bg-blue-100", text: "text-blue-700", label: "Updated" },
+  };
 
 export const NodeHeader = memo(function NodeHeader({
   name,
@@ -46,19 +47,24 @@ export const NodeHeader = memo(function NodeHeader({
 }: NodeHeaderProps) {
   return (
     <div
-      className="flex items-center gap-3 border-b px-4 py-3.5 bg-slate-50/30"
-      style={{ borderColor: diffStatus ? 'transparent' : borderColor }}
+      className="flex items-center justify-between  gap-3 border-b px-4 py-3.5 bg-slate-50/30 w-full overflow-clip"
+      style={{ borderColor: diffStatus ? "transparent" : borderColor }}
     >
       {expandable && (
         <button
-          onClick={() => {
+          type="button"
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse subtree" : "Expand subtree"}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
             onToggle?.();
           }}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${expanded ? "bg-slate-200/5" : "bg-slate-100/15"
-            }`}
+          className={`nodrag nopan flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
+            expanded ? "bg-slate-200/5" : "bg-slate-100/15"
+          }`}
           style={{
             borderColor,
-
           }}
         >
           {expanded ? (
@@ -69,16 +75,17 @@ export const NodeHeader = memo(function NodeHeader({
         </button>
       )}
 
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2.5 flex-1 overflow-hidden">
         <span className="text-xl" style={{ color: iconColor }}>
           {icon}
         </span>
-        <span className="text-base font-bold tracking-wide text-slate-800" style={{ color: textColor }}>
+        <span
+          className="text-base font-bold tracking-wide text-slate-800 overflow-clip truncate"
+          style={{ color: textColor }}
+        >
           {name}
         </span>
       </div>
-
-      <div className="flex-1" />
 
       {status && status !== "idle" && (
         <span
@@ -97,11 +104,16 @@ export const NodeHeader = memo(function NodeHeader({
 
       {hasCode && (
         <button
-          onClick={() => {
-            onCodeToggle?.()
+          type="button"
+          aria-label={showCode ? "Hide code" : "Show code"}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onCodeToggle?.();
           }}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${showCode ? "bg-slate-200/5" : "bg-slate-100/15"
-            }`}
+          className={`nodrag nopan flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
+            showCode ? "bg-slate-200/5" : "bg-slate-100/15"
+          }`}
           style={{
             borderColor,
             color: iconColor,

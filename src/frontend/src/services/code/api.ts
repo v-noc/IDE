@@ -1,6 +1,16 @@
 import { api } from "@/lib/api";
 import API_ROUTES from '@/lib/apiRoutes';
 
+export type CodeDescendantsResponse = {
+  /** Nested code tree roots under the requested parent (same shape as project tree nodes). */
+  children: Record<string, unknown>[];
+};
+
+export type CodeLineageResponse = {
+  path_ids: string[];
+  tree: Record<string, unknown>[];
+};
+
 export interface CodeData {
   file_id: string;
   file_name: string;
@@ -38,5 +48,33 @@ export const codeApi = {
       method: 'POST',
       body: { code },
     });
+  },
+
+  getDescendants: (
+    projectId: string,
+    parentId: string,
+    opts?: {
+      depthStart?: number;
+      depthMax?: number;
+      childTypes?: string;
+      compareTo?: string | null;
+    }
+  ): Promise<CodeDescendantsResponse> => {
+    const params: Record<string, string> = {
+      project_id: projectId,
+      parent_id: parentId,
+    };
+    if (opts?.depthStart != null) params.depth_start = String(opts.depthStart);
+    if (opts?.depthMax != null) params.depth_max = String(opts.depthMax);
+    if (opts?.childTypes) params.child_types = opts.childTypes;
+    const qs = buildQueryString(params);
+    return api(`${API_ROUTES.CODE_ELEMENTS}descendants${qs}`, {
+      compareTo: opts?.compareTo ?? undefined,
+    }) as Promise<CodeDescendantsResponse>;
+  },
+
+  getLineage: (projectId: string, targetId: string): Promise<CodeLineageResponse> => {
+    const qs = buildQueryString({ project_id: projectId, target_id: targetId });
+    return api(`${API_ROUTES.CODE_ELEMENTS}lineage${qs}`) as Promise<CodeLineageResponse>;
   },
 }

@@ -101,26 +101,32 @@ export interface GroupNode extends ContainerNode {
 
 export interface ContainerNodeTree extends ContainerNode {
   children: AnyNodeTree[]
+  /** Present on file/class/function/call/group from structure or descendants API. */
+  lazy_child_ids?: string[]
 }
 
 export interface CallNodeTree extends CallNode {
   children: CallNodeTree[]
-
+  lazy_child_ids?: string[]
 }
 
 export interface GroupNodeTree extends GroupNode {
   children: (FunctionNodeTree | ClassNodeTree | CallNodeTree | GroupNodeTree | FileNodeTree | FolderNodeTree)[]
+  lazy_child_ids?: string[]
 }
 export interface FunctionNodeTree extends FunctionNode {
   children: (FunctionNodeTree | CallNodeTree | ClassNodeTree | GroupNodeTree)[]
+  lazy_child_ids?: string[]
 }
 
 export interface ClassNodeTree extends ClassNode {
   children: (FunctionNodeTree | ClassNodeTree | CallNodeTree | GroupNodeTree)[]
+  lazy_child_ids?: string[]
 }
 
 export interface FileNodeTree extends FileNode {
   children: (FunctionNodeTree | ClassNodeTree | CallNodeTree | GroupNodeTree)[]
+  lazy_child_ids?: string[]
 }
 
 export interface FolderNodeTree extends FolderNode {

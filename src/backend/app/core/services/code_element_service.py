@@ -1,7 +1,9 @@
 import aiofiles
 
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Any, Literal, Optional, Tuple
+
+from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import FunctionNode, ClassNode
 from app.core.model.properties import CodePosition
 from app.core.utils.code_utils import (
@@ -32,6 +34,57 @@ class CodeElementService():
 
     async def get_children(self, node_id: str):
         return await self.repos.code_element_repo.get_children(node_id, [])
+
+    async def get_target_lineage_tree(
+        self, target_id: str, *, compare_to: bool = False
+    ) -> dict[str, Any]:
+        """Root→leaf document chain as path ids and nested tree (spine only)."""
+        repos = (
+            self.uow.get_project_repos(use_compare_to=True)
+            if compare_to
+            else self.repos
+        )
+        docs = await repos.code_element_repo.get_node_lineage(target_id)
+        if not docs:
+            return {"path_ids": [], "tree": []}
+
+        tree_builder = TreeBuilder(docs)
+        tree = tree_builder.build()
+
+        path_ids: list[str] = []
+
+        def collect_path_ids(node):
+            if node.id:
+                path_ids.append(node.id)
+            for child in node.children:
+                collect_path_ids(child)
+        for node in tree:
+            collect_path_ids(node)
+
+        return {
+            "path_ids": path_ids,
+            "tree": [n.model_dump(mode="json") for n in tree],
+        }
+
+    async def get_code_descendants(
+        self,
+        parent_id: str,
+        child_types: list[str],
+        depth_start: int | None = None,
+        depth_max: int | None = None,
+        compare_to: bool = False,
+    ) -> Tuple[list[Any], dict[str, dict[str, Any]]]:
+        repos = (
+            self.uow.get_project_repos(use_compare_to=True)
+            if compare_to
+            else self.repos
+        )
+        return await repos.code_element_repo.get_code_descendant_nodes(
+            parent_id,
+            child_types,
+            depth_start=depth_start,
+            depth_max=depth_max,
+        )
 
     async def add_child(self, parent_node_id: str, child_node_id: str, child_type: Literal["function", "class", "call", "code_element_group", "call_group"]):
         return await self.repos.code_element_repo.move_item(parent_node_id, child_node_id, child_type)

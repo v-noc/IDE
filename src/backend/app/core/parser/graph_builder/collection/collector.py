@@ -4,11 +4,8 @@ from pathlib import Path
 from typing import List, Optional
 
 import aiofiles
-import asyncio
 from app.core.model.nodes import ProjectNode, FileNode
-from app.core.parser.ast.scanner import scan
-from app.core.parser.jedi_adapter.manager import JediProjectManager
-from app.core.parser.jedi_adapter.resolver import MROResolver
+from app.core.parser.drivers import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.discovery.change_detector import ChangeSet
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
@@ -36,20 +33,19 @@ class Collector:
         self,
         project_node: ProjectNode,
         repos: Repositories,
-        jedi_manager: JediProjectManager,
+        driver_manager: DriverManager,
     ):
         self.project_node = project_node
         self.project_path = Path(project_node.path)
         self.repos = repos
-        self.jedi_manager = jedi_manager
+        self.driver_manager = driver_manager
 
         self.folder_processor = FolderProcessor(
             project_node)
         self.file_processor = FileProcessor(
             project_node)
 
-        self.mro_resolver = MROResolver(jedi_manager)
-        self.ast_processor = ASTProcessor(repos, self.mro_resolver)
+        self.ast_processor = ASTProcessor(repos)
 
     def reset_session(self) -> None:
         """Reset builder caches between orchestrator runs."""
@@ -129,14 +125,16 @@ class Collector:
                 logger.error(f"Failed to read file {file_node.path}: {e}")
                 return None
 
-            # 3. Scan AST
-            loop = asyncio.get_event_loop()
+            # 3. Parse via language driver (inject IDs + AST + optional MRO)
             try:
-                # scan now returns (nodes, processed_content)
                 with tracker.timer("collector.process_file.scan_ast"):
-                    ast_nodes, processed_content = await loop.run_in_executor(
-                        None, scan, content, str(abs_path)
+                    driver = await self.driver_manager.get_driver(str(abs_path))
+                    parse_result = await driver.parse_file(
+                        str(abs_path), content, resolve_mro=True
                     )
+
+                    ast_nodes = parse_result.nodes
+                    processed_content = parse_result.content
             except Exception as e:
                 logger.error(
                     f"Failed to scan AST for {file_node.path}: {e}")
@@ -145,10 +143,16 @@ class Collector:
             # 4. Sync Content
             with tracker.timer("collector.process_file.sync_content"):
                 structure_batch_plan = await self.ast_processor.sync_content(
-                    file_node, ast_nodes, content=processed_content, progress_tracker=progress_tracker
+                    file_node,
+                    ast_nodes,
+                    content=processed_content,
+                    progress_tracker=progress_tracker,
                 )
-                file_node_for_phase2 = file_node if (
-                    structure_batch_plan.insert or structure_batch_plan.update) else None
+                file_node_for_phase2 = (
+                    file_node
+                    if (structure_batch_plan.insert or structure_batch_plan.update)
+                    else None
+                )
                 return CollectionResult(
                     structure_batch_plan=structure_batch_plan,
                     file_node=file_node_for_phase2,

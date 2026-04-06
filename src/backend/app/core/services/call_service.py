@@ -2,8 +2,13 @@
 from datetime import datetime, timezone
 import uuid
 from typing import Literal, List, Tuple
+
 from app.core.model.nodes import CallNode
+from app.core.call_insert_order import toposort_calls_for_insert
 from app.db.context import ProjectUoW
+
+_CALL_INSERT_CHUNK = 50_000
+_CALL_DELETE_MOVE_CHUNK = 5_000
 
 
 class CallService():
@@ -103,8 +108,28 @@ class CallService():
             "code": code,
         }
 
-    async def flush_batch(self, inserts: List[CallNode], deletes: List[str], moves: List[Tuple[str, str, str]]):
-        return await self.repos.call_repo._flush_batch_combined(inserts, deletes, moves)
+    async def flush_batch(
+        self,
+        inserts: List[CallNode],
+        deletes: List[str],
+        moves: List[Tuple[str, str, str]],
+    ) -> bool:
+        if inserts:
+            ordered = toposort_calls_for_insert(inserts)
+            insert_ids = {n.id for n in inserts}
+            for i in range(0, len(ordered), _CALL_INSERT_CHUNK):
+                chunk = ordered[i : i + _CALL_INSERT_CHUNK]
+                if await self.repos.call_repo.create(chunk) is None:
+                    return False
+        else:
+            insert_ids = None
+
+        return await self.repos.call_repo.flush_delete_move_batch_chunked(
+            deletes,
+            moves,
+            insert_ids=insert_ids,
+            chunk_size=_CALL_DELETE_MOVE_CHUNK,
+        )
 
     async def get_call_with_parent_and_target(self, parent_id: str, target_id: str):
         # Note: repository expects (target_id, parent_id)

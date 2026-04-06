@@ -1,8 +1,12 @@
-import { type ContainerNodeTree } from "@/types/project";
+import { useMemo } from "react";
+import { type CallNodeTree, type ContainerNodeTree } from "@/types/project";
 import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu";
 import { NodeContent } from "./NodeContent";
 import { useTreeNodeState } from "../../hooks/useTreeNodeState";
 import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
+import { useLazyCodeChildren } from "@/features/Dashboard/service/codeDescendants";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { mergeStructureAndLazyChildren } from "@/features/Dashboard/utils/mergeCodeTreeChildren";
 
 interface TreeNodeProps {
   node: ContainerNodeTree;
@@ -19,10 +23,30 @@ export const TreeNode = ({
   childFilter,
   onSelect,
 }: TreeNodeProps) => {
-  const { isOpen, isSelected, isActive, hasChildren } = useTreeNodeState(
-    node,
+  const isOpen = useProjectStore((s) =>
+    (s.expandedNodeIds[tabId] ?? []).includes(node.id),
+  );
+
+  const lazy = useLazyCodeChildren(node, isOpen);
+
+  const displayNode = useMemo((): ContainerNodeTree => {
+    if (!lazy.loadedNodes.length) return node;
+    return {
+      ...node,
+      children: mergeStructureAndLazyChildren(node.children, lazy.loadedNodes),
+    };
+  }, [node, lazy.loadedNodes]);
+
+  const lazyMeta = useMemo(
+    () => ({ lazyHintCount: node.lazy_child_ids?.length ?? 0 }),
+    [node.lazy_child_ids],
+  );
+
+  const { isSelected, isActive, hasChildren } = useTreeNodeState(
+    displayNode,
     childFilter,
     tabId,
+    lazyMeta,
   );
 
   const { handleToggle, handleSelectNode, onAction } = useNodeHandlers(
@@ -40,11 +64,15 @@ export const TreeNode = ({
     <NodeContextMenu
       nodeId={node.id}
       nodeType={node.node_type}
-      manuallyCreated={(node as any).manually_created}
+      manuallyCreated={
+        node.node_type === "call"
+          ? (node as CallNodeTree).manually_created
+          : undefined
+      }
       onAction={onAction}
     >
       <NodeContent
-        node={node}
+        node={displayNode}
         tabId={tabId}
         isOpen={isOpen}
         isSelected={isSelected}

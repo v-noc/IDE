@@ -1,6 +1,7 @@
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
 
 from pydantic import BaseModel
+from loguru import logger
 
 from app.core.schemas.tree import (
     AnyTreeNode,
@@ -50,15 +51,26 @@ STRUCTURE_CHILDREN = (FolderTreeNode, FileTreeNode, GroupTreeNode)
 CODE_CHILDREN = (ClassTreeNode, FunctionTreeNode, CallTreeNode, GroupTreeNode)
 CALL_CHILDREN = (CallTreeNode, GroupTreeNode)
 
+# Nodes that may have code (or group) children loaded lazily when not in the payload.
+_LAZY_CHILD_TRACKING_TYPES: Tuple[Type[Any], ...] = (
+    FileTreeNode,
+    ClassTreeNode,
+    FunctionTreeNode,
+    CallTreeNode,
+    GroupTreeNode,
+)
+
 
 class TreeBuilder:
     def __init__(
         self,
         base_nodes: List[Any],
         compare_nodes: Optional[List[Any]] = None,
+        target_lookup: Optional[Dict[str, Dict[str, Any]]] = None,
     ):
         self.base_nodes = base_nodes
         self.compare_nodes = compare_nodes
+        self.target_lookup = target_lookup or {}
         self.status_map: Dict[str, str] = {}
         self.parent_map: Dict[str, str] = {}
 
@@ -87,6 +99,8 @@ class TreeBuilder:
     def _target_function_id(d: Dict[str, Any]) -> Optional[str]:
         raw = d.get("target_function")
         if raw is None:
+            raw = d.get("target_class")
+        if raw is None:
             return None
         if isinstance(raw, str) and raw:
             return raw
@@ -95,6 +109,50 @@ class TreeBuilder:
         if isinstance(raw, dict):
             return raw.get("id") or raw.get("@id")
         return str(raw) if raw else None
+
+    def _call_target_tree_node(
+        self, target_id: str
+    ) -> Optional[Union[FunctionTreeNode, ClassTreeNode]]:
+        existing = self.nodes_map.get(target_id)
+        if existing and isinstance(
+            existing, (FunctionTreeNode, ClassTreeNode)
+        ):
+            return existing.model_copy(
+                update={"node_type": "function", "children": []}
+            )
+        raw = self.target_lookup.get(target_id)
+        if not raw:
+            return None
+        model_cls = self._get_model_class(raw)
+        if model_cls not in (FunctionTreeNode, ClassTreeNode):
+            return None
+        validate_d: Dict[str, Any] = {}
+        for k, v in raw.items():
+            if k == "children":
+                continue
+            if k == "@id":
+                validate_d["id"] = v
+            elif k == "@type":
+                validate_d["type"] = v
+                validate_d["schema_type"] = v
+            else:
+                validate_d[k] = v
+        if "id" not in validate_d:
+            return None
+        validate_d["children"] = []
+        validate_d["status"] = self.status_map.get(
+            validate_d["id"], "unchanged"
+        )
+        try:
+            node = model_cls.model_validate(validate_d)
+            return node.model_copy(
+                update={"node_type": "function", "children": []}
+            )
+        except Exception as e:
+            logger.error(
+                f"Error validating lookup target {target_id}: {e}"
+            )
+            return None
 
     @staticmethod
     def _get_model_class(item: Any) -> type | None:
@@ -366,19 +424,19 @@ class TreeBuilder:
                     self.parent_map[cid] = pid
                     referenced.add(cid)
 
-        # Phase 3: Link call targets
+            if isinstance(parent, _LAZY_CHILD_TRACKING_TYPES):
+                attached_ids = {c.id for c in parent.children}
+                lazy = [cid for cid in cids if cid not in attached_ids]
+                if lazy:
+                    parent.lazy_child_ids = lazy
+
+        # Phase 3: Link call targets (nodes_map first, else target_lookup)
         for call_id, target_id in target_function_id_by_call.items():
             call_node = self.nodes_map.get(call_id)
-            target_node = self.nodes_map.get(target_id)
-            if (
-                call_node
-                and target_node
-                and isinstance(call_node, CallTreeNode)
-                and isinstance(target_node, (FunctionTreeNode, ClassTreeNode))
-            ):
-                target_copy = target_node.model_copy(
-                    update={"node_type": "function", "children": []}
-                )
+            if not call_node or not isinstance(call_node, CallTreeNode):
+                continue
+            target_copy = self._call_target_tree_node(target_id)
+            if target_copy:
                 call_node.target = target_copy
 
         # Phase 4: Propagate statuses upward

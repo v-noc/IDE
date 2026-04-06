@@ -756,6 +756,7 @@ class Schema:
                 commit_msg=commit_msg,
                 graph_type=GraphType.SCHEMA.value,
                 full_replace=True,
+                compress="never",
             )
         else:
             await client.update_document(

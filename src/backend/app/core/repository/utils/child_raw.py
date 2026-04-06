@@ -108,6 +108,18 @@ def parse_structure_child(raw: dict[str, Any]) -> Optional[FolderNode]:
     return parse_code_element_child(raw)
 
 
+def ensure_path_choice_grouped(field_name: str) -> str:
+    """
+    WOQL PathTimes / PathPlus apply to a single phrase. Subsets from
+    build_path_field_name may be `a|b` without parentheses; wrap so
+    patterns like `(a|b){1,3}` tokenize correctly.
+    """
+    s = field_name.strip()
+    if s.startswith("(") and s.endswith(")"):
+        return s
+    return f"({s})"
+
+
 def build_path_field_name(
     child_types: list[str],
     all_fields: tuple[str, ...],

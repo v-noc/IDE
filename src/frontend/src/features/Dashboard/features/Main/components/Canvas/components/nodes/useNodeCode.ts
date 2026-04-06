@@ -18,7 +18,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
 
   // Only fetch code for file, class, or function node types
   const shouldFetchCode =
-    nodeType === "file" || nodeType === "class" || nodeType === "function";
+    nodeType === "file" || nodeType === "class" || nodeType === "function" || nodeType === "call";
 
   // Fetch code dynamically for the node
   const effectiveNodeId = nodeType === "call" && targetKey ? targetKey : nodeId;
@@ -59,7 +59,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
     (editorValue && editorValue.length > 0);
 
   const fileName = codeData?.file_name || codeData?.file_path || "";
-  const language = detectLanguage(fileName);
+  const language = detectLanguage(codeData?.file_path || codeData?.file_name || "");
 
   const toggleCode = () => setShowCode((prev) => !prev);
 

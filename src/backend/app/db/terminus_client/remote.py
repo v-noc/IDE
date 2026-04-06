@@ -1,4 +1,4 @@
-"""Remote operations: push, pull, fetch, rebase, reset, optimize, squash."""
+"""Remote operations: push, pull, fetch, remote CRUD, rebase, reset, optimize, squash."""
 
 import json
 from typing import Optional
@@ -74,6 +74,64 @@ class RemoteMixin:
             auth=self._auth(),
         )
 
+        return json.loads(_finish_response(result))
+
+    async def create_remote(
+        self,
+        remote_name: str,
+        remote_location: str,
+    ) -> dict:
+        """Create a new remote (POST /remote/{path})."""
+        self._check_connection()
+        result = await self._session.post(
+            self._branch_base("remote"),
+            headers=self._default_headers,
+            json={
+                "remote_name": remote_name,
+                "remote_location": remote_location,
+            },
+            auth=self._auth(),
+        )
+        return json.loads(_finish_response(result))
+
+    async def update_remote(
+        self,
+        remote_name: str,
+        remote_location: str,
+    ) -> dict:
+        """Update a remote with a new location (PUT /remote/{path})."""
+        self._check_connection()
+        result = await self._session.put(
+            self._branch_base("remote"),
+            headers=self._default_headers,
+            json={
+                "remote_name": remote_name,
+                "remote_location": remote_location,
+            },
+            auth=self._auth(),
+        )
+        return json.loads(_finish_response(result))
+
+    async def delete_remote(self, remote_name: str) -> dict:
+        """Delete a remote by name (DELETE /remote/{path})."""
+        self._check_connection()
+        result = await self._session.delete(
+            self._branch_base("remote"),
+            headers=self._default_headers,
+            params={"remote_name": remote_name},
+            auth=self._auth(),
+        )
+        return json.loads(_finish_response(result))
+
+    async def get_remote(self, remote_name: str) -> dict:
+        """Get the URL for a given remote (GET /remote/{path})."""
+        self._check_connection()
+        result = await self._session.get(
+            self._branch_base("remote"),
+            headers=self._default_headers,
+            params={"remote_name": remote_name},
+            auth=self._auth(),
+        )
         return json.loads(_finish_response(result))
 
     async def push(

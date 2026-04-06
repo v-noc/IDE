@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends
 
+from app.api.schemas.terminus_remote import RemoteAuth
 from app.db.async_terminus_client import AsyncClient
 from app.db.client import get_terminus_client
 from app.api.dependencies import get_project_uow, ProjectUoW
@@ -8,12 +9,6 @@ from app.db.context import DbTarget
 from app.db.scoped_client import scoped_client
 
 router = APIRouter()
-
-
-class RemoteAuth(BaseModel):
-    type: str = "http_basic"
-    username: str | None = None
-    key: str
 
 
 class CloneRequest(BaseModel):
@@ -27,13 +22,14 @@ class PushRequest(BaseModel):
     remote: str = "origin"
     branch: str | None = None
     remote_branch: str | None = None
-    remote_auth: RemoteAuth | None = None
+    remote_auth: RemoteAuth
 
 
 class PullRequest(BaseModel):
     remote: str = "origin"
     branch: str | None = None
     remote_branch: str | None = None
+    remote_auth: RemoteAuth
 
 
 class FetchRequest(BaseModel):
@@ -46,15 +42,16 @@ async def clone_remote(
     base: AsyncClient = Depends(get_terminus_client),
 ):
     client = base.clone()
-    remote_auth_dict = None
-    if request.remote_auth:
-        remote_auth_dict = request.remote_auth.model_dump()
-    await client.clonedb(
+    remote_auth_dict = (
+        request.remote_auth.model_dump() if request.remote_auth else None
+    )
+    result = await client.clonedb(
         clone_source=request.remote_url,
         newid=request.local_db_name,
         description=request.description,
         remote_auth=remote_auth_dict,
     )
+    print(f"result: {result}")
     return {"ok": True, "local_db": request.local_db_name}
 
 
@@ -68,11 +65,10 @@ async def push_remote(
         branch=project_uow.ctx.branch,
     )
     async with scoped_client(project_uow.client, target) as session:
-        remote_auth = request.remote_auth.model_dump() if request.remote_auth else None
         result = await session.push(
             remote=request.remote,
             remote_branch=request.remote_branch or request.branch,
-            remote_auth=remote_auth,
+            remote_auth=request.remote_auth.model_dump(),
         )
         return result
 
@@ -90,6 +86,7 @@ async def pull_remote(
         result = await session.pull(
             remote=request.remote,
             remote_branch=request.remote_branch or request.branch,
+            remote_auth=request.remote_auth.model_dump(),
         )
         return result
 

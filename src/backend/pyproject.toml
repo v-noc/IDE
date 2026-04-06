@@ -48,8 +48,16 @@ asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 
+[tool.uv]
+dev-dependencies = [
+  "pytest>=8.4.1",
+  "pytest-asyncio>=1.1.0",
+  "vnoc-lsp-python",
+]
+
 [tool.uv.scripts]
 dev = "uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
 
 [tool.uv.sources]
 vn-logger = { workspace = true }
+vnoc-lsp-python = { workspace = true }

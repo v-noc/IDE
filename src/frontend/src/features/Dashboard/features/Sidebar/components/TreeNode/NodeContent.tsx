@@ -19,6 +19,9 @@ interface NodeContentProps {
   handleSelectNode: () => void;
   childFilter?: (node: ContainerNodeTree) => boolean;
   onSelect?: (node: ContainerNodeTree) => void;
+  showLoadMore?: boolean;
+  loadMorePending?: boolean;
+  onLoadMore?: () => void;
 }
 
 export const NodeContent = memo(function NodeContent({
@@ -33,6 +36,9 @@ export const NodeContent = memo(function NodeContent({
   handleSelectNode,
   childFilter,
   onSelect,
+  showLoadMore,
+  loadMorePending,
+  onLoadMore,
 }: NodeContentProps) {
   const style = useNodeStyle(node);
   const diffStatus = node.status ?? "none";
@@ -98,6 +104,21 @@ export const NodeContent = memo(function NodeContent({
                 childFilter={childFilter}
                 onSelect={onSelect}
               />
+              {showLoadMore && onLoadMore ? (
+                <div className="pl-6 pt-1">
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground underline disabled:opacity-50"
+                    disabled={loadMorePending}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onLoadMore();
+                    }}
+                  >
+                    {loadMorePending ? "Loading…" : "Load more"}
+                  </button>
+                </div>
+              ) : null}
             </CollapsibleContent>
           )}
         </div>
