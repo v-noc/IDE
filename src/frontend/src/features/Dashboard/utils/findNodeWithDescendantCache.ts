@@ -1,9 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 import queryKeys from "@/lib/queryKeys";
+import { canLazyLoadCodeChildren } from "@/features/Dashboard/service/codeDescendants";
 import type { CodeDescendantsResponse } from "@/services/code/api";
-import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
+import type { AnyNodeTree, ContainerNodeTree, ProjectNodeTree } from "@/types/project";
 
 import { findNodeByKey } from "./findNode";
+import { mergeStructureAndLazyChildren } from "./mergeCodeTreeChildren";
 
 function rawNodeId(raw: Record<string, unknown>): string {
   const id = raw.id ?? raw["@id"];
@@ -72,4 +74,99 @@ export function findNodeByIdWithDescendantCache(
     if (hit) return hit;
   }
   return null;
+}
+
+function getEffectiveChildrenMerged(
+  queryClient: QueryClient,
+  projectKey: string,
+  branch: string | null | undefined,
+  ref: string | null | undefined,
+  compareTo: string | null | undefined,
+  node: ContainerNodeTree,
+): AnyNodeTree[] {
+  const structure = (node.children ?? []) as AnyNodeTree[];
+  if (!projectKey) return structure;
+  if (
+    !canLazyLoadCodeChildren(
+      node as unknown as Parameters<typeof canLazyLoadCodeChildren>[0],
+    )
+  ) {
+    return structure;
+  }
+  const data = queryClient.getQueryData<CodeDescendantsResponse>(
+    queryKeys.code.descendants(projectKey, node.id, branch, ref, compareTo),
+  );
+  const loaded = (data?.children ?? []) as unknown as AnyNodeTree[];
+  return mergeStructureAndLazyChildren(structure, loaded);
+}
+
+/**
+ * Parent of `node` when traversing structure plus cached `code.descendants` merges (same as sidebar tree).
+ */
+export function getParentNodeWithDescendantCache(
+  node: AnyNodeTree,
+  root: ContainerNodeTree,
+  queryClient: QueryClient,
+  projectKey: string,
+  branch: string | null | undefined,
+  ref: string | null | undefined,
+  compareTo: string | null | undefined,
+): ContainerNodeTree | null {
+  const effective = getEffectiveChildrenMerged(
+    queryClient,
+    projectKey,
+    branch,
+    ref,
+    compareTo,
+    root,
+  );
+  if (effective.some((c) => c.id === node.id)) {
+    return root;
+  }
+  for (const child of effective) {
+    const sub = getParentNodeWithDescendantCache(
+      node,
+      child as ContainerNodeTree,
+      queryClient,
+      projectKey,
+      branch,
+      ref,
+      compareTo,
+    );
+    if (sub) return sub;
+  }
+  return null;
+}
+
+/**
+ * Siblings of `node` under the resolved parent (structure + lazy descendants merged).
+ */
+export function getSiblingsWithDescendantCache(
+  node: AnyNodeTree,
+  root: ContainerNodeTree,
+  queryClient: QueryClient,
+  projectKey: string,
+  branch: string | null | undefined,
+  ref: string | null | undefined,
+  compareTo: string | null | undefined,
+): AnyNodeTree[] {
+  const parent = getParentNodeWithDescendantCache(
+    node,
+    root,
+    queryClient,
+    projectKey,
+    branch,
+    ref,
+    compareTo,
+  );
+  if (!parent) return [];
+  const effective = getEffectiveChildrenMerged(
+    queryClient,
+    projectKey,
+    branch,
+    ref,
+    compareTo,
+    parent,
+  );
+  return effective.filter((c) => c.id !== node.id);
 }

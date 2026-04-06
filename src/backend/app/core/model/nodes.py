@@ -153,7 +153,7 @@ class CallGroupNode(BaseGroupNode):
             theme_config=raw_dict.get("theme_config"),
         )
 
-    def children_by_type(self) -> dict[str, set]:
+    def get_children_by_type(self) -> dict[str, set]:
         if self.children_by_type is not None:
             return self.children_by_type
         return dict.fromkeys(

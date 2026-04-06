@@ -66,6 +66,7 @@ class GroupService():
         repo = self.current_repo(group_type)
         node = self.current_node(group_type)
         schema = self.current_schema(group_type)
+
         group = node(
             id=f"{schema.__name__}/{str(uuid.uuid4())}",
             name=name,

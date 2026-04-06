@@ -52,6 +52,7 @@ async def create_group(
         ..., description="Group type: structure_group, code_element_group, or call_group"),
 
 ):
+
     gt = _parse_group_type(group_type)
 
     children: List[Tuple[str, str]] = [

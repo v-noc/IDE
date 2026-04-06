@@ -56,7 +56,12 @@ function NodeRow({
   checked,
   onCheckedChange,
 }: {
-  node: { name: string; node_type: NodeType; group_type?: string; icon?: string };
+  node: {
+    name: string;
+    node_type: NodeType;
+    group_type?: string;
+    icon?: string;
+  };
   checked: boolean;
   onCheckedChange: (next: boolean) => void;
 }) {
@@ -237,7 +242,8 @@ const GroupDialog = ({
         selectedChildrenIds.map(async (id) => {
           const node = currentChildren.find((item) => item.id === id);
           if (!node) return;
-          const itemType: GroupApiItemType | null = mapNodeToGroupItemType(node);
+          const itemType: GroupApiItemType | null =
+            mapNodeToGroupItemType(node);
           if (!itemType) return;
           await removeChildFromGroupMutation.mutateAsync({
             childId: id,
@@ -403,14 +409,18 @@ const GroupDialog = ({
                 type="button"
                 variant="secondary"
                 onClick={handleRemoveSelection}
-                disabled={!hasRemoveSelection || isMutatingChildren || !canUseGroupApi}
+                disabled={
+                  !hasRemoveSelection || isMutatingChildren || !canUseGroupApi
+                }
               >
                 Remove from children
               </Button>
               <Button
                 type="button"
                 onClick={handleAddSelection}
-                disabled={!hasAddSelection || isMutatingChildren || !canUseGroupApi}
+                disabled={
+                  !hasAddSelection || isMutatingChildren || !canUseGroupApi
+                }
               >
                 Add to children
               </Button>
@@ -426,7 +436,9 @@ const GroupDialog = ({
               </Button>
               <Button
                 type="submit"
-                disabled={!hasInfoChanges || isMutatingSettings || !canUseGroupApi}
+                disabled={
+                  !hasInfoChanges || isMutatingSettings || !canUseGroupApi
+                }
               >
                 {isCreating
                   ? "Creating..."

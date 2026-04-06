@@ -3,10 +3,13 @@ import GroupDialog from "./GroupDialog";
 import SelectNodeDialog from "./SelectNodeDialog";
 import PromptBuilder from "@/components/PromptBuilder/PromptBuilder";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import {
-  getParentNode,
-  getSiblings,
-} from "@/features/Dashboard/utils/treeUtils";
+  getParentNodeWithDescendantCache,
+  getSiblingsWithDescendantCache,
+} from "@/features/Dashboard/utils/findNodeWithDescendantCache";
+import queryKeys from "@/lib/queryKeys";
+import { useQueryClient, useIsFetching } from "@tanstack/react-query";
 import { useTreeNodeActions } from "../hooks/useNodeAction";
 import type {
   AnyNodeTree,
@@ -18,16 +21,61 @@ import { useMemo } from "react";
 export function SidebarDialogs() {
   const { activeModal, targetNode, closeModal } = useSidebarModalStore();
   const projectData = useProjectStore((s) => s.projectData);
+  const queryClient = useQueryClient();
+  const branch = useVersioningStore((s) => s.branch);
+  const ref = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareTo = useVersioningStore((s) => s.compareToCommitId);
+  const projectKey = projectData?.id ?? "";
+
+  const descendantsFetchCount = useIsFetching({
+    predicate: (q) => {
+      const k = q.queryKey as readonly unknown[];
+      return (
+        !!projectKey &&
+        k.length >= 3 &&
+        k[0] === queryKeys.code.all[0] &&
+        k[1] === "descendants" &&
+        k[2] === projectKey
+      );
+    },
+  });
 
   const { handleAddCall } = useTreeNodeActions(targetNode as ContainerNodeTree);
 
-  // Memoize parent and siblings to avoid re-calculation on every render
   const { parentNode, siblings } = useMemo(() => {
-    if (!targetNode || !projectData) return { parentNode: null, siblings: [] };
-    const parent = getParentNode(targetNode, projectData as ContainerNodeTree);
-    const sibs = getSiblings(targetNode, projectData as ContainerNodeTree);
+    if (!targetNode || !projectData) {
+      return { parentNode: null, siblings: [] as AnyNodeTree[] };
+    }
+    const root = projectData as ContainerNodeTree;
+    const parent = getParentNodeWithDescendantCache(
+      targetNode,
+      root,
+      queryClient,
+      projectKey,
+      branch,
+      ref,
+      compareTo,
+    );
+    const sibs = getSiblingsWithDescendantCache(
+      targetNode,
+      root,
+      queryClient,
+      projectKey,
+      branch,
+      ref,
+      compareTo,
+    );
     return { parentNode: parent, siblings: sibs };
-  }, [targetNode, projectData]);
+  }, [
+    targetNode,
+    projectData,
+    projectKey,
+    branch,
+    ref,
+    compareTo,
+    queryClient,
+    descendantsFetchCount,
+  ]);
 
   // No node = no dialogs
   if (!targetNode) return null;

@@ -1,7 +1,7 @@
 
 from typing import Optional, Set
 
-from app.core.model.nodes import CallNode, ClassNode, CodeElementGroupNode, FunctionNode
+from app.core.model.nodes import CallNode, ClassNode, CodeElementGroupNode, FunctionNode, CallGroupNode
 
 from .base import BaseSchema
 from .metadata import CodePositionSchema, DocumentSchema, ThemeConfigSchema
@@ -77,6 +77,21 @@ class CallGroupSchema(BaseSchema):
     call_children: Set["CallSchema"]
     call_group: Set["CallGroupSchema"]
     theme_config: Optional[ThemeConfigSchema]
+
+    @staticmethod
+    def from_pydantic(call_group: CallGroupNode):
+        by_type = call_group.get_children_by_type()
+        return CallGroupSchema(
+            _id=call_group.id,
+            name=call_group.name,
+            description=call_group.description,
+            call_children=by_type.get("call_children", set()),
+            call_group=by_type.get("call_group", set()),
+            theme_config=ThemeConfigSchema.from_pydantic(
+                call_group.theme_config),
+            created_at=call_group.created_at,
+            updated_at=call_group.updated_at,
+        )
 
 
 class ClassSchema(BaseSchema):
