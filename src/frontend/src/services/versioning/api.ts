@@ -72,7 +72,7 @@ export const versioningApi = {
       start,
       count,
     });
-    return api(`${API_ROUTES.VERSIONING}/commits${qs}`, { branch, ref });
+    return api(`${API_ROUTES.VERSIONING}/commits/${qs}`, { branch, ref });
   },
 
   getDiff: (
