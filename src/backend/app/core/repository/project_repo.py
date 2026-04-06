@@ -3,10 +3,10 @@ from datetime import timezone
 from app.db.errors import DatabaseError
 from app.db.async_terminus_client import WOQLQuery as WQ
 from app.db.async_terminus_client import AsyncClient
-from app.core.model.schemas import ProjectSchema, ensure_schema
+from app.core.model.schemas import ProjectSchema
 from app.core.model import ProjectNode
-from slugify import slugify
 
+from app.core.repository.project_bootstrap import bootstrap_empty_project_database
 from app.core.repository.utils import parse_structure_child
 from app.core.model.schemas import FileSchema, FolderSchema, FunctionSchema, ClassSchema, CallSchema, CodeElementGroupSchema, CallGroupSchema, StructureGroupSchema
 
@@ -52,25 +52,13 @@ class ProjectRepo():
             else:
                 raise e
 
-    async def create(self, name, description, path):
-
-        db_name = slugify(name)
-        clone_db = self.client.clone()
-
-        try:
-            await clone_db.create_database(db_name, label=db_name, description="V-NOC code analysis graph")
-        except DatabaseError as e:
-            if e.error_obj.get("api:error", {}).get("@type", "") == "api:DatabaseAlreadyExists":
-                db_name = f"{db_name}_{datetime.now().strftime("%Y%m%d%H%M%S")}"
-                await clone_db.create_database(db_name, label=db_name, description="V-NOC code analysis graph")
-            else:
-                raise e
-        print(f"clone_db--: {self.client.db} {clone_db.db}")
-        await ensure_schema(clone_db, f"{name} Schema", description, [f"{name} Team"])
-
-        init_folder = FolderSchema.create_init_folder()
-        await clone_db.insert_document(init_folder, commit_msg="Add __init__ global document theme folder")
-
+    async def register_project(
+        self,
+        name: str,
+        description: str,
+        path: str,
+        db_name: str,
+    ) -> ProjectNode:
         project = ProjectSchema(
             _id=f"{db_name}",
             name=name,
@@ -80,10 +68,8 @@ class ProjectRepo():
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
-
         await self.client.insert_document(project, commit_msg=f"Creating project {name}")
-
-        project_node = ProjectNode(
+        return ProjectNode(
             id=project._id,
             name=project.name,
             description=project.description,
@@ -92,7 +78,14 @@ class ProjectRepo():
             created_at=project.created_at,
             updated_at=project.updated_at,
         )
-        return project_node
+
+    async def create(self, name, description, path):
+        db_name = await bootstrap_empty_project_database(
+            self.client.clone(),
+            name,
+            description,
+        )
+        return await self.register_project(name, description, path, db_name)
 
     async def get_by_id(self, project_id: str):
         try:

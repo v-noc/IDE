@@ -1,32 +1,49 @@
+from pathlib import Path
+from typing import Literal, Optional
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, model_validator
+from terminusdb_client.errors import InterfaceError
 
-from app.core.schemas.tree import ProjectTreeNode, AnyTreeNode
-from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
-from app.core.builder.tree_builder import TreeBuilder
-from app.db.client import get_terminus_client
-
-from app.core.services.project_service import ProjectService
 from app.api.dependencies import (
     ProjectUoW,
+    get_project_node,
     get_project_service,
     get_project_service_with_uow,
-    get_project_node,
 )
-from pathlib import Path
-from app.core.watcher.service import WatcherService, get_watcher_service
-from loguru import logger
+from app.api.schemas.terminus_remote import RemoteConfig
+from app.core.builder.tree_builder import TreeBuilder
 from app.core.model.nodes import ProjectNode
-from app.core.model.schemas import StructureGroupSchema
+from app.core.parser.graph_builder.orchestrator import GraphBuilderOrchestrator
+from app.core.schemas.tree import AnyTreeNode, ProjectTreeNode
+from app.core.services.project_service import ProjectService
+from app.core.watcher.service import WatcherService, get_watcher_service
 from app.db.async_terminus_client import AsyncClient
+from app.db.client import get_terminus_client
 from app.db.context import RequestDbContext
+from app.db.errors import DatabaseError
+from app.core.model.schemas import StructureGroupSchema
+from loguru import logger
 
 
 class CreateProjectRequest(BaseModel):
     name: str = Field(..., min_length=3)
     description: Optional[str] = Field(default=None)
     path: str = Field(...)
+    remote: Optional[RemoteConfig] = None
+    remote_mode: Literal["none", "create_remote", "clone"] = Field(
+        default="none",
+        description="none: local only. create_remote: bootstrap on remote URL then clonedb locally. clone: full clone URL only.",
+    )
+
+    @model_validator(mode="after")
+    def _remote_matches_mode(self):
+        if self.remote is None:
+            if self.remote_mode != "none":
+                raise ValueError("remote is required when remote_mode is not none")
+        elif self.remote_mode == "none":
+            raise ValueError("remote_mode cannot be none when remote is set")
+        return self
 
 
 class UpdateProjectRequest(BaseModel):
@@ -49,9 +66,7 @@ async def create_project(
 ) -> ProjectTreeNode:
     """Create a project graph from a local path.
 
-    Returns a `ProjectTreeNode` built from the analyzed source code if
-    successful.
-    Raises 400 when the provided path does not exist.
+    Optional ``remote`` + ``remote_mode`` integrate Terminus remotes (see OpenAPI field docs).
     """
     project_root = Path(project.path)
     if not project_root.exists():
@@ -63,18 +78,44 @@ async def create_project(
             },
         )
 
-    try:
-        project_node = await project_service.create(
-            name=project.name,
-            description=project.description or "",
-            path=project.path,
-        )
-        uow = ProjectUoW(db, project_node, RequestDbContext(
-            branch="main", ref=None))
+    desc = project.description or ""
 
+    try:
+        if project.remote_mode == "none":
+            project_node = await project_service.create(
+                name=project.name,
+                description=desc,
+                path=project.path,
+            )
+        elif project.remote_mode == "create_remote":
+            rc = project.remote
+            assert rc is not None
+            project_node = await project_service.create_with_remote_bootstrap(
+                local_client=db,
+                name=project.name,
+                description=desc,
+                path=project.path,
+                remote=rc,
+            )
+        else:
+            rc = project.remote
+            assert rc is not None
+            project_node = await project_service.create_from_remote_clone(
+                local_client=db,
+                name=project.name,
+                description=desc,
+                path=project.path,
+                remote=rc,
+            )
+
+        uow = ProjectUoW(
+            db,
+            project_node,
+            RequestDbContext(branch="main", ref=None),
+        )
         orchestrator = GraphBuilderOrchestrator(
             project_node=project_node,
-            uow=uow
+            uow=uow,
         )
         await orchestrator.resync()
 
@@ -86,8 +127,18 @@ async def create_project(
                 "message": str(exc),
             },
         )
+    except InterfaceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"message": str(exc)},
+        )
+    except DatabaseError as exc:
+        logger.exception("Terminus database error during project create")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"message": str(exc)},
+        )
     except Exception as exc:
-        # Let the global exception handler return 500, but preserve traceback
         logger.exception(f"Failed to build project graph: {exc}")
         raise
 
@@ -97,9 +148,7 @@ async def create_project(
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
 
-    project_tree = ProjectTreeNode(**project_node.model_dump(), children=tree)
-
-    return project_tree
+    return ProjectTreeNode(**project_node.model_dump(), children=tree)
 
 
 @router.get("/", response_model=ProjectTreeNode)

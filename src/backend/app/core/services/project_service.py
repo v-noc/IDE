@@ -1,7 +1,8 @@
 from typing import Optional
-from app.core.repository import Repositories
+
+from app.api.schemas.terminus_remote import RemoteConfig
 from app.core.model.nodes import ProjectNode
-# from app.core.services.container_service import ContainerService
+from app.db.async_terminus_client import AsyncClient
 from app.db.context import ProjectUoW
 
 
@@ -22,6 +23,48 @@ class ProjectService():
 
     async def create(self, name: str, description: str, path: str):
         return await self.meta_repos.project_repo.create(name, description, path)
+
+    async def create_with_remote_bootstrap(
+        self,
+        local_client: AsyncClient,
+        name: str,
+        description: str,
+        path: str,
+        remote: RemoteConfig,
+    ) -> ProjectNode:
+        from app.core.services.project_remote_flows import (
+            create_with_remote_bootstrap as remote_bootstrap,
+        )
+
+        return await remote_bootstrap(
+            project_repo=self.meta_repos.project_repo,
+            local_client=local_client,
+            name=name,
+            description=description,
+            path=path,
+            remote=remote,
+        )
+
+    async def create_from_remote_clone(
+        self,
+        local_client: AsyncClient,
+        name: str,
+        description: str,
+        path: str,
+        remote: RemoteConfig,
+    ) -> ProjectNode:
+        from app.core.services.project_remote_flows import (
+            create_from_remote_clone as remote_clone,
+        )
+
+        return await remote_clone(
+            project_repo=self.meta_repos.project_repo,
+            local_client=local_client,
+            name=name,
+            description=description,
+            path=path,
+            remote=remote,
+        )
 
     async def get(self, project_id: str):
         return await self.meta_repos.project_repo.get_by_id(project_id)
