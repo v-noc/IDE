@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { ChevronDown, GitCommit, X } from "lucide-react";
+import {
+  ChevronDown,
+  DownloadCloud,
+  GitCommit,
+  UploadCloud,
+  X,
+} from "lucide-react";
 import { useVersioningStore } from "../store/useVersioningStore";
 import CommitHistory from "./CommitHistory";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
@@ -8,6 +14,9 @@ import { mapCommitToDisplay } from "../utils/commitUtils";
 import { useVersioningBranches } from "../hooks/useVersioningBranches";
 import BranchDropdown from "./BranchDropdown";
 import CreateBranchDialog from "./CreateBranchDialog";
+import RemoteSyncAuthDialog from "./RemoteSyncAuthDialog";
+import { usePushToRemote, usePullFromRemote } from "@/services/versioning";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +55,10 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
       : itemScopeId;
   const [page, setPage] = useState(0);
   const [isCreateBranchOpen, setIsCreateBranchOpen] = useState(false);
+  const [remoteSyncMode, setRemoteSyncMode] = useState<"push" | "pull" | null>(
+    null,
+  );
+
   const {
     currentBranch,
     availableBranches,
@@ -54,6 +67,9 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
     isCreatingBranch,
     isLoadingBranches,
   } = useVersioningBranches(projectData?.id);
+
+  const pushMutation = usePushToRemote(projectData?.id, currentBranch);
+  const pullMutation = usePullFromRemote(projectData?.id, currentBranch);
 
   useEffect(() => {
     setPage(0);
@@ -76,16 +92,46 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   return (
     <div className="flex h-full w-full flex-col border-l bg-white shadow-sm transition-all duration-300">
       <div className="border-b px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-slate-800">
             Commit history
           </h2>
-          <button
-            onClick={togglePanel}
-            className="rounded-md p-1 hover:bg-slate-100 text-slate-500"
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={togglePanel}
+              className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+              aria-label="Close panel"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1 px-2 text-xs"
+            disabled={!projectData?.id}
+            onClick={() => setRemoteSyncMode("push")}
+            title="Push to origin"
           >
-            <X size={20} />
-          </button>
+            <UploadCloud className="size-3.5" />
+            Push
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1 px-2 text-xs"
+            disabled={!projectData?.id}
+            onClick={() => setRemoteSyncMode("pull")}
+            title="Pull from origin"
+          >
+            <DownloadCloud className="size-3.5" />
+            Pull
+          </Button>
         </div>
         <div className="mt-3 flex flex-col gap-1">
           <div className="flex min-w-0 items-center justify-between w-full gap-1">
@@ -180,6 +226,43 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
         onOpenChange={setIsCreateBranchOpen}
         onCreate={createBranch}
         isCreating={isCreatingBranch}
+      />
+      <RemoteSyncAuthDialog
+        open={remoteSyncMode != null}
+        onOpenChange={(open) => {
+          if (!open) setRemoteSyncMode(null);
+        }}
+        mode={remoteSyncMode ?? "push"}
+        isPending={pushMutation.isPending || pullMutation.isPending}
+        onConfirm={(auth) => {
+          const remote_auth = {
+            type: auth.type,
+            key: auth.key,
+            ...(auth.type === "http_basic" ? { username: auth.username } : {}),
+          };
+          const onSettled = () => setRemoteSyncMode(null);
+          if (remoteSyncMode === "push") {
+            pushMutation.mutate(remote_auth, {
+              onSuccess: () => {
+                toast.success("Push completed");
+                onSettled();
+              },
+              onError: (err) => {
+                toast.error(err instanceof Error ? err.message : "Push failed");
+              },
+            });
+          } else if (remoteSyncMode === "pull") {
+            pullMutation.mutate(remote_auth, {
+              onSuccess: () => {
+                toast.success("Pull completed");
+                onSettled();
+              },
+              onError: (err) => {
+                toast.error(err instanceof Error ? err.message : "Pull failed");
+              },
+            });
+          }
+        }}
       />
     </div>
   );
