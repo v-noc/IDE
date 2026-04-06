@@ -23,6 +23,7 @@ import {
 import {
   mapNodeToGroupApiType,
   mapNodeToGroupItemType,
+  isSiblingCandidateForGroupType,
   type GroupApiItemType,
 } from "../service/groupApiUtils";
 import { useForm } from "react-hook-form";
@@ -144,8 +145,13 @@ const GroupDialog = ({
 
   const availableSiblings = useMemo(() => {
     const childKeys = new Set(currentChildren.map((c) => c.id));
-    return siblings.filter((s) => !childKeys.has(s.id) && s.id !== group?.id);
-  }, [siblings, currentChildren, group?.id]);
+    return siblings.filter(
+      (s) =>
+        !childKeys.has(s.id) &&
+        s.id !== group?.id &&
+        isSiblingCandidateForGroupType(s, effectiveGroupType),
+    );
+  }, [siblings, currentChildren, group?.id, effectiveGroupType]);
 
   const filteredChildren = useMemo(() => {
     if (!leftFilter) return currentChildren;

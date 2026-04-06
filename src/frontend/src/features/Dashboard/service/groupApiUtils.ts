@@ -54,6 +54,38 @@ export function mapNodeToGroupApiType(node?: AnyNodeTree | null): GroupApiType |
   }
 }
 
+/**
+ * Whether a tree node may be added as a sibling into the "available" pool for a group of this API type
+ * (aligns with StructureGroupSchema / CodeElementGroupSchema / CallGroupSchema child sets).
+ */
+export function isSiblingCandidateForGroupType(
+  node: AnyNodeTree,
+  groupType: GroupApiType,
+): boolean {
+  switch (groupType) {
+    case "code_element_group":
+      if (node.node_type === "function" || node.node_type === "class") return true;
+      if (node.node_type === "group") {
+        return mapNodeToGroupApiType(node) === "code_element_group";
+      }
+      return false;
+    case "call_group":
+      if (node.node_type === "call") return true;
+      if (node.node_type === "group") {
+        return mapNodeToGroupApiType(node) === "call_group";
+      }
+      return false;
+    case "structure_group":
+      if (node.node_type === "folder" || node.node_type === "file") return true;
+      if (node.node_type === "group") {
+        return mapNodeToGroupApiType(node) === "structure_group";
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
 export function mapNodeToGroupItemType(node: AnyNodeTree): GroupApiItemType | null {
   switch (node.node_type) {
     case "folder":

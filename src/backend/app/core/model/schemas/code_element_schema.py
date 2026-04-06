@@ -93,6 +93,23 @@ class CallGroupSchema(BaseSchema):
             updated_at=call_group.updated_at,
         )
 
+    def to_pydantic(self):
+        children = self.call_children | self.call_group
+        children_by_type = {
+            "call_children": self.call_children,
+            "call_group": self.call_group,
+        }
+        return CallGroupNode(
+            id=self._id,
+            name=self.name,
+            description=self.description,
+            children=children,
+            children_by_type=children_by_type,
+            theme_config=self.theme_config.to_pydantic() if self.theme_config else None,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
+
 
 class ClassSchema(BaseSchema):
     """
