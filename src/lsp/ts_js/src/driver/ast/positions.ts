@@ -6,7 +6,7 @@ import type { NodePosition } from "../models";
 export function getNodePosition(node: Node): NodePosition {
   const sf = node.getSourceFile().compilerNode;
   const start = node.getStart(true);
-  const end = node.getEnd() - 1;
+  const end = node.getEnd();
   const s = ts.getLineAndCharacterOfPosition(sf, start);
   const e = ts.getLineAndCharacterOfPosition(sf, Math.max(start, end));
   return {
