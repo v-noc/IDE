@@ -17,7 +17,7 @@ const getIcons = (nodeType: NodeType): string => {
     case "group":
       return "HiMiniRectangleGroup";
     default:
-      return "FaFile";
+      return "FaThLarge";
   }
 };
 

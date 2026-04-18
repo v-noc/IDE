@@ -1,7 +1,9 @@
+import asyncio
 from typing import Optional
 
 from app.api.schemas.terminus_remote import RemoteConfig
-from app.core.model.nodes import ProjectNode
+from app.core.model.nodes import FolderNode, ProjectNode
+from app.core.model.schemas import FileSchema, FolderSchema, StructureGroupSchema
 from app.db.async_terminus_client import AsyncClient
 from app.db.context import ProjectUoW
 
@@ -81,10 +83,79 @@ class ProjectService():
         project_repos = self.uow.get_project_repos()
         if compare_to:
             project_repos = self.uow.get_project_repos(use_compare_to=True)
-        return await project_repos.project_repo.get_structure(
-            exclude_types,
-            include_commit_id,
-        )
+        repo = project_repos.structure_repo
+        client = repo.client
+        to_node = repo._to_node
+        load_groups = StructureGroupSchema.__name__ not in set(exclude_types)
+
+        if include_commit_id:
+            if load_groups:
+                (folders_raw, version), files_raw, groups_raw = await asyncio.gather(
+                    client.get_all_documents(
+                        doc_type=FolderSchema.__name__,
+                        get_data_version=True,
+                        as_list=True,
+                    ),
+                    client.get_all_documents(
+                        doc_type=FileSchema.__name__,
+                        as_list=True,
+                    ),
+                    client.get_all_documents(
+                        doc_type=StructureGroupSchema.__name__,
+                        as_list=True,
+                    ),
+                )
+            else:
+                (folders_raw, version), files_raw = await asyncio.gather(
+                    client.get_all_documents(
+                        doc_type=FolderSchema.__name__,
+                        get_data_version=True,
+                        as_list=True,
+                    ),
+                    client.get_all_documents(
+                        doc_type=FileSchema.__name__,
+                        as_list=True,
+                    ),
+                )
+                groups_raw = []
+        else:
+            if load_groups:
+                folders_raw, files_raw, groups_raw = await asyncio.gather(
+                    client.get_all_documents(
+                        doc_type=FolderSchema.__name__,
+                        as_list=True,
+                    ),
+                    client.get_all_documents(
+                        doc_type=FileSchema.__name__,
+                        as_list=True,
+                    ),
+                    client.get_all_documents(
+                        doc_type=StructureGroupSchema.__name__,
+                        as_list=True,
+                    ),
+                )
+            else:
+                folders_raw, files_raw = await asyncio.gather(
+                    client.get_all_documents(
+                        doc_type=FolderSchema.__name__,
+                        as_list=True,
+                    ),
+                    client.get_all_documents(
+                        doc_type=FileSchema.__name__,
+                        as_list=True,
+                    ),
+                )
+                groups_raw = []
+            version = None
+
+        merged = []
+        for raw in folders_raw + files_raw + groups_raw:
+            node = to_node(raw)
+            if isinstance(node, FolderNode) and node.is_root:
+                continue
+            merged.append(node)
+
+        return merged, version
 
     async def get_children(self, exclude_types: list[str] = [],  include_commit_id: bool = False, compare_to: Optional[bool] = False):
         project_repos = self.uow.get_project_repos()
