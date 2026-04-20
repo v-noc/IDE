@@ -12,6 +12,8 @@ import { DocSidebar } from "./components/Docs/DocSidebar";
 import { useWorkspaceDocs } from "./hooks/useWorkspaceDocs";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import { useCommitHistory } from "@/features/Dashboard/features/Versioning/hooks/useCommitHistory";
+import { Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 /**
  * Workspace Container - Manages the state, logic, and data flow for the central central area.
@@ -38,10 +40,10 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
   const setHistoryScope = useVersioningStore((s) => s.setHistoryScope);
   const clearHistoryScope = useVersioningStore((s) => s.clearHistoryScope);
   const isDocSidebarOpen = useProjectStore(
-    (s: ProjectStore) => s.isDocSidebarOpen[tabId]
+    (s: ProjectStore) => s.isDocSidebarOpen[tabId],
   );
   const setDocSidebarOpen = useProjectStore(
-    (s: ProjectStore) => s.setDocSidebarOpen
+    (s: ProjectStore) => s.setDocSidebarOpen,
   );
   const bottomPanelRef = useRef<ImperativePanelHandle>(null);
 
@@ -57,7 +59,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
     tabId,
     effectiveNode,
     selectedNode,
-    secondarySelectedNode
+    secondarySelectedNode,
   );
 
   const historyScope = useMemo(() => {
@@ -126,6 +128,17 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
             onSelectDocument={selectDocument}
             onClose={() => setDocSidebarOpen(tabId, false)}
           />
+        ) : undefined
+      }
+      floatingButton={
+        tabValue !== "docs" && documents.length > 0 && !isDocSidebarOpen ? (
+          <Button
+            aria-label="Open document sidebar"
+            onClick={() => setDocSidebarOpen(tabId, true)}
+            className="absolute top-20 right-3 z-50 size-10 bg-background hover:cursor-pointer hover:bg-background rounded-full border shadow-sm backdrop-blur  flex items-center justify-center"
+          >
+            <Info className="h-4 w-4" />
+          </Button>
         ) : undefined
       }
       topPanelContent={

@@ -13,6 +13,7 @@ interface WorkspaceLayoutProps {
   topPanelContent: React.ReactNode;
   rightSidebarContent?: React.ReactNode;
   tabId: string;
+  floatingButton?: React.ReactNode;
   isSandboxOpen: boolean;
   onToggleSandbox: (open: boolean) => void;
   bottomPanelRef: React.RefObject<any>;
@@ -26,15 +27,16 @@ export function WorkspaceLayout({
   topPanelContent,
   rightSidebarContent,
   tabId,
+  floatingButton,
   isSandboxOpen,
   onToggleSandbox,
   bottomPanelRef,
 }: WorkspaceLayoutProps) {
   const docSidebarSize = useProjectStore(
-    (s: ProjectStore) => s.docSidebarSize[tabId]
+    (s: ProjectStore) => s.docSidebarSize[tabId],
   );
   const setDocSidebarSize = useProjectStore(
-    (s: ProjectStore) => s.setDocSidebarSize
+    (s: ProjectStore) => s.setDocSidebarSize,
   );
 
   const handleHorizontalLayout = (sizes: number[]) => {
@@ -70,13 +72,17 @@ export function WorkspaceLayout({
             onLayout={handleHorizontalLayout}
           >
             <ResizablePanel defaultSize={mainContentDefaultSize} minSize={30}>
-              <div className="h-full w-full overflow-hidden">{topPanelContent}</div>
+              <div className="h-full w-full overflow-hidden">
+                {topPanelContent}
+              </div>
             </ResizablePanel>
             {rightSidebarContent && (
               <>
                 <ResizableHandle className="w-1 bg-border" />
                 <ResizablePanel defaultSize={sidebarDefaultSize} minSize={20}>
-                  <div className="h-full w-full overflow-hidden">{rightSidebarContent}</div>
+                  <div className="h-full w-full overflow-hidden">
+                    {rightSidebarContent}
+                  </div>
                 </ResizablePanel>
               </>
             )}
@@ -117,6 +123,8 @@ export function WorkspaceLayout({
           <span className="align-middle">Open sandbox</span>
         </button>
       )}
+      {/* Floating button for additional actions */}
+      {floatingButton}
     </div>
   );
 }
