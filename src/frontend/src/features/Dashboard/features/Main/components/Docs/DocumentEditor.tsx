@@ -12,6 +12,7 @@ import {
   useExtension,
 } from "@blocknote/react";
 import { useEffect, useRef, useMemo } from "react";
+import { useTheme } from "next-themes";
 import { FileText } from "lucide-react";
 import { filterSuggestionItems } from "@blocknote/core/extensions";
 import { debounce } from "remeda";
@@ -67,6 +68,9 @@ export function DocumentEditor({
   debounceMs = 1000,
   containerClassName = "",
 }: DocumentEditorProps) {
+  const { resolvedTheme } = useTheme();
+  const blockNoteTheme = resolvedTheme === "light" ? "light" : "dark";
+
   const editor = useCreateBlockNote({
     extensions: [VersionDiffExtension()],
     schema: BlockNoteSchema.create().extend({
@@ -267,7 +271,7 @@ export function DocumentEditor({
       >
         <BlockNoteView
           className="rounded-none docs-editor"
-          theme="light"
+          theme={blockNoteTheme}
           onChange={handleChange}
           editor={editor}
           slashMenu={!isDiffActive}

@@ -128,8 +128,43 @@
   }
 }
 
+/* @xyflow/react — pane + zoom bar match shadcn tokens (CanvasView sets colorMode from theme) */
+.react-flow {
+  background-color: var(--background);
+}
+.react-flow__controls {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+.react-flow__controls-button {
+  background-color: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.react-flow__controls-button:hover {
+  background-color: var(--muted);
+}
+.react-flow__controls-button svg {
+  fill: var(--foreground);
+}
+
 .bn-editor {
   height: 100% !important;
+}
+
+/* BlockNote workspace docs — match dashboard background (theme from DocumentEditor BlockNoteView) */
+.docs-editor {
+  background-color: var(--background);
+}
+.docs-editor .bn-container,
+.docs-editor .bn-editor {
+  background-color: var(--background);
+}
+
+/* Monaco — align chrome with #1a1a1a when using vs-dark */
+.monaco-editor .monaco-editor-background {
+  background-color: var(--background);
 }
 
 /* Custom styles for Mermaid block alignment and resize handles */

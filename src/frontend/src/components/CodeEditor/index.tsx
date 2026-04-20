@@ -51,8 +51,9 @@ const CodeEditor = ({
 
   return (
     <Editor
-      className={cn("h-full w-full", className)}
+      className={cn("h-full w-full min-h-[200px]", className)}
       {...rest}
+      theme={editorTheme}
       options={{
         minimap: { enabled: false },
         wordWrap: "on",

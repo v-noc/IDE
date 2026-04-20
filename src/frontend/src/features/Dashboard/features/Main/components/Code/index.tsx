@@ -68,7 +68,7 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full min-h-0 bg-(--background-color)">
       {showDiff ? (
         isLoadingDiff ? (
           <div className="flex h-full w-full items-center justify-center text-muted-foreground">

@@ -16,6 +16,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useTheme } from "next-themes";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
@@ -53,6 +54,9 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   projectId: _projectId,
 }) => {
   void _projectId;
+
+  const { resolvedTheme } = useTheme();
+  const flowColorMode = resolvedTheme === "light" ? "light" : "dark";
 
   const queryClient = useQueryClient();
 
@@ -271,9 +275,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   );
 
   return (
-    <div className="h-full w-full bg-slate-50">
+    <div className="h-full w-full bg-background">
       <ReactFlow
-        className="bg-transparent"
+        colorMode={flowColorMode}
+        className="bg-background"
         nodeTypes={nodeTypes}
         nodes={nodes}
         edges={edges}
