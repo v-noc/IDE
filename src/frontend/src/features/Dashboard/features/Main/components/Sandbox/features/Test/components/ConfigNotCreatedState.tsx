@@ -10,7 +10,7 @@ export default function ConfigNotCreatedState({
 }: ConfigNotCreatedStateProps) {
   return (
     <div className="h-full w-full p-6">
-      <div className="h-full w-full rounded-lg border border-dashed bg-white p-8 flex items-center justify-center">
+      <div className="h-full w-full rounded-lg border border-dashed border-border bg-card p-8 flex items-center justify-center">
         <div className="max-w-xl text-center flex flex-col items-center gap-4">
           <div className="size-14 rounded-full bg-muted flex items-center justify-center border">
             <Cog className="size-7 text-muted-foreground" />

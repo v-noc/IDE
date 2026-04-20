@@ -105,12 +105,12 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
   const getStatusColors = () => {
     const level = (node.level_name || "").toLowerCase();
     if (level === "error" || node.error) {
-      return "bg-red-50/50 border-red-100 hover:bg-red-100/60 text-red-900";
+      return "bg-destructive/10 border-border hover:bg-destructive/15 text-foreground";
     }
     if (level === "warning" || level === "warn") {
-      return "bg-amber-50/50 border-amber-100 hover:bg-amber-100/60 text-amber-900";
+      return "bg-amber-500/10 border-border hover:bg-amber-500/15 text-foreground";
     }
-    return "bg-white hover:bg-slate-50 border-slate-200/60";
+    return "bg-card/30 hover:bg-muted/40 border-border/80 text-foreground";
   };
 
   const statusClasses = getStatusColors();
@@ -137,10 +137,10 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
               className={cn(
                 "h-5 w-5 p-0 transition-colors",
                 node.level_name?.toLowerCase() === "error" || node.error
-                  ? "hover:bg-red-200/50 text-red-400 group-hover:text-red-600"
+                  ? "hover:bg-destructive/20 text-destructive"
                   : node.level_name?.toLowerCase() === "warning"
-                    ? "hover:bg-amber-200/50 text-amber-400 group-hover:text-amber-600"
-                    : "hover:bg-slate-200 text-slate-400 group-hover:text-slate-600"
+                    ? "hover:bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                    : "hover:bg-muted text-muted-foreground group-hover:text-foreground"
               )}
               onClick={(e) => {
                 e.stopPropagation();
@@ -166,10 +166,10 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
             className={cn(
               "text-sm truncate block font-medium transition-colors",
               node.level_name?.toLowerCase() === "error" || node.error
-                ? "text-red-700"
+                ? "text-destructive"
                 : node.level_name?.toLowerCase() === "warning"
-                  ? "text-amber-700"
-                  : "text-slate-700 group-hover:text-slate-900"
+                  ? "text-amber-700 dark:text-amber-300"
+                  : "text-foreground"
             )}
             title={node.message || ""}
           >
@@ -195,7 +195,7 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreHorizontal className="size-4 text-slate-400" />
+                <MoreHorizontal className="size-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -217,10 +217,10 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
           className={cn(
             "border-b overflow-hidden",
             node.level_name?.toLowerCase() === "error" || node.error
-              ? "bg-red-50/30 border-red-100"
+              ? "bg-destructive/5 border-border"
               : node.level_name?.toLowerCase() === "warning"
-                ? "bg-amber-50/30 border-amber-100"
-                : "bg-slate-50/50 border-slate-100"
+                ? "bg-amber-500/5 border-border"
+                : "bg-muted/30 border-border"
           )}
         >
           <div

@@ -1,4 +1,5 @@
 import React, { memo, lazy, Suspense, useState } from "react";
+import { useTheme } from "next-themes";
 import { Save, Copy, Check, Maximize2 } from "lucide-react";
 import { DiffEditor } from "@monaco-editor/react";
 import { CodeViewDialog } from "./CodeViewDialog";
@@ -8,8 +9,8 @@ const CodeEditor = lazy(() => import("@/components/CodeEditor"));
 
 function CodeEditorSkeleton() {
   return (
-    <div className="h-[300px] bg-slate-50 animate-pulse flex items-center justify-center border-b">
-      <span className="text-slate-400 text-xs">Loading editor...</span>
+    <div className="h-[300px] bg-muted animate-pulse flex items-center justify-center border-b border-border">
+      <span className="text-muted-foreground text-xs">Loading editor...</span>
     </div>
   );
 }
@@ -49,6 +50,8 @@ export const NodeCodeView = memo(function NodeCodeView({
   borderColor,
   iconColor,
 }: NodeCodeViewProps) {
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "light" ? "vs" : "vs-dark";
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -60,12 +63,12 @@ export const NodeCodeView = memo(function NodeCodeView({
   };
 
   return (
-    <div className="border-t bg-slate-50" style={{ borderColor }}>
+    <div className="border-t bg-muted/30" style={{ borderColor }}>
       <div
-        className="flex items-center justify-between px-4 py-2.5 bg-white border-b"
+        className="flex items-center justify-between px-4 py-2.5 bg-card border-b border-border"
         style={{ borderColor }}
       >
-        <span className="font-mono text-xs font-semibold text-slate-700 truncate max-w-[200px]">
+        <span className="font-mono text-xs font-semibold text-foreground truncate max-w-[200px]">
           {fileName || "Code"}
         </span>
         <div className="flex items-center gap-2">
@@ -76,7 +79,7 @@ export const NodeCodeView = memo(function NodeCodeView({
                 onSave();
               }}
               disabled={isSaving}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-muted active:scale-95 disabled:opacity-50"
               style={{ color: iconColor }}
             >
               <Save size={14} />
@@ -85,7 +88,7 @@ export const NodeCodeView = memo(function NodeCodeView({
           )}
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-slate-100 active:scale-95"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-muted active:scale-95"
             style={{ color: iconColor }}
           >
             {copied ? (
@@ -100,10 +103,10 @@ export const NodeCodeView = memo(function NodeCodeView({
               </>
             )}
           </button>
-          <div className="w-px h-4 bg-slate-200 mx-1" />
+          <div className="w-px h-4 bg-border mx-1" />
           <button
             onClick={() => setIsExpanded(true)}
-            className="flex items-center justify-center p-1.5 rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="flex items-center justify-center p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <Maximize2 size={14} />
           </button>
@@ -137,7 +140,7 @@ export const NodeCodeView = memo(function NodeCodeView({
             isLoadingDiff ? (
               <CodeEditorSkeleton />
             ) : diffError ? (
-              <div className="h-full w-full flex items-center justify-center text-xs text-slate-500">
+              <div className="h-full w-full flex items-center justify-center text-xs text-muted-foreground">
                 {diffError}
               </div>
             ) : (
@@ -146,7 +149,7 @@ export const NodeCodeView = memo(function NodeCodeView({
                 language={language}
                 original={originalContent}
                 modified={modifiedContent}
-                theme="vs-light"
+                theme={monacoTheme}
                 options={{
                   readOnly: true,
                   originalEditable: false,

@@ -269,7 +269,7 @@ const Test = forwardRef<TestHandle, TestProps>(
 
     if (isConfigLoading) {
       return (
-        <div className="h-full w-full rounded-lg border bg-white p-8 flex items-center justify-center text-sm text-muted-foreground">
+        <div className="h-full w-full rounded-lg border border-border bg-card p-8 flex items-center justify-center text-sm text-muted-foreground">
           Loading test configuration...
         </div>
       );
@@ -335,7 +335,7 @@ const Test = forwardRef<TestHandle, TestProps>(
           </div>
 
           {latestRunResult && isResultPanelOpen && (
-            <aside className="w-[45%] shrink-0 rounded-lg border bg-white flex flex-col">
+            <aside className="w-[45%] shrink-0 rounded-lg border border-border bg-card flex flex-col">
               <div className="px-3 py-2 border-b flex items-center justify-between">
                 <div className="text-sm font-semibold text-slate-800">
                   Output

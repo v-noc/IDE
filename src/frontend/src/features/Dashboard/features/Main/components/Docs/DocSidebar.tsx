@@ -50,7 +50,7 @@ export function DocSidebar({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-(--background-color)">
       {/* Header with Horizontal Doc list */}
       <div className="flex items-center border-b bg-background pr-2">
         <ScrollArea className="flex-1 whitespace-nowrap">
@@ -68,8 +68,8 @@ export function DocSidebar({
                   (doc.status === "added" || doc.status === "removed")
                     ? ""
                     : selectedDocumentId === doc.id
-                      ? "bg-white text-foreground"
-                      : "hover:bg-white/50 text-muted-foreground hover:text-foreground",
+                      ? "bg-card text-foreground"
+                      : "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
                 )}
               >
                 <span className="truncate max-w-[120px]">
@@ -87,7 +87,7 @@ export function DocSidebar({
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-white/50 rounded-md transition-colors text-muted-foreground hover:text-foreground ml-2 cursor-pointer"
+            className="p-1.5 hover:bg-muted/50 rounded-md transition-colors text-muted-foreground hover:text-foreground ml-2 cursor-pointer"
             aria-label="Close sidebar"
           >
             <X className="h-4 w-4" />

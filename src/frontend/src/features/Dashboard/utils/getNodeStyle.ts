@@ -1,6 +1,5 @@
 import type { CallNodeTree, ContainerNodeTree } from "@/types/project";
 
-
 const getNodeStyle = (node: ContainerNodeTree) => {
   // If node has theme overrides, prefer them
   const themed = node.theme_config || {};
@@ -9,62 +8,63 @@ const getNodeStyle = (node: ContainerNodeTree) => {
     node_type = (node as CallNodeTree).target?.node_type || "function";
   }
 
+  /** Theme tokens — follow `index.css` for both light and dark */
   const defaults = (() => {
     switch (node_type) {
       case "project":
         return {
-          backgroundColor: "#fff",
-          color: "#1C1B1F",
-          iconColor: "#6750A4",
-          cardColor: "#F3EDF7",
-          borderColor: "#E7E0EC",
-          textColor: "#1C1B1F",
+          backgroundColor: "var(--muted)",
+          color: "var(--foreground)",
+          iconColor: "var(--primary)",
+          cardColor: "var(--muted)",
+          borderColor: "var(--border)",
+          textColor: "var(--foreground)",
         };
       case "folder":
         return {
-          backgroundColor: "#FFFBFE",
-          color: "#1C1B1F",
-          iconColor: "#625B71",
-          cardColor: "#FFFBFE",
-          textColor: "#1C1B1F",
-          borderColor: "#E7E0EC",
+          backgroundColor: "var(--secondary)",
+          color: "var(--foreground)",
+          iconColor: "var(--muted-foreground)",
+          cardColor: "var(--secondary)",
+          textColor: "var(--foreground)",
+          borderColor: "var(--border)",
         };
       case "file":
         return {
-          backgroundColor: "#FFFFFF",
-          color: "#1C1B1F",
-          iconColor: "#49454F",
-          cardColor: "#FFFFFF",
-          borderColor: "#E7E0EC",
-          textColor: "#1C1B1F",
+          backgroundColor: "var(--secondary)",
+          color: "var(--foreground)",
+          iconColor: "var(--muted-foreground)",
+          cardColor: "var(--secondary)",
+          borderColor: "var(--border)",
+          textColor: "var(--foreground)",
         };
       case "function":
         return {
-          backgroundColor: "#FFFFFF",
-          color: "#7D5260",
-          iconColor: "#7D5260",
-          cardColor: "#FFFFFF",
-          textColor: "#7D5260",
-          borderColor: "#F4E7ED",
+          backgroundColor: "var(--secondary)",
+          color: "var(--foreground)",
+          iconColor: "var(--primary)",
+          cardColor: "var(--secondary)",
+          textColor: "var(--foreground)",
+          borderColor: "var(--border)",
         };
       case "class":
         return {
-          backgroundColor: "#FFFFFF",
-          color: "#6750A4",
-          iconColor: "#6750A4",
-          cardColor: "#FFFFFF",
-          textColor: "#6750A4",
-          borderColor: "#E9E1F6",
+          backgroundColor: "var(--secondary)",
+          color: "var(--foreground)",
+          iconColor: "var(--primary)",
+          cardColor: "var(--secondary)",
+          textColor: "var(--foreground)",
+          borderColor: "var(--border)",
         };
 
       default:
         return {
-          backgroundColor: "#FFFBFE",
-          color: "#1C1B1F",
-          iconColor: "#49454F",
-          borderColor: "#E7E0EC",
-          cardColor: "#FFFBFE",
-          textColor: "#1C1B1F",
+          backgroundColor: "var(--secondary)",
+          color: "var(--foreground)",
+          iconColor: "var(--muted-foreground)",
+          borderColor: "var(--border)",
+          cardColor: "var(--secondary)",
+          textColor: "var(--foreground)",
         };
     }
   })();

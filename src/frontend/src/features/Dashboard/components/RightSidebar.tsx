@@ -7,7 +7,7 @@ export type RightSidebarProps = {
 
 const RightSidebar: React.FC<RightSidebarProps> = ({ children, className }) => {
   return (
-    <aside className={`h-full w-full bg-white border-l ${className ?? ""}`}>
+    <aside className={`h-full w-full bg-(--right-sidebar-color) border-l border-border ${className ?? ""}`}>
       <div className="h-full overflow-auto">
         {children ?? <div>Right sidebar placeholder</div>}
       </div>

@@ -62,7 +62,7 @@ export function WorkspaceLayout({
         <ResizablePanel
           defaultSize={70}
           minSize={40}
-          className="flex flex-col border-b bg-white"
+          className="flex flex-col border-b border-border bg-(--background-color)"
         >
           <ResizablePanelGroup
             direction="horizontal"
@@ -111,7 +111,7 @@ export function WorkspaceLayout({
           type="button"
           aria-label="Open sandbox"
           onClick={() => onToggleSandbox(true)}
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-50 rounded-full border bg-white/90 px-2.5 py-1 text-xs shadow-sm backdrop-blur hover:bg-white"
+          className="absolute bottom-2 left-1/2 -translate-x-1/2 z-50 rounded-full border border-border bg-card/90 px-2.5 py-1 text-xs text-foreground shadow-sm backdrop-blur hover:bg-card"
         >
           <ChevronUp className="h-3.5 w-3.5 inline-block mr-1 align-middle" />
           <span className="align-middle">Open sandbox</span>

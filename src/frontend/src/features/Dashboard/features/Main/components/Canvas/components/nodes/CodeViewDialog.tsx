@@ -1,4 +1,5 @@
 import { memo, lazy, Suspense, useState } from "react";
+import { useTheme } from "next-themes";
 import { Save, Copy, Check, X } from "lucide-react";
 import { DiffEditor } from "@monaco-editor/react";
 import {
@@ -13,8 +14,8 @@ const CodeEditor = lazy(() => import("@/components/CodeEditor"));
 
 function CodeEditorSkeleton() {
     return (
-        <div className="h-full w-full bg-slate-50 animate-pulse flex items-center justify-center">
-            <span className="text-slate-400 text-sm">Loading editor...</span>
+        <div className="h-full w-full bg-muted animate-pulse flex items-center justify-center">
+            <span className="text-muted-foreground text-sm">Loading editor...</span>
         </div>
     );
 }
@@ -59,6 +60,8 @@ export const CodeViewDialog = memo(function CodeViewDialog({
     iconColor = "#64748b",
 }: CodeViewDialogProps) {
     void _borderColor;
+    const { resolvedTheme } = useTheme();
+    const monacoTheme = resolvedTheme === "light" ? "vs" : "vs-dark";
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
@@ -69,10 +72,10 @@ export const CodeViewDialog = memo(function CodeViewDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="min-w-[60vw] w-full h-[90vh] flex flex-col p-0 gap-0 border-none shadow-2xl overflow-hidden bg-white sm:rounded-xl">
-                <DialogHeader className="px-5 py-3 border-b flex flex-row items-center justify-between space-y-0 bg-white z-10">
+            <DialogContent className="min-w-[60vw] w-full h-[90vh] flex flex-col p-0 gap-0 border border-border shadow-2xl overflow-hidden bg-card sm:rounded-xl">
+                <DialogHeader className="px-5 py-3 border-b border-border flex flex-row items-center justify-between space-y-0 bg-card z-10">
                     <DialogTitle className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-semibold text-slate-700">
+                        <span className="font-mono text-sm font-semibold text-foreground">
                             {fileName || "Code Editor"}
                         </span>
                         {hasChanges && (
@@ -85,7 +88,7 @@ export const CodeViewDialog = memo(function CodeViewDialog({
                             <button
                                 onClick={onSave}
                                 disabled={isSaving}
-                                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-50 border border-slate-200"
+                                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all hover:bg-muted active:scale-95 disabled:opacity-50 border border-border"
                                 style={{ color: iconColor }}
                             >
                                 <Save size={14} />
@@ -95,7 +98,7 @@ export const CodeViewDialog = memo(function CodeViewDialog({
 
                         <button
                             onClick={handleCopy}
-                            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all hover:bg-slate-100 active:scale-95 border border-slate-200"
+                            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all hover:bg-muted active:scale-95 border border-border"
                             style={{ color: iconColor }}
                         >
                             {copied ? (
@@ -111,24 +114,24 @@ export const CodeViewDialog = memo(function CodeViewDialog({
                             )}
                         </button>
 
-                        <div className="w-px h-4 bg-slate-200 mx-1" />
+                        <div className="w-px h-4 bg-border mx-1" />
 
                         <button
                             onClick={onClose}
-                            className="flex items-center justify-center w-7 h-7 rounded-md text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600"
+                            className="flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
                         >
                             <X size={16} />
                         </button>
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 min-h-0 bg-slate-50 relative w-full">
+                <div className="flex-1 min-h-0 bg-background relative w-full">
                     <Suspense fallback={<CodeEditorSkeleton />}>
                         {showDiff ? (
                             isLoadingDiff ? (
                                 <CodeEditorSkeleton />
                             ) : diffError ? (
-                                <div className="h-full w-full flex items-center justify-center text-sm text-slate-500">
+                                <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
                                     {diffError}
                                 </div>
                             ) : (
@@ -137,7 +140,7 @@ export const CodeViewDialog = memo(function CodeViewDialog({
                                     language={language}
                                     original={originalContent}
                                     modified={modifiedContent}
-                                    theme="vs-light"
+                                    theme={monacoTheme}
                                     options={{
                                         readOnly: true,
                                         originalEditable: false,

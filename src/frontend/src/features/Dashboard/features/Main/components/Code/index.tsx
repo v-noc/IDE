@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTheme } from "next-themes";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { useCode } from "@/services/code";
 import { useEditableCode } from "./useEditableCode";
@@ -15,6 +16,8 @@ interface EditorCodeProps {
 }
 
 const EditorCode = ({ tabId }: EditorCodeProps) => {
+  const { resolvedTheme } = useTheme();
+  const monacoTheme = resolvedTheme === "light" ? "vs" : "vs-dark";
   const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
   const secondarySelectedNode = useProjectStore(
     (s) => s.secondarySelectedNode[tabId],
@@ -82,7 +85,7 @@ const EditorCode = ({ tabId }: EditorCodeProps) => {
             language={language}
             original={originalContent}
             modified={modifiedContent}
-            theme="vs-light"
+            theme={monacoTheme}
             options={{
               readOnly: true,
               originalEditable: false,

@@ -16,9 +16,9 @@ export const SidebarHeader = memo(function SidebarHeader({
     return (
         <>
             <Link to="/">
-                <div className="text-2xl font-bold flex items-center p-4 gap-2 h-[57px] text-white">
-                    <PiShareNetworkFill className="size-6 fill-green-600" />
-                    <span className="text-black">V-NOC</span>
+                <div className="text-2xl font-bold flex items-center p-4 gap-2 h-[57px] text-foreground">
+                    <PiShareNetworkFill className="size-6 fill-primary" />
+                    <span>V-NOC</span>
                 </div>
             </Link>
             <Separator />

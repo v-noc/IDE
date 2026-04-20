@@ -90,17 +90,17 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const displayedCommitId = checkedOutCommitId ?? headCommitId;
 
   return (
-    <div className="flex h-full w-full flex-col border-l bg-white shadow-sm transition-all duration-300">
-      <div className="border-b px-4 py-3">
+    <div className="flex h-full w-full flex-col border-l border-border bg-card text-card-foreground shadow-sm transition-all duration-300">
+      <div className="border-b border-border px-4 py-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-800">
+          <h2 className="text-lg font-semibold text-foreground">
             Commit history
           </h2>
           <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={togglePanel}
-              className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+              className="rounded-md p-1 text-muted-foreground hover:bg-muted"
               aria-label="Close panel"
             >
               <X size={20} />
@@ -135,7 +135,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
         </div>
         <div className="mt-3 flex flex-col gap-1">
           <div className="flex min-w-0 items-center justify-between w-full gap-1">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Branch
             </span>
             <BranchDropdown
@@ -157,20 +157,20 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
                 });
               }}
               isLoading={isLoadingBranches}
-              triggerClassName="h-7 justify-start gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-normal text-sm text-slate-800 hover:bg-slate-50"
+              triggerClassName="h-7 justify-start gap-1.5 rounded-md border border-border bg-background px-2.5 font-normal text-sm text-foreground hover:bg-muted"
             />
           </div>
           <div className="flex min-w-0 items-center justify-between w-full gap-1">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Current commit
             </span>
-            <span className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md border  border-slate-200 bg-white px-2.5 font-mono text-xs text-slate-700">
-              <GitCommit className="size-3.5 shrink-0 text-slate-500" />
+            <span className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 font-mono text-xs text-foreground">
+              <GitCommit className="size-3.5 shrink-0 text-muted-foreground" />
               {shortCommit(displayedCommitId)}
             </span>
           </div>
           <div className="flex min-w-0 items-center justify-between w-full gap-1">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Scope
             </span>
             <DropdownMenu>
@@ -178,7 +178,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 justify-start gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-normal text-sm text-slate-800 hover:bg-slate-50"
+                  className="h-7 justify-start gap-1.5 rounded-md border border-border bg-background px-2.5 font-normal text-sm text-foreground hover:bg-muted"
                 >
                   <span className="truncate text-xs">
                     {scopeOverride === "repository"

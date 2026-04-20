@@ -34,7 +34,7 @@ export const LogsContainer: React.FC<{ tabId: string }> = ({ tabId }) => {
 
   if (!hasSelection) {
     return (
-      <div className="flex h-full w-full items-center justify-center p-8 text-center text-sm text-muted-foreground bg-white/50 rounded-md border border-dashed">
+      <div className="flex h-full w-full items-center justify-center p-8 text-center text-sm text-muted-foreground bg-muted/40 rounded-md border border-dashed border-border">
         Select a function or call in the workspace to view execution logs.
       </div>
     );
@@ -43,20 +43,20 @@ export const LogsContainer: React.FC<{ tabId: string }> = ({ tabId }) => {
   if (viewMode === "chart" && selectedLogForChart) {
     return (
       <div
-        className="w-full h-full flex flex-col bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm"
+        className="w-full h-full flex flex-col bg-card border border-border rounded-lg overflow-hidden shadow-sm"
         ref={ref}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-2">
+        <div className="flex items-center justify-between border-b border-border bg-muted/30 p-2">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleBackToList}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
             Back to List
           </Button>
-          <span className="text-xs font-medium text-slate-500">
+          <span className="text-xs font-medium text-muted-foreground">
             Trace: {selectedLogForChart.message || selectedLogForChart._id}
           </span>
           <div className="w-20" /> {/* Spacer for balance */}
@@ -83,39 +83,39 @@ export const LogsContainer: React.FC<{ tabId: string }> = ({ tabId }) => {
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+    <div className="w-full h-full flex flex-col bg-card border border-border rounded-lg overflow-hidden shadow-sm">
       {/* Header - Fixed */}
-      <div className="flex items-center border-b border-slate-200 bg-white sticky top-0 z-10 py-3.5 px-4 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-        <div className="w-[120px] shrink-0 text-left font-bold text-[10px] text-slate-500 uppercase tracking-widest">
+      <div className="flex items-center border-b border-border bg-muted/40 sticky top-0 z-10 py-3.5 px-4 shadow-sm">
+        <div className="w-[120px] shrink-0 text-left font-bold text-[10px] text-muted-foreground uppercase tracking-widest">
           ID
         </div>
-        <div className="flex-1 text-left font-bold text-[10px] text-slate-500 uppercase tracking-widest px-4 border-l border-slate-100/50 ml-4">
+        <div className="flex-1 text-left font-bold text-[10px] text-muted-foreground uppercase tracking-widest px-4 border-l border-border/60 ml-4">
           Message
         </div>
-        <div className="w-[180px] shrink-0 text-left font-bold text-[10px] text-slate-500 uppercase tracking-widest px-4 border-l border-slate-100/50">
+        <div className="w-[180px] shrink-0 text-left font-bold text-[10px] text-muted-foreground uppercase tracking-widest px-4 border-l border-border/60">
           Timestamp
         </div>
-        <div className="w-[100px] shrink-0 text-right font-bold text-[10px] text-slate-500 uppercase tracking-widest px-4 border-l border-slate-100/50">
+        <div className="w-[100px] shrink-0 text-right font-bold text-[10px] text-muted-foreground uppercase tracking-widest px-4 border-l border-border/60">
           Duration
         </div>
-        <div className="w-[120px] shrink-0 text-center font-bold text-[10px] text-slate-500 uppercase tracking-widest border-l border-slate-100/50 ml-4">
+        <div className="w-[120px] shrink-0 text-center font-bold text-[10px] text-muted-foreground uppercase tracking-widest border-l border-border/60 ml-4">
           Status
         </div>
         <div className="w-[40px] shrink-0" />
       </div>
 
       {/* Body - Scrollable */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-muted-foreground/30 scrollbar-track-transparent">
         {isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <div className="size-8 border-2 border-slate-200 border-t-slate-500 rounded-full animate-spin mb-4" />
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+            <div className="size-8 border-2 border-border border-t-primary rounded-full animate-spin mb-4" />
             <span className="font-medium animate-pulse">
               Loading execution logs...
             </span>
           </div>
         )}
         {!isLoading && logs.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <p className="text-sm font-medium">
               No logs available for this selection.
             </p>

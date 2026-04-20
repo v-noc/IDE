@@ -36,27 +36,27 @@ export default function Sandbox({ tabId }: { tabId: string }) {
       onValueChange={setActiveTab}
       className="flex flex-col h-full"
     >
-      <TabsList className="p-0 w-full bg-[#f9f9f9] flex items-center">
+      <TabsList className="p-0 w-full bg-card flex items-center text-muted-foreground border-b border-border">
         <TabsTrigger
           value="playground"
-          className="rounded-none shadow-sm  data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+          className="rounded-none bg-card border-x border-b border-border border-t-2 border-t-transparent text-muted-foreground data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
         >
           Playground
         </TabsTrigger>
         <TabsTrigger
           value="test"
-          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+          className="rounded-none bg-card border-x border-b border-border border-t-2 border-t-transparent text-muted-foreground data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
         >
           Test
         </TabsTrigger>
         <TabsTrigger
           value="logs"
-          className="rounded-none data-[state=active]:border-none shadow-sm data-[state=active]:shadow-none data-[state=active]:bg-transparent bg-white"
+          className="rounded-none bg-card border-x border-b border-border border-t-2 border-t-transparent text-muted-foreground data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
         >
           Logs
         </TabsTrigger>
 
-        <div className="border bg-white justify-end flex items-center w-full h-full">
+        <div className="border-l border-border bg-card justify-end flex items-center w-full h-full">
           <SandboxToolbar
             variant={toolbarVariant}
             modeLabel={activeTab}
@@ -67,7 +67,7 @@ export default function Sandbox({ tabId }: { tabId: string }) {
         </div>
       </TabsList>
 
-      <div className="flex-1 min-h-0 relative bg-white/30">
+      <div className="flex-1 min-h-0 relative bg-background/80">
         <TabsContent
           value="playground"
           className="m-0 h-full overflow-hidden outline-none"

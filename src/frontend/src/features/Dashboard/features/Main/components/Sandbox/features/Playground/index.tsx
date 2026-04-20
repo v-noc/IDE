@@ -68,7 +68,7 @@ const Playground = forwardRef<PlayGroundHandle, PlaygroundProps>(
           className="h-[calc(100%-1rem)] py-1"
         >
           <ResizablePanel defaultSize={20} minSize={16}>
-            <div className="flex h-full flex-col gap-2 pr-2 rounded p-2 border bg-white">
+            <div className="flex h-full flex-col gap-2 pr-2 rounded p-2 border border-border bg-card">
               <div className="flex items-center justify-between border-b pb-2">
                 <div className="text-sm font-medium text-muted-foreground">Files</div>
                 <div className="flex items-center gap-1">
@@ -106,7 +106,7 @@ const Playground = forwardRef<PlayGroundHandle, PlaygroundProps>(
               <ResizablePanel
                 defaultSize={60}
                 minSize={40}
-                className="rounded p-2 px-0 border bg-white"
+                className="rounded p-2 px-0 border border-border bg-card"
               >
                 <div className="h-full overflow-auto">
                   <CodeEditor
@@ -120,7 +120,7 @@ const Playground = forwardRef<PlayGroundHandle, PlaygroundProps>(
               <ResizableHandle withHandle className="w-3 bg-transparent" />
 
               <ResizablePanel defaultSize={40} minSize={20}>
-                <div className="h-full border bg-white rounded p-2 flex flex-col overflow-hidden">
+                <div className="h-full border border-border bg-card rounded p-2 flex flex-col overflow-hidden">
                   <div className="mb-2 text-sm font-medium text-muted-foreground">Output</div>
                   <pre className="flex-grow min-h-0 overflow-y-auto whitespace-break-spaces rounded border bg-muted/40 p-2 text-xs font-mono">
                     {output}

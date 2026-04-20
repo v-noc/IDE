@@ -48,14 +48,14 @@ export const NodeRow = memo(function NodeRow({
           ? "hover:bg-white/10"
           : diffStatus === "modified"
             ? "hover:bg-amber-200/60"
-            : "hover:bg-black/5",
+            : "hover:bg-foreground/5",
       )}
     >
       {/* Toggle */}
       {hasChildren ? (
         <button
           onClick={onToggle}
-          className="p-0.5 rounded-md hover:bg-black/10"
+          className="p-0.5 rounded-md hover:bg-foreground/10"
           aria-label={isOpen ? "Collapse" : "Expand"}
         >
           <ChevronRight

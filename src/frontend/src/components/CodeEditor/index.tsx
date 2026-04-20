@@ -1,4 +1,5 @@
 import Editor, { type EditorProps } from "@monaco-editor/react";
+import { useTheme } from "next-themes";
 import { Skeleton } from "../ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,9 @@ const CodeEditor = ({
   options,
   ...rest
 }: CodeEditorProps) => {
+  const { resolvedTheme } = useTheme();
+  const editorTheme = resolvedTheme === "light" ? "vs" : "vs-dark";
+
   if (isLoading) {
     return (
       <div className={cn("h-full w-full p-4", className)}>
@@ -53,6 +57,7 @@ const CodeEditor = ({
         minimap: { enabled: false },
         wordWrap: "on",
         scrollBeyondLastLine: false,
+        theme: editorTheme,
         ...options,
       }}
     />

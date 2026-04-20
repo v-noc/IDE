@@ -72,7 +72,7 @@ export default function Layout({
               <button
                 onClick={leftPanel.open}
                 aria-label="Expand sidebar"
-                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-50 p-1 py-2 bg-white border rounded-r-md shadow hover:bg-gray-50 cursor-pointer hover:shadow-md"
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-50 p-1 py-2 bg-background border border-border rounded-r-md shadow hover:bg-muted cursor-pointer hover:shadow-md"
               >
                 <ChevronRight className="h-4 w-4 translate-x-1" />
               </button>
@@ -89,7 +89,7 @@ export default function Layout({
               defaultSize={25}
               minSize={20}
               maxSize={40}
-              className="bg-white"
+              className="bg-card"
             >
               {rightSidebar}
             </ResizablePanel>

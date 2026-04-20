@@ -38,11 +38,11 @@ export function WorkspaceTabs({
       onValueChange={onTabValueChange}
       className="flex h-full w-full flex-col"
     >
-      <TabsList className="rounded-none p-0 bg-white w-full">
+      <TabsList className="rounded-none p-0 bg-(--background-color) text-muted-foreground w-full">
         {isCodeActive && (
           <TabsTrigger
             value="code"
-            className="rounded-none bg-(--background-color) border border-border border-t-0 data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+            className="rounded-none bg-(--background-color) border-x border-b border-border border-t-2 border-t-transparent text-muted-foreground data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
           >
             Code
           </TabsTrigger>
@@ -50,13 +50,13 @@ export function WorkspaceTabs({
 
         <TabsTrigger
           value="docs"
-          className="rounded-none bg-(--background-color) border border-border border-t-0 data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+          className="rounded-none bg-(--background-color) border-x border-b border-border border-t-2 border-t-transparent text-muted-foreground data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
         >
           Docs
         </TabsTrigger>
         <TabsTrigger
           value="canvas"
-          className="rounded-none bg-(--background-color) border border-border border-r-0 border-t-0 data-[state=active]:border-none data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+          className="rounded-none bg-(--background-color) border-x border-b border-border border-r-0 border-t-2 border-t-transparent text-muted-foreground data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
         >
           Canvas
         </TabsTrigger>
@@ -68,7 +68,7 @@ export function WorkspaceTabs({
       {isCodeActive && (
         <TabsContent
           value="code"
-          className="flex-1 flex flex-col overflow-hidden bg-white border-t p-0"
+          className="flex-1 flex flex-col overflow-hidden bg-(--background-color) border-t border-border p-0"
         >
           <div className="h-full w-full py-4 overflow-auto">
             <EditorCode tabId={tabId} />
@@ -78,7 +78,7 @@ export function WorkspaceTabs({
 
       <TabsContent
         value="docs"
-        className="flex flex-col overflow-hidden bg-white border-t"
+        className="flex flex-col overflow-hidden bg-(--background-color) border-t border-border"
       >
         <div className="flex-1 overflow-hidden py-2">
           <DocumentEditor
@@ -93,7 +93,7 @@ export function WorkspaceTabs({
       </TabsContent>
       <TabsContent
         value="canvas"
-        className="flex flex-col overflow-hidden bg-white border-t"
+        className="flex flex-col overflow-hidden bg-(--background-color) border-t border-border"
       >
         <div className="flex-1 overflow-hidden">
           <div className="h-full w-full overflow-auto">
