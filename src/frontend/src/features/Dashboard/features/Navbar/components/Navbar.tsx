@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/menubar";
 import { ProgressIndicator } from "./ProgressIndicator";
 import HistoryButton from "../../Versioning/components/HistoryButton";
+import GitHubStarButton from "@/components/GitHubStarButton";
 // import { AgentToggleButton } from "../../Agent/components/AgentToggleButton";
 
 interface NavbarProps {
@@ -47,6 +48,7 @@ const Navbar = ({ projectId }: NavbarProps) => {
         <ProgressIndicator projectId={projectId} />
         {/* <AgentToggleButton /> */}
         <HistoryButton />
+        <GitHubStarButton />
       </div>
     </div>
   );

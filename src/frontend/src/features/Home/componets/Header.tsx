@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import CreateProjectDialog from "./CreateProjectDialog";
+import GitHubStarButton from "@/components/GitHubStarButton";
 
 // import { useCreateProject } from "@/services/projectService";
 
@@ -21,6 +22,7 @@ const Header = () => {
           title="Create New Project"
           description="Create a new project from your local computer"
         />
+        <GitHubStarButton />
       </div>
     </div>
   );
