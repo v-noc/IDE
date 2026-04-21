@@ -43,6 +43,7 @@ GROUP_SCHEMA_TO_GROUP_TYPE = {
     "StructureGroupSchema": "structure_group",
     "CodeElementGroupNode": "code_element_group",
     "CallGroupNode": "call_group",
+    "CallGroupSchema": "call_group",
     "StructureGroupNode": "structure_group",
 }
 
