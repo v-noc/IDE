@@ -16,6 +16,7 @@ import BranchDropdown from "./BranchDropdown";
 import CreateBranchDialog from "./CreateBranchDialog";
 import RemoteSyncAuthDialog from "./RemoteSyncAuthDialog";
 import { usePushToRemote, usePullFromRemote } from "@/services/versioning";
+import { isCommitListDisabled } from "../config/commitListEnv";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -88,6 +89,13 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const hasNextPage = commits.length === COMMITS_PER_PAGE;
   const hasPrevPage = page > 0;
   const displayedCommitId = checkedOutCommitId ?? headCommitId;
+
+  const commitListDisabled = isCommitListDisabled();
+  const commitHistoryEmptyMessage = commitListDisabled
+    ? "Commit history is temporarily disabled."
+    : !projectData?.id || !historyNodeId
+      ? "Select content to view commit history"
+      : undefined;
 
   return (
     <div className="flex h-full w-full flex-col border-l border-border bg-card text-card-foreground shadow-sm transition-all duration-300">
@@ -207,18 +215,14 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
       <div className="flex-1 overflow-y-auto">
         <CommitHistory
           commits={displayCommits}
-          isLoading={isLoading}
-          isError={isError}
-          hasNextPage={hasNextPage}
-          hasPrevPage={hasPrevPage}
+          isLoading={commitListDisabled ? false : isLoading}
+          isError={commitListDisabled ? false : isError}
+          hasNextPage={commitListDisabled ? false : hasNextPage}
+          hasPrevPage={commitListDisabled ? false : hasPrevPage}
           page={page}
           onNextPage={() => setPage((p) => p + 1)}
           onPrevPage={() => setPage((p) => Math.max(0, p - 1))}
-          emptyMessage={
-            !projectData?.id || !historyNodeId
-              ? "Select content to view commit history"
-              : undefined
-          }
+          emptyMessage={commitHistoryEmptyMessage}
         />
       </div>
       <CreateBranchDialog

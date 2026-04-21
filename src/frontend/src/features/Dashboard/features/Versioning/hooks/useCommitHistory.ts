@@ -1,4 +1,5 @@
 import { useCommitDiff, useCommits } from "@/services/versioning";
+import { isCommitListDisabled } from "../config/commitListEnv";
 
 export type { Commit, TerminusJsonDiff } from "@/services/versioning";
 
@@ -13,7 +14,11 @@ export function useCommitHistory(
     ref?: string;
   }
 ) {
-  return useCommits(projectId, nodeId, options);
+  const listDisabled = isCommitListDisabled();
+  return useCommits(projectId, nodeId, {
+    ...options,
+    enabled: (options?.enabled ?? true) && !listDisabled,
+  });
 }
 
 export function useSelectedCommitDiff(
