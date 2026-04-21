@@ -1,4 +1,6 @@
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import { blockWriteIfReadOnly } from "@/lib/readOnlyGate";
+import { isWriteHttpMethod } from "@/lib/readOnlyMode";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
@@ -37,6 +39,17 @@ async function apiClient<T>(
     compareTo: compareToOverride,
     ...customConfig
   } = options as ApiRequestOptions;
+
+  const resolvedMethod =
+    typeof customConfig.method === "string"
+      ? customConfig.method
+      : body !== undefined
+        ? "POST"
+        : "GET";
+  if (isWriteHttpMethod(resolvedMethod)) {
+    blockWriteIfReadOnly();
+  }
+
   const state = useVersioningStore.getState();
   const branch = branchOverride ?? state.branch;
   const ref = normalizeCommitId(refOverride ?? state.checkedOutCommitId ?? undefined);

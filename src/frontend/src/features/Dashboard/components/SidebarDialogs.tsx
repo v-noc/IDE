@@ -17,6 +17,7 @@ import type {
   GroupNodeTree,
 } from "@/types/project";
 import { useMemo } from "react";
+import { DemoReadOnlyDialog } from "@/components/DemoReadOnlyDialog";
 
 export function SidebarDialogs() {
   const { activeModal, targetNode, closeModal } = useSidebarModalStore();
@@ -77,47 +78,55 @@ export function SidebarDialogs() {
     descendantsFetchCount,
   ]);
 
-  // No node = no dialogs
-  if (!targetNode) return null;
+  const readOnlyOpen = activeModal === "demo-read-only";
+
+  // Node-targeted dialogs require a selection; read-only dialog can open from API guard without a node.
+  if (!targetNode && !readOnlyOpen) return null;
 
   return (
     <>
-      <SelectNodeDialog
-        isOpen={activeModal === "add-call"}
-        onClose={closeModal}
-        list={(projectData?.children as AnyNodeTree[]) ?? []}
-        selectNodeType={["function"]}
-        onSelect={(node) => {
-          handleAddCall(node);
-          closeModal();
-        }}
-      />
+      {targetNode ? (
+        <>
+          <SelectNodeDialog
+            isOpen={activeModal === "add-call"}
+            onClose={closeModal}
+            list={(projectData?.children as AnyNodeTree[]) ?? []}
+            selectNodeType={["function"]}
+            onSelect={(node) => {
+              handleAddCall(node);
+              closeModal();
+            }}
+          />
 
-      <GroupDialog
-        isOpen={activeModal === "create-group"}
-        onClose={closeModal}
-        mode="create"
-        initialChildren={[targetNode as AnyNodeTree]}
-        project_key={projectData?.id ?? ""}
-        parent_node_id={parentNode?.id ?? ""}
-        siblings={siblings}
-      />
+          <GroupDialog
+            isOpen={activeModal === "create-group"}
+            onClose={closeModal}
+            mode="create"
+            initialChildren={[targetNode as AnyNodeTree]}
+            project_key={projectData?.id ?? ""}
+            parent_node_id={parentNode?.id ?? ""}
+            siblings={siblings}
+          />
 
-      <GroupDialog
-        isOpen={activeModal === "manage-group"}
-        onClose={closeModal}
-        mode="manage"
-        group={targetNode as unknown as GroupNodeTree}
-        siblings={siblings}
-        project_key={projectData?.id ?? ""}
-        parent_node_id={parentNode?.id ?? ""}
-      />
+          <GroupDialog
+            isOpen={activeModal === "manage-group"}
+            onClose={closeModal}
+            mode="manage"
+            group={targetNode as unknown as GroupNodeTree}
+            siblings={siblings}
+            project_key={projectData?.id ?? ""}
+            parent_node_id={parentNode?.id ?? ""}
+          />
 
-      <PromptBuilder
-        open={activeModal === "prompt-builder"}
-        onOpenChange={(open) => !open && closeModal()}
-        rootNode={targetNode as ContainerNodeTree}
-      />
+          <PromptBuilder
+            open={activeModal === "prompt-builder"}
+            onOpenChange={(open) => !open && closeModal()}
+            rootNode={targetNode as ContainerNodeTree}
+          />
+        </>
+      ) : null}
+
+      <DemoReadOnlyDialog isOpen={readOnlyOpen} onClose={closeModal} />
     </>
   );
 }

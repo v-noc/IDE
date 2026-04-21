@@ -26,6 +26,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
 import API_ROUTES from "@/lib/apiRoutes";
+import { blockWriteIfReadOnly } from "@/lib/readOnlyGate";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -55,6 +56,7 @@ const CreateVirtualFolderDialog = () => {
   // Create mutation for virtual folder creation
   const createVirtualFolderMutation = useMutation({
     mutationFn: async (requestData: CreateVirtualFolderRequest) => {
+      blockWriteIfReadOnly();
       if (!projectData?.key) {
         throw new Error("No project selected");
       }

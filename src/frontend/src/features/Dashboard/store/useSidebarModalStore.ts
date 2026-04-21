@@ -9,6 +9,7 @@ type ModalType =
   | 'prompt-builder'
   | 'edit-virtual-folder'
   | 'select-node'
+  | 'demo-read-only'
   | null;
 
 interface SidebarModalState {
@@ -18,6 +19,8 @@ interface SidebarModalState {
 
   // Actions
   openModal: (type: ModalType, node: AnyNodeTree) => void;
+  /** Opens the demo read-only dialog without requiring a sidebar target node (e.g. API guard). */
+  openReadOnlyModal: () => void;
   closeModal: () => void;
 }
 
@@ -31,6 +34,8 @@ export const useSidebarModalStore = create<SidebarModalState>()(
         activeModal: type,
         targetNode: node
       }),
+
+      openReadOnlyModal: () => set({ activeModal: 'demo-read-only' }),
 
       closeModal: () => set({
         activeModal: null,
