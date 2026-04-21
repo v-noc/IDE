@@ -8,7 +8,11 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { ContainerNodeTree, AnyNodeTree, ProjectNodeTree } from "@/types/project";
+import type {
+  ContainerNodeTree,
+  AnyNodeTree,
+  ProjectNodeTree,
+} from "@/types/project";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/findNodeWithDescendantCache";
 import { usePromptBuilder } from "./usePromptBuilder";
@@ -57,34 +61,46 @@ const PromptBuilder = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-3xl sm:max-w-4xl h-[80vh]">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle>Prompt Builder</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="flex h-[80vh] w-full max-w-3xl flex-col overflow-hidden sm:max-w-5xl">
+        <DialogHeader className="shrink-0 space-y-1 border-b border-border/60 px-6 pb-4 pt-6">
+          <DialogTitle className="text-xl font-semibold tracking-tight">
+            Prompt Builder
+          </DialogTitle>
+          <DialogDescription className="text-sm leading-relaxed text-muted-foreground">
             Select tree items, configure documents and code, then preview and
             copy your XML prompt.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6">
-          <Tabs defaultValue="builder" className="h-full flex flex-col">
-            <TabsList className="grid w-full max-w-xs grid-cols-2 mb-4">
-              <TabsTrigger value="builder">Builder</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-6 pt-4">
+          <Tabs defaultValue="builder" className="flex h-full min-h-0 flex-col gap-0">
+            <TabsList className="mb-4 grid h-10 w-full max-w-sm grid-cols-2 gap-1 rounded-xl bg-muted/70 p-1 shadow-inner">
+              <TabsTrigger
+                value="builder"
+                className="rounded-lg data-[state=active]:shadow-sm"
+              >
+                Builder
+              </TabsTrigger>
+              <TabsTrigger
+                value="preview"
+                className="rounded-lg data-[state=active]:shadow-sm"
+              >
+                Preview
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent
               value="builder"
-              className="flex-1 min-h-0 grid grid-cols-2 gap-4"
+              className="mt-0 grid min-h-0 flex-1 grid-cols-2 gap-4 data-[state=inactive]:hidden"
             >
               {/* Tree Pane */}
-              <div className="border rounded-lg overflow-hidden bg-card">
-                <div className="bg-muted/50 px-3 py-2 border-b">
-                  <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                    Tree Selection
+              <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-sm">
+                <div className="shrink-0 border-b border-zinc-800 bg-zinc-900 px-4 py-3">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Tree selection
                   </h3>
                 </div>
-                <div className="h-full overflow-auto">
+                <div className="min-h-0 flex-1 overflow-auto bg-zinc-950">
                   <TreePane
                     root={rootNode}
                     checked={state.checked}
@@ -99,14 +115,14 @@ const PromptBuilder = ({
               </div>
 
               {/* Selection Detail Pane */}
-              <div className="border rounded-lg overflow-hidden bg-card flex flex-col">
-                <div className="bg-muted/50 px-3 py-2 border-b">
-                  <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                    Selection Details
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
+                <div className="shrink-0 border-b border-border/60 bg-muted/30 px-4 py-3">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Selection details
                   </h3>
                 </div>
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <div className="p-3">
+                <div className="min-h-0 flex-1 overflow-auto">
+                  <div className="p-4">
                     <SelectionDetailPane
                       node={selectedNode}
                       checked={
@@ -129,11 +145,15 @@ const PromptBuilder = ({
                       }
                       onToggleDocs={() =>
                         selectedNode &&
-                        state.toggleIncludeDocs(promptBuilderNodeKey(selectedNode))
+                        state.toggleIncludeDocs(
+                          promptBuilderNodeKey(selectedNode),
+                        )
                       }
                       onToggleCode={() =>
                         selectedNode &&
-                        state.toggleIncludeCode(promptBuilderNodeKey(selectedNode))
+                        state.toggleIncludeCode(
+                          promptBuilderNodeKey(selectedNode),
+                        )
                       }
                       setDocumentsForNode={state.setDocumentsForNode}
                       setCodeForNode={state.setCodeForNode}
@@ -142,16 +162,18 @@ const PromptBuilder = ({
                 </div>
               </div>
             </TabsContent>
-
-            <TabsContent value="preview" className="flex-1 min-h-0">
-              <div className="border rounded-lg overflow-hidden bg-card h-full flex flex-col">
-                <div className="bg-muted/50 px-3 py-2 border-b">
-                  <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                    XML Preview
+            <TabsContent
+              value="preview"
+              className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden"
+            >
+              <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-sm">
+                <div className="shrink-0 border-b border-border/60 bg-muted/30 px-4 py-3">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    XML preview
                   </h3>
                 </div>
-                <div className="flex-1 min-h-0 overflow-auto">
-                  <div className="p-3">
+                <div className="min-h-0 flex-1 overflow-auto">
+                  <div className="p-4">
                     <PreviewPane xml={xml} />
                   </div>
                 </div>

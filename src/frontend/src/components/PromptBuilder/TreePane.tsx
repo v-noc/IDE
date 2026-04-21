@@ -50,11 +50,28 @@ const getNodeIcon = (type: string) => {
   }
 };
 
-const treeRowClass =
-  "group hover:before:opacity-100 before:absolute before:rounded-lg before:left-0 px-2 before:w-full before:opacity-0 before:bg-accent/70 before:h-[2rem] before:-z-10";
+const treeCheckboxClass =
+  "size-[15px] rounded border border-zinc-500 bg-transparent shadow-none data-[state=checked]:border-emerald-500 data-[state=checked]:bg-emerald-500 data-[state=checked]:text-zinc-950 dark:data-[state=checked]:bg-emerald-500";
 
-const selectedRowClass =
-  "before:opacity-100 before:bg-accent/70 text-accent-foreground";
+const rowShellClass = (isSelected: boolean) =>
+  cn(
+    "group relative flex w-full items-center gap-2 rounded-md py-1.5 pl-1 pr-2 text-left transition-colors",
+    "hover:bg-zinc-800/70",
+    isSelected &&
+      "bg-zinc-800/90 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:rounded-sm before:bg-emerald-500",
+  );
+
+function nodeTypeBadge(nodeType: string) {
+  const label = nodeType ? nodeType.replace(/_/g, " ") : "item";
+  return (
+    <span
+      className="max-w-18 shrink-0 truncate rounded bg-zinc-800/90 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400"
+      title={label}
+    >
+      {label.length > 10 ? `${label.slice(0, 9)}…` : label}
+    </span>
+  );
+}
 
 interface PromptTreeNodeProps {
   node: ContainerNodeTree;
@@ -96,7 +113,9 @@ const PromptTreeNode: React.FC<PromptTreeNodeProps> = ({
     displayChildren.length > 0 || lazyHintCount > 0 || lazy.isFetching;
 
   const isCall = node.node_type === "call";
-  const targetNode = isCall ? (node as AnyNodeTree & { target?: AnyNodeTree }).target : null;
+  const targetNode = isCall
+    ? (node as AnyNodeTree & { target?: AnyNodeTree }).target
+    : null;
   const effectiveNode = (targetNode || node) as AnyNodeTree;
   const Icon = getNodeIcon(node.node_type);
   const subtitle =
@@ -105,15 +124,28 @@ const PromptTreeNode: React.FC<PromptTreeNodeProps> = ({
       : (effectiveNode as { qname?: string }).qname;
 
   const isSelected = selectedNodeKey === key;
+  const isChecked = !!checked[key];
 
-  const checkbox = (
-    <Checkbox
-      checked={!!checked[key]}
-      onCheckedChange={() => {
-        onToggleChecked(key);
-      }}
+  const checkboxEl = (
+    <div
+      className="flex shrink-0 items-center justify-center"
       onClick={(e) => e.stopPropagation()}
-    />
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <Checkbox
+        className={treeCheckboxClass}
+        checked={isChecked}
+        onCheckedChange={() => {
+          onToggleChecked(key);
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+
+  const titleClass = cn(
+    "truncate text-sm font-medium leading-tight",
+    isSelected ? "text-cyan-300" : "text-zinc-100",
   );
 
   if (!hasChildren) {
@@ -122,29 +154,21 @@ const PromptTreeNode: React.FC<PromptTreeNodeProps> = ({
         <div
           role="treeitem"
           className={cn(
-            "ml-5 flex text-left items-center py-2 cursor-pointer before:right-1 relative",
-            treeRowClass,
-            isSelected && selectedRowClass,
+            rowShellClass(isSelected),
+            "cursor-pointer py-2 pl-0.5",
           )}
           onClick={() => onSelect(key)}
         >
-          <Icon className="h-4 w-4 shrink-0 mr-2" />
-          <div className="flex flex-col grow min-w-0">
-            <span className="text-sm truncate">{node.name}</span>
+          <span className="inline-block w-5 shrink-0" aria-hidden />
+          {checkboxEl}
+          <Icon className="h-4 w-4 shrink-0 text-zinc-500" />
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className={titleClass}>{node.name}</span>
             {subtitle ? (
-              <span className="text-xs text-muted-foreground truncate">
-                {subtitle}
-              </span>
+              <span className="truncate text-xs text-zinc-500">{subtitle}</span>
             ) : null}
           </div>
-          <div
-            className={cn(
-              isSelected ? "block" : "hidden",
-              "absolute right-3 group-hover:block",
-            )}
-          >
-            {checkbox}
-          </div>
+          {nodeTypeBadge(node.node_type)}
         </div>
       </li>
     );
@@ -175,32 +199,29 @@ const PromptTreeNode: React.FC<PromptTreeNodeProps> = ({
           <AccordionPrimitive.Header>
             <AccordionPrimitive.Trigger
               className={cn(
-                "flex flex-1 w-full items-center py-2 transition-all relative text-left",
-                "first:[&[data-state=open]>svg]:first-of-type:rotate-90",
-                treeRowClass,
-                isSelected && selectedRowClass,
+                "flex w-full flex-1 items-center gap-2 py-2 pl-0.5 text-left transition-all outline-none",
+                "data-[state=open]:bg-zinc-900/50",
+                rowShellClass(isSelected),
               )}
               onClick={() => onSelect(key)}
             >
-              <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-200 text-accent-foreground/50 mr-1" />
-              <Icon className="h-4 w-4 shrink-0 mr-2" />
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-sm truncate">{node.name}</span>
+              <span className="flex w-5 shrink-0 justify-center text-zinc-500">
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 transition-transform duration-200",
+                    isOpen && "rotate-90",
+                  )}
+                />
+              </span>
+              {checkboxEl}
+              <Icon className="h-4 w-4 shrink-0 text-zinc-500" />
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className={titleClass}>{node.name}</span>
                 {subtitle ? (
-                  <span className="text-xs text-muted-foreground truncate">
-                    {subtitle}
-                  </span>
+                  <span className="truncate text-xs text-zinc-500">{subtitle}</span>
                 ) : null}
               </div>
-              <div
-                className={cn(
-                  isSelected ? "block" : "hidden",
-                  "absolute right-3 group-hover:block",
-                )}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {checkbox}
-              </div>
+              {nodeTypeBadge(node.node_type)}
             </AccordionPrimitive.Trigger>
           </AccordionPrimitive.Header>
           <AccordionPrimitive.Content
@@ -208,7 +229,7 @@ const PromptTreeNode: React.FC<PromptTreeNodeProps> = ({
               "overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down",
             )}
           >
-            <div className="pb-1 pt-0 ml-4 pl-1 border-l">
+            <div className="ml-2 border-l border-zinc-800 pb-1 pl-3 pt-0">
               <ul>
                 {displayChildren.map((child) => (
                   <PromptTreeNode
@@ -239,7 +260,7 @@ export const TreePane: React.FC<TreePaneProps> = ({
   onLazyParentAccordionChange,
 }) => {
   return (
-    <div className="overflow-hidden relative p-2 h-full overflow-y-auto">
+    <div className="relative h-full overflow-y-auto overflow-x-hidden bg-zinc-950 p-2 text-zinc-100">
       <ul role="tree">
         <PromptTreeNode
           node={root}
