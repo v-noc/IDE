@@ -35,7 +35,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
   const { handlePromote } = useWorkspaceActions(tabId);
 
   const [tabValue, setTabValue] = useState("docs");
-  const [isSandboxOpen, setIsSandboxOpen] = useState(true);
+  const [isSandboxOpen, setIsSandboxOpen] = useState(false);
   const isVersioningOpen = useVersioningStore((s) => s.isOpen);
   const setHistoryScope = useVersioningStore((s) => s.setHistoryScope);
   const clearHistoryScope = useVersioningStore((s) => s.clearHistoryScope);

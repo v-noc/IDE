@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from app.core.model.schemas import FileSchema, FolderSchema
+from app.core.model.schemas.structure_schema import INIT_FOLDER_ID
 
 from app.core.parser.drivers import DriverManager
 from app.core.repository import Repositories
@@ -353,6 +354,11 @@ class ChangeDetector:
             self.repos.structure_repo.get_all(doc_type=FileSchema.__name__),
             self.repos.structure_repo.get_all(doc_type=FolderSchema.__name__),
         )
+
+        # Virtual global root from bootstrap (FolderSchema.create_init_folder); not on disk.
+        db_folder_snapshots = [
+            n for n in db_folder_snapshots if n.id != INIT_FOLDER_ID
+        ]
 
         # 2) Extract stable IDs for all currently scanned paths.
         current_folder_id_by_path = await self._extract_current_path_to_id(

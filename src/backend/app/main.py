@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.socket.manager import get_socket_manager
 
 from .api import root
+from .core.cache_setup import init_cache, shutdown_cache
 from .db.client import get_terminus_client, close_db_client
 from .core.watcher.service import WatcherService
 from .utils.exceptions import generic_exception_handler
@@ -35,10 +36,13 @@ async def lifespan(app: FastAPI):
     _ = get_socket_manager()
     print("🔌 Socket.IO server initialized and ready")
 
+    await init_cache(app)
+
     yield
 
     # Shutdown
     print("🔄 Shutting down database connections...")
+    await shutdown_cache(app)
     # Stop file watchers gracefully
     await close_db_client()
     try:

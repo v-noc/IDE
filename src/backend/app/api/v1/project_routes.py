@@ -23,7 +23,9 @@ from app.db.client import get_terminus_client
 from app.db.context import RequestDbContext
 from app.db.errors import DatabaseError
 from app.core.model.schemas import StructureGroupSchema
+from app.core.cache_setup import DEFAULT_TTL
 from loguru import logger
+from fastapi_cache.decorator import cache
 
 
 class CreateProjectRequest(BaseModel):
@@ -223,6 +225,7 @@ async def get_project_structure(
 
 
 @router.get("/all", response_model=list[ProjectNode])
+@cache(expire=DEFAULT_TTL)
 async def get_projects(
     project_service: ProjectService = Depends(get_project_service),
 ) -> list[AnyTreeNode]:

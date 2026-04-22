@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Body, Query, status
+from fastapi_cache.decorator import cache
 from pydantic import BaseModel
 from typing import Any, Dict, Optional
 
@@ -16,6 +17,7 @@ from app.core.socket.manager import get_socket_manager
 from app.core.services import CodeElementService
 from app.core.builder.tree_builder import TreeBuilder
 from app.core.schemas.tree import AnyTreeNode
+from app.core.cache_setup import DEFAULT_TTL
 
 
 router = APIRouter()
@@ -103,6 +105,7 @@ async def write_code(
 
 
 @router.get("/read-code/")
+@cache(expire=DEFAULT_TTL)
 async def get_code(
     node_id: str = Query(..., description="The ID of the element to get"),
     code_element_service: CodeElementService = Depends(
@@ -134,6 +137,7 @@ async def get_code(
 
 
 @router.get("/descendants", response_model=CodeDescendantsResponse)
+@cache(expire=DEFAULT_TTL)
 async def get_code_descendants(
     parent_id: str = Query(
         ...,
@@ -200,6 +204,7 @@ async def get_code_descendants(
 
 
 @router.get("/lineage", response_model=CodeLineageResponse)
+@cache(expire=DEFAULT_TTL)
 async def get_code_lineage(
     target_id: str = Query(
         ...,

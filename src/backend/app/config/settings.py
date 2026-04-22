@@ -17,6 +17,11 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
 
+    # fastapi-cache2 + Redis. If false, use a no-op backend.
+    ENABLE_CACHE: bool = False
+    REDIS_URL: Optional[str] = None
+    CACHE_PREFIX: str = "vnoc-cache"
+
     # Optional JSON-RPC URLs for language drivers (loaded from the same .env as above).
     VNOC_LSP_PYTHON_URL: Optional[str] = None
     VNOC_LSP_TS_JS_URL: Optional[str] = None

@@ -1,7 +1,9 @@
 from app.api.dependencies import get_document_service
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi_cache.decorator import cache
 from typing import Optional, Dict
 
+from app.core.cache_setup import DEFAULT_TTL
 from app.core.services.document_service import DocumentService
 from app.core.model import DocumentNode
 from pydantic import BaseModel, Field
@@ -101,6 +103,7 @@ async def delete_document(
 
 
 @router.get("/", response_model=List[DocumentResponse])
+@cache(expire=DEFAULT_TTL)
 async def get_documents_for_node(
     node_id: str = Query(...,
                          description="The ID of the node to get documents for"),
