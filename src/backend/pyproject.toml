@@ -3,6 +3,7 @@ name = "backend"
 version = "0.1.0"
 dependencies = [
   "fastapi",
+  "gunicorn>=23.0.0",
   "uvicorn",
   "python-arango",
   "pydantic",

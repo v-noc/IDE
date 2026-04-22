@@ -1,0 +1,10 @@
+# Backend API — connect this Railway service to the repo root (not a subdirectory).
+# Docker build context is the repository root; see src/backend/Dockerfile.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "src/backend/Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/v1/health/"
+restartPolicyType = "ON_FAILURE"
