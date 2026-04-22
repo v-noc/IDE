@@ -189,6 +189,7 @@ async def get_project(
 
 
 @router.get("/structure", response_model=ProjectTreeNode)
+@cache(expire=DEFAULT_TTL)
 async def get_project_structure(
     project_node: ProjectNode = Depends(get_project_node),
     exclude_groups: bool = Query(
