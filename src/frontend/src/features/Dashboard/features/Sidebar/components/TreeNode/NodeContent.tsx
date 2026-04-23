@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NodeRow } from "./NodeRow";
 import { NodeChildren } from "./NodeChildren";
@@ -22,6 +23,8 @@ interface NodeContentProps {
   showLoadMore?: boolean;
   loadMorePending?: boolean;
   onLoadMore?: () => void;
+  /** Lazy code descendants request in flight and no rows to show yet. */
+  showLazyChildrenSkeleton?: boolean;
 }
 
 export const NodeContent = memo(function NodeContent({
@@ -39,6 +42,7 @@ export const NodeContent = memo(function NodeContent({
   showLoadMore,
   loadMorePending,
   onLoadMore,
+  showLazyChildrenSkeleton = false,
 }: NodeContentProps) {
   const style = useNodeStyle(node);
   const diffStatus = node.status ?? "none";
@@ -104,6 +108,20 @@ export const NodeContent = memo(function NodeContent({
                 childFilter={childFilter}
                 onSelect={onSelect}
               />
+              {showLazyChildrenSkeleton ? (
+                <ul
+                  className="pl-2 pt-1 space-y-1"
+                  aria-busy="true"
+                  aria-label="Loading nested items"
+                >
+                  {[0, 1, 2].map((i) => (
+                    <li key={i} className="flex items-center gap-2 py-0.5">
+                      <Skeleton className="size-4 shrink-0 rounded" />
+                      <Skeleton className="h-3.5 flex-1 max-w-[min(100%,14rem)] rounded-md" />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               {showLoadMore && onLoadMore ? (
                 <div className="pl-6 pt-1">
                   <button

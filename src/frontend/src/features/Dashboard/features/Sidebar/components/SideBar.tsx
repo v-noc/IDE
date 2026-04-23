@@ -1,6 +1,7 @@
 import { memo } from "react";
+import { useParams } from "react-router-dom";
 import { SidebarHeader } from "./SidebarHeader";
-
+import { SidebarProjectSkeleton } from "./SidebarProjectSkeleton";
 import { TabContextStack } from "./TabContextStack";
 
 import { useSidebarData } from "../hooks/useSidebarData";
@@ -12,8 +13,39 @@ import useProjectStore from "../../../store/useProjectStore";
  * Supports hierarchical Context Panels.
  */
 export const SideBar = memo(function SideBar() {
+  const { projectId } = useParams();
+  const projectKey = projectId ? `ProjectSchema/${projectId}` : "";
   const projectData = useProjectStore((s) => s.projectData);
-  const { filteredProjectData, searchQuery, setSearchQuery } = useSidebarData();
+  const {
+    filteredProjectData,
+    searchQuery,
+    setSearchQuery,
+    isStructurePending,
+  } = useSidebarData();
+
+  const structureOutOfSync =
+    Boolean(projectKey) &&
+    Boolean(projectData) &&
+    projectData.id !== projectKey;
+  const showStructureSkeleton =
+    Boolean(projectKey) && (isStructurePending || structureOutOfSync);
+
+  if (showStructureSkeleton) {
+    return (
+      <div className="flex flex-col h-full bg-sidebar border-r overflow-hidden">
+        <div className="flex-none transition-all duration-300">
+          <SidebarHeader
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            loading
+          />
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden p-0">
+          <SidebarProjectSkeleton />
+        </div>
+      </div>
+    );
+  }
 
   if (!projectData) {
     return (

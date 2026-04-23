@@ -4,7 +4,10 @@ import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu
 import { NodeContent } from "./NodeContent";
 import { useTreeNodeState } from "../../hooks/useTreeNodeState";
 import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
-import { useLazyCodeChildren } from "@/features/Dashboard/service/codeDescendants";
+import {
+  canLazyLoadCodeChildren,
+  useLazyCodeChildren,
+} from "@/features/Dashboard/service/codeDescendants";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { mergeStructureAndLazyChildren } from "@/features/Dashboard/utils/mergeCodeTreeChildren";
 
@@ -36,6 +39,18 @@ export const TreeNode = ({
       children: mergeStructureAndLazyChildren(node.children, lazy.loadedNodes),
     };
   }, [node, lazy.loadedNodes]);
+
+  const filteredDisplayChildCount = useMemo(() => {
+    const ch = displayNode.children ?? [];
+    if (!childFilter) return ch.length;
+    return ch.filter((n) => childFilter(n as ContainerNodeTree)).length;
+  }, [displayNode.children, childFilter]);
+
+  const showLazyChildrenSkeleton =
+    isOpen &&
+    lazy.isFetching &&
+    canLazyLoadCodeChildren(node) &&
+    filteredDisplayChildCount === 0;
 
   const lazyMeta = useMemo(
     () => ({ lazyHintCount: node.lazy_child_ids?.length ?? 0 }),
@@ -83,6 +98,7 @@ export const TreeNode = ({
         handleSelectNode={handleSelectOverride}
         childFilter={childFilter}
         onSelect={onSelect}
+        showLazyChildrenSkeleton={showLazyChildrenSkeleton}
       />
     </NodeContextMenu>
   );

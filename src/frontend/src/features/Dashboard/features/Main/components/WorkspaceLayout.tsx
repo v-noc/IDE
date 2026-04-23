@@ -98,7 +98,7 @@ export function WorkspaceLayout({
           collapsible
           className="relative rounded group"
         >
-          <Sandbox tabId={tabId} />
+          {isSandboxOpen && <Sandbox tabId={tabId} />}
           {/* Close button near the handle */}
           <button
             type="button"

@@ -47,7 +47,7 @@ export function useSidebarData() {
   const showAffectedOnly = useVersioningStore((s) => s.showAffectedOnly);
   const projectKey = projectId ? `ProjectSchema/${projectId}` : "";
 
-  const { data, isLoading, isSuccess } = useGetProjectStructureTree({
+  const { data, isLoading, isPending, isSuccess } = useGetProjectStructureTree({
     key: projectKey,
   });
 
@@ -100,6 +100,8 @@ export function useSidebarData() {
 
   return {
     isLoading,
+    isStructurePending: isPending,
+    projectKey,
     rawProjectData,
     filteredProjectData,
     searchQuery,
