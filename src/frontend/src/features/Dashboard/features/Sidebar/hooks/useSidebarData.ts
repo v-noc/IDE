@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 
 import { useGetProjectStructureTree } from "@/features/Dashboard/service/useProject";
@@ -35,11 +35,10 @@ function filterAffectedTree(nodes: AnyNodeTree[]): AnyNodeTree[] {
 export function useSidebarData() {
   const { projectId } = useParams();
 
-  const activeTabId = useTabStore((s) => s.activeTabId);
-  const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds);
-  const toggleNodeExpansion = useProjectStore((s) => s.toggleNodeExpansion);
   const setProjectData = useProjectStore((s) => s.setProjectData);
   const rawProjectData = useProjectStore((s) => s.projectData);
+  /** Which project root id we already auto-expanded (avoid refetch re-opening after user collapses). */
+  const lastBootstrappedRootIdRef = useRef<string | null>(null);
 
   const checkedOutCommitId = useVersioningStore((s) => s.checkedOutCommitId);
   const headCommitId = useVersioningStore((s) => s.headCommitId);
@@ -56,10 +55,15 @@ export function useSidebarData() {
    * Uses useEffectEvent to avoid reactive cycle with projectData.
    */
   const syncProjectData = useEffectEvent((newData: AnyNodeTree) => {
+    const rootId = newData.id;
+    const rootChanged = lastBootstrappedRootIdRef.current !== rootId;
+    lastBootstrappedRootIdRef.current = rootId;
+
     setProjectData(newData as ProjectNodeTree);
-    // Check expansion logic (also accesses latest state via closure/event)
-    if (projectId && activeTabId && !expandedNodeIds[activeTabId]?.includes(projectId)) {
-      toggleNodeExpansion(activeTabId, projectId);
+
+    if (rootChanged) {
+      const rootTabId = useTabStore.getState().rootTabId;
+      useProjectStore.getState().expandNode(rootTabId, rootId);
     }
   });
 
@@ -69,6 +73,12 @@ export function useSidebarData() {
       setHeadCommitId(normalizedVersion);
     }
   }, [checkedOutCommitId, data?.version, headCommitId, setHeadCommitId]);
+
+  useEffect(() => {
+    if (!projectKey) {
+      lastBootstrappedRootIdRef.current = null;
+    }
+  }, [projectKey]);
 
   useEffect(() => {
     if (data && isSuccess) {
