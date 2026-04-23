@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import Layout from "@/features/Dashboard/components/Layout";
 import SideBar from "@/features/Dashboard/features/Sidebar/components/SideBar";
 import Navbar from "@/features/Dashboard/features/Navbar/components/Navbar";
@@ -20,6 +20,7 @@ import VersioningPanel from "@/features/Dashboard/features/Versioning/components
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import AgentOverlay from "@/features/Dashboard/features/Agent";
 import VersioningStatusBanner from "@/features/Dashboard/features/Versioning/components/VersioningStatusBanner";
+import { useDashboardDeepLinkFocus } from "@/features/Dashboard/hooks/useDashboardDeepLinkFocus";
 
 /**
  * Dashboard Page - Entry point for the IDE dashboard.
@@ -27,6 +28,10 @@ import VersioningStatusBanner from "@/features/Dashboard/features/Versioning/com
  */
 const Dashboard = () => {
   const { projectId } = useParams();
+  const [searchParams] = useSearchParams();
+  const focusLinkPending = Boolean(
+    searchParams.get("focus")?.length || searchParams.get("share")?.length,
+  );
   const activeTabId = useTabStore((s) => s.activeTabId);
   const selectedNode = useProjectStore((s) => s.selectedNode[activeTabId]);
   const projectData = useProjectStore((s) => s.projectData);
@@ -42,12 +47,20 @@ const Dashboard = () => {
   // Transformation hooks
   useGroupFlattening();
 
+  useDashboardDeepLinkFocus(projectId);
+
   // Set default selection for the active tab if nothing is selected
   useEffect(() => {
-    if (!selectedNode && projectData != null) {
+    if (!selectedNode && projectData != null && !focusLinkPending) {
       handleNodeSelection(activeTabId, projectData, "primary");
     }
-  }, [selectedNode, projectData, handleNodeSelection, activeTabId]);
+  }, [
+    selectedNode,
+    projectData,
+    handleNodeSelection,
+    activeTabId,
+    focusLinkPending,
+  ]);
 
   return (
     <ResizablePanelGroup direction="horizontal">

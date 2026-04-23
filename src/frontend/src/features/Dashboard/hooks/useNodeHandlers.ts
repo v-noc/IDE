@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import useProjectStore from '@/features/Dashboard/store/useProjectStore';
 import useTabStore from '@/features/Dashboard/store/useTabStore';
@@ -7,6 +8,7 @@ import type { AnyNodeTree, CallNodeTree, ContainerNodeTree } from '@/types/proje
 import { useShallow } from 'zustand/react/shallow';
 import { useTreeNodeActions } from './useNodeAction';
 import { findNodeByIdWithDescendantCache } from '@/features/Dashboard/utils/findNodeWithDescendantCache';
+import { buildProjectNodeShareUrl } from '@/features/Dashboard/utils/shareUrl';
 import type { ProjectStore } from '@/features/Dashboard/store/useProjectStore';
 
 /**
@@ -14,6 +16,7 @@ import type { ProjectStore } from '@/features/Dashboard/store/useProjectStore';
  * All mutations dispatch to modal store or API.
  */
 export function useNodeHandlers(nodeId: string, tabId: string) {
+  const { projectId: routeProjectId } = useParams();
   const queryClient = useQueryClient();
   // Store actions
   const handleNodeSelection = useTabStore((s: any) => s.handleNodeSelection);
@@ -95,8 +98,16 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
       case 'copy-path':
         navigator.clipboard.writeText((node as any).path ?? node.name);
         break;
+      case 'copy-link': {
+        const n = node as AnyNodeTree;
+        const pid = routeProjectId ?? useProjectStore.getState().projectData?.id?.replace(/^ProjectSchema\//, '');
+        if (!pid || !n?.id) return;
+        const url = buildProjectNodeShareUrl(pid, n.id);
+        void navigator.clipboard.writeText(url);
+        break;
+      }
     }
-  }, [getNode, openModal]);
+  }, [getNode, openModal, routeProjectId]);
 
 
   const onAction = (action: string) => {
@@ -114,6 +125,10 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
     }
     if (action === "expand") {
       handleExpand();
+      return;
+    }
+    if (action === "copy-link") {
+      handleContextAction("copy-link");
       return;
     }
     // All other actions (add-call, create-group, manage-group, prompt-builder)

@@ -5,7 +5,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Separator } from "@/components/ui/separator";
-import { Crosshair, Expand, Group, Link, Trash, FileCode } from "lucide-react";
+import { Crosshair, Expand, Group, Link, Link2, Trash, FileCode } from "lucide-react";
 
 interface NodeContextMenuProps {
   children: React.ReactNode;
@@ -36,6 +36,10 @@ export const NodeContextMenu = ({
         <ContextMenuItem onClick={() => onAction("expand")}>
           <Expand className="mr-2 h-4 w-4" />
           Expand
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => onAction("copy-link")}>
+          <Link2 className="mr-2 h-4 w-4" />
+          Copy link
         </ContextMenuItem>
         <ContextMenuItem onClick={() => onAction("prompt-builder")}>
           <FileCode className="mr-2 h-4 w-4" />
