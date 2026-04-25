@@ -36,6 +36,7 @@ dependencies = [
   "fastapi-cache2>=0.2.2",
   "redis>=7.4.0",
   "msgpack>=1.1.2",
+  "orjson>=3.11.8",
 ]
 
 [project.optional-dependencies]

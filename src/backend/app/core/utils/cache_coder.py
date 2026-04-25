@@ -1,47 +1,23 @@
-import json
-import msgpack
-import datetime
-import uuid
-import enum
+import orjson
 from typing import Any
 from fastapi_cache.coder import Coder
 
 
-class MsgPackCoder(Coder):
+class OrjsonCoder(Coder):
     @classmethod
     def encode(cls, value: Any) -> bytes:
-        return msgpack.packb(value, default=cls._encoder, use_bin_type=True)
+        return orjson.dumps(
+            value,
+            default=cls._default,
+            option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_PASSTHROUGH_DATETIME,
+        )
 
     @classmethod
     def decode(cls, value: bytes) -> Any:
-        try:
-            return msgpack.unpackb(value, raw=False)
-        except (msgpack.exceptions.ExtraData, msgpack.exceptions.FormatError):
-            return json.loads(value)
+        return orjson.loads(value)
 
     @classmethod
-    def _encoder(cls, obj: Any) -> Any:
-        # Pydantic models
+    def _default(cls, obj: Any) -> Any:
         if hasattr(obj, "model_dump"):
             return obj.model_dump()
-        if hasattr(obj, "dict"):
-            return obj.dict()
-
-        # Common Python types
-        if isinstance(obj, uuid.UUID):
-            return str(obj)
-        if isinstance(obj, datetime.datetime):
-            return obj.isoformat()
-        if isinstance(obj, datetime.date):
-            return obj.isoformat()
-        if isinstance(obj, datetime.time):
-            return obj.isoformat()
-        if isinstance(obj, enum.Enum):
-            return obj.value
-        if isinstance(obj, set):
-            return list(obj)
-        if isinstance(obj, bytes):
-            return obj
-
-        # Nuclear fallback — convert to string
-        return str(obj)
+        raise TypeError(f"Type not serializable: {type(obj)}")
