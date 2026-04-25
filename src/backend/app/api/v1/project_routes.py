@@ -197,7 +197,7 @@ async def get_project_structure(
     ),
     project_service: ProjectService = Depends(get_project_service_with_uow),
     watcher_service: WatcherService = Depends(get_watcher_service),
-) -> ProjectTreeNode:
+) -> dict:
     """Load folder/file/(optional) structure-group shell only — no code elements."""
     watcher_service.start_watching(project_node)
 

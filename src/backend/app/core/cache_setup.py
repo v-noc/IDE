@@ -12,6 +12,7 @@ from redis import asyncio as aioredis
 from starlette.datastructures import URL
 
 from app.config.settings import get_settings
+from app.core.utils.cache_coder import MsgPackCoder
 
 # fastapi_cache `expire` is in seconds; one day.
 DEFAULT_TTL = 24 * 60 * 60
@@ -42,7 +43,8 @@ def request_key_builder(
     from fastapi_cache import default_key_builder  # local import: circular
 
     return default_key_builder(
-        func, namespace, request=request, response=response, args=args, kwargs=dict(kwargs or {})
+        func, namespace, request=request, response=response, args=args, kwargs=dict(
+            kwargs or {})
     )
 
 
@@ -78,6 +80,7 @@ async def init_cache(app) -> None:
             RedisBackend(redis),
             prefix=prefix,
             key_builder=request_key_builder,
+            coder=MsgPackCoder,
         )
     else:
         app.state.redis = None
