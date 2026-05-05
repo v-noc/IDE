@@ -20,6 +20,13 @@ from app.core.parser.graph_builder.collection.structure_batch import StructureBa
 logger = logging.getLogger(__name__)
 
 
+def _scope_id_usable(node_id: Optional[str]) -> bool:
+    """Reject missing ids and legacy bad ids like FunctionSchema/None."""
+    if not node_id or not str(node_id).strip():
+        return False
+    return not str(node_id).endswith("/None")
+
+
 class ASTProcessor:
     def __init__(self, repos: Repositories):
         self.repos = repos
@@ -169,7 +176,7 @@ class ASTProcessor:
             node_data: Dict[str, Any] = data["node_data"]
             parent_id: str = data["parent_id"]
 
-            if not ast_node.id:
+            if not _scope_id_usable(ast_node.id):
                 continue
 
             node_id = ast_node.id
@@ -264,6 +271,9 @@ class ASTProcessor:
         """Recursively flatten nodes and prepare their metadata."""
         for node in nodes:
             if isinstance(node, (ASTClassNode, ASTFunctionNode)):
+                if not _scope_id_usable(node.id):
+                    continue
+
                 qname = f"{parent_node.qname}.{node.name}"
                 node_type = "class" if isinstance(
                     node, ASTClassNode) else "function"
@@ -283,10 +293,7 @@ class ASTProcessor:
                         "parent_id": parent_node.id}
                 )
 
-                if node.id:
-                    node_id = node.id
-                else:
-                    continue
+                node_id = node.id
 
                 if node_type == "class":
                     pseudo_parent = ClassNode(

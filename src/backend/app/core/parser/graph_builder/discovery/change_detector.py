@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
@@ -12,6 +13,8 @@ from app.core.parser.drivers import DriverManager
 from app.core.repository import Repositories
 from app.core.parser.graph_builder.discovery.scanner import ScanResult
 from app.core.model.nodes import FileNode, FolderNode
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -136,7 +139,16 @@ class ChangeDetector:
 
         async def _one(p: str) -> Tuple[str, Optional[str]]:
             async with semaphore:
-                return p, await extractor(p)
+                try:
+                    return p, await extractor(p)
+                except Exception:
+                    logger.warning(
+                        "Stable id lookup failed for %s; path will be omitted "
+                        "from id-based change detection for this run.",
+                        p,
+                        exc_info=True,
+                    )
+                    return p, None
 
         return await asyncio.gather(*(_one(p) for p in paths))
 

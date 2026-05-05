@@ -21,7 +21,7 @@ from app.core.model.schemas import CallSchema, CodeElementGroupSchema, CallGroup
 
 logger = logging.getLogger(__name__)
 
-_INSERT_FLUSH_THRESHOLD = 50_000
+_INSERT_FLUSH_THRESHOLD = 10_000
 _DELETE_MOVE_FLUSH_THRESHOLD = 5_000
 _INSERT_CHUNK_SIZE = 60_000
 _DELETE_MOVE_CHUNK_SIZE = 5_000
@@ -280,14 +280,20 @@ class BodyParser:
                     moves=results.moves_to_execute,
                     deletes=results.call_ids_to_remove,
                 )
-
             except Exception as e:
-                print(f"Error processing node {node.qname}: {e}")
-                raise e
-
-            if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
-                self.progress_tracker.increment_entity_processed()
-                self.progress_tracker.clear_current_function()
+                logger.warning(
+                    "Call/scope processing failed for %s in %s: %s",
+                    getattr(node, "qname", node),
+                    fp,
+                    e,
+                    exc_info=True,
+                )
+            else:
+                if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
+                    self.progress_tracker.increment_entity_processed()
+            finally:
+                if isinstance(node, (FunctionNode, ClassNode)) and self.progress_tracker:
+                    self.progress_tracker.clear_current_function()
 
         semaphore = asyncio.Semaphore(1)
 

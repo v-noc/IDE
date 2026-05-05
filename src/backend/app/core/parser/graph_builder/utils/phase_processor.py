@@ -140,14 +140,19 @@ class PhaseProcessor:
         # if not content_chunks:
         #     content_chunks = [[]]
 
-        await self.repos.code_element_repo.flush_batch(
-            structure_batch_plan.insert,
-            structure_batch_plan.update,
-            content_pairs,
-            structure_batch_plan.delete,
-            structure_batch_plan.move,
-            max_queries_per_commit=self._max_queries_per_code_flush,
-        )
+        try:
+            await self.repos.code_element_repo.flush_batch(
+                structure_batch_plan.insert,
+                structure_batch_plan.update,
+                content_pairs,
+                structure_batch_plan.delete,
+                structure_batch_plan.move,
+                max_queries_per_commit=self._max_queries_per_code_flush,
+            )
+        except Exception:
+            logger.exception(
+                "Code DB flush failed (structure/code rows may be partial until next sync)"
+            )
 
     async def process_collection_phase(
         self,
@@ -180,7 +185,7 @@ class PhaseProcessor:
                     progress_tracker.set_current_file(file_node.path)
                     await progress_tracker.emit()
                 try:
-                    print(f"processing file: {file_node.path}")
+                    print(f"processing file-->: {file_node.path}")
                     result = await asyncio.wait_for(
                         self.collector.process_file(
                             file_node, checksum, progress_tracker=progress_tracker),
@@ -206,6 +211,7 @@ class PhaseProcessor:
                     return None
 
         file_nodes = await self.repos.structure_repo.get_by_ids(files_to_process)
+
         tasks = [
             asyncio.create_task(_process_single_file(node))
             for node in file_nodes
@@ -297,16 +303,26 @@ class PhaseProcessor:
                                 file_node.path)
                             await progress_tracker.emit()
 
-        # Execute in chunks (collection_results are (file_node, content) tuples)
+        # Execute in chunks (collection_results are (file_node, content) tuples).
+        # Use gather(return_exceptions=True) so one failing file does not cancel siblings.
         for i in range(0, len(collection_results), _ANALYSIS_PHASE_CONCURRENCY):
             chunk = collection_results[i: i + _ANALYSIS_PHASE_CONCURRENCY]
-            async with asyncio.TaskGroup() as tg:
-                tasks = [
-                    tg.create_task(_process_single_file_analysis(fn, content))
-                    for fn, content in chunk
-                ]
-            for task in tasks:
-                task.result()
+            tasks = [
+                asyncio.create_task(_process_single_file_analysis(fn, content))
+                for fn, content in chunk
+            ]
+            outcomes = await asyncio.gather(*tasks, return_exceptions=True)
+            for outcome in outcomes:
+                if isinstance(outcome, BaseException):
+                    logger.error(
+                        "Analysis task failed",
+                        exc_info=outcome,
+                    )
 
         # Flush all buffered call operations (inserts, deletes, moves) in one final batch
-        await body_parser.flush_buffers()
+        try:
+            await body_parser.flush_buffers()
+        except Exception:
+            logger.exception(
+                "Final call-graph flush failed; some call edges may be missing until next sync"
+            )

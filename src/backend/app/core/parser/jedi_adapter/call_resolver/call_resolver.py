@@ -58,6 +58,18 @@ class CallHierarchyResolver:
     def __init__(self, jedi_manager: JediProjectManager):
         self.jedi_manager = jedi_manager
 
+    @staticmethod
+    def _is_class_callee(callee) -> bool:
+        """True if the callee should use ClassSchema (not FunctionSchema).
+
+        Jedi often sets ``is_function()`` for class constructor calls; ``api_type``
+        and the Parso ``Class`` node are more reliable.
+        """
+        if getattr(callee, "api_type", None) == "class":
+            return True
+        tree_node = getattr(callee, "tree_node", None)
+        return isinstance(tree_node, Class)
+
     def resolve_call_hierarchy(self, file_path: str, call_positions) -> CallFrameStack:
         self.call_frame_stack = CallFrameStack(
             target_qname="root", target_id="root", children=[])
@@ -147,8 +159,21 @@ class CallHierarchyResolver:
                         continue
                     if call_frame_stack.is_ancestor(qname):
                         continue
+
+                    # Class vs function: Jedi often reports class constructors as
+                    # is_function() == True, so we must detect class *before* that
+                    # branch. Also trust Parso: class definitions use Class nodes.
+                    is_class_target = self._is_class_callee(callee_for_args)
+                    schema_prefix = (
+                        ClassSchema.__name__
+                        if is_class_target
+                        else FunctionSchema.__name__
+                    )
                     new_call_frame = CallFrameStack(
-                        target_qname=qname, target_id=f"{FunctionSchema.__name__}/{target_id}", children=[])
+                        target_qname=qname,
+                        target_id=f"{schema_prefix}/{target_id}",
+                        children=[],
+                    )
                     current_call_frame = call_frame_stack.add_child(
                         new_call_frame)
 
@@ -161,7 +186,34 @@ class CallHierarchyResolver:
                             call_context,
                         )
 
-                    if callee_for_args.is_function():
+                    if is_class_target:
+                        inits = callee_for_args.py__getattribute__("__init__")
+                        created_instance = TreeInstance(
+                            self.inference_state,
+                            callee_for_args.parent_context,
+                            callee_for_args,
+                            arguments,
+                        )
+                        if inits:
+
+                            init_method = list(inits)[0]
+                            bound_method = BoundMethod(
+                                created_instance, callee_for_args, init_method
+                            )
+                            init_tree_node = getattr(
+                                init_method, "tree_node", None)
+
+                            if arguments:
+                                execution_context = bound_method.as_context(
+                                    arguments
+                                )
+                            else:
+                                execution_context = bound_method.as_context()
+
+                            self._analyze_function(
+                                init_tree_node, execution_context, current_call_frame
+                            )
+                    elif callee_for_args.is_function():
                         if arguments:
                             function_context = callee_for_args.as_context(
                                 arguments)
@@ -179,34 +231,6 @@ class CallHierarchyResolver:
                             function_context,
                             current_call_frame
                         )
-                    elif callee_for_args.api_type == "class":
-                        new_call_frame.target_id = f"{ClassSchema.__name__}/{target_id}"
-                        inits = callee_for_args.py__getattribute__("__init__")
-                        created_instance = TreeInstance(
-                            self.inference_state,
-                            callee_for_args.parent_context,
-                            callee_for_args,
-                            arguments,
-                        )
-                        if inits:
-
-                            init_method = list(inits)[0]
-                            bound_method = BoundMethod(
-                                created_instance, callee_for_args, init_method
-                            )
-                            init_tree_node = getattr(
-                                init_method, "tree_node", None)
-                            # init_id = self._extract_id_from_docstring(init_method)
-
-                            if arguments:
-                                execution_context = bound_method.as_context(
-                                    arguments
-                                )
-                            else:
-                                execution_context = bound_method.as_context()
-
-                            self._analyze_function(
-                                init_tree_node, execution_context, current_call_frame)
                 except Exception:
                     logger.exception(
                         "Failed to process callee at %s:%s in %s; continuing",

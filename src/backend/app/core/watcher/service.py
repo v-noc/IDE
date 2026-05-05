@@ -178,6 +178,7 @@ class WatcherService:
 
             except Exception as e:
                 logger.error(f"Error resyncing {project_node.name}: {e}")
+
                 emit_sync_event(
                     "sync_error",
                     {"message": str(e), "project_id": project_id}

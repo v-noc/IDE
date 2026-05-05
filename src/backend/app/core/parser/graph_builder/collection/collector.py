@@ -128,29 +128,44 @@ class Collector:
             # 3. Parse via language driver (inject IDs + AST + optional MRO)
             try:
                 with tracker.timer("collector.process_file.scan_ast"):
-                    driver = await self.driver_manager.get_driver(str(abs_path))
+                    driver = await self.driver_manager.get_driver(
+                        str(abs_path)
+                    )
                     parse_result = await driver.parse_file(
                         str(abs_path), content, resolve_mro=True
                     )
 
                     ast_nodes = parse_result.nodes
+
                     processed_content = parse_result.content
             except Exception as e:
-                logger.error(
+                print(
                     f"Failed to scan AST for {file_node.path}: {e}")
                 return None
 
             # 4. Sync Content
             with tracker.timer("collector.process_file.sync_content"):
-                structure_batch_plan = await self.ast_processor.sync_content(
-                    file_node,
-                    ast_nodes,
-                    content=processed_content,
-                    progress_tracker=progress_tracker,
-                )
+                try:
+                    structure_batch_plan = (
+                        await self.ast_processor.sync_content(
+                            file_node,
+                            ast_nodes,
+                            content=processed_content,
+                            progress_tracker=progress_tracker,
+                        )
+                    )
+                except Exception:
+                    logger.exception(
+                        "AST/sync_content failed for %s; skipping file",
+                        file_node.path,
+                    )
+                    return None
                 file_node_for_phase2 = (
                     file_node
-                    if (structure_batch_plan.insert or structure_batch_plan.update)
+                    if (
+                        structure_batch_plan.insert
+                        or structure_batch_plan.update
+                    )
                     else None
                 )
                 return CollectionResult(
