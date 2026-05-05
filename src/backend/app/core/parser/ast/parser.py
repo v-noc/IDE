@@ -122,15 +122,19 @@ class JediParser:
 
         return unique_nodes
 
-    def _visit_class(self, node: Class) -> ClassNode:
+    def _visit_class(self, node: Class) -> Optional[ClassNode]:
+        raw_id = self._extract_id(node)
+
+        if not raw_id:
+            return None
         return ClassNode(
-            id=f"{ClassSchema.__name__}/{self._extract_id(node)}",
+            id=f"{ClassSchema.__name__}/{raw_id}",
             name=node.name.value,
             position=self._get_position(node),
-            children=self._scan_children(node)
+            children=self._scan_children(node),
         )
 
-    def _visit_function(self, node: Function) -> FunctionNode:
+    def _visit_function(self, node: Function) -> Optional[FunctionNode]:
         if node.type == 'lambdef':
             return None
         target_node = node
@@ -139,11 +143,14 @@ class JediParser:
         if node.parent and node.parent.type == 'async_stmt':
             position = self._get_position(node.parent)
 
+        raw_id = self._extract_id(target_node)
+        if not raw_id:
+            return None
         return FunctionNode(
-            id=f"{FunctionSchema.__name__}/{self._extract_id(target_node)}",
+            id=f"{FunctionSchema.__name__}/{raw_id}",
             name=node.name.value,
             position=position,
-            children=self._scan_children(target_node)
+            children=self._scan_children(target_node),
         )
 
     def _get_clean_code(self, node) -> str:

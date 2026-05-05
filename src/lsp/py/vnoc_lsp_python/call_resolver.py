@@ -52,6 +52,15 @@ class CallFrameStack(BaseModel):
             current = current.parent
         return False
 
+    def to_json_tree(self) -> dict:
+        """RPC dict without ``parent`` (``model_dump`` would hit circular refs)."""
+        return {
+            "target_qname": self.target_qname,
+            "target_id": self.target_id,
+            "call_count": self.call_count,
+            "children": [c.to_json_tree() for c in self.children],
+        }
+
 
 class CallHierarchyResolver:
     def __init__(self, jedi_manager: JediProjectManager):
@@ -200,19 +209,23 @@ class CallHierarchyResolver:
                             self._analyze_function(
                                 init_tree_node, execution_context, current_call_frame
                             )
-                except Exception:
-                    logger.exception(
-                        "Failed to process callee at %s:%s in %s; continuing",
+                except Exception as e:
+                    logger.warning(
+                        "Failed to process callee at %s:%s in %s: %s",
                         line,
                         col,
                         getattr(self, "file_path", "<unknown>"),
+                        e,
+                        exc_info=logger.isEnabledFor(logging.DEBUG),
                     )
-        except Exception:
-            logger.exception(
-                "Failed to resolve node at %s:%s in %s; continuing",
+        except Exception as e:
+            logger.warning(
+                "Failed to resolve node at %s:%s in %s: %s",
                 line,
                 col,
                 getattr(self, "file_path", "<unknown>"),
+                e,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
             )
 
     def _analyze_function(self, function_node, function_context, call_frame_stack):

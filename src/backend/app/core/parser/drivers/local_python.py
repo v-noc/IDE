@@ -89,14 +89,32 @@ class LocalPythonDriver:
     ) -> ParseResult:
 
         def _run() -> ParseResult:
-            nodes, processed_content, modified = scan_with_meta(content, file_path)
-            if resolve_mro:
-                _apply_mro_to_classes(
-                    nodes, file_path, processed_content, self._mro_resolver
+            try:
+                nodes, processed_content, modified = scan_with_meta(
+                    content, file_path
                 )
-            return ParseResult(
-                nodes=nodes, content=processed_content, modified=modified
-            )
+                if resolve_mro:
+                    _apply_mro_to_classes(
+                        nodes, file_path, processed_content, self._mro_resolver
+                    )
+                return ParseResult(
+                    nodes=nodes, content=processed_content, modified=modified
+                )
+            except RecursionError:
+                logger.warning(
+                    "Parse aborted (recursion limit) for %s; skipping AST/MRO. "
+                    "Often caused by Jedi inference on complex or pytest-heavy code.",
+                    file_path,
+                    exc_info=True,
+                )
+                return ParseResult(nodes=[], content=content, modified=False)
+            except Exception:
+                logger.warning(
+                    "Parse failed for %s; returning empty AST so the pipeline can continue.",
+                    file_path,
+                    exc_info=True,
+                )
+                return ParseResult(nodes=[], content=content, modified=False)
 
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, _run)

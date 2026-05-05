@@ -28,14 +28,15 @@ def build_app():
     api = jsonrpc.API()
     entry = build_entrypoint(service)
     api.bind_entrypoint(entry)
-    return api.app
+    return api
 
 
 def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO)
-    p = argparse.ArgumentParser(description="v-noc Python language driver (JSON-RPC)")
+    p = argparse.ArgumentParser(
+        description="v-noc Python language driver (JSON-RPC)")
     p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=0, help="0 = auto free port")
+    p.add_argument("--port", type=int, default=9002, help="0 = auto free port")
     args = p.parse_args(argv)
 
     port = _pick_port(args.port)

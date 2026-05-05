@@ -124,7 +124,7 @@ class PythonDriverService:
             except Exception:
                 logger.exception("resolve_calls failed for one call site")
 
-        return {"call_frame_stack": merged.model_dump(mode="json")}
+        return {"call_frame_stack": merged.to_json_tree()}
 
     def read_or_inject_file_id(self, file_path: str) -> dict:
         fid, modified = read_or_inject_file_id(Path(file_path))
