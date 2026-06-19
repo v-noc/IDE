@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, getApiErrorStatus } from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 import type { ProjectNodeTree } from "@/types/project";
 import { useQuery } from "@tanstack/react-query";
@@ -47,6 +47,8 @@ export const useGetProjectFullTree = ({ key }: ProjectTreeQueryParams) => {
     queryKey: queryKeys.projects.tree(key, branch, ref, compareTo),
     queryFn: () => fetchProjectFullTree({ key, compareTo }),
     enabled: key != null && key.length > 0,
+    retry: (failureCount, error) =>
+      getApiErrorStatus(error) === 404 ? false : failureCount < 3,
   });
 };
 
@@ -68,6 +70,8 @@ export const useGetProjectStructureTree = ({ key }: ProjectTreeQueryParams) => {
     ),
     queryFn: () => fetchProjectStructureTree({ key, compareTo }),
     enabled: key != null && key.length > 0,
+    retry: (failureCount, error) =>
+      getApiErrorStatus(error) === 404 ? false : failureCount < 3,
   });
 };
 

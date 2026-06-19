@@ -4,7 +4,7 @@ import { isWriteHttpMethod } from "@/lib/readOnlyMode";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   status: number;
   response: unknown;
   constructor(message: string, status: number, response: unknown) {
@@ -13,6 +13,15 @@ class ApiError extends Error {
     this.status = status;
     this.response = response;
   }
+}
+
+export function getApiErrorStatus(error: unknown): number | undefined {
+  if (error instanceof ApiError) return error.status;
+  if (typeof error === "object" && error !== null && "status" in error) {
+    const status = (error as { status: unknown }).status;
+    return typeof status === "number" ? status : undefined;
+  }
+  return undefined;
 }
 
 type JsonRequestInit = Omit<RequestInit, "body"> & { body?: unknown };

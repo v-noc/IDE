@@ -1,5 +1,7 @@
 import { useEffect, useEffectEvent, useMemo, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+
+import { getApiErrorStatus } from "@/lib/api";
 
 import { useGetProjectStructureTree } from "@/features/Dashboard/service/useProject";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
@@ -34,6 +36,7 @@ function filterAffectedTree(nodes: AnyNodeTree[]): AnyNodeTree[] {
 
 export function useSidebarData() {
   const { projectId } = useParams();
+  const navigate = useNavigate();
 
   const setProjectData = useProjectStore((s) => s.setProjectData);
   const rawProjectData = useProjectStore((s) => s.projectData);
@@ -46,9 +49,16 @@ export function useSidebarData() {
   const showAffectedOnly = useVersioningStore((s) => s.showAffectedOnly);
   const projectKey = projectId ? `ProjectSchema/${projectId}` : "";
 
-  const { data, isLoading, isPending, isSuccess } = useGetProjectStructureTree({
-    key: projectKey,
-  });
+  const { data, isLoading, isPending, isSuccess, isError, error } =
+    useGetProjectStructureTree({
+      key: projectKey,
+    });
+
+  useEffect(() => {
+    if (!isError || getApiErrorStatus(error) !== 404) return;
+    setProjectData(null);
+    navigate("/", { replace: true });
+  }, [isError, error, navigate, setProjectData]);
 
   /*
    * Sync server data to store.
