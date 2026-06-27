@@ -1,6 +1,9 @@
 <div align="center">
 
-# V-NOC
+<h1>
+  <img src="assets/icon.svg" alt="V-NOC" width="48" height="48" style="vertical-align: middle; margin-left: 0.25em;" />
+  V-NOC
+</h1>
 
 ### The Graph-Based IDE
 
