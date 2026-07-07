@@ -33,6 +33,11 @@ import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/find
 import type { AnyNodeTree } from "@/types/project";
 import { useShallow } from "zustand/react/shallow";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
+import {
+  registerCanvas,
+  unregisterCanvas,
+} from "@/features/Dashboard/features/Agent/walkthrough/executor/canvasRegistry";
+import { useWalkthroughStore } from "@/features/Dashboard/features/Agent/walkthrough/store/useWalkthroughStore";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
@@ -233,6 +238,17 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstanceRef.current = instance;
+    registerCanvas(tabId, instance);
+  }, [tabId]);
+
+  useEffect(() => {
+    return () => unregisterCanvas(tabId);
+  }, [tabId]);
+
+  const onMoveStart = useCallback(() => {
+    if (useWalkthroughStore.getState().phase === "playing") {
+      useWalkthroughStore.getState().setUserInteracted(true);
+    }
   }, []);
 
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -285,6 +301,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onInit={onInit}
+        onMoveStart={onMoveStart}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeClick={onNodeClick}
         nodesDraggable={true}

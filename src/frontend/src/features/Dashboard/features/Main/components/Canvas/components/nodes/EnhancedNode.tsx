@@ -168,6 +168,9 @@ const EnhancedNode = memo(function EnhancedNode({
                 (statusStyles.borderColor as string) || data.borderColor
               }
               iconColor={(statusStyles.color as string) || data.iconColor}
+              nodeId={data.nodeId ?? ""}
+              nodeStartLine={nodeCode.nodeStartLine}
+              isWalkthroughPlaying={nodeCode.isWalkthroughPlaying}
             />
           ) : (
             <NodeDescription

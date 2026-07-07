@@ -211,3 +211,13 @@
   background-color: rgb(255 255 255 / 0.06);
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
 }
+
+/* Walkthrough Monaco line decorations */
+.monaco-editor .walkthrough-line {
+  background-color: color-mix(in oklch, var(--primary) 18%, transparent);
+  border-left: 3px solid var(--primary);
+}
+
+.monaco-editor .walkthrough-dim {
+  opacity: 0.35;
+}

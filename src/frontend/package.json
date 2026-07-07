@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@blocknote/code-block": "^0.46.1",
@@ -55,6 +57,7 @@
     "date-fns": "^4.1.0",
     "diff": "^8.0.3",
     "driver.js": "^1.4.0",
+    "fast-json-patch": "^3.1.1",
     "immer": "^10.1.1",
     "lucide-react": "^0.532.0",
     "mermaid": "^11.9.0",
@@ -95,6 +98,7 @@
     "tw-animate-css": "^1.3.6",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^4.1.10"
   }
 }
