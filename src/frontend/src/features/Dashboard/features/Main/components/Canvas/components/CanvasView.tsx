@@ -38,6 +38,7 @@ import {
   unregisterCanvas,
 } from "@/features/Dashboard/features/Agent/walkthrough/executor/canvasRegistry";
 import { useWalkthroughStore } from "@/features/Dashboard/features/Agent/walkthrough/store/useWalkthroughStore";
+import { cn } from "@/lib/utils";
 
 const nodeTypes = {
   enhanced: EnhancedNode,
@@ -90,6 +91,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   const centerNode = selectedNode as SimpleTreeNode | null;
   const projectKey = projectData?.id ?? "";
+  const isTourPlaying = useWalkthroughStore((s) => s.phase === "playing");
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   const layoutConfig = useMemo(
@@ -301,7 +303,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   );
 
   return (
-    <div className="h-full w-full bg-background">
+    <div
+      className={cn(
+        "h-full w-full bg-background",
+        isTourPlaying && "walkthrough-playing",
+      )}
+    >
       <ReactFlow
         colorMode={flowColorMode}
         className="bg-background"

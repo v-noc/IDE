@@ -129,7 +129,7 @@ const EnhancedNode = memo(function EnhancedNode({
       </NodeToolbar>
 
       <div
-      className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${
+      className={`walkthrough-node relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${
         selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
       } ${isCurrentStepNodeVisible ? "walkthrough-current-node" : ""}`}
       style={{

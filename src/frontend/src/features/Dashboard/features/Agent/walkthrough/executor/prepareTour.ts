@@ -9,11 +9,30 @@ export async function prepareTour(
   tabId: string,
   session: WalkthroughSession,
 ): Promise<void> {
+  const visits = session.visit_list.nodes;
+  if (visits.length === 0) return;
+
   const failedIds: string[] = [];
 
-  for (const visit of session.visit_list.nodes) {
+  try {
+    const root = await ensureOnCanvas(
+      queryClient,
+      tabId,
+      visits[0].node_id,
+      { reroot: true },
+    );
+    if (!root) {
+      failedIds.push(visits[0].node_id);
+    }
+  } catch {
+    failedIds.push(visits[0].node_id);
+  }
+
+  for (const visit of visits.slice(1)) {
     try {
-      const node = await ensureOnCanvas(queryClient, tabId, visit.node_id);
+      const node = await ensureOnCanvas(queryClient, tabId, visit.node_id, {
+        reroot: false,
+      });
       if (!node) {
         failedIds.push(visit.node_id);
       }
@@ -22,19 +41,8 @@ export async function prepareTour(
     }
   }
 
-  const stopIds = session.visit_list.nodes.map((visit) => visit.node_id);
-  if (stopIds.length > 0) {
-    useProjectStore.getState().expandNodesBulk(tabId, stopIds);
-  }
-
-  const rootId = session.visit_list.nodes[0]?.node_id;
-  if (rootId) {
-    try {
-      await ensureOnCanvas(queryClient, tabId, rootId);
-    } catch {
-      // best-effort restore focus to tour root
-    }
-  }
+  const stopIds = visits.map((visit) => visit.node_id);
+  useProjectStore.getState().expandNodesBulk(tabId, stopIds);
 
   if (failedIds.length > 0) {
     toast.error(`${failedIds.length} stops could not be loaded`);

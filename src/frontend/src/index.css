@@ -228,6 +228,23 @@
   outline-offset: 2px;
 }
 
+/* Walkthrough spotlight: dim everything except the current stop */
+.walkthrough-playing .walkthrough-node {
+  opacity: 0.3;
+  filter: saturate(0.6);
+  transition: opacity 0.25s ease, filter 0.25s ease;
+}
+
+.walkthrough-playing .walkthrough-node.walkthrough-current-node {
+  opacity: 1;
+  filter: none;
+}
+
+.walkthrough-playing .react-flow__edge {
+  opacity: 0.2;
+  transition: opacity 0.25s ease;
+}
+
 @keyframes walkthrough-focus-ring {
   0%,
   100% {

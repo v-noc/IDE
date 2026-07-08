@@ -68,7 +68,8 @@ async function runActions(
   cursor: number,
 ) {
   const store = useWalkthroughStore.getState();
-  const setSelectedNode = useProjectStore.getState().setSelectedNode;
+  const setSecondarySelectedNode =
+    useProjectStore.getState().setSecondarySelectedNode;
 
   let highlight: { nodeId: string; startLine: number; endLine: number } | null =
     null;
@@ -76,12 +77,14 @@ async function runActions(
 
   for (const action of actions) {
     if (action.type === "select_node") {
-      const node = await ensureOnCanvas(queryClient, tabId, action.nodeId);
+      const node = await ensureOnCanvas(queryClient, tabId, action.nodeId, {
+        reroot: false,
+      });
       if (!node) {
         toast.error(`Could not load node: ${action.nodeId}`);
         return false;
       }
-      setSelectedNode(tabId, node);
+      setSecondarySelectedNode(tabId, node);
       continue;
     }
 

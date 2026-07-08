@@ -5,15 +5,22 @@ import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/find
 import { resolveLineageFromPath } from "@/features/Dashboard/utils/resolveLineageFromPath";
 import type { AnyNodeTree, ProjectNodeTree } from "@/types/project";
 
+export interface EnsureOnCanvasOptions {
+  /** When true, re-root via focus stack (call-portal flow). Default false. */
+  reroot?: boolean;
+}
+
 /**
  * Ensures a node exists on the canvas, injecting ancestors via lineage when needed.
- * Mirrors the call-portal / deep-link focus flow.
+ * With `reroot: false` (default), expansion only — no focus or primary selection writes.
  */
 export async function ensureOnCanvas(
   queryClient: QueryClient,
   tabId: string,
   nodeId: string,
+  opts: EnsureOnCanvasOptions = {},
 ): Promise<AnyNodeTree | null> {
+  const { reroot = false } = opts;
   const projectData = useProjectStore.getState().projectData;
   const projectKey = projectData?.id ?? "";
   if (!projectKey || !projectData) return null;
@@ -39,12 +46,15 @@ export async function ensureOnCanvas(
     if (!lineage?.length) return null;
 
     const store = useProjectStore.getState();
-    store.clearFocus(tabId);
-    store.pushFocusBulk(tabId, lineage);
-    store.expandNodesBulk(
-      tabId,
-      lineage.map((node) => node.id),
-    );
+    const lineageIds = lineage.map((node) => node.id);
+
+    if (reroot) {
+      store.clearFocus(tabId);
+      store.pushFocusBulk(tabId, lineage);
+      store.expandNodesBulk(tabId, lineageIds);
+    } else {
+      store.expandNodesBulk(tabId, lineageIds);
+    }
 
     return lineage[lineage.length - 1];
   } catch {
