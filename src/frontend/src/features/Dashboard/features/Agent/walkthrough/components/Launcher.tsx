@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
@@ -56,10 +56,25 @@ export function Launcher() {
     }
   }, [depth, projectId, selectedNode]);
 
+  useEffect(() => {
+    setEstimate(null);
+    setEstimateError(null);
+  }, [selectedNode?.id, depth]);
+
+  useEffect(() => {
+    if (!selectedNode || !projectId) return;
+
+    const timer = window.setTimeout(() => {
+      void loadEstimate();
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [selectedNode?.id, depth, projectId, loadEstimate]);
+
   const handleGenerate = () => {
     if (!selectedNode || !projectId) return;
 
-    if (phase !== "idle" && phase !== "ready" && phase !== "error") {
+    if (useWalkthroughStore.getState().session != null) {
       const confirmed = window.confirm(
         "Discard the current walkthrough and generate a new one?",
       );

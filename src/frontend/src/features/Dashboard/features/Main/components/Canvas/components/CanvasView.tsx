@@ -140,6 +140,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     })),
   });
 
+  const descendantsDataKey = descendantQueries
+    .map((query) => query.dataUpdatedAt)
+    .join("|");
+
   const lazyChildrenByParentId = useMemo(() => {
     const m = new Map<string, AnyNodeTree[]>();
     lazyParentIds.forEach((parentId, i) => {
@@ -149,7 +153,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({
       }
     });
     return m;
-  }, [lazyParentIds, descendantQueries]);
+    // descendantsDataKey tracks descendant DATA changes; the query array identity
+    // changes every render and must not be a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lazyParentIds, descendantsDataKey]);
 
   const { initialNodes, initialEdges } = useEnhancedTreeLayout({
     centerNode: centerNode,
@@ -202,6 +209,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const lastCenteredTargetIdRef = useRef<string | null>(null);
 
   const centerOnTarget = useEffectEvent(() => {
+    if (useWalkthroughStore.getState().phase === "playing") return;
+
     const nodeId = centerNode?.id;
     if (!nodeId || nodes.length === 0 || !reactFlowInstanceRef.current) {
       return;
@@ -245,7 +254,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     return () => unregisterCanvas(tabId);
   }, [tabId]);
 
-  const onMoveStart = useCallback(() => {
+  const onMoveStart = useCallback((event?: MouseEvent | TouchEvent | null) => {
+    if (!event) return;
     if (useWalkthroughStore.getState().phase === "playing") {
       useWalkthroughStore.getState().setUserInteracted(true);
     }

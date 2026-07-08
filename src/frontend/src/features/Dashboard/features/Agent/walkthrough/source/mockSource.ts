@@ -1,18 +1,14 @@
-import smallFunctionFixture from "../fixtures/smallFunction.json";
-import classWithCallFixture from "../fixtures/classWithCall.json";
-import type { Estimate, Frame, MockFixture, RunRequest } from "../types";
-import { mockFixtureSchema } from "../types";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { queryClient } from "@/lib/queryClient";
+import type { ProjectNodeTree } from "@/types/project";
+import type { Frame, RunRequest } from "../types";
 import type { WalkthroughSource } from "./types";
-
-const FIXTURES: Record<string, MockFixture> = {
-  smallFunction: mockFixtureSchema.parse(smallFunctionFixture),
-  classWithCall: mockFixtureSchema.parse(classWithCallFixture),
-};
-
-function pickFixture(req: RunRequest): MockFixture {
-  // Use the richer fixture when depth > 0; otherwise the minimal tour.
-  return req.depth > 0 ? FIXTURES.classWithCall : FIXTURES.smallFunction;
-}
+import {
+  buildMockSession,
+  buildMockVisitList,
+  computeMockEstimate,
+  generateMockFrames,
+} from "./mockGenerator";
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -31,15 +27,43 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+function requireProjectContext(req: RunRequest): {
+  projectData: ProjectNodeTree;
+  projectKey: string;
+} {
+  const projectData = useProjectStore.getState().projectData;
+  if (!projectData?.id || projectData.id !== req.project_id) {
+    throw new Error("Project data is not loaded");
+  }
+  return { projectData, projectKey: projectData.id };
+}
+
 export const mockSource: WalkthroughSource = {
   async estimate(req) {
-    return pickFixture(req).estimate;
+    const { projectData, projectKey } = requireProjectContext(req);
+    const visitList = await buildMockVisitList(
+      queryClient,
+      projectData,
+      projectKey,
+      req.node_id,
+      req.depth,
+    );
+    return computeMockEstimate(visitList);
   },
 
   async run(req, onFrame, signal) {
-    const fixture = pickFixture(req);
+    const { projectData, projectKey } = requireProjectContext(req);
+    const visitList = await buildMockVisitList(
+      queryClient,
+      projectData,
+      projectKey,
+      req.node_id,
+      req.depth,
+    );
+    const session = buildMockSession(req, visitList);
+    const frames = generateMockFrames(session);
 
-    for (const entry of fixture.frames) {
+    for (const entry of frames) {
       await sleep(entry.delay, signal);
       onFrame(entry.frame as Frame);
     }

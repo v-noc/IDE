@@ -51,6 +51,7 @@ class VisitList(BaseModel):
     start_node_id: str
     depth: int
     nodes: list[VisitNode]
+    truncated: bool = False
 
 
 class EstimateResponse(Estimate):

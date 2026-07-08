@@ -36,10 +36,10 @@ async def structured_call(
     validate = validate or (lambda _: [])
     error_log: list[str] = []
     prompt = user
+    llm = make_llm(call_type)
 
     for attempt in range(2):
         try:
-            llm = make_llm(call_type)
             result = await llm.invoke_structured(schema, system, prompt)
             issues = validate(result)
             if issues:

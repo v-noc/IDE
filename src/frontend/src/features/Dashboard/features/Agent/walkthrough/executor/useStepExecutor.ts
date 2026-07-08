@@ -1,5 +1,4 @@
 import { useEffect, useEffectEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
@@ -7,32 +6,69 @@ import type { Action } from "../types";
 import { useWalkthroughStore } from "../store/useWalkthroughStore";
 import { ensureOnCanvas } from "./ensureOnCanvas";
 import { getCanvasInstance } from "./canvasRegistry";
+import { isNodeFullyInViewport } from "./viewport";
+import { queryClient } from "@/lib/queryClient";
 
-function panToNode(tabId: string, nodeId: string) {
+function getCanvasSize(): { width: number; height: number } | null {
+  const pane = document.querySelector(".react-flow") as HTMLElement | null;
+  if (!pane) return null;
+  return { width: pane.clientWidth, height: pane.clientHeight };
+}
+
+function moveCameraToStep(
+  tabId: string,
+  nodeId: string,
+  isTourRoot: boolean,
+  attempts = 0,
+) {
+  if (useWalkthroughStore.getState().phase !== "playing") return;
+  if (attempts > 60) return;
+
   const instance = getCanvasInstance(tabId);
   if (!instance) return;
 
   const rfNode = instance.getNode(nodeId);
   if (!rfNode?.measured?.width) {
-    requestAnimationFrame(() => panToNode(tabId, nodeId));
+    requestAnimationFrame(() =>
+      moveCameraToStep(tabId, nodeId, isTourRoot, attempts + 1),
+    );
     return;
   }
 
-  instance.setCenter(
-    rfNode.position.x + (rfNode.measured.width ?? 0) / 2,
-    rfNode.position.y + (rfNode.measured.height ?? 0) / 2,
-    { zoom: 1, duration: 500 },
-  );
+  const width = rfNode.measured.width ?? 0;
+  const height = rfNode.measured.height ?? 0;
+  const cx = rfNode.position.x + width / 2;
+  const cy = rfNode.position.y + height / 2;
+
+  if (isTourRoot) {
+    instance.setCenter(cx, cy, { zoom: 1, duration: 500 });
+    return;
+  }
+
+  const canvas = getCanvasSize();
+  const viewport = instance.getViewport();
+  if (
+    canvas &&
+    isNodeFullyInViewport(viewport, canvas, {
+      x: rfNode.position.x,
+      y: rfNode.position.y,
+      width,
+      height,
+    })
+  ) {
+    return;
+  }
+
+  instance.setCenter(cx, cy, { zoom: instance.getZoom(), duration: 600 });
 }
 
 async function runActions(
   tabId: string,
   actions: Action[],
-  queryClient: ReturnType<typeof useQueryClient>,
+  cursor: number,
 ) {
   const store = useWalkthroughStore.getState();
-  const handleNodeSelection = useTabStore.getState().handleNodeSelection;
-  const expandNode = useProjectStore.getState().expandNode;
+  const setSelectedNode = useProjectStore.getState().setSelectedNode;
 
   let highlight: { nodeId: string; startLine: number; endLine: number } | null =
     null;
@@ -45,12 +81,11 @@ async function runActions(
         toast.error(`Could not load node: ${action.nodeId}`);
         return false;
       }
-      handleNodeSelection(tabId, node, "primary");
+      setSelectedNode(tabId, node);
       continue;
     }
 
     if (action.type === "show_code") {
-      expandNode(tabId, action.nodeId);
       codeOpenNodeId = action.nodeId;
       continue;
     }
@@ -74,7 +109,7 @@ async function runActions(
       actions.find((a) => a.type === "show_code")?.nodeId;
 
     if (targetNodeId) {
-      panToNode(tabId, targetNodeId);
+      moveCameraToStep(tabId, targetNodeId, cursor === 0);
     }
   }
 
@@ -85,7 +120,6 @@ async function runActions(
  * Reacts to cursor changes and drives canvas actions for the current step.
  */
 export function useStepExecutor() {
-  const queryClient = useQueryClient();
   const cursor = useWalkthroughStore((s) => s.cursor);
   const phase = useWalkthroughStore((s) => s.phase);
   const tabId = useWalkthroughStore((s) => s.tabId);
@@ -99,7 +133,7 @@ export function useStepExecutor() {
 
     useTabStore.getState().setActiveTabId(state.tabId);
 
-    const ok = await runActions(state.tabId, step.actions, queryClient);
+    const ok = await runActions(state.tabId, step.actions, state.cursor);
     if (!ok) return;
   });
 

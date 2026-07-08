@@ -4,6 +4,7 @@ from app.walkthrough.graph import GraphNode
 from app.walkthrough.traversal import (
     LINE_GATE,
     VISIT_CAP,
+    block_bounds,
     build_visit_list,
     compute_estimate,
 )
@@ -108,15 +109,41 @@ def test_estimate_arithmetic():
     assert est.over_cap is False
 
 
+def test_block_bounds_values():
+    assert block_bounds(7) == (2, 2)
+    assert block_bounds(10) == (2, 2)
+    assert block_bounds(30) == (2, 6)
+
+
 def test_over_cap_flag():
+    child_ids = [f"fn{i}" for i in range(50)]
     nodes = [
-        GraphNode(f"n{i}", f"n{i}", f"n{i}", "function", "x", [f"n{i+1}"], 1, 5)
-        for i in range(VISIT_CAP + 5)
+        GraphNode(
+            "file",
+            "wide.py",
+            "wide.py",
+            "file",
+            "file",
+            child_ids,
+            1,
+            200,
+        ),
     ]
-    for i in range(len(nodes) - 1):
-        nodes[i].children = [nodes[i + 1].id]
+    for index, child_id in enumerate(child_ids):
+        nodes.append(
+            GraphNode(
+                child_id,
+                f"fn{index}",
+                f"fn{index}",
+                "function",
+                "x",
+                [],
+                index + 2,
+                index + 10,
+            ),
+        )
     graph = _g(nodes)
-    visit = build_visit_list(graph, nodes[0].id, depth=VISIT_CAP + 5)
+    visit = build_visit_list(graph, "file", depth=1)
     est = compute_estimate(visit)
     assert est.over_cap is True
     assert len(visit.nodes) == VISIT_CAP

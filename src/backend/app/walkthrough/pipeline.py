@@ -45,7 +45,12 @@ async def _load_numbered_code(
 ) -> str | None:
     if not visit.has_code or visit.start_line is None:
         return None
-    payload = await code_service.get_code(visit.node_id)
+    code_node_id = (
+        visit.target_id
+        if visit.node_type == "call" and visit.target_id
+        else visit.node_id
+    )
+    payload = await code_service.get_code(code_node_id)
     if not payload or not payload.get("code"):
         return None
     return _numbered_code(payload["code"], visit.start_line)
@@ -88,6 +93,16 @@ async def run_pipeline(
 
         if not visit.gated:
             plan = single_block_plan(visit)
+        elif numbered_code is None:
+            plan_degraded = True
+            min_blocks, max_blocks = ctx.min_blocks, ctx.max_blocks
+            error_log.append(f"code unavailable for {visit.node_id}")
+            plan = even_split_plan(
+                visit.start_line or 1,
+                visit.end_line or (visit.start_line or 1),
+                min_blocks=min_blocks,
+                max_blocks=max_blocks,
+            )
         else:
             plan_ctx = build_context(
                 visit,
@@ -133,6 +148,8 @@ async def run_pipeline(
                 visit_list,
                 numbered_code,
                 block.focus,
+                block.start_line,
+                block.end_line,
                 previous_focus,
             )
             text_result, text_errors = await structured_call(
@@ -164,10 +181,14 @@ def _block_text_context(
     visit_list: VisitList,
     numbered_code: str | None,
     block_focus: str,
+    block_start: int,
+    block_end: int,
     previous_focus: list[str],
 ) -> NodeContext:
     ctx = build_context(visit, visit_list_len=len(visit_list.nodes))
     ctx.numbered_code = numbered_code
     ctx.block_focus = block_focus
+    ctx.block_start = block_start
+    ctx.block_end = block_end
     ctx.previous_focus_lines = list(previous_focus)
     return ctx

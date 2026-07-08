@@ -29,6 +29,7 @@ Each file covers one domain and nothing else.
 | 10 | [10-implementation-steps.md](10-implementation-steps.md) | Delivery | Build order, phase by phase. |
 | — | [frontend/](frontend/README.md) | Frontend (detailed) | Concrete build plan against the existing React code: folders, wire + mock sources, store, canvas injection, edge cases, build order. Supersedes 09 where they differ. |
 | — | [backend/](backend/README.md) | Backend (detailed) | Concrete build plan against the existing FastAPI code: folders, the configurable LLM provider layer (OpenAI / Vercel gateway / custom / fake), routes + patcher + NDJSON transport, persistence, testing, build order. |
+| — | [fixes/](fixes/README.md) | Review + fixes | Findings from reviewing the first implementation, as a verify-first fix guide: mock mode on real node data, play-flow/step-card UI, frontend and backend correctness bugs (3 with failing tests), verification checklist. |
 
 ## The pipeline in one picture
 

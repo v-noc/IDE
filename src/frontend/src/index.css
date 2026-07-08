@@ -221,3 +221,19 @@
 .monaco-editor .walkthrough-dim {
   opacity: 0.35;
 }
+
+.walkthrough-current-node {
+  animation: walkthrough-focus-ring 2s ease-in-out infinite;
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}
+
+@keyframes walkthrough-focus-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(251, 191, 36, 0);
+  }
+}

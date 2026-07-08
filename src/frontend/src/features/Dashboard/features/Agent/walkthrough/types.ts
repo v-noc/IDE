@@ -24,6 +24,7 @@ export const nodeTypeSchema = z.enum([
   "class",
   "function",
   "call",
+  "project",
 ]);
 
 export const visitModeSchema = z.enum(["full", "contextual"]);
@@ -51,6 +52,7 @@ export const visitListSchema = z.object({
   start_node_id: z.string(),
   depth: z.number().int(),
   nodes: z.array(visitNodeSchema),
+  truncated: z.boolean().optional(),
 });
 
 // ── Steps ─────────────────────────────────────────────────────────────────────

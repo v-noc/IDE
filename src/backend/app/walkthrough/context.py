@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.walkthrough.schemas import VisitNode
+from app.walkthrough.traversal import block_bounds
 
 
 @dataclass
@@ -24,6 +25,8 @@ class NodeContext:
     start_line: int | None
     end_line: int | None
     block_focus: str | None = None
+    block_start: int | None = None
+    block_end: int | None = None
     previous_focus_lines: list[str] | None = None
 
 
@@ -37,7 +40,7 @@ def build_context(
     if visit.qname:
         header = f"{header} — {visit.qname}"
 
-    min_blocks, max_blocks = _block_bounds(visit.line_count)
+    min_blocks, max_blocks = block_bounds(visit.line_count)
 
     first_seen_ref = None
     if visit.first_seen_order is not None:
@@ -62,8 +65,3 @@ def build_context(
         end_line=visit.end_line,
     )
 
-
-def _block_bounds(line_count: int | None) -> tuple[int, int]:
-    lines = line_count or 0
-    max_blocks = max(2, min(6, lines // 5)) if lines else 2
-    return 2, max_blocks

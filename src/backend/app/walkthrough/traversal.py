@@ -49,10 +49,14 @@ def _code_bounds(
     return None, None, None
 
 
-def _block_bounds(line_count: int | None) -> tuple[int, int]:
+def block_bounds(line_count: int | None) -> tuple[int, int]:
     lines = line_count or 0
-    max_blocks = max(2, min(6, lines // 5))
+    max_blocks = max(2, min(6, lines // 5)) if lines else 2
     return 2, max_blocks
+
+
+def _block_bounds(line_count: int | None) -> tuple[int, int]:
+    return block_bounds(line_count)
 
 
 def _est_blocks(visit: VisitNode) -> int:
@@ -67,7 +71,7 @@ def _est_blocks(visit: VisitNode) -> int:
 def compute_estimate(visit_list: VisitList) -> Estimate:
     nodes = visit_list.nodes
     node_count = len(nodes)
-    over_cap = node_count > VISIT_CAP
+    over_cap = visit_list.truncated or node_count > VISIT_CAP
 
     step_estimate = sum(1 + _est_blocks(node) for node in nodes)
     llm_call_estimate = (
@@ -96,16 +100,15 @@ def build_visit_list(
     explained: dict[str, int] = {}
     visits: list[VisitNode] = []
     order = 0
+    truncated = False
+    total_stops = 0
 
     def visit(
         node_id: str,
         level: int,
         parent_order: int | None,
     ) -> None:
-        nonlocal order
-
-        if len(visits) >= VISIT_CAP:
-            return
+        nonlocal order, truncated, total_stops
 
         node = graph.get(node_id)
         if not node:
@@ -120,7 +123,14 @@ def build_visit_list(
                 visit(child_id, level, parent_order)
             return
 
+        total_stops += 1
+        if len(visits) >= VISIT_CAP:
+            truncated = True
+            return
+
         tid = node.target_id
+        if tid is None and node.kind in ("function", "class"):
+            tid = node.id
         first_seen = explained.get(tid) if tid else None
         mode: Literal["full", "contextual"] = (
             "contextual" if tid and tid in explained else "full"
@@ -179,8 +189,12 @@ def build_visit_list(
 
     visit(start_node_id, 0, None)
 
+    if total_stops > VISIT_CAP:
+        truncated = True
+
     return VisitList(
         start_node_id=start_node_id,
         depth=depth,
         nodes=visits,
+        truncated=truncated,
     )

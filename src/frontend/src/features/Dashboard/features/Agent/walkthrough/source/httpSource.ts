@@ -1,8 +1,46 @@
-import type { Estimate, Frame, RunRequest } from "../types";
+import type { Estimate, Frame } from "../types";
 import { parseFrame } from "../types";
 import type { WalkthroughSource } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
+
+export function parseNdjsonChunk(
+  buffer: string,
+  onFrame: (frame: Frame) => void,
+): string {
+  const lines = buffer.split("\n");
+  const remainder = lines.pop() ?? "";
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    try {
+      const raw = JSON.parse(trimmed) as unknown;
+      const frame = parseFrame(raw);
+      if (frame) onFrame(frame);
+    } catch {
+      console.warn("[walkthrough] bad frame line", line);
+    }
+  }
+
+  return remainder;
+}
+
+export function parseNdjsonTail(
+  tail: string,
+  onFrame: (frame: Frame) => void,
+): void {
+  const trimmed = tail.trim();
+  if (!trimmed) return;
+
+  try {
+    const frame = parseFrame(JSON.parse(trimmed) as unknown);
+    if (frame) onFrame(frame);
+  } catch {
+    console.warn("[walkthrough] bad frame line", tail);
+  }
+}
 
 export const httpSource: WalkthroughSource = {
   async estimate(req) {
@@ -40,23 +78,9 @@ export const httpSource: WalkthroughSource = {
       if (done) break;
 
       buffer += value;
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        const raw = JSON.parse(trimmed) as unknown;
-        const frame = parseFrame(raw);
-        if (frame) onFrame(frame);
-      }
+      buffer = parseNdjsonChunk(buffer, onFrame);
     }
 
-    const tail = buffer.trim();
-    if (tail) {
-      const frame = parseFrame(JSON.parse(tail) as unknown);
-      if (frame) onFrame(frame);
-    }
+    parseNdjsonTail(buffer, onFrame);
   },
 };

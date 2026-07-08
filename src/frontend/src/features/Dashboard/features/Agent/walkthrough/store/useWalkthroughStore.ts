@@ -17,6 +17,8 @@ import {
   firstStepIdForVisit,
 } from "./flatten";
 import { captureSavedView, restoreSavedView } from "../executor/restoreView";
+import { prepareTour } from "../executor/prepareTour";
+import { queryClient } from "@/lib/queryClient";
 
 interface WalkthroughState {
   phase: WalkthroughPhase;
@@ -34,6 +36,9 @@ interface WalkthroughState {
     endLine: number;
   } | null;
   codeOpenNodeId: string | null;
+  pendingAdvance: boolean;
+  preparing: boolean;
+  tourPrepared: boolean;
 
   start: (req: RunRequest, tabId: string) => void;
   applyOps: (ops: Operation[]) => void;
@@ -76,6 +81,9 @@ const initialState = {
   savedView: null,
   highlight: null,
   codeOpenNodeId: null,
+  pendingAdvance: false,
+  preparing: false,
+  tourPrepared: false,
 };
 
 export const useWalkthroughStore = create<WalkthroughState>()(
@@ -137,6 +145,15 @@ export const useWalkthroughStore = create<WalkthroughState>()(
           syncDerived(state);
 
           if (
+            state.pendingAdvance &&
+            state.phase === "playing" &&
+            state.cursor < state.playerSteps.length - 1
+          ) {
+            state.cursor += 1;
+            state.pendingAdvance = false;
+          }
+
+          if (
             state.phase === "playing" &&
             state.cursor >= 0 &&
             state.cursor >= state.playerSteps.length
@@ -147,15 +164,45 @@ export const useWalkthroughStore = create<WalkthroughState>()(
       },
 
       play() {
+        const current = get();
+        if (
+          !current.session ||
+          current.playerSteps.length === 0 ||
+          current.preparing
+        ) {
+          return;
+        }
+
         set((state) => {
-          if (!state.session || state.playerSteps.length === 0) return;
           if (!state.savedView && state.tabId) {
             state.savedView = captureSavedView(state.tabId);
           }
-          state.phase = "playing";
-          state.cursor = state.cursor < 0 ? 0 : state.cursor;
+          state.preparing = true;
           state.userInteracted = false;
         });
+
+        void (async () => {
+          const { tabId, session } = get();
+          if (!tabId || !session) {
+            set((state) => {
+              state.preparing = false;
+            });
+            return;
+          }
+
+          // On Play: materialize and expand every tour stop up front, so the canvas
+          // layout is final before the first step. Step 0 focuses the tour root at
+          // zoom 1; later steps slide at the current zoom when needed. The tour
+          // drives the camera alone while playing.
+          await prepareTour(queryClient, tabId, session);
+
+          set((state) => {
+            state.preparing = false;
+            state.tourPrepared = true;
+            state.phase = "playing";
+            state.cursor = state.cursor < 0 ? 0 : state.cursor;
+          });
+        })();
       },
 
       exit() {
@@ -165,6 +212,7 @@ export const useWalkthroughStore = create<WalkthroughState>()(
           state.userInteracted = false;
           state.highlight = null;
           state.codeOpenNodeId = null;
+          state.pendingAdvance = false;
         });
         if (savedView) {
           restoreSavedView(savedView);
@@ -173,17 +221,18 @@ export const useWalkthroughStore = create<WalkthroughState>()(
 
       next() {
         set((state) => {
-          if (state.playerSteps.length === 0) return;
-          if (state.phase !== "playing" && state.phase !== "generating") {
-            state.phase = "playing";
-            state.cursor = 0;
-            return;
-          }
+          if (state.playerSteps.length === 0 || state.phase !== "playing") return;
 
           const nextCursor = state.cursor + 1;
           if (nextCursor < state.playerSteps.length) {
             state.cursor = nextCursor;
             state.userInteracted = false;
+            state.pendingAdvance = false;
+            return;
+          }
+
+          if (state.session?.status === "generating") {
+            state.pendingAdvance = true;
           }
         });
       },
@@ -193,21 +242,46 @@ export const useWalkthroughStore = create<WalkthroughState>()(
           if (state.cursor > 0) {
             state.cursor -= 1;
             state.userInteracted = false;
+            state.pendingAdvance = false;
           }
         });
       },
 
       jumpTo(stepId) {
+        const index = findStepIndex(get().playerSteps, stepId);
+        if (index < 0) return;
+
+        if (get().preparing) return;
+
         set((state) => {
-          const index = findStepIndex(state.playerSteps, stepId);
-          if (index < 0) return;
           if (!state.savedView && state.tabId) {
             state.savedView = captureSavedView(state.tabId);
           }
-          state.phase = "playing";
-          state.cursor = index;
-          state.userInteracted = false;
+          state.preparing = true;
         });
+
+        void (async () => {
+          const { tabId, session, tourPrepared } = get();
+          if (!tabId || !session) {
+            set((state) => {
+              state.preparing = false;
+            });
+            return;
+          }
+
+          if (!tourPrepared) {
+            await prepareTour(queryClient, tabId, session);
+          }
+
+          set((state) => {
+            state.preparing = false;
+            state.tourPrepared = true;
+            state.phase = "playing";
+            state.cursor = index;
+            state.userInteracted = false;
+            state.pendingAdvance = false;
+          });
+        })();
       },
 
       discard() {
@@ -268,6 +342,11 @@ export function selectCurrentStep(): PlayerStep | null {
   const { playerSteps, cursor } = useWalkthroughStore.getState();
   if (cursor < 0 || cursor >= playerSteps.length) return null;
   return playerSteps[cursor];
+}
+
+export function isCurrentStepNode(nodeId: string): boolean {
+  const { phase, cursor, playerSteps } = useWalkthroughStore.getState();
+  return phase === "playing" && playerSteps[cursor]?.nodeId === nodeId;
 }
 
 export { clampCursor };

@@ -17,7 +17,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
   const { projectData } = useProjectStore();
   const projectId = projectData?.id;
   const walkthroughCodeOpen = useWalkthroughStore(
-    (s) => s.phase === "playing" && s.codeOpenNodeId === (nodeType === "call" && targetKey ? targetKey : nodeId),
+    (s) => s.phase === "playing" && s.codeOpenNodeId === nodeId,
   );
 
   // Only fetch code for file, class, or function node types

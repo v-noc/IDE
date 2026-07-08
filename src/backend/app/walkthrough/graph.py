@@ -114,11 +114,6 @@ def build_graph(
             continue
         by_id[str(node.id)] = graph_node_from_domain(node)
 
-    if start_id not in by_id and nodes:
-        first = nodes[0]
-        if getattr(first, "id", None):
-            by_id[str(first.id)] = graph_node_from_domain(first)
-
     return by_id
 
 

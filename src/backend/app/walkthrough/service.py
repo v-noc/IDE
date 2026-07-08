@@ -4,15 +4,16 @@ import asyncio
 from typing import Any
 
 from fastapi import HTTPException, status
+from loguru import logger
 
 from app.agent.llm.providers import resolve_model_id
+from app.agent.llm.structured import make_llm
 from app.core.services.code_element_service import CodeElementService
 from app.db.context import ProjectUoW
 from app.walkthrough.loader import load_traversal_graph
 from app.walkthrough.patcher import Patcher
 from app.walkthrough.pipeline import run_pipeline
 from app.walkthrough.schemas import (
-    Estimate,
     EstimateResponse,
     RunRequest,
     VisitList,
@@ -63,6 +64,9 @@ class WalkthroughService:
                 },
             )
 
+        placeholder_id = f"pending-{project_id}"
+        _active_runs[project_id] = placeholder_id
+
         return ndjson_response(lambda: self._stream_run(request, code_service))
 
     async def _stream_run(
@@ -79,6 +83,18 @@ class WalkthroughService:
         async def producer() -> None:
             session: WalkthroughSession | None = None
             try:
+                try:
+                    make_llm("intro")
+                except Exception as exc:
+                    await queue.put(
+                        {
+                            "kind": "end",
+                            "status": "error",
+                            "message": f"LLM provider not configured: {exc}",
+                        },
+                    )
+                    return
+
                 repos = self.uow.get_project_repos()
                 graph = await load_traversal_graph(repos, request.node_id)
                 if request.node_id not in graph:
@@ -120,13 +136,28 @@ class WalkthroughService:
                 patcher = Patcher(session, emit)
                 await queue.put(await patcher.hello_frame())
 
-                await run_pipeline(
+                final_session = await run_pipeline(
                     session,
                     patcher,
                     code_service=code_service,
                 )
                 await patcher.set_status("complete")
                 await queue.put(await patcher.end_frame("complete"))
+
+                degraded_count = sum(
+                    1
+                    for node_steps in final_session.node_steps
+                    if node_steps.degraded
+                    or any(block.degraded for block in node_steps.blocks)
+                )
+                logger.info(
+                    "walkthrough complete id={} stops={} degraded={} errors={}",
+                    final_session.id,
+                    len(final_session.node_steps),
+                    degraded_count,
+                    len(final_session.error_log),
+                )
+                # TODO(persistence): save final_session
             except asyncio.CancelledError:
                 if session is not None:
                     patcher = Patcher(session, emit)

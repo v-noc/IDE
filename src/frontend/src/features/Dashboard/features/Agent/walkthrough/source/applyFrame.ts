@@ -89,7 +89,7 @@ export function applyFrame(
           ? { ...current.session, status: "complete" }
           : null,
         lastSeq: current.lastSeq,
-        phase: "ready",
+        phase: current.phase === "playing" ? "playing" : "ready",
         error: null,
       };
   }

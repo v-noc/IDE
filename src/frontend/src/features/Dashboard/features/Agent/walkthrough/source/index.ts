@@ -10,5 +10,7 @@ export const walkthroughSource: WalkthroughSource = useMock
   ? mockSource
   : httpSource;
 
+console.info("[walkthrough] source:", useMock ? "mock" : "http");
+
 export { applyFrame, applyOpsToSession } from "./applyFrame";
 export type { WalkthroughSource } from "./types";

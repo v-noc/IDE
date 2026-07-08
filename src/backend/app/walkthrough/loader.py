@@ -18,11 +18,14 @@ async def _fetch_node(repos: Repositories, node_id: str) -> Any | None:
 async def load_traversal_graph(
     repos: Repositories,
     start_node_id: str,
+    *,
+    depth_max: int | None = None,
 ) -> dict[str, GraphNode]:
     """Load the subgraph reachable from ``start_node_id`` for traversal."""
     collected: dict[str, Any] = {}
     pending: list[str] = [start_node_id]
     seen: set[str] = set()
+    descendants_fetched: set[str] = set()
 
     while pending:
         node_id = pending.pop()
@@ -35,21 +38,30 @@ async def load_traversal_graph(
             continue
         collected[node_id] = node
 
-        descendants, target_lookup = (
-            await repos.code_element_repo.get_code_descendant_nodes(
-                node_id,
-                child_types=[],
-                depth_max=None,
+        should_fetch_descendants = (
+            node_id not in descendants_fetched
+            and (
+                node_id == start_node_id
+                or node_id.startswith("CallSchema")
             )
         )
-        for desc in descendants:
-            if desc and getattr(desc, "id", None):
-                collected[str(desc.id)] = desc
+        if should_fetch_descendants:
+            descendants_fetched.add(node_id)
+            descendants, target_lookup = (
+                await repos.code_element_repo.get_code_descendant_nodes(
+                    node_id,
+                    child_types=[],
+                    depth_max=depth_max,
+                )
+            )
+            for desc in descendants:
+                if desc and getattr(desc, "id", None):
+                    collected[str(desc.id)] = desc
 
-        for raw in (target_lookup or {}).values():
-            parsed = parse_code_element_child(raw)
-            if parsed and getattr(parsed, "id", None):
-                collected[str(parsed.id)] = parsed
+            for raw in (target_lookup or {}).values():
+                parsed = parse_code_element_child(raw)
+                if parsed and getattr(parsed, "id", None):
+                    collected[str(parsed.id)] = parsed
 
         if node_id.startswith(("FolderSchema", "FileSchema", "ProjectSchema")):
             structure_children = await repos.structure_repo.get_children(

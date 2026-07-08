@@ -10,11 +10,11 @@ import { useShallow } from "zustand/react/shallow";
 import { useWalkthroughStore } from "../store/useWalkthroughStore";
 import { GeneratingShimmer } from "./GeneratingShimmer";
 
-interface StepCardProps {
-  className?: string;
+function stopPropagation(event: React.SyntheticEvent) {
+  event.stopPropagation();
 }
 
-export function StepCard({ className }: StepCardProps) {
+export function StepPopover() {
   const [playerSteps, cursor, session, next, prev, exit] = useWalkthroughStore(
     useShallow((state) => [
       state.playerSteps,
@@ -35,10 +35,13 @@ export function StepCard({ className }: StepCardProps) {
 
   return (
     <div
+      data-walkthrough-popover
       className={cn(
-        "pointer-events-auto w-[440px] max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-background p-4 text-foreground shadow-lg",
-        className,
+        "pointer-events-auto w-[360px] max-w-[70vw] rounded-xl border border-border bg-background p-4 text-foreground shadow-lg",
       )}
+      onClick={stopPropagation}
+      onPointerDown={stopPropagation}
+      onWheel={stopPropagation}
     >
       <div className="mb-2 flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-foreground">

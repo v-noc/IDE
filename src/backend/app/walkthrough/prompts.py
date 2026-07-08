@@ -72,7 +72,11 @@ def block_text_user_prompt(ctx: NodeContext) -> str:
         ctx.numbered_code or "(code unavailable)",
         "",
         "### this block",
-        ctx.block_focus or "this section",
+        (
+            f"Lines {ctx.block_start}-{ctx.block_end}: {ctx.block_focus}"
+            if ctx.block_start is not None and ctx.block_end is not None
+            else (ctx.block_focus or "this section")
+        ),
     ]
     if ctx.previous_focus_lines:
         parts.extend(["", "### previous blocks", *ctx.previous_focus_lines])
