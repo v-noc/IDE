@@ -37,6 +37,7 @@ dependencies = [
   "redis>=7.4.0",
   "msgpack>=1.1.2",
   "orjson>=3.11.8",
+  "jsonpatch>=1.33",
 ]
 
 [project.optional-dependencies]

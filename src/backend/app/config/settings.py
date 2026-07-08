@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     VNOC_LSP_PYTHON_URL: Optional[str] = None
     VNOC_LSP_TS_JS_URL: Optional[str] = None
 
+    WALKTHROUGH_LLM_PROVIDER: str = "fake"
+    WALKTHROUGH_LLM_MODEL: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    AI_GATEWAY_API_KEY: Optional[str] = None
+    CUSTOM_LLM_BASE_URL: Optional[str] = None
+    CUSTOM_LLM_API_KEY: Optional[str] = None
+
     model_config = SettingsConfigDict(
         # Pydantic-Settings will automatically use the ENV_FILE env var if it exists.
         # Otherwise, it will fall back to ".env".

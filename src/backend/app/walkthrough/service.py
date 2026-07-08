@@ -1,11 +1,28 @@
 from __future__ import annotations
 
+import asyncio
+from typing import Any
+
 from fastapi import HTTPException, status
 
+from app.agent.llm.providers import resolve_model_id
+from app.core.services.code_element_service import CodeElementService
 from app.db.context import ProjectUoW
 from app.walkthrough.loader import load_traversal_graph
-from app.walkthrough.schemas import Estimate, EstimateResponse, VisitList
-from app.walkthrough.traversal import build_visit_list, compute_estimate
+from app.walkthrough.patcher import Patcher
+from app.walkthrough.pipeline import run_pipeline
+from app.walkthrough.schemas import (
+    Estimate,
+    EstimateResponse,
+    RunRequest,
+    VisitList,
+    WalkthroughSession,
+    new_session,
+)
+from app.walkthrough.traversal import VISIT_CAP, build_visit_list, compute_estimate
+from app.walkthrough.transport import ndjson_response
+
+_active_runs: dict[str, str] = {}
 
 
 class WalkthroughService:
@@ -34,3 +51,106 @@ class WalkthroughService:
         repos = self.uow.get_project_repos()
         graph = await load_traversal_graph(repos, node_id)
         return build_visit_list(graph, node_id, depth)
+
+    def run(self, request: RunRequest, code_service: CodeElementService):
+        project_id = request.project_id
+        if project_id in _active_runs:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "A walkthrough is already running for this project.",
+                    "session_id": _active_runs[project_id],
+                },
+            )
+
+        return ndjson_response(lambda: self._stream_run(request, code_service))
+
+    async def _stream_run(
+        self,
+        request: RunRequest,
+        code_service: CodeElementService,
+    ):
+        queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+        project_id = request.project_id
+
+        async def emit(frame: dict[str, Any]) -> None:
+            await queue.put(frame)
+
+        async def producer() -> None:
+            session: WalkthroughSession | None = None
+            try:
+                repos = self.uow.get_project_repos()
+                graph = await load_traversal_graph(repos, request.node_id)
+                if request.node_id not in graph:
+                    await queue.put(
+                        {
+                            "kind": "end",
+                            "status": "error",
+                            "message": f"Node not found: {request.node_id}",
+                        },
+                    )
+                    return
+
+                visit_list = build_visit_list(graph, request.node_id, request.depth)
+                estimate = compute_estimate(visit_list)
+                if estimate.over_cap:
+                    await queue.put(
+                        {
+                            "kind": "end",
+                            "status": "error",
+                            "message": (
+                                f"Visit list exceeds cap ({VISIT_CAP} stops). "
+                                "Lower the depth."
+                            ),
+                        },
+                    )
+                    return
+
+                branch = self.uow.ctx.branch
+                commit_id = self.uow.ctx.ref or f"{branch}@head"
+                session = new_session(
+                    request,
+                    visit_list,
+                    branch=branch,
+                    commit_id=commit_id,
+                    model_id=resolve_model_id(),
+                )
+
+                _active_runs[project_id] = session.id
+                patcher = Patcher(session, emit)
+                await queue.put(await patcher.hello_frame())
+
+                await run_pipeline(
+                    session,
+                    patcher,
+                    code_service=code_service,
+                )
+                await patcher.set_status("complete")
+                await queue.put(await patcher.end_frame("complete"))
+            except asyncio.CancelledError:
+                if session is not None:
+                    patcher = Patcher(session, emit)
+                    await patcher.set_status("aborted")
+                raise
+            except Exception as exc:
+                await queue.put(
+                    {"kind": "end", "status": "error", "message": str(exc)},
+                )
+            finally:
+                _active_runs.pop(project_id, None)
+                await queue.put(None)
+
+        task = asyncio.create_task(producer())
+        try:
+            while True:
+                frame = await queue.get()
+                if frame is None:
+                    break
+                yield frame
+        finally:
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass

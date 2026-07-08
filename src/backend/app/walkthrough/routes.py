@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 
-from app.api.dependencies import get_project_uow
+from app.api.dependencies import get_code_element_service, get_project_uow
+from app.core.services.code_element_service import CodeElementService
 from app.db.context import ProjectUoW
-from app.walkthrough.schemas import Estimate
+from app.walkthrough.schemas import Estimate, RunRequest
 from app.walkthrough.service import WalkthroughService
 
 router = APIRouter()
@@ -36,3 +38,20 @@ async def get_estimate(
         llm_call_estimate=result.llm_call_estimate,
         over_cap=result.over_cap,
     )
+
+
+@router.post("/run")
+async def run_walkthrough(
+    body: RunRequest,
+    service: WalkthroughService = Depends(get_walkthrough_service),
+    code_service: CodeElementService = Depends(get_code_element_service),
+) -> StreamingResponse:
+    try:
+        return service.run(body, code_service)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(exc),
+        ) from exc

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 
 NodeType = Literal["folder", "file", "class", "function", "call", "project"]
 VisitMode = Literal["full", "contextual"]
+SessionStatus = Literal["generating", "complete", "error", "aborted"]
+
+SCHEMA_VERSION = "1"
+PROMPT_VERSION = "1"
 
 
 class RunRequest(BaseModel):
@@ -49,3 +55,82 @@ class VisitList(BaseModel):
 
 class EstimateResponse(Estimate):
     visit_list: VisitList
+
+
+class PlannedBlock(BaseModel):
+    start_line: int
+    end_line: int
+    focus: str = Field(max_length=100)
+
+
+class BlockPlan(BaseModel):
+    reasoning: str
+    blocks: list[PlannedBlock]
+
+
+class IntroOut(BaseModel):
+    reasoning: str
+    intro: str
+
+
+class BlockTextOut(BaseModel):
+    text: str
+
+
+class BlockStep(BaseModel):
+    index: int
+    start_line: int
+    end_line: int
+    focus: str
+    text: str = ""
+    degraded: bool = False
+
+
+class NodeSteps(BaseModel):
+    node_id: str
+    order: int
+    mode: VisitMode
+    intro_text: str = ""
+    degraded: bool = False
+    blocks: list[BlockStep] = Field(default_factory=list)
+
+
+class TokenUsage(BaseModel):
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+class WalkthroughSession(BaseModel):
+    id: str
+    created_at: str
+    request: RunRequest
+    branch: str
+    commit_id: str
+    visit_list: VisitList
+    node_steps: list[NodeSteps] = Field(default_factory=list)
+    status: SessionStatus = "generating"
+    error_log: list[str] = Field(default_factory=list)
+    schema_version: str = SCHEMA_VERSION
+    prompt_version: str = PROMPT_VERSION
+    model_id: str
+    usage: TokenUsage = Field(default_factory=TokenUsage)
+
+
+def new_session(
+    request: RunRequest,
+    visit_list: VisitList,
+    *,
+    branch: str,
+    commit_id: str,
+    model_id: str,
+) -> WalkthroughSession:
+    return WalkthroughSession(
+        id=str(uuid4()),
+        created_at=datetime.now(timezone.utc).isoformat(),
+        request=request,
+        branch=branch,
+        commit_id=commit_id,
+        visit_list=visit_list,
+        model_id=model_id,
+        prompt_version=PROMPT_VERSION,
+    )
