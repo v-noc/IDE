@@ -40,6 +40,7 @@ interface WalkthroughState {
   preparing: boolean;
   tourPrepared: boolean;
   anchorEpoch: number;
+  stepDialogOpen: boolean;
 
   start: (req: RunRequest, tabId: string) => void;
   applyOps: (ops: Operation[]) => void;
@@ -58,6 +59,7 @@ interface WalkthroughState {
   setCodeOpenNodeId: (nodeId: string | null) => void;
   clearHighlight: () => void;
   bumpAnchorEpoch: () => void;
+  setStepDialogOpen: (open: boolean) => void;
 }
 
 let abortController: AbortController | null = null;
@@ -88,6 +90,7 @@ const initialState = {
   preparing: false,
   tourPrepared: false,
   anchorEpoch: 0,
+  stepDialogOpen: false,
 };
 
 export const useWalkthroughStore = create<WalkthroughState>()(
@@ -217,6 +220,7 @@ export const useWalkthroughStore = create<WalkthroughState>()(
           state.highlight = null;
           state.codeOpenNodeId = null;
           state.pendingAdvance = false;
+          state.stepDialogOpen = false;
         });
         if (savedView) {
           restoreSavedView(savedView);
@@ -337,6 +341,12 @@ export const useWalkthroughStore = create<WalkthroughState>()(
           set((state) => {
             state.anchorEpoch += 1;
           });
+        });
+      },
+
+      setStepDialogOpen(open) {
+        set((state) => {
+          state.stepDialogOpen = open;
         });
       },
     })),

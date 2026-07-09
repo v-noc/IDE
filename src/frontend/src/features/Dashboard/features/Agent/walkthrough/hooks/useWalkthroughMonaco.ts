@@ -25,12 +25,6 @@ export function useWalkthroughMonaco(
   const highlight = useWalkthroughStore((s) =>
     s.highlight?.nodeId === nodeId ? s.highlight : null,
   );
-  const anchorLine = useWalkthroughStore((s) => {
-    const anchor = currentStepAnchor(s);
-    return anchor?.type === "code-line" && anchor.nodeId === nodeId
-      ? anchor.line
-      : null;
-  });
   const cursor = useWalkthroughStore((s) => s.cursor);
   const bumpAnchorEpoch = useWalkthroughStore((s) => s.bumpAnchorEpoch);
 
@@ -124,19 +118,24 @@ export function useWalkthroughMonaco(
 
     clearSync();
 
+    // Stable editor-level anchor: covers the whole Monaco surface and does NOT
+    // move when the user scrolls code — popover stays mid-dialog on the right.
+    const editorAnchor = document.createElement("div");
+    editorAnchor.setAttribute("data-walkthrough-editor-anchor", "");
+    editorAnchor.setAttribute("data-node-id", nodeId);
+    editorAnchor.style.position = "absolute";
+    editorAnchor.style.inset = "0";
+    editorAnchor.style.pointerEvents = "none";
+    editorAnchor.style.opacity = "0";
+
     const spotlight = document.createElement("div");
     spotlight.className = "walkthrough-monaco-spotlight";
-    const anchorEl = document.createElement("div");
-    anchorEl.setAttribute("data-walkthrough-code-anchor", "");
-    anchorEl.setAttribute("data-node-id", nodeId);
-    anchorEl.style.position = "absolute";
-    anchorEl.style.pointerEvents = "none";
-    anchorEl.style.opacity = "0";
 
+    domNode.style.position = domNode.style.position || "relative";
+    domNode.appendChild(editorAnchor);
     domNode.appendChild(spotlight);
-    domNode.appendChild(anchorEl);
 
-    const sync = () => {
+    const syncSpotlight = () => {
       const layout = editor.getLayoutInfo();
       const scrollTop = editor.getScrollTop();
       const lineHeight = editor.getOption(
@@ -150,33 +149,24 @@ export function useWalkthroughMonaco(
       spotlight.style.left = `${layout.contentLeft}px`;
       spotlight.style.width = `${layout.contentWidth}px`;
       spotlight.style.height = `${Math.max(lineHeight, topEnd - topStart)}px`;
-
-      const absoluteAnchorLine = anchorLine ?? highlight.startLine;
-      anchorEl.setAttribute("data-line", String(absoluteAnchorLine));
-      const editorAnchorLine = absoluteToEditorLine(
-        absoluteAnchorLine,
-        nodeStartLine,
-      );
-      const anchorTop =
-        editor.getTopForLineNumber(editorAnchorLine) - scrollTop;
-      anchorEl.style.top = `${anchorTop}px`;
-      anchorEl.style.left = `${layout.contentLeft}px`;
-      anchorEl.style.width = `${layout.contentWidth}px`;
-      anchorEl.style.height = `${lineHeight}px`;
-
-      scheduleBump();
     };
 
-    sync();
+    syncSpotlight();
+    // Bump once so the popover layer measures the editor rect after mount.
+    scheduleBump();
 
-    const scrollDisposable = editor.onDidScrollChange(sync);
-    const layoutDisposable = editor.onDidLayoutChange(sync);
+    const scrollDisposable = editor.onDidScrollChange(syncSpotlight);
+    const layoutDisposable = editor.onDidLayoutChange(() => {
+      syncSpotlight();
+      // Layout/size changes move the editor on screen — re-center the popover.
+      scheduleBump();
+    });
 
     syncCleanupRef.current = () => {
       scrollDisposable.dispose();
       layoutDisposable.dispose();
       spotlight.remove();
-      anchorEl.remove();
+      editorAnchor.remove();
       if (bumpRafRef.current != null) {
         cancelAnimationFrame(bumpRafRef.current);
         bumpRafRef.current = null;
@@ -190,7 +180,6 @@ export function useWalkthroughMonaco(
   }, [
     phase,
     highlight,
-    anchorLine,
     cursor,
     nodeStartLine,
     codeLoaded,

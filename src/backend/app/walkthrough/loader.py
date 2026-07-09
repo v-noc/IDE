@@ -10,7 +10,15 @@ from app.walkthrough.graph import GraphNode, build_graph
 async def _fetch_node(repos: Repositories, node_id: str) -> Any | None:
     if node_id.startswith("CallSchema"):
         return await repos.call_repo.get_by_id(node_id)
-    if node_id.startswith(("FolderSchema", "FileSchema", "ProjectSchema")) or "GroupSchema" in node_id:
+    if node_id.startswith("CodeElementGroupSchema"):
+        return await repos.code_element_group_repo.get_by_id(node_id)
+    if node_id.startswith("CallGroupSchema"):
+        return await repos.call_group_repo.get_by_id(node_id)
+    if node_id.startswith("StructureGroupSchema"):
+        return await repos.structure_group_repo.get_by_id(node_id)
+    if node_id.startswith("ProjectSchema"):
+        return await repos.project_repo.get_by_id(node_id)
+    if node_id.startswith(("FolderSchema", "FileSchema")):
         return await repos.structure_repo.get_by_id(node_id)
     return await repos.code_element_repo.get_by_id(node_id)
 

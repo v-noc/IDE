@@ -1,5 +1,11 @@
 # 01 — Mock mode must use the REAL selected node
 
+> ⚠ **SUPERSEDED by [11-backend-only-mock.md](11-backend-only-mock.md)** (2026-07-09).
+> The frontend mock generator this doc describes is being **deleted**: the backend
+> pipeline with the `fake` provider is the one and only mock, so switching to a real
+> LLM never touches the frontend. Do not implement or extend anything below; kept
+> for history only.
+
 ## The problem (what the user sees)
 
 Today `mockSource` (in

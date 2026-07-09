@@ -3,31 +3,36 @@ import { createPortal } from "react-dom";
 import { StepPopover } from "./StepPopover";
 import { useWalkthroughStore } from "../store/useWalkthroughStore";
 import { currentStepAnchor } from "../store/selectors";
+import {
+  WALKTHROUGH_POPOVER_GAP,
+  WALKTHROUGH_POPOVER_H,
+  WALKTHROUGH_POPOVER_W,
+} from "./popoverLayout";
 
-const POPOVER_W = 360;
-const POPOVER_ESTIMATE_H = 200;
-
-function computePopoverPosition(rect: DOMRect) {
-  let x = rect.left - POPOVER_W - 12;
-  let y = rect.top + rect.height / 2 - POPOVER_ESTIMATE_H / 2;
+/**
+ * Popover on the LEFT of the editor (keeps line numbers visible and pairs
+ * with node-centered camera — right-side popover was clipped by the agent panel).
+ */
+function computePopoverPosition(editorRect: DOMRect) {
+  let x = editorRect.left - WALKTHROUGH_POPOVER_W - WALKTHROUGH_POPOVER_GAP;
+  let y =
+    editorRect.top + editorRect.height / 2 - WALKTHROUGH_POPOVER_H / 2;
 
   if (x < 8) {
-    x = rect.right + 12;
+    x = editorRect.right + WALKTHROUGH_POPOVER_GAP;
   }
 
-  y = Math.max(8, Math.min(y, window.innerHeight - POPOVER_ESTIMATE_H - 8));
-
-  if (rect.right < 0) {
-    x = 8;
-  } else if (rect.left > window.innerWidth) {
-    x = window.innerWidth - POPOVER_W - 8;
-  }
+  y = Math.max(
+    8,
+    Math.min(y, window.innerHeight - WALKTHROUGH_POPOVER_H - 8),
+  );
 
   return { x, y };
 }
 
 export function CodeLinePopoverLayer() {
   const phase = useWalkthroughStore((s) => s.phase);
+  const stepDialogOpen = useWalkthroughStore((s) => s.stepDialogOpen);
   const anchorEpoch = useWalkthroughStore((s) => s.anchorEpoch);
   const anchorType = useWalkthroughStore((s) => {
     const anchor = currentStepAnchor(s);
@@ -36,10 +41,6 @@ export function CodeLinePopoverLayer() {
   const anchorNodeId = useWalkthroughStore((s) => {
     const anchor = currentStepAnchor(s);
     return anchor?.type === "code-line" ? anchor.nodeId : null;
-  });
-  const anchorLine = useWalkthroughStore((s) => {
-    const anchor = currentStepAnchor(s);
-    return anchor?.type === "code-line" ? anchor.line : null;
   });
   const bumpAnchorEpoch = useWalkthroughStore((s) => s.bumpAnchorEpoch);
 
@@ -55,7 +56,7 @@ export function CodeLinePopoverLayer() {
     }
 
     const el = document.querySelector(
-      `[data-walkthrough-code-anchor][data-node-id="${anchorNodeId}"]`,
+      `[data-walkthrough-editor-anchor][data-node-id="${anchorNodeId}"]`,
     );
     if (!el) return null;
 
@@ -63,10 +64,14 @@ export function CodeLinePopoverLayer() {
     if (rect.width === 0 && rect.height === 0) return null;
 
     return computePopoverPosition(rect);
-    // anchorLine included so step changes re-measure even at same epoch
-  }, [phase, anchorType, anchorNodeId, anchorLine, anchorEpoch]);
+  }, [phase, anchorType, anchorNodeId, anchorEpoch]);
 
-  if (phase !== "playing" || anchorType !== "code-line" || !position) {
+  if (
+    phase !== "playing" ||
+    anchorType !== "code-line" ||
+    !position ||
+    stepDialogOpen
+  ) {
     return null;
   }
 
@@ -76,7 +81,7 @@ export function CodeLinePopoverLayer() {
       style={{
         left: position.x,
         top: position.y,
-        width: POPOVER_W,
+        width: WALKTHROUGH_POPOVER_W,
       }}
     >
       <StepPopover />

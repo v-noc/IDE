@@ -46,7 +46,9 @@ class FakeLLM:
 
             return IntroOut(
                 reasoning=f"Read {name} from the outside.",
-                intro=f"This {name} handles part of the flow described in the tour.",
+                intro=(
+                    f"This `{name}` handles part of the flow described in the tour."
+                ),
             )  # type: ignore[return-value]
 
         if self.call_type == "block_plan":
@@ -72,9 +74,14 @@ class FakeLLM:
             from app.walkthrough.schemas import BlockTextOut
 
             focus = _extract_focus(user)
-            return BlockTextOut(
-                text=f"Explains {focus or name}: what this section does and why it matters.",
-            )  # type: ignore[return-value]
+            if _is_first_block(user):
+                text = _first_block_markdown_text(focus or name)
+            else:
+                text = (
+                    f"Explains {focus or name}: what this section does "
+                    "and why it matters."
+                )
+            return BlockTextOut(text=text)  # type: ignore[return-value]
 
         raise ValueError(f"Unknown fake call type: {self.call_type}")
 
@@ -108,6 +115,26 @@ def _extract_line_range(user: str) -> tuple[int | None, int | None]:
 def _extract_focus(user: str) -> str | None:
     match = re.search(r"### this block\s*\n(.+)", user, re.MULTILINE)
     return match.group(1).strip() if match else None
+
+
+def _is_first_block(user: str) -> bool:
+    return "### previous blocks" not in user
+
+
+def _first_block_markdown_text(focus: str) -> str:
+    long_narration = (
+        "This section walks through validation, retries, and how errors "
+        "propagate through the call stack when inputs are incomplete or "
+        "external services are unavailable during processing. "
+    ) * 6
+    return (
+        f"The block starts by validating input:\n\n"
+        "```python\n"
+        "if not card.valid():\n"
+        "    raise PaymentError()\n"
+        "```\n\n"
+        f"Then it proceeds. {long_narration[:820]}"
+    )
 
 
 def _even_blocks(start: int, end: int, count: int) -> list:

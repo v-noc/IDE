@@ -196,6 +196,10 @@ Rules:
 You return: text (the popup body).
 ```
 
+> **Frontend renderer note (fix 13):** when the real LLM lands, narration may use
+> markdown **inline code and fenced blocks only** — no headings, no images, no links
+> unless asked. Do not change prompts until `PROMPT_VERSION` bumps for this rule.
+
 ### 2.4 Block text (user)
 
 ```

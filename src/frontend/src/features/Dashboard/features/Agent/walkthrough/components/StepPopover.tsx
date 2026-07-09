@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -9,22 +9,25 @@ import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
 import { useWalkthroughStore } from "../store/useWalkthroughStore";
 import { GeneratingShimmer } from "./GeneratingShimmer";
+import { StepMarkdown } from "./StepMarkdown";
 
 function stopPropagation(event: React.SyntheticEvent) {
   event.stopPropagation();
 }
 
 export function StepPopover() {
-  const [playerSteps, cursor, session, next, prev, exit] = useWalkthroughStore(
-    useShallow((state) => [
-      state.playerSteps,
-      state.cursor,
-      state.session,
-      state.next,
-      state.prev,
-      state.exit,
-    ]),
-  );
+  const [playerSteps, cursor, session, setStepDialogOpen, next, prev, exit] =
+    useWalkthroughStore(
+      useShallow((state) => [
+        state.playerSteps,
+        state.cursor,
+        state.session,
+        state.setStepDialogOpen,
+        state.next,
+        state.prev,
+        state.exit,
+      ]),
+    );
 
   const step = cursor >= 0 ? playerSteps[cursor] : null;
   const total = playerSteps.length;
@@ -58,14 +61,32 @@ export function StepPopover() {
               <TooltipContent>Fallback text was used for this step.</TooltipContent>
             </Tooltip>
           ) : null}
+          <button
+            type="button"
+            className="flex items-center justify-center rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Expand step"
+            onClick={(event) => {
+              event.stopPropagation();
+              setStepDialogOpen(true);
+            }}
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </button>
           <span>
             {position} / {total || "…"}
           </span>
         </div>
       </div>
 
-      <div className="mb-4 min-h-[3rem] text-sm leading-relaxed text-foreground">
-        {waitingForText ? <GeneratingShimmer /> : <p>{step?.text ?? ""}</p>}
+      <div
+        className="mb-4 max-h-60 overflow-y-auto overscroll-contain pr-1 text-sm leading-relaxed text-foreground"
+        onWheel={stopPropagation}
+      >
+        {waitingForText ? (
+          <GeneratingShimmer />
+        ) : (
+          <StepMarkdown text={step?.text ?? ""} />
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-2">

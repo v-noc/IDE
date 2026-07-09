@@ -33,6 +33,9 @@ export function useWalkthroughKeyboard() {
     }
 
     if (event.key === "Escape") {
+      if (useWalkthroughStore.getState().stepDialogOpen) {
+        return;
+      }
       event.preventDefault();
       useWalkthroughStore.getState().exit();
     }
