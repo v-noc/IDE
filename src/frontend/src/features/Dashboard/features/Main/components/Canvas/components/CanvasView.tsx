@@ -172,6 +172,20 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+  const centerTarget = useMemo(() => {
+    const id = centerNode?.id;
+    if (!id) return null;
+    const n = nodes.find((node) => node.id === id);
+    if (!n?.measured?.width) return null;
+    return {
+      id,
+      x: n.position.x + n.measured.width / 2,
+      y: n.position.y + (n.measured.height ?? 0) / 2,
+    };
+  }, [nodes, centerNode?.id]);
+
+  const followSelectionRef = useRef(false);
+
   const syncDiffOverlay = useEffectEvent(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
@@ -208,44 +222,18 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     };
   }, [centerNode?.id, projectData?.id, tabId, expandNodesBulk, expandNode]);
 
-  const lastCenteredTargetIdRef = useRef<string | null>(null);
-
-  const centerOnTarget = useEffectEvent(() => {
-    if (useWalkthroughStore.getState().phase === "playing") return;
-
-    const nodeId = centerNode?.id;
-    if (!nodeId || nodes.length === 0 || !reactFlowInstanceRef.current) {
-      return;
-    }
-
-    const rfNode = nodes.find((n) => n.id === nodeId);
-
-    // Check if node exists and has been measured (width > 0)
-    if (rfNode && rfNode.measured?.width) {
-      if (lastCenteredTargetIdRef.current !== nodeId) {
-        reactFlowInstanceRef.current.setCenter(
-          rfNode.position.x + (rfNode.measured?.width ?? 0) / 2,
-          rfNode.position.y + (rfNode.measured?.height ?? 0) / 2,
-          {
-            zoom: 1,
-            duration: 300,
-          },
-        );
-        lastCenteredTargetIdRef.current = nodeId;
-      }
-    } else {
-      // If node not found yet or dimensions not measured, retry next frame.
-      requestAnimationFrame(centerOnTarget);
-    }
-  });
+  useEffect(() => {
+    followSelectionRef.current = true;
+  }, [centerNode?.id]);
 
   useEffect(() => {
-    if (centerNode) {
-      centerOnTarget();
-    } else {
-      lastCenteredTargetIdRef.current = null;
-    }
-  }, [centerNode, centerOnTarget]);
+    if (!centerTarget || !followSelectionRef.current) return;
+    if (useWalkthroughStore.getState().phase === "playing") return;
+    reactFlowInstanceRef.current?.setCenter(centerTarget.x, centerTarget.y, {
+      zoom: 1,
+      duration: 300,
+    });
+  }, [centerTarget]);
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstanceRef.current = instance;
@@ -258,6 +246,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   const onMoveStart = useCallback((event?: MouseEvent | TouchEvent | null) => {
     if (!event) return;
+    followSelectionRef.current = false;
     if (useWalkthroughStore.getState().phase === "playing") {
       useWalkthroughStore.getState().setUserInteracted(true);
     }
