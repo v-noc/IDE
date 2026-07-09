@@ -103,6 +103,11 @@ async function runActions(
   }
 
   store.setHighlight(highlight);
+
+  if (highlight) {
+    codeOpenNodeId = highlight.nodeId;
+  }
+
   store.setCodeOpenNodeId(codeOpenNodeId);
 
   if (!store.userInteracted) {
@@ -126,6 +131,11 @@ export function useStepExecutor() {
   const cursor = useWalkthroughStore((s) => s.cursor);
   const phase = useWalkthroughStore((s) => s.phase);
   const tabId = useWalkthroughStore((s) => s.tabId);
+  const stepSignature = useWalkthroughStore((s) => {
+    const step = s.cursor >= 0 ? s.playerSteps[s.cursor] : null;
+    if (!step) return "";
+    return `${step.id}:${step.actions.map((a) => a.type).join(",")}:${step.text.length}`;
+  });
 
   const executeCurrentStep = useEffectEvent(async () => {
     const state = useWalkthroughStore.getState();
@@ -143,7 +153,7 @@ export function useStepExecutor() {
   useEffect(() => {
     if (phase !== "playing") return;
     void executeCurrentStep();
-  }, [cursor, phase, executeCurrentStep]);
+  }, [cursor, phase, stepSignature, executeCurrentStep]);
 
   useEffect(() => {
     if (!tabId) return;

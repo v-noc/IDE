@@ -263,6 +263,18 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     }
   }, []);
 
+  const onMove = useCallback(() => {
+    if (useWalkthroughStore.getState().phase === "playing") {
+      useWalkthroughStore.getState().bumpAnchorEpoch();
+    }
+  }, []);
+
+  const onNodeDrag = useCallback(() => {
+    if (useWalkthroughStore.getState().phase === "playing") {
+      useWalkthroughStore.getState().bumpAnchorEpoch();
+    }
+  }, []);
+
   const onNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (!reactFlowInstanceRef.current) return;
     reactFlowInstanceRef.current.setCenter(
@@ -319,6 +331,8 @@ const CanvasView: React.FC<CanvasViewProps> = ({
         onEdgesChange={onEdgesChange}
         onInit={onInit}
         onMoveStart={onMoveStart}
+        onMove={onMove}
+        onNodeDrag={onNodeDrag}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeClick={onNodeClick}
         nodesDraggable={true}

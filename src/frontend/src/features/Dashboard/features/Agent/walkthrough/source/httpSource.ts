@@ -59,7 +59,11 @@ export const httpSource: WalkthroughSource = {
   },
 
   async run(req, onFrame, signal) {
-    const res = await fetch(`${API_BASE}/walkthroughs/run`, {
+    const params = new URLSearchParams({
+      project_id: req.project_id,
+    });
+
+    const res = await fetch(`${API_BASE}/walkthroughs/run?${params}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),

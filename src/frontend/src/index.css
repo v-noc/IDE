@@ -213,13 +213,23 @@
 }
 
 /* Walkthrough Monaco line decorations */
-.monaco-editor .walkthrough-line {
+.monaco-editor .walkthrough-monaco-line-deco {
   background-color: color-mix(in oklch, var(--primary) 18%, transparent);
   border-left: 3px solid var(--primary);
 }
 
 .monaco-editor .walkthrough-dim {
   opacity: 0.35;
+}
+
+.walkthrough-monaco-spotlight {
+  position: absolute;
+  pointer-events: none;
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  outline: 1px solid color-mix(in oklch, var(--primary) 45%, transparent);
+  border-radius: 4px;
+  transition: top 0.15s ease, height 0.15s ease;
+  z-index: 5;
 }
 
 .walkthrough-current-node {

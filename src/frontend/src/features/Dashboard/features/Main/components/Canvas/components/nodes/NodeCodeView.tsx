@@ -4,7 +4,7 @@ import { Save, Copy, Check, Maximize2 } from "lucide-react";
 import { DiffEditor, type Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { CodeViewDialog } from "./CodeViewDialog";
-import { useWalkthroughMonacoHighlight } from "@/features/Dashboard/features/Agent/walkthrough/hooks/useWalkthroughMonacoHighlight";
+import { useWalkthroughMonaco } from "@/features/Dashboard/features/Agent/walkthrough/hooks/useWalkthroughMonaco";
 
 // Lazy load Monaco Editor
 const CodeEditor = lazy(() => import("@/components/CodeEditor"));
@@ -62,25 +62,20 @@ export const NodeCodeView = memo(function NodeCodeView({
   const monacoTheme = resolvedTheme === "light" ? "vs" : "vs-dark";
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [editor, setEditor] = useState<editor.IStandaloneCodeEditor | null>(
-    null,
-  );
-  const [monaco, setMonaco] = useState<Monaco | null>(null);
+  const codeLoaded = !isLoading && code.length > 0;
 
-  useWalkthroughMonacoHighlight({
-    editor,
-    monaco,
+  const { onMount: walkthroughOnMount } = useWalkthroughMonaco(
     nodeId,
     nodeStartLine,
-    codeLoaded: !isLoading && code.length > 0,
-  });
+    showDiff,
+    codeLoaded,
+  );
 
   const handleEditorMount = (
     editorInstance: editor.IStandaloneCodeEditor,
     monacoApi: Monaco,
   ) => {
-    setEditor(editorInstance);
-    setMonaco(monacoApi);
+    walkthroughOnMount(editorInstance, monacoApi);
   };
 
   const handleCopy = (e: React.MouseEvent) => {

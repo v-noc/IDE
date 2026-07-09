@@ -4,7 +4,7 @@ services:
   terminusdb:
     image: terminusdb/terminusdb-server:latest
     container_name: terminusdb-server
-    pull_policy: always
+    # pull_policy: always
     ports:
       - "6363:6363"
     environment:

@@ -1,20 +1,24 @@
+import { CodeLinePopoverLayer } from "@/features/Dashboard/features/Agent/walkthrough/components/CodeLinePopoverLayer";
 import { WalkthroughProgressPill } from "@/features/Dashboard/features/Agent/walkthrough/components/WalkthroughProgressPill";
 import { useWalkthroughStore } from "@/features/Dashboard/features/Agent/walkthrough/store/useWalkthroughStore";
 import { useStepExecutor } from "@/features/Dashboard/features/Agent/walkthrough/executor/useStepExecutor";
 
 /**
- * Bottom progress pill while a tour is playing. Step text lives on the node popover.
+ * Walkthrough overlay: line-anchored popover layer, step executor, progress pill.
  */
 export function WalkthroughStepOverlay() {
   const phase = useWalkthroughStore((s) => s.phase);
 
   useStepExecutor();
 
-  if (phase !== "playing") return null;
-
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4">
-      <WalkthroughProgressPill />
-    </div>
+    <>
+      <CodeLinePopoverLayer />
+      {phase === "playing" ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4">
+          <WalkthroughProgressPill />
+        </div>
+      ) : null}
+    </>
   );
 }

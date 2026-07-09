@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from typing import TypeVar
@@ -54,7 +55,8 @@ class FakeLLM:
             bounds = _extract_bounds(user)
             start, end = _extract_line_range(user)
             min_blocks, max_blocks = bounds
-            count = min(max_blocks, max(min_blocks, 2))
+            span = max_blocks - min_blocks + 1
+            count = min_blocks + (_stable_hash(name) % span)
             if start is None or end is None:
                 blocks = [
                     PlannedBlock(start_line=1, end_line=10, focus="overview"),
@@ -75,6 +77,10 @@ class FakeLLM:
             )  # type: ignore[return-value]
 
         raise ValueError(f"Unknown fake call type: {self.call_type}")
+
+
+def _stable_hash(name: str) -> int:
+    return int(hashlib.md5(name.encode()).hexdigest(), 16)
 
 
 def _extract_node_name(user: str) -> str:

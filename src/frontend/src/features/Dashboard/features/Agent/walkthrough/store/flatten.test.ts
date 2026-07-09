@@ -62,6 +62,7 @@ describe("flattenSession", () => {
     ]);
     expect(steps[0].actions).toEqual([
       { type: "select_node", nodeId: "services/payment/charge" },
+      { type: "show_code", nodeId: "services/payment/charge" },
     ]);
     expect(steps[1].actions).toEqual([
       { type: "show_code", nodeId: "services/payment/charge" },

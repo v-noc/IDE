@@ -1,5 +1,5 @@
 import type { NodeSteps, VisitList, WalkthroughSession } from "../types";
-import type { PlayerStep } from "../types";
+import type { Action, PlayerStep } from "../types";
 
 function padOrder(order: number): string {
   return String(order).padStart(2, "0");
@@ -11,10 +11,21 @@ function visitName(visitList: VisitList, order: number): string {
 
 function introStep(nodeSteps: NodeSteps, visitList: VisitList): PlayerStep {
   const orderKey = padOrder(nodeSteps.order);
+  const visit = visitList.nodes.find((n) => n.order === nodeSteps.order);
+  const actions: Action[] = [
+    { type: "select_node", nodeId: nodeSteps.node_id },
+  ];
+  if (
+    visit?.has_code &&
+    nodeSteps.mode === "full" &&
+    nodeSteps.blocks.length > 0
+  ) {
+    actions.push({ type: "show_code", nodeId: nodeSteps.node_id });
+  }
   return {
     id: `n${orderKey}`,
     nodeId: nodeSteps.node_id,
-    actions: [{ type: "select_node", nodeId: nodeSteps.node_id }],
+    actions,
     title: visitName(visitList, nodeSteps.order),
     text: nodeSteps.intro_text,
     degraded: nodeSteps.degraded,

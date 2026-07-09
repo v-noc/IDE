@@ -59,6 +59,13 @@ const EnhancedNode = memo(function EnhancedNode({
 
   const activeTabId = useTabStore((s) => s.activeTabId);
   const nodeId = data.nodeId ?? "";
+  const anchorType = useWalkthroughStore((s) => {
+    const step = s.playerSteps[s.cursor];
+    if (s.phase !== "playing" || !step || step.nodeId !== nodeId) return null;
+    const hl = step.actions.find((a) => a.type === "highlight_lines");
+    return hl ? "code-line" : "node";
+  });
+  const isNodePopover = anchorType === "node";
   const isCurrentStepNodeVisible = useWalkthroughStore(
     (s) =>
       s.phase === "playing" && s.playerSteps[s.cursor]?.nodeId === nodeId,
@@ -120,7 +127,7 @@ const EnhancedNode = memo(function EnhancedNode({
   return (
     <>
       <NodeToolbar
-        isVisible={isCurrentStepNodeVisible}
+        isVisible={isNodePopover}
         position={Position.Left}
         align="center"
         offset={16}

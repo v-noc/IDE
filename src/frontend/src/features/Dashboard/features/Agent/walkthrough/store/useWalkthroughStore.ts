@@ -39,6 +39,7 @@ interface WalkthroughState {
   pendingAdvance: boolean;
   preparing: boolean;
   tourPrepared: boolean;
+  anchorEpoch: number;
 
   start: (req: RunRequest, tabId: string) => void;
   applyOps: (ops: Operation[]) => void;
@@ -56,9 +57,11 @@ interface WalkthroughState {
   ) => void;
   setCodeOpenNodeId: (nodeId: string | null) => void;
   clearHighlight: () => void;
+  bumpAnchorEpoch: () => void;
 }
 
 let abortController: AbortController | null = null;
+let anchorEpochRaf: number | null = null;
 
 function syncDerived(state: WalkthroughState) {
   state.playerSteps = state.session ? flattenSession(state.session) : [];
@@ -84,6 +87,7 @@ const initialState = {
   pendingAdvance: false,
   preparing: false,
   tourPrepared: false,
+  anchorEpoch: 0,
 };
 
 export const useWalkthroughStore = create<WalkthroughState>()(
@@ -323,6 +327,16 @@ export const useWalkthroughStore = create<WalkthroughState>()(
       clearHighlight() {
         set((state) => {
           state.highlight = null;
+        });
+      },
+
+      bumpAnchorEpoch() {
+        if (anchorEpochRaf != null) return;
+        anchorEpochRaf = requestAnimationFrame(() => {
+          anchorEpochRaf = null;
+          set((state) => {
+            state.anchorEpoch += 1;
+          });
         });
       },
     })),
