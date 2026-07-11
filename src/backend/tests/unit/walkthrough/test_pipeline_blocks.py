@@ -136,7 +136,7 @@ async def test_pipeline_emits_blocks_per_contract(monkeypatch):
     block_plan_calls = 0
     original_make_llm = structured_module.make_llm
 
-    def counting_make_llm(call_type: str) -> FakeLLM:
+    def counting_make_llm(call_type: str, **_kwargs) -> FakeLLM:
         nonlocal block_plan_calls
         if call_type == "block_plan":
             block_plan_calls += 1
@@ -161,13 +161,23 @@ async def test_pipeline_emits_blocks_per_contract(monkeypatch):
         model_id="fake:fake-model",
     )
 
+    contexts = {
+        visit.order: build_context(visit, visit_list_len=len(visit_list.nodes))
+        for visit in visit_list.nodes
+    }
+
     frames: list[dict[str, Any]] = []
 
     async def emit(frame: dict[str, Any]) -> None:
         frames.append(frame)
 
     patcher = Patcher(session, emit)
-    final = await run_pipeline(session, patcher, code_service=code_service)
+    final = await run_pipeline(
+        session,
+        patcher,
+        code_service=code_service,
+        contexts=contexts,
+    )
 
     cls_blocks = _blocks_by_visit_order(patcher, cls_visit.order)
     big_blocks = _blocks_by_visit_order(patcher, big_visit.order)
@@ -214,7 +224,13 @@ def test_fake_parses_block_plan_prompt():
         build_visit_list(_pipeline_graph(), "cls", depth=1),
         "big_fn",
     )
-    ctx = build_context(visit, visit_list_len=4, numbered_code="10 | code")
+    ctx = build_context(
+        visit,
+        visit_list_len=4,
+        numbered_code="\n".join(
+            f"{line:4d} | code" for line in range(visit.start_line, visit.end_line + 1)
+        ),
+    )
     prompt = block_plan_user_prompt(ctx)
 
     bounds = _extract_bounds(prompt)

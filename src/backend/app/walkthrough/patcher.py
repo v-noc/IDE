@@ -86,6 +86,11 @@ class Patcher:
     async def set_status(self, status: str) -> None:
         await self._frame([{"op": "replace", "path": "/status", "value": status}])
 
+    async def append_error(self, message: str) -> None:
+        await self._frame(
+            [{"op": "add", "path": "/error_log/-", "value": message}],
+        )
+
     async def end_frame(self, status: str, message: str | None = None) -> dict[str, Any]:
         frame: dict[str, Any] = {"kind": "end", "status": status}
         if message:

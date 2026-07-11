@@ -29,6 +29,8 @@ class GraphNode:
     line_no: int | None = None
     end_line_no: int | None = None
     target_id: str | None = None
+    documents: list[str] = field(default_factory=list)
+    parent_id: str | None = None
 
 
 def _is_group_id(node_id: str) -> bool:
@@ -91,6 +93,9 @@ def graph_node_from_domain(node: Any) -> GraphNode:
     kind = _node_kind(node)
     line_no, end_line_no = _position(node)
     children = sorted(str(c) for c in (getattr(node, "children", None) or set()) if c)
+    documents = sorted(
+        str(d) for d in (getattr(node, "documents", None) or set()) if d
+    )[:3]
     return GraphNode(
         id=str(node.id),
         name=node.name,
@@ -101,6 +106,7 @@ def graph_node_from_domain(node: Any) -> GraphNode:
         line_no=line_no,
         end_line_no=end_line_no,
         target_id=_target_id(node, kind),
+        documents=documents,
     )
 
 
@@ -113,6 +119,12 @@ def build_graph(
         if node is None or not getattr(node, "id", None):
             continue
         by_id[str(node.id)] = graph_node_from_domain(node)
+
+    for node in by_id.values():
+        for child_id in node.children:
+            child = by_id.get(child_id)
+            if child is not None and child.parent_id is None:
+                child.parent_id = node.id
 
     return by_id
 
@@ -133,6 +145,27 @@ def expand_children(
             ordered.extend(expand_children(graph, child_id))
         else:
             ordered.append(child_id)
+    return ordered
+
+
+def expand_children_with_groups(
+    graph: dict[str, GraphNode],
+    node_id: str,
+    group_name: str | None = None,
+) -> list[tuple[str, str | None]]:
+    """Like expand_children, but remembers which group a child came through."""
+    node = graph.get(node_id)
+    if not node:
+        return []
+    ordered: list[tuple[str, str | None]] = []
+    for child_id in node.children:
+        child = graph.get(child_id)
+        if child and child.kind == "group":
+            ordered.extend(
+                expand_children_with_groups(graph, child_id, child.name),
+            )
+        else:
+            ordered.append((child_id, group_name))
     return ordered
 
 

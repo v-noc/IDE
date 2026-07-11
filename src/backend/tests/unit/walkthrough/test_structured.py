@@ -24,7 +24,7 @@ async def test_structured_call_retries_then_succeeds():
 
     original = structured_module.make_llm
 
-    def fake_factory(call_type: str) -> FakeLLM:
+    def fake_factory(call_type: str, **_kwargs) -> FakeLLM:
         return FakeLLM(call_type, fail_first_attempts=1)
 
     structured_module.make_llm = fake_factory

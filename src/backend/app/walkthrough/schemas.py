@@ -11,8 +11,8 @@ NodeType = Literal["folder", "file", "class", "function", "call", "project"]
 VisitMode = Literal["full", "contextual"]
 SessionStatus = Literal["generating", "complete", "error", "aborted"]
 
-SCHEMA_VERSION = "1"
-PROMPT_VERSION = "1"
+SCHEMA_VERSION = "2"
+PROMPT_VERSION = "4"
 
 
 class RunRequest(BaseModel):
@@ -61,11 +61,34 @@ class EstimateResponse(Estimate):
 class PlannedBlock(BaseModel):
     start_line: int
     end_line: int
-    focus: str = Field(max_length=100)
+    focus: str = Field(
+        max_length=100,
+        description=(
+            "User-facing label of what this block DOES, e.g. "
+            "'validate the card fields'. At most 100 characters."
+        ),
+    )
+    description: str = Field(
+        description=(
+            "One complete sentence to the narrator who will explain this block: "
+            "what it does and why the code needs it."
+        ),
+    )
 
 
 class BlockPlan(BaseModel):
-    reasoning: str
+    reasoning: str = Field(
+        description=(
+            "Think in order: (a) the code's overall structure, (b) where the "
+            "natural seams are, (c) how many blocks that gives and why."
+        ),
+    )
+    block_count: int = Field(
+        description=(
+            "The number of blocks your reasoning justified. "
+            "blocks must contain exactly this many entries."
+        ),
+    )
     blocks: list[PlannedBlock]
 
 
@@ -83,6 +106,7 @@ class BlockStep(BaseModel):
     start_line: int
     end_line: int
     focus: str
+    description: str = ""
     text: str = ""
     degraded: bool = False
 

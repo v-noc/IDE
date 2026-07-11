@@ -41,8 +41,16 @@ async def test_patcher_applies_ops_to_mirror():
 
     await patcher.open_node_steps(0, visit.node_id, "full")
     await patcher.set_intro(0, "Intro text", False)
+    await patcher.append_error("intro attempt 1: fake failure")
 
     assert len(patcher.mirror.node_steps) == 1
     assert patcher.mirror.node_steps[0].intro_text == "Intro text"
+    assert patcher.mirror.error_log == ["intro attempt 1: fake failure"]
     assert frames[0]["kind"] == "patch"
     assert frames[0]["seq"] == 0
+    assert any(
+        op.get("path") == "/error_log/-"
+        for frame in frames
+        if frame.get("kind") == "patch"
+        for op in frame.get("ops", [])
+    )

@@ -27,7 +27,8 @@ services:
     environment:
       - TERMINUSDB_CONTENT_ENDPOINT=http://terminusdb:6363
       - TERMINUSDB_USER_FORWARD_HEADER=X-User-Forward
-      - OPENAI_KEY=${OPENAI_KEY}
+      # Vectorlink's env name is OPENAI_KEY; feed it from our shared OPENAI_API_KEY
+      - OPENAI_KEY=${OPENAI_API_KEY:-}
     volumes:
       - ./vector_storage:/app/storage
     command:

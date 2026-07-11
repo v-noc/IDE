@@ -85,18 +85,25 @@ fill `target_id`.
 
 ## Block plan (the only LLM-authored plan)
 
-The schema bound to the block-planner call. `reasoning` comes **first** on purpose —
-the model writes its reading of the code before committing to numbers (see 08).
+The schema bound to the block-planner call. Field order is the design (see 08):
+`reasoning` first — the model reads the code before committing to numbers — then
+`block_count` — the justified count, committed before any range is typed — then the
+blocks themselves.
 
 ```python
 class PlannedBlock:
     start_line: int         # absolute line numbers, matching the numbered code shown
     end_line: int
-    focus: str              # ≤ 100 chars: what this block is about ("validate inputs",
-                            # "build the query", "handle the error path")
+    focus: str              # ≤ 100 chars, USER-FACING: what this block is about
+                            # ("validate inputs") — becomes the outline row / step title
+    description: str        # one sentence, MODEL-FACING: the planner's note to the
+                            # block-text call ("Rejects bad numbers and expired dates
+                            # early so the provider is never called with junk.")
 
 class BlockPlan:
-    reasoning: str          # 1-3 sentences: the function's structure, where the seams are
+    reasoning: str          # ordered CoT: the code's structure → the seams → why
+                            # block_count blocks (see 08)
+    block_count: int        # the commitment; validator checks len(blocks) == block_count
     blocks: list[PlannedBlock]
 ```
 
@@ -104,11 +111,12 @@ class BlockPlan:
 
 | Rule | On violation |
 |---|---|
-| `min_blocks ≤ len(blocks) ≤ max_blocks` (bounds from 03) | retry with the error message |
+| `block_count == len(blocks)` (the commitment, 08) | retry with the error message |
+| `min_blocks ≤ len(blocks) ≤ max_blocks` (bounds from 03) | retry |
 | every range inside the node's `[start_line, end_line]` | retry |
 | blocks ordered by `start_line`, non-overlapping | retry |
 | blocks cover ≥ 80 % of the node's lines (no big unexplained holes) | retry |
-| second failure | **fallback**: even split into `clamp(ceil(lines/15), 2, 6)` blocks, `focus = "lines A–B"` |
+| second failure | **fallback**: even split into `clamp(ceil(lines/15), 2, 6)` blocks, `focus = "lines A–B"`, `description = ""` |
 
 ## Steps (assembled by code, consumed by the player)
 
@@ -118,6 +126,9 @@ class BlockStep:
     start_line: int
     end_line: int
     focus: str              # from the plan (popup title)
+    description: str        # from the plan; persisted for evals and previous-block
+                            # context — the UI renders focus + text only, and the
+                            # frontend zod schema simply ignores this field
     text: str               # explainer output; fallback: the focus line + degraded flag
     degraded: bool          # true when any fallback fired
 
@@ -266,3 +277,6 @@ Two independent version strings, both stamped on the session:
 - `SCHEMA_VERSION` — bump when `BlockPlan` / `NodeSteps` shape changes, so exported
   sessions state what shape they are.
 - `PROMPT_VERSION` — bump on any prompt text change (see 07). Schema stays put.
+
+The 2026-07-11 revision bumps **both** to `"2"`: prompts changed wholesale (07 Part 2)
+and `BlockPlan`/`PlannedBlock`/`BlockStep` gained `block_count`/`description`.

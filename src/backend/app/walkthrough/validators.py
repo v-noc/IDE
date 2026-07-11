@@ -6,6 +6,13 @@ from app.walkthrough.traversal import block_bounds
 
 def validate_block_plan(plan: BlockPlan, visit: VisitNode) -> list[str]:
     errors: list[str] = []
+
+    if plan.block_count != len(plan.blocks):
+        errors.append(
+            f"block_count says {plan.block_count} "
+            f"but you returned {len(plan.blocks)} blocks",
+        )
+
     if visit.start_line is None or visit.end_line is None:
         return errors
 

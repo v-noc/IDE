@@ -61,12 +61,18 @@ class FakeLLM:
             count = min_blocks + (_stable_hash(name) % span)
             if start is None or end is None:
                 blocks = [
-                    PlannedBlock(start_line=1, end_line=10, focus="overview"),
+                    PlannedBlock(
+                        start_line=1,
+                        end_line=10,
+                        focus="overview",
+                        description="Covers overview.",
+                    ),
                 ]
             else:
                 blocks = _even_blocks(start, end, count)
             return BlockPlan(
                 reasoning=f"Split {name} into {len(blocks)} logical blocks.",
+                block_count=len(blocks),
                 blocks=blocks,
             )  # type: ignore[return-value]
 
@@ -91,7 +97,7 @@ def _stable_hash(name: str) -> int:
 
 
 def _extract_node_name(user: str) -> str:
-    match = re.search(r"^### node\s*\n(.+)", user, re.MULTILINE)
+    match = re.search(r"^### (?:node|call site)\s*\n(.+)", user, re.MULTILINE)
     if not match:
         return "this node"
     header = match.group(1).strip()
@@ -99,6 +105,9 @@ def _extract_node_name(user: str) -> str:
 
 
 def _extract_bounds(user: str) -> tuple[int, int]:
+    match = re.search(r"Split into (\d+)-(\d+) blocks", user)
+    if match:
+        return int(match.group(1)), int(match.group(2))
     match = re.search(r"between (\d+) and (\d+) blocks", user)
     if match:
         return int(match.group(1)), int(match.group(2))
@@ -109,16 +118,29 @@ def _extract_line_range(user: str) -> tuple[int | None, int | None]:
     match = re.search(r"lines (\d+)[–-](\d+)", user)
     if match:
         return int(match.group(1)), int(match.group(2))
+    numbers = [int(n) for n in re.findall(r"(?m)^\s*(\d+)\s*\|", user)]
+    if numbers:
+        return numbers[0], numbers[-1]
     return None, None
 
 
 def _extract_focus(user: str) -> str | None:
+    match = re.search(
+        r"### your block\s*\nLines \d+-\d+: (.+)",
+        user,
+        re.MULTILINE,
+    )
+    if match:
+        return match.group(1).strip()
     match = re.search(r"### this block\s*\n(.+)", user, re.MULTILINE)
     return match.group(1).strip() if match else None
 
 
 def _is_first_block(user: str) -> bool:
-    return "### previous blocks" not in user
+    return (
+        "### previous blocks covered" not in user
+        and "### previous blocks" not in user
+    )
 
 
 def _first_block_markdown_text(focus: str) -> str:
@@ -148,12 +170,24 @@ def _even_blocks(start: int, end: int, count: int) -> list:
         if cursor > end:
             break
         block_end = min(end, cursor + size - 1)
+        focus = f"lines {cursor}–{block_end}"
         blocks.append(
             PlannedBlock(
                 start_line=cursor,
                 end_line=block_end,
-                focus=f"lines {cursor}–{block_end}",
+                focus=focus,
+                description=f"Covers {focus}.",
             ),
         )
         cursor = block_end + 1
-    return blocks or [PlannedBlock(start_line=start, end_line=end, focus=f"lines {start}–{end}")]
+    if not blocks:
+        focus = f"lines {start}–{end}"
+        blocks = [
+            PlannedBlock(
+                start_line=start,
+                end_line=end,
+                focus=focus,
+                description=f"Covers {focus}.",
+            ),
+        ]
+    return blocks

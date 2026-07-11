@@ -20,26 +20,31 @@ def even_split_plan(
     cursor = start_line
     while cursor <= end_line and len(blocks) < count:
         block_end = min(end_line, cursor + size - 1)
+        focus = f"lines {cursor}–{block_end}"
         blocks.append(
             PlannedBlock(
                 start_line=cursor,
                 end_line=block_end,
-                focus=f"lines {cursor}–{block_end}",
+                focus=focus,
+                description="",
             ),
         )
         cursor = block_end + 1
 
     if not blocks:
+        focus = f"lines {start_line}–{end_line}"
         blocks = [
             PlannedBlock(
                 start_line=start_line,
                 end_line=end_line,
-                focus=f"lines {start_line}–{end_line}",
+                focus=focus,
+                description="",
             ),
         ]
 
     return BlockPlan(
         reasoning="Fallback even split after planner failure.",
+        block_count=len(blocks),
         blocks=blocks,
     )
 
@@ -49,11 +54,13 @@ def single_block_plan(visit: VisitNode) -> BlockPlan:
     end = visit.end_line or start
     return BlockPlan(
         reasoning="Whole body fits in one block.",
+        block_count=1,
         blocks=[
             PlannedBlock(
                 start_line=start,
                 end_line=end,
                 focus=visit.name,
+                description="",
             ),
         ],
     )

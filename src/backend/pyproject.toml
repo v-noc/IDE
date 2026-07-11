@@ -38,6 +38,9 @@ dependencies = [
   "msgpack>=1.1.2",
   "orjson>=3.11.8",
   "jsonpatch>=1.33",
+  "langchain>=0.3",
+  "langchain-openai>=0.3",
+  "langgraph>=1.2.9",
 ]
 
 [project.optional-dependencies]

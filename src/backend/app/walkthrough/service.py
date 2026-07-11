@@ -10,6 +10,7 @@ from app.agent.llm.providers import resolve_model_id
 from app.agent.llm.structured import make_llm
 from app.core.services.code_element_service import CodeElementService
 from app.db.context import ProjectUoW
+from app.walkthrough.context import build_contexts
 from app.walkthrough.loader import load_traversal_graph
 from app.walkthrough.patcher import Patcher
 from app.walkthrough.pipeline import run_pipeline
@@ -122,6 +123,8 @@ class WalkthroughService:
                     )
                     return
 
+                contexts = await build_contexts(graph, visit_list, repos)
+
                 branch = self.uow.ctx.branch
                 commit_id = self.uow.ctx.ref or f"{branch}@head"
                 session = new_session(
@@ -136,10 +139,14 @@ class WalkthroughService:
                 patcher = Patcher(session, emit)
                 await queue.put(await patcher.hello_frame())
 
+                # Connection stays open (NDJSON) while the pipeline finishes each
+                # stop. Token-level streaming can land later; today each step's
+                # finished text is patched as soon as the structured call returns.
                 final_session = await run_pipeline(
                     session,
                     patcher,
                     code_service=code_service,
+                    contexts=contexts,
                 )
                 await patcher.set_status("complete")
                 await queue.put(await patcher.end_frame("complete"))

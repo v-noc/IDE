@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
+from app.agent.llm.providers import models_catalog
 from app.api.dependencies import get_code_element_service, get_project_uow
 from app.core.services.code_element_service import CodeElementService
 from app.db.context import ProjectUoW
@@ -14,6 +15,12 @@ def get_walkthrough_service(
     uow: ProjectUoW = Depends(get_project_uow),
 ) -> WalkthroughService:
     return WalkthroughService(uow)
+
+
+@router.get("/models")
+async def list_models() -> dict:
+    """Active model + provider catalog for the future picker. Never returns keys."""
+    return models_catalog()
 
 
 @router.get("/estimate", response_model=Estimate)
