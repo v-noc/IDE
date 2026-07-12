@@ -33,6 +33,7 @@ V-NOC replaces the archaic file-and-folder system with a **logic graph**, moving
 - [Quick Start](#quick-start)
 - [Creating a Project](#creating-a-project)
 - [Supported Languages](#supported-languages)
+- [Walkthrough Agent](#walkthrough-agent)
 - [Service Ports](#service-ports)
 - [Documentation](#documentation)
 - [Community & License](#community--license)
@@ -61,6 +62,7 @@ For the long-form philosophy, see **[doc/01-vision.md](doc/01-vision.md)**.
 | Component | Path | Stack |
 |---|---|---|
 | Backend API (REST + JSON-RPC) | `src/backend/` | FastAPI, Python 3.12, TerminusDB |
+| Walkthrough agent | `src/backend/app/walkthrough/` | LangGraph, LangChain, OpenAI-compatible LLMs |
 | Frontend (canvas IDE) | `src/frontend/` | React, Vite, TypeScript |
 | Python language driver | `src/lsp/py/` | Jedi, LibCST, FastAPI JSON-RPC |
 | TS/JS language driver | `src/lsp/ts_js/` | Bun, ts-morph, Hono |
@@ -94,7 +96,7 @@ make install-lsp     # Python + TS/JS language drivers
 cp src/backend/.env.example src/backend/.env
 ```
 
-Edit `src/backend/.env` if you want non-default ports or a different TerminusDB password.
+Edit `src/backend/.env` if you want non-default ports, a different TerminusDB password, or a real LLM for the walkthrough agent (see [Walkthrough Agent](#walkthrough-agent)).
 
 ### 3. Run
 
@@ -164,6 +166,30 @@ make run-lsp
 ```
 
 Driver protocol and how to add a new language: **[doc/05-language-drivers.md](doc/05-language-drivers.md)**.
+
+---
+
+## Walkthrough Agent
+
+The walkthrough agent generates an AI-guided tour of your call graph — intro, block plan, and per-block explanations — streamed from the backend while the canvas highlights each stop.
+
+**Default:** `WALKTHROUGH_LLM=fake` needs no API key and returns deterministic placeholder copy (good for local dev and tests).
+
+**Real LLM:** set one line in `src/backend/.env` and restart the backend:
+
+| Goal | `.env` |
+|---|---|
+| OpenAI | `WALKTHROUGH_LLM=openai:gpt-4o-mini` + `OPENAI_API_KEY=sk-...` |
+| Vercel AI Gateway | `WALKTHROUGH_LLM=vercel:zai/glm-4.7` + `AI_GATEWAY_API_KEY=...` |
+| Local / OpenRouter / vLLM | `WALKTHROUGH_LLM=custom:your-model` + `CUSTOM_LLM_BASE_URL=...` + `CUSTOM_LLM_API_KEY=...` |
+
+`OPENAI_API_KEY` is also used by Vectorlink for semantic search embeddings when the database stack is running.
+
+**Optional tracing:** set `LANGSMITH_API_KEY` (and optionally `LANGSMITH_PROJECT`) to send LangGraph runs to [LangSmith](https://smith.langchain.com/).
+
+**API:** `GET /api/v1/walkthroughs/models` lists providers and curated models; `POST /api/v1/walkthroughs/run` starts a tour (NDJSON stream). In the UI, open the Agent panel on a function or class node and choose **Generate walkthrough**.
+
+Full design notes: **[plan/walkthrough-agent/](plan/walkthrough-agent/)**.
 
 ---
 
