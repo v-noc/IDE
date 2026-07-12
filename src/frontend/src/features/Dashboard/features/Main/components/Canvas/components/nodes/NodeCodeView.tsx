@@ -1,8 +1,10 @@
 import React, { memo, lazy, Suspense, useState } from "react";
 import { useTheme } from "next-themes";
 import { Save, Copy, Check, Maximize2 } from "lucide-react";
-import { DiffEditor } from "@monaco-editor/react";
+import { DiffEditor, type Monaco } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { CodeViewDialog } from "./CodeViewDialog";
+import { useWalkthroughMonaco } from "@/features/Dashboard/features/Agent/walkthrough/hooks/useWalkthroughMonaco";
 
 // Lazy load Monaco Editor
 const CodeEditor = lazy(() => import("@/components/CodeEditor"));
@@ -31,6 +33,9 @@ interface NodeCodeViewProps {
   diffError?: string | null;
   borderColor: string;
   iconColor: string;
+  nodeId?: string;
+  nodeStartLine?: number;
+  isWalkthroughPlaying?: boolean;
 }
 
 export const NodeCodeView = memo(function NodeCodeView({
@@ -49,11 +54,29 @@ export const NodeCodeView = memo(function NodeCodeView({
   diffError = null,
   borderColor,
   iconColor,
+  nodeId = "",
+  nodeStartLine,
+  isWalkthroughPlaying = false,
 }: NodeCodeViewProps) {
   const { resolvedTheme } = useTheme();
   const monacoTheme = resolvedTheme === "light" ? "vs" : "vs-dark";
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const codeLoaded = !isLoading && code.length > 0;
+
+  const { onMount: walkthroughOnMount } = useWalkthroughMonaco(
+    nodeId,
+    nodeStartLine,
+    showDiff,
+    codeLoaded,
+  );
+
+  const handleEditorMount = (
+    editorInstance: editor.IStandaloneCodeEditor,
+    monacoApi: Monaco,
+  ) => {
+    walkthroughOnMount(editorInstance, monacoApi);
+  };
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -72,7 +95,7 @@ export const NodeCodeView = memo(function NodeCodeView({
           {fileName || "Code"}
         </span>
         <div className="flex items-center gap-2">
-          {!showDiff && hasChanges && (
+          {!showDiff && hasChanges && !isWalkthroughPlaying && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -168,9 +191,10 @@ export const NodeCodeView = memo(function NodeCodeView({
               value={code}
               onChange={onChange}
               isLoading={isLoading}
+              onMount={handleEditorMount}
               options={{
                 minimap: { enabled: false },
-                readOnly: false,
+                readOnly: isWalkthroughPlaying,
                 scrollBeyondLastLine: false,
                 fontSize: 12,
                 lineHeight: 18,

@@ -1,0 +1,289 @@
+{
+  "estimate": {
+    "node_count": 4,
+    "step_estimate": 9,
+    "llm_call_estimate": 8,
+    "over_cap": false
+  },
+  "frames": [
+    {
+      "delay": 0,
+      "frame": {
+        "kind": "hello",
+        "protocol": 1,
+        "session": {
+          "id": "mock-class-with-call",
+          "created_at": "2026-07-07T10:00:00.000Z",
+          "request": {
+            "project_id": "demo",
+            "node_id": "services/payment/PaymentService",
+            "depth": 1
+          },
+          "branch": "main",
+          "commit_id": "abc123",
+          "visit_list": {
+            "start_node_id": "services/payment/PaymentService",
+            "depth": 1,
+            "nodes": [
+              {
+                "node_id": "services/payment/PaymentService",
+                "name": "PaymentService",
+                "qname": "PaymentService",
+                "node_type": "class",
+                "description": "Orchestrates payment flow for the app.",
+                "level": 0,
+                "order": 0,
+                "parent_order": null,
+                "target_id": "services/payment/PaymentService",
+                "mode": "full",
+                "first_seen_order": null,
+                "has_code": false,
+                "start_line": null,
+                "end_line": null,
+                "line_count": null,
+                "gated": false
+              },
+              {
+                "node_id": "services/payment/charge",
+                "name": "charge",
+                "qname": "PaymentService.charge",
+                "node_type": "function",
+                "description": "Charge a card and return a receipt.",
+                "level": 1,
+                "order": 1,
+                "parent_order": 0,
+                "target_id": "services/payment/charge",
+                "mode": "full",
+                "first_seen_order": null,
+                "has_code": true,
+                "start_line": 10,
+                "end_line": 40,
+                "line_count": 31,
+                "gated": true
+              },
+              {
+                "node_id": "services/payment/calls/validate_card",
+                "name": "validate_card",
+                "qname": null,
+                "node_type": "call",
+                "description": "Checks card number, expiry, and CVV format.",
+                "level": 1,
+                "order": 2,
+                "parent_order": 1,
+                "target_id": "services/validation/validate_card",
+                "mode": "full",
+                "first_seen_order": null,
+                "has_code": true,
+                "start_line": 5,
+                "end_line": 28,
+                "line_count": 24,
+                "gated": true
+              },
+              {
+                "node_id": "services/payment/calls/validate_card-ctx",
+                "name": "validate_card",
+                "qname": null,
+                "node_type": "call",
+                "description": "Second call site — already explained.",
+                "level": 1,
+                "order": 3,
+                "parent_order": 1,
+                "target_id": "services/validation/validate_card",
+                "mode": "contextual",
+                "first_seen_order": 2,
+                "has_code": false,
+                "start_line": null,
+                "end_line": null,
+                "line_count": null,
+                "gated": false
+              }
+            ]
+          },
+          "node_steps": [],
+          "status": "generating",
+          "error_log": [],
+          "schema_version": "1",
+          "prompt_version": "1",
+          "model_id": "mock",
+          "usage": { "prompt_tokens": 0, "completion_tokens": 0 }
+        }
+      }
+    },
+    {
+      "delay": 300,
+      "frame": {
+        "kind": "patch",
+        "seq": 0,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/node_steps/-",
+            "value": {
+              "node_id": "services/payment/PaymentService",
+              "order": 0,
+              "mode": "full",
+              "intro_text": "",
+              "degraded": false,
+              "blocks": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 500,
+      "frame": {
+        "kind": "patch",
+        "seq": 1,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/node_steps/0/intro_text",
+            "value": "PaymentService owns the payment flow — charge is the main entry point, with validation delegated to a shared helper."
+          }
+        ]
+      }
+    },
+    {
+      "delay": 400,
+      "frame": {
+        "kind": "patch",
+        "seq": 2,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/node_steps/-",
+            "value": {
+              "node_id": "services/payment/charge",
+              "order": 1,
+              "mode": "full",
+              "intro_text": "",
+              "degraded": false,
+              "blocks": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 500,
+      "frame": {
+        "kind": "patch",
+        "seq": 3,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/node_steps/1/intro_text",
+            "value": "charge() validates the card, calls the provider, and returns a receipt."
+          },
+          {
+            "op": "add",
+            "path": "/node_steps/1/blocks/-",
+            "value": {
+              "index": 0,
+              "start_line": 10,
+              "end_line": 40,
+              "focus": "charge flow",
+              "text": "The method validates input, delegates to validate_card, then charges and returns a receipt.",
+              "degraded": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 400,
+      "frame": {
+        "kind": "patch",
+        "seq": 4,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/node_steps/-",
+            "value": {
+              "node_id": "services/payment/calls/validate_card",
+              "order": 2,
+              "mode": "full",
+              "intro_text": "",
+              "degraded": false,
+              "blocks": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 500,
+      "frame": {
+        "kind": "patch",
+        "seq": 5,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/node_steps/2/intro_text",
+            "value": "validate_card lives in another file — it checks number, expiry, and CVV before charge proceeds."
+          },
+          {
+            "op": "add",
+            "path": "/node_steps/2/blocks/-",
+            "value": {
+              "index": 0,
+              "start_line": 5,
+              "end_line": 28,
+              "focus": "field checks",
+              "text": "Each field is validated with explicit error messages so callers get actionable failures.",
+              "degraded": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 400,
+      "frame": {
+        "kind": "patch",
+        "seq": 6,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/node_steps/-",
+            "value": {
+              "node_id": "services/payment/calls/validate_card-ctx",
+              "order": 3,
+              "mode": "contextual",
+              "intro_text": "",
+              "degraded": false,
+              "blocks": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 500,
+      "frame": {
+        "kind": "patch",
+        "seq": 7,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/node_steps/3/intro_text",
+            "value": "This second call to validate_card reuses the same helper — see stop 3 for the full implementation."
+          }
+        ]
+      }
+    },
+    {
+      "delay": 200,
+      "frame": {
+        "kind": "patch",
+        "seq": 8,
+        "ops": [{ "op": "replace", "path": "/status", "value": "complete" }]
+      }
+    },
+    {
+      "delay": 100,
+      "frame": { "kind": "end", "status": "complete" }
+    }
+  ]
+}

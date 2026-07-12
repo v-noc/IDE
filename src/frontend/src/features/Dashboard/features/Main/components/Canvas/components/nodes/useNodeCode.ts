@@ -4,6 +4,7 @@ import { useEditableCode } from "@/features/Dashboard/features/Main/components/C
 import { useCodeDiff } from "@/features/Dashboard/features/Main/components/Code/useCodeDiff";
 import { detectLanguage } from "@/components/CodeEditor/detectLanguage";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useWalkthroughStore } from "@/features/Dashboard/features/Agent/walkthrough/store/useWalkthroughStore";
 
 export interface UseNodeCodeOptions {
   nodeId: string;
@@ -15,6 +16,9 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
   const [showCode, setShowCode] = useState(false);
   const { projectData } = useProjectStore();
   const projectId = projectData?.id;
+  const walkthroughCodeOpen = useWalkthroughStore(
+    (s) => s.phase === "playing" && s.codeOpenNodeId === nodeId,
+  );
 
   // Only fetch code for file, class, or function node types
   const shouldFetchCode =
@@ -26,7 +30,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
   const effectiveNodeType = nodeType === "call" ? "call" : nodeType;
 
   const { data: codeData } = useCode(
-    showCode && shouldFetchCode ? effectiveNodeId : undefined,
+    (showCode || walkthroughCodeOpen) && shouldFetchCode ? effectiveNodeId : undefined,
     effectiveNodeType,
     projectId
   );
@@ -63,8 +67,11 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
 
   const toggleCode = () => setShowCode((prev) => !prev);
 
+  const effectiveShowCode = showCode || walkthroughCodeOpen;
+  const isWalkthroughPlaying = useWalkthroughStore((s) => s.phase === "playing");
+
   return {
-    showCode,
+    showCode: effectiveShowCode,
     toggleCode,
     hasCode,
     code: editorValue,
@@ -81,5 +88,7 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
     modifiedContent,
     isLoadingDiff,
     diffError,
+    nodeStartLine: codeData?.position?.line_no,
+    isWalkthroughPlaying,
   };
 }

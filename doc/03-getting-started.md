@@ -61,7 +61,7 @@ PORT=8000
 > [!IMPORTANT]
 > `TERMINUSDB_ADMIN_PASS` **must** equal `TERMINUS_KEY`. The compose file sets the admin password to `${TERMINUSDB_ADMIN_PASS}`, and the backend authenticates with `TERMINUS_KEY`.
 
-If you set `OPENAI_KEY` in the same file, Vectorlink will be able to compute embeddings for semantic search.
+If you set `OPENAI_API_KEY` in the same file, Vectorlink will be able to compute embeddings for semantic search (compose maps it to Vectorlink’s `OPENAI_KEY`). The walkthrough agent uses the same `OPENAI_API_KEY` when `WALKTHROUGH_LLM=openai:…`.
 
 ---
 

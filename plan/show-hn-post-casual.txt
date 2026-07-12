@@ -1,0 +1,37 @@
+TITLE (HN limit is 80 chars, pick one):
+
+Show HN: V-NOC – an IDE prototype that shows your codebase as a graph
+Show HN: I'm trying to make programming simpler by turning code into a graph
+Show HN: V-NOC – an early prototype of a graph-based coding environment
+
+BODY (HN is plain text, no markdown. Paste everything below as-is):
+
+Hi HN. I've been working on this for about a year, mostly alone. It's still an early prototype, but I think the direction is worth showing and I'd like some honest feedback before I go further.
+
+V-NOC is my attempt at making programming simpler by cutting down how much you have to keep in your head. When you work on a codebase you didn't write, the hard part is rarely the change itself. It's building the map first: which function calls which, what breaks if you touch this, where the logs for this thing even go. That map lives in your brain, and it fades every time you step away.
+
+So instead of files and folders, V-NOC stores the codebase as a graph. Functions, classes, files and folders are nodes. Calls, imports and dependencies are edges. Tests, logs and docs attach to the node they belong to. When you look at a function, you also see who calls it, what it calls, and its tests, without opening anything else.
+
+Demo, no signup needed:
+
+https://vnoc.vercel.app/project/claudecode
+
+That's Anthropic's open source Claude Code repo parsed into a graph. You can pan around, expand nodes and follow the call edges.
+
+Two things I'd point you at:
+
+Focus mode. Click a function or class and everything else disappears. You get that one piece of code plus its callers and callees. The view has its own URL, so you can send a teammate a link to a function with its context instead of a file path and a line number.
+
+Walkthrough agent. Very new, still rough. You drop a function, class or folder into the chat, pick how deep to go, and it plays a guided tour on the canvas: it moves to a node, opens the code, highlights a few lines, explains them, and waits for you to click next. The route comes from the graph, not from the model, so it can't wander off or invent code that isn't there. I made it for onboarding, since "walk me through this module" usually costs someone an afternoon.
+
+Longer term, the idea is to track everything about a project in one place. Tasks are the next piece (not built yet): a task would be a node in the same graph, connected to the exact functions and classes it touches, next to their docs and tests. Open a task and see the code it involves. Open a function and see the open tasks on it. No more jumping between the issue tracker, the wiki and the editor to piece the story together.
+
+Honest limits right now: Python and TypeScript/JavaScript only. It's not a full editor, you keep editing in your own editor and it syncs through a file watcher. First parse of a big repo is slow. The hosted demo is read-only.
+
+It's open source (Apache 2.0):
+
+[REPO URL]
+
+It runs on TerminusDB, a graph database with git-style branches and commits built in.
+
+The main thing I want to know: does seeing code as a graph actually reduce the mental load for you, or is the file tree fine and I've spent a year on a toy? Either answer helps. I'll be in the comments.

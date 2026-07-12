@@ -1,4 +1,5 @@
 import asyncio
+import os
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,6 +38,17 @@ async def lifespan(app: FastAPI):
     print("🔌 Socket.IO server initialized and ready")
 
     await init_cache(app)
+
+    from app.agent.llm.providers import validate_llm_settings
+    from app.config.settings import get_settings
+
+    validate_llm_settings()
+
+    settings = get_settings()
+    if settings.LANGSMITH_API_KEY:
+        os.environ.setdefault("LANGSMITH_TRACING", "true")
+        os.environ.setdefault("LANGSMITH_API_KEY", settings.LANGSMITH_API_KEY)
+        os.environ.setdefault("LANGSMITH_PROJECT", settings.LANGSMITH_PROJECT)
 
     yield
 

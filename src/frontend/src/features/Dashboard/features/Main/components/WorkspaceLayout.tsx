@@ -8,6 +8,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import Sandbox from "./Sandbox";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import type { ProjectStore } from "@/features/Dashboard/store/useProjectStore";
+import { WalkthroughStepOverlay } from "@/features/Dashboard/features/Agent/walkthrough/components/WalkthroughStepOverlay";
 
 interface WorkspaceLayoutProps {
   topPanelContent: React.ReactNode;
@@ -125,6 +126,7 @@ export function WorkspaceLayout({
       )}
       {/* Floating button for additional actions */}
       {floatingButton}
+      <WalkthroughStepOverlay />
     </div>
   );
 }

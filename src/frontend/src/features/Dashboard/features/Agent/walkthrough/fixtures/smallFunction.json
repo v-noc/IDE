@@ -1,0 +1,211 @@
+{
+  "estimate": {
+    "node_count": 1,
+    "step_estimate": 4,
+    "llm_call_estimate": 4,
+    "over_cap": false
+  },
+  "frames": [
+    {
+      "delay": 0,
+      "frame": {
+        "kind": "hello",
+        "protocol": 1,
+        "session": {
+          "id": "mock-small-function",
+          "created_at": "2026-07-07T10:00:00.000Z",
+          "request": {
+            "project_id": "demo",
+            "node_id": "services/payment/charge",
+            "depth": 0
+          },
+          "branch": "main",
+          "commit_id": "abc123",
+          "visit_list": {
+            "start_node_id": "services/payment/charge",
+            "depth": 0,
+            "nodes": [
+              {
+                "node_id": "services/payment/charge",
+                "name": "charge",
+                "qname": "PaymentService.charge",
+                "node_type": "function",
+                "description": "Charge a card and return a receipt.",
+                "level": 0,
+                "order": 0,
+                "parent_order": null,
+                "target_id": "services/payment/charge",
+                "mode": "full",
+                "first_seen_order": null,
+                "has_code": true,
+                "start_line": 10,
+                "end_line": 62,
+                "line_count": 53,
+                "gated": true
+              }
+            ]
+          },
+          "node_steps": [],
+          "status": "generating",
+          "error_log": [],
+          "schema_version": "1",
+          "prompt_version": "1",
+          "model_id": "mock",
+          "usage": { "prompt_tokens": 0, "completion_tokens": 0 }
+        }
+      }
+    },
+    {
+      "delay": 400,
+      "frame": {
+        "kind": "patch",
+        "seq": 0,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/node_steps/-",
+            "value": {
+              "node_id": "services/payment/charge",
+              "order": 0,
+              "mode": "full",
+              "intro_text": "",
+              "degraded": false,
+              "blocks": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 600,
+      "frame": {
+        "kind": "patch",
+        "seq": 1,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/node_steps/0/intro_text",
+            "value": "This function orchestrates charging a card: it validates input, calls the provider, and returns a receipt."
+          }
+        ]
+      }
+    },
+    {
+      "delay": 500,
+      "frame": {
+        "kind": "patch",
+        "seq": 2,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/node_steps/0/blocks/-",
+            "value": {
+              "index": 0,
+              "start_line": 10,
+              "end_line": 22,
+              "focus": "validate inputs",
+              "text": "",
+              "degraded": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 700,
+      "frame": {
+        "kind": "patch",
+        "seq": 3,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/node_steps/0/blocks/0/text",
+            "value": "The function first checks the card number, expiry, and CVV so bad input fails fast before any provider call."
+          }
+        ]
+      }
+    },
+    {
+      "delay": 500,
+      "frame": {
+        "kind": "patch",
+        "seq": 4,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/node_steps/0/blocks/-",
+            "value": {
+              "index": 1,
+              "start_line": 23,
+              "end_line": 45,
+              "focus": "call provider",
+              "text": "",
+              "degraded": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 700,
+      "frame": {
+        "kind": "patch",
+        "seq": 5,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/node_steps/0/blocks/1/text",
+            "value": "With valid input, it builds the provider payload, sends the charge request, and maps the response into a receipt object."
+          }
+        ]
+      }
+    },
+    {
+      "delay": 500,
+      "frame": {
+        "kind": "patch",
+        "seq": 6,
+        "ops": [
+          {
+            "op": "add",
+            "path": "/node_steps/0/blocks/-",
+            "value": {
+              "index": 2,
+              "start_line": 46,
+              "end_line": 62,
+              "focus": "return receipt",
+              "text": "",
+              "degraded": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "delay": 700,
+      "frame": {
+        "kind": "patch",
+        "seq": 7,
+        "ops": [
+          {
+            "op": "replace",
+            "path": "/node_steps/0/blocks/2/text",
+            "value": "Finally it emails the receipt, handles retries, and returns the receipt to the caller."
+          }
+        ]
+      }
+    },
+    {
+      "delay": 200,
+      "frame": {
+        "kind": "patch",
+        "seq": 8,
+        "ops": [{ "op": "replace", "path": "/status", "value": "complete" }]
+      }
+    },
+    {
+      "delay": 100,
+      "frame": { "kind": "end", "status": "complete" }
+    }
+  ]
+}

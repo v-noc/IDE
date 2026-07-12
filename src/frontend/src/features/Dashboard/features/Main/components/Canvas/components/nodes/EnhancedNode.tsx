@@ -1,5 +1,7 @@
 import React, { memo, useMemo } from "react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, NodeToolbar, Position } from "@xyflow/react";
+import { StepPopover } from "@/features/Dashboard/features/Agent/walkthrough/components/StepPopover";
+import { useWalkthroughStore } from "@/features/Dashboard/features/Agent/walkthrough/store/useWalkthroughStore";
 import { NodeHeader } from "./NodeHeader";
 import { NodeDescription } from "./NodeDescription";
 import { NodeCodeView } from "./NodeCodeView";
@@ -56,6 +58,18 @@ const EnhancedNode = memo(function EnhancedNode({
   });
 
   const activeTabId = useTabStore((s) => s.activeTabId);
+  const nodeId = data.nodeId ?? "";
+  const anchorType = useWalkthroughStore((s) => {
+    const step = s.playerSteps[s.cursor];
+    if (s.phase !== "playing" || !step || step.nodeId !== nodeId) return null;
+    const hl = step.actions.find((a) => a.type === "highlight_lines");
+    return hl ? "code-line" : "node";
+  });
+  const isNodePopover = anchorType === "node";
+  const isCurrentStepNodeVisible = useWalkthroughStore(
+    (s) =>
+      s.phase === "playing" && s.playerSteps[s.cursor]?.nodeId === nodeId,
+  );
 
   const { statusStyles, contentStyles } = useMemo(() => {
     const status = data.metadata?.status;
@@ -111,10 +125,20 @@ const EnhancedNode = memo(function EnhancedNode({
   };
 
   return (
-    <div
-      className={`relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${
+    <>
+      <NodeToolbar
+        isVisible={isNodePopover}
+        position={Position.Left}
+        align="center"
+        offset={16}
+      >
+        <StepPopover />
+      </NodeToolbar>
+
+      <div
+      className={`walkthrough-node relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${
         selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
-      }`}
+      } ${isCurrentStepNodeVisible ? "walkthrough-current-node" : ""}`}
       style={{
         backgroundColor: statusStyles.backgroundColor || data.bgColor,
         color: statusStyles.color || data.textColor,
@@ -168,6 +192,9 @@ const EnhancedNode = memo(function EnhancedNode({
                 (statusStyles.borderColor as string) || data.borderColor
               }
               iconColor={(statusStyles.color as string) || data.iconColor}
+              nodeId={data.nodeId ?? ""}
+              nodeStartLine={nodeCode.nodeStartLine}
+              isWalkthroughPlaying={nodeCode.isWalkthroughPlaying}
             />
           ) : (
             <NodeDescription
@@ -191,6 +218,7 @@ const EnhancedNode = memo(function EnhancedNode({
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
     </div>
+    </>
   );
 });
 

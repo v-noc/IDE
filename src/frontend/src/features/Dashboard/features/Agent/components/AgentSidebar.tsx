@@ -3,7 +3,7 @@ import { useConversationStore } from "../store/useConversationStore";
 import { selectMessageText } from "../store/selectors/conversationSelectors";
 import { useShallow } from "zustand/react/shallow";
 import { AgentChatInput } from "./AgentChatInput";
-import { WalkthroughView } from "./WalkthroughView/WalkthroughView";
+import { WalkthroughPanel } from "../walkthrough";
 
 interface AgentSidebarProps {
   className?: string;
@@ -30,7 +30,7 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
       <div className="border-b border-border px-4 py-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            AI Cognitive Replay
+            Walkthrough Agent
           </p>
           <p className="mt-1 truncate text-xs text-foreground">
             {currentConversation?.title ?? "No conversation selected"}
@@ -62,7 +62,7 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
             )}
           </section>
         ) : (
-          <WalkthroughView conversation={currentConversation} />
+          <WalkthroughPanel />
         )}
       </div>
 
