@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "cd src/frontend && yarn install",
+  "installCommand": "cd src/frontend && corepack enable && yarn install",
   "buildCommand": "cd src/frontend && yarn build",
   "outputDirectory": "src/frontend/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]

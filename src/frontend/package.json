@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "yarn@4.9.2",
+  "resolutions": {
+    "vite": "7.2.2"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -102,6 +106,6 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
     "vite": "^7.0.4",
-    "vitest": "^4.1.10"
+    "vitest": "~4.0.18"
   }
 }

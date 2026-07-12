@@ -239,9 +239,20 @@
 }
 
 /* Walkthrough spotlight: dim everything except the current stop */
-.walkthrough-playing .walkthrough-node {
+.walkthrough-playing .react-flow__node:not(:has(.walkthrough-current-node)) {
   opacity: 0.3;
   filter: saturate(0.6);
+  z-index: 0 !important;
+  transition: opacity 0.25s ease, filter 0.25s ease;
+}
+
+.walkthrough-playing .react-flow__node:has(.walkthrough-current-node) {
+  opacity: 1;
+  filter: none;
+  z-index: 50 !important;
+}
+
+.walkthrough-playing .walkthrough-node {
   transition: opacity 0.25s ease, filter 0.25s ease;
 }
 

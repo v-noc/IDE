@@ -92,6 +92,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const centerNode = selectedNode as SimpleTreeNode | null;
   const projectKey = projectData?.id ?? "";
   const isTourPlaying = useWalkthroughStore((s) => s.phase === "playing");
+  const walkthroughForegroundNodeId = useWalkthroughStore((s) => {
+    if (s.phase !== "playing") return null;
+    return s.codeOpenNodeId ?? s.playerSteps[s.cursor]?.nodeId ?? null;
+  });
   const reactFlowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   const layoutConfig = useMemo(
@@ -169,7 +173,27 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     lazyChildrenByParentId,
   });
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const nodesWithWalkthroughLayer = useMemo(() => {
+    if (!isTourPlaying || !walkthroughForegroundNodeId) {
+      return initialNodes;
+    }
+    const secondaryId = secondarySelectedNode?.id;
+    return initialNodes.map((node) => {
+      const isForeground = node.id === walkthroughForegroundNodeId;
+      return {
+        ...node,
+        zIndex: isForeground ? 50 : 0,
+        selected: isForeground || node.id === secondaryId,
+      };
+    });
+  }, [
+    initialNodes,
+    isTourPlaying,
+    walkthroughForegroundNodeId,
+    secondarySelectedNode?.id,
+  ]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(nodesWithWalkthroughLayer);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const centerTarget = useMemo(() => {
@@ -187,13 +211,13 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const followSelectionRef = useRef(false);
 
   const syncDiffOverlay = useEffectEvent(() => {
-    setNodes(initialNodes);
+    setNodes(nodesWithWalkthroughLayer);
     setEdges(initialEdges);
   });
 
   useEffect(() => {
     syncDiffOverlay();
-  }, [initialNodes, initialEdges]);
+  }, [nodesWithWalkthroughLayer, initialEdges]);
 
   useEffect(() => {
     if (!centerNode?.id) return;
@@ -278,6 +302,9 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      if (useWalkthroughStore.getState().phase === "playing") {
+        return;
+      }
       const nodeKey = node.id;
       if (!nodeKey) return;
       const foundNode = findNodeByIdWithDescendantCache(
