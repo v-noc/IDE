@@ -107,7 +107,13 @@ export function useWalkthroughMonaco(
       decorations,
     );
 
-    editor.revealLineInCenter(startLine);
+    const scrollHighlightToTop = () => {
+      const top = editor.getTopForLineNumber(startLine);
+      editor.setScrollTop(Math.max(0, top));
+    };
+
+    scrollHighlightToTop();
+    requestAnimationFrame(scrollHighlightToTop);
 
     const domNode = editor.getDomNode();
     if (!domNode) {
@@ -119,7 +125,7 @@ export function useWalkthroughMonaco(
     clearSync();
 
     // Stable editor-level anchor: covers the whole Monaco surface and does NOT
-    // move when the user scrolls code — popover stays mid-dialog on the right.
+    // move when the user scrolls code — used as a popover fallback only.
     const editorAnchor = document.createElement("div");
     editorAnchor.setAttribute("data-walkthrough-editor-anchor", "");
     editorAnchor.setAttribute("data-node-id", nodeId);
@@ -152,13 +158,12 @@ export function useWalkthroughMonaco(
     };
 
     syncSpotlight();
-    // Bump once so the popover layer measures the editor rect after mount.
     scheduleBump();
 
     const scrollDisposable = editor.onDidScrollChange(syncSpotlight);
     const layoutDisposable = editor.onDidLayoutChange(() => {
+      scrollHighlightToTop();
       syncSpotlight();
-      // Layout/size changes move the editor on screen — re-center the popover.
       scheduleBump();
     });
 

@@ -5,29 +5,22 @@ import { useWalkthroughStore } from "../store/useWalkthroughStore";
 import { currentStepAnchor } from "../store/selectors";
 import {
   WALKTHROUGH_POPOVER_GAP,
-  WALKTHROUGH_POPOVER_H,
   WALKTHROUGH_POPOVER_W,
 } from "./popoverLayout";
 
 /**
- * Popover on the LEFT of the editor (keeps line numbers visible and pairs
+ * Popover on the LEFT of the node (keeps line numbers visible and pairs
  * with node-centered camera — right-side popover was clipped by the agent panel).
  */
-function computePopoverPosition(editorRect: DOMRect) {
-  let x = editorRect.left - WALKTHROUGH_POPOVER_W - WALKTHROUGH_POPOVER_GAP;
-  let y =
-    editorRect.top + editorRect.height / 2 - WALKTHROUGH_POPOVER_H / 2;
+function computePopoverPosition(nodeRect: DOMRect) {
+  let x = nodeRect.left - WALKTHROUGH_POPOVER_W - WALKTHROUGH_POPOVER_GAP;
+  const centerY = nodeRect.top + nodeRect.height / 2;
 
   if (x < 8) {
-    x = editorRect.right + WALKTHROUGH_POPOVER_GAP;
+    x = nodeRect.right + WALKTHROUGH_POPOVER_GAP;
   }
 
-  y = Math.max(
-    8,
-    Math.min(y, window.innerHeight - WALKTHROUGH_POPOVER_H - 8),
-  );
-
-  return { x, y };
+  return { x, centerY };
 }
 
 export function CodeLinePopoverLayer() {
@@ -55,9 +48,13 @@ export function CodeLinePopoverLayer() {
       return null;
     }
 
-    const el = document.querySelector(
-      `[data-walkthrough-editor-anchor][data-node-id="${anchorNodeId}"]`,
-    );
+    const el =
+      document.querySelector(
+        `[data-walkthrough-node-anchor][data-node-id="${anchorNodeId}"]`,
+      ) ??
+      document.querySelector(
+        `[data-walkthrough-editor-anchor][data-node-id="${anchorNodeId}"]`,
+      );
     if (!el) return null;
 
     const rect = el.getBoundingClientRect();
@@ -80,7 +77,8 @@ export function CodeLinePopoverLayer() {
       className="pointer-events-auto fixed z-30"
       style={{
         left: position.x,
-        top: position.y,
+        top: position.centerY,
+        transform: "translateY(-50%)",
         width: WALKTHROUGH_POPOVER_W,
       }}
     >
