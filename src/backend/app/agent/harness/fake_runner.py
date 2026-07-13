@@ -3,12 +3,19 @@ from __future__ import annotations
 import asyncio
 import re
 
+import time
+
 from app.agent.harness.echo_runner import run_echo
 from app.agent.harness.history import latest_node_refs
 from app.agent.harness.middleware import build_attached_blocks
 from app.agent.harness.patcher import ConversationPatcher
 from app.agent.prompts.registry import get_prompt_registry
-from app.agent.schemas.conversation import Conversation, EffortLevel, MessageMetadata
+from app.agent.schemas.conversation import (
+    Conversation,
+    EffortLevel,
+    MessageMetadata,
+    TokenUsage,
+)
 from app.agent.schemas.parts import TextPart
 from app.core.services.code_element_service import CodeElementService
 from app.db.context import ProjectUoW
@@ -92,14 +99,18 @@ async def run_fake_enriched(
             chunk_delay_s=chunk_delay_s,
         )
 
+    started = time.monotonic()
+    prompt_version = get_prompt_registry().version("agent.system")
     part_index = await patcher.add_part(assistant_index, TextPart(text=""))
     chunk_size = max(1, len(reply) // 6) if len(reply) > 6 else 1
     for start in range(0, len(reply), chunk_size):
         if cancelled is not None and cancelled.is_set():
             return MessageMetadata(
                 model_id="fake:echo",
-                prompt_version=get_prompt_registry().version("agent.system"),
+                prompt_version=prompt_version,
                 effort=effort,
+                usage=TokenUsage(),
+                duration_ms=int((time.monotonic() - started) * 1000),
                 stop_reason="cancelled",
             )
         await patcher.append_text(
@@ -112,7 +123,9 @@ async def run_fake_enriched(
 
     return MessageMetadata(
         model_id="fake:echo",
-        prompt_version=get_prompt_registry().version("agent.system"),
+        prompt_version=prompt_version,
         effort=effort,
+        usage=TokenUsage(),
+        duration_ms=int((time.monotonic() - started) * 1000),
         stop_reason="end_turn",
     )

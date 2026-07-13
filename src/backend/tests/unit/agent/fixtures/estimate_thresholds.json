@@ -1,0 +1,26 @@
+{
+  "description": "Walkthrough confirmation gate: confirm when llm_calls > auto_run_limit; never confirm when over_cap.",
+  "cases": [
+    {
+      "name": "under_limit",
+      "llm_calls": 10,
+      "auto_run_limit": 15,
+      "over_cap": false,
+      "needs_confirmation": false
+    },
+    {
+      "name": "over_limit",
+      "llm_calls": 10,
+      "auto_run_limit": 5,
+      "over_cap": false,
+      "needs_confirmation": true
+    },
+    {
+      "name": "over_cap_refuses_without_confirm",
+      "llm_calls": 100,
+      "auto_run_limit": 15,
+      "over_cap": true,
+      "needs_confirmation": false
+    }
+  ]
+}

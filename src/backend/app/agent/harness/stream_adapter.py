@@ -4,7 +4,8 @@ import time
 from typing import Any
 
 from app.agent.harness.patcher import ConversationPatcher
-from app.agent.schemas.conversation import MessageMetadata
+from app.agent.harness.usage import estimate_cost_usd, extract_usage, merge_usage
+from app.agent.schemas.conversation import MessageMetadata, TokenUsage
 from app.agent.schemas.parts import ReasoningPart, TextPart
 
 
@@ -72,8 +73,15 @@ class StreamAdapter:
         self._reasoning_part: int | None = None
         self._reasoning_started: float | None = None
         self._stop_reason = "end_turn"
+        self._usage: TokenUsage | None = None
+        self._started_at = time.monotonic()
+        self._error: str | None = None
 
     async def on_message_chunk(self, message: Any) -> None:
+        usage = extract_usage(message)
+        if usage is not None:
+            self._usage = merge_usage(self._usage, usage)
+
         reasoning = _reasoning_delta(message)
         if reasoning:
             if self._reasoning_part is None:
@@ -89,7 +97,6 @@ class StreamAdapter:
             )
 
         text = _content_text(getattr(message, "content", None))
-        # Strip thinking blocks already handled
         if isinstance(getattr(message, "content", None), list):
             text = "".join(
                 str(b.get("text") or "")
@@ -100,7 +107,6 @@ class StreamAdapter:
         if not text:
             return
 
-        # Settle reasoning when content starts
         if self._reasoning_part is not None and self._reasoning_started is not None:
             duration_ms = int((time.monotonic() - self._reasoning_started) * 1000)
             conv = self.patcher.conversation
@@ -132,13 +138,20 @@ class StreamAdapter:
     def mark_cancelled(self) -> None:
         self._stop_reason = "cancelled"
 
-    def mark_error(self) -> None:
+    def mark_error(self, message: str | None = None) -> None:
         self._stop_reason = "error"
+        if message:
+            self._error = message
 
     def metadata(self) -> MessageMetadata:
+        duration_ms = int((time.monotonic() - self._started_at) * 1000)
         return MessageMetadata(
             model_id=self.model_id,
             prompt_version=self.prompt_version,
             effort=self.effort,  # type: ignore[arg-type]
+            usage=self._usage,
+            cost_usd=estimate_cost_usd(self.model_id, self._usage),
+            duration_ms=duration_ms,
             stop_reason=self._stop_reason,  # type: ignore[arg-type]
+            error=self._error,
         )

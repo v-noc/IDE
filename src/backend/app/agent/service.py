@@ -9,9 +9,11 @@ from typing import Any
 from fastapi import HTTPException, status
 from loguru import logger
 
+from app.agent.harness.degraded import count_degraded_tools
 from app.agent.harness.loop import resume_agent_turn
 from app.agent.harness.patcher import ConversationPatcher
 from app.agent.harness.runner import run_turn
+from app.agent.harness.title import maybe_title
 from app.agent.schemas.constants import HARNESS_SCHEMA_VERSION
 from app.agent.schemas.conversation import (
     Conversation,
@@ -20,7 +22,7 @@ from app.agent.schemas.conversation import (
     Message,
     MessageMetadata,
 )
-from app.agent.schemas.parts import DecisionPart, Part
+from app.agent.schemas.parts import DecisionPart, Part, TextPart
 from app.db.context import ProjectUoW
 from app.walkthrough.transport import ndjson_response
 
@@ -140,16 +142,10 @@ class AgentService:
         )
 
     async def cancel(self, conversation_id: str) -> None:
+        """Abort the active run (composer stop). Distinct from confirm-card cancel."""
         run = _active_runs.get(conversation_id)
         if run is not None:
             run.cancel.set()
-            # Unblock a waiting decision with cancel
-            try:
-                run.resume_queue.put_nowait(
-                    {"decision": "cancel", "overrides": {}, "tool_call_id": ""},
-                )
-            except asyncio.QueueFull:
-                pass
 
     async def _stream_message(
         self,
@@ -221,10 +217,46 @@ class AgentService:
 
                 # Pause stream while awaiting confirmation; resume on /decision
                 while patcher.conversation.status == "awaiting_confirmation":
-                    decision = await run.resume_queue.get()
-                    # Persist the user's decision as a part on the user side
-                    # (transcript honesty) — appended as decision part on assistant
-                    # message for simplicity of reload.
+                    if cancel_flag.is_set():
+                        metadata = MessageMetadata(
+                            model_id=metadata.model_id,
+                            prompt_version=metadata.prompt_version,
+                            effort=effort,
+                            stop_reason="cancelled",
+                            duration_ms=metadata.duration_ms,
+                            usage=metadata.usage,
+                            cost_usd=metadata.cost_usd,
+                        )
+                        break
+
+                    get_decision = asyncio.create_task(run.resume_queue.get())
+                    wait_cancel = asyncio.create_task(cancel_flag.wait())
+                    done, pending = await asyncio.wait(
+                        {get_decision, wait_cancel},
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    for task in pending:
+                        task.cancel()
+                    if wait_cancel in done and cancel_flag.is_set():
+                        metadata = MessageMetadata(
+                            model_id=metadata.model_id,
+                            prompt_version=metadata.prompt_version,
+                            effort=effort,
+                            stop_reason="cancelled",
+                            duration_ms=metadata.duration_ms,
+                            usage=metadata.usage,
+                            cost_usd=metadata.cost_usd,
+                        )
+                        break
+                    decision = None
+                    if get_decision in done and not get_decision.cancelled():
+                        try:
+                            decision = get_decision.result()
+                        except Exception:
+                            decision = None
+                    if decision is None:
+                        continue
+
                     dpart = DecisionPart(
                         tool_call_id=decision.get("tool_call_id") or "",
                         decision=decision.get("decision") or "cancel",
@@ -232,15 +264,8 @@ class AgentService:
                     )
                     await patcher.add_part(assistant_index, dpart)
 
-                    if decision.get("decision") == "cancel" and cancel_flag.is_set():
-                        metadata = MessageMetadata(
-                            model_id=metadata.model_id,
-                            prompt_version=metadata.prompt_version,
-                            effort=effort,
-                            stop_reason="cancelled",
-                        )
-                        break
-
+                    # Confirm-card cancel resumes with "declined by user";
+                    # only POST /cancel aborts the whole run.
                     metadata = await resume_agent_turn(
                         patcher,
                         conversation=patcher.conversation,
@@ -252,10 +277,48 @@ class AgentService:
                         emit=emit,
                     )
 
+                if cancel_flag.is_set() and metadata.stop_reason != "error":
+                    metadata.stop_reason = "cancelled"
+
                 if effort is not None and metadata.effort is None:
                     metadata.effort = effort
 
+                # Degraded honesty: one short note when a tool fell back
+                degraded = count_degraded_tools(
+                    patcher.conversation, assistant_index,
+                )
+                if degraded and metadata.stop_reason == "end_turn":
+                    note = (
+                        f"\n\n({degraded} tool step"
+                        f"{'s' if degraded != 1 else ''} ran degraded.)"
+                    )
+                    # Append to last text part or add one
+                    parts_list = patcher.conversation.messages[
+                        assistant_index
+                    ].parts
+                    text_idx = next(
+                        (
+                            i for i, p in enumerate(parts_list)
+                            if isinstance(p, TextPart)
+                        ),
+                        None,
+                    )
+                    if text_idx is not None:
+                        await patcher.append_text(
+                            assistant_index, text_idx, note,
+                        )
+                    else:
+                        await patcher.add_part(
+                            assistant_index, TextPart(text=note.strip()),
+                        )
+
                 await patcher.finalize_message(assistant_index, metadata)
+
+                # Title after first completed turn
+                title = maybe_title(patcher.conversation)
+                if title:
+                    await patcher.set_title(title)
+
                 final_status = "idle"
                 if metadata.stop_reason == "error":
                     final_status = "error"

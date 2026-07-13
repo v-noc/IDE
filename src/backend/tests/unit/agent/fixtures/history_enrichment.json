@@ -1,0 +1,14 @@
+{
+  "description": "Past node refs collapse to cards; current turn gets full attached_node XML; reasoning is dropped.",
+  "attached_blocks": {
+    "FunctionSchema/charge": "<attached_node id=\"FunctionSchema/charge\" kind=\"function\" name=\"charge\"><description>Charges a card.</description></attached_node>"
+  },
+  "expect": {
+    "message_count": 3,
+    "past_contains": ["<node id=\"FunctionSchema/old\""],
+    "past_excludes": ["<attached_node"],
+    "assistant_content": "answered",
+    "assistant_excludes": ["secret"],
+    "current_contains": ["<attached_node", "what does this do?", "Charges a card."]
+  }
+}

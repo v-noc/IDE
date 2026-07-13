@@ -1,0 +1,13 @@
+{
+  "description": "Deterministic titles from first user text — no LLM.",
+  "cases": [
+    {"input": "", "expected": "New conversation"},
+    {"input": "what does charge do?", "expected": "what does charge do?"},
+    {"input": "Please explain the retry path", "expected": "explain the retry path"},
+    {
+      "input": "Hey, walk me through how payment capture works end to end in detail please",
+      "expected_prefix": "walk me through how payment capture works end to",
+      "expected_suffix": "…"
+    }
+  ]
+}

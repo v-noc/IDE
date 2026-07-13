@@ -181,7 +181,7 @@ async def run_agent_turn(
             return meta
     except Exception as exc:
         logger.exception("agent astream failed: {}", exc)
-        adapter.mark_error()
+        adapter.mark_error(str(exc))
         meta = adapter.metadata()
         meta.error = str(exc)
         return meta
@@ -274,7 +274,7 @@ async def resume_agent_turn(
             return meta
     except Exception as exc:
         logger.exception("agent resume failed: {}", exc)
-        adapter.mark_error()
+        adapter.mark_error(str(exc))
         meta = adapter.metadata()
         meta.error = str(exc)
         return meta

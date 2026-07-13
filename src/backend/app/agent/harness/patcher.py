@@ -187,6 +187,13 @@ class ConversationPatcher:
             persist=True,
         )
 
+    async def set_title(self, title: str) -> None:
+        await self._patch(
+            self.doc_id,
+            [{"op": "replace", "path": "/title", "value": title}],
+            persist=True,
+        )
+
     async def finalize_message(
         self,
         message_index: int,
