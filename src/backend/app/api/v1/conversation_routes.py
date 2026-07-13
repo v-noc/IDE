@@ -36,15 +36,9 @@ async def list_conversations(
     return await service.list_conversations(limit=limit, offset=offset)
 
 
-@router.get("/{conversation_id}", response_model=Conversation)
-async def get_conversation(
-    conversation_id: str,
-    service: AgentService = Depends(get_agent_service),
-) -> Conversation:
-    return await service.get_conversation(conversation_id)
-
-
-@router.post("/{conversation_id}/messages")
+# Sub-routes before `/{conversation_id:path}` so slashed Terminus ids
+# (ConversationSchema/<uuid>) do not swallow /messages, /cancel, etc.
+@router.post("/{conversation_id:path}/messages")
 async def send_message(
     conversation_id: str,
     body: SendMessageRequest,
@@ -65,7 +59,7 @@ async def send_message(
 
 
 @router.post(
-    "/{conversation_id}/decision",
+    "/{conversation_id:path}/decision",
     status_code=status.HTTP_501_NOT_IMPLEMENTED,
 )
 async def decide(
@@ -79,7 +73,7 @@ async def decide(
 
 
 @router.post(
-    "/{conversation_id}/cancel",
+    "/{conversation_id:path}/cancel",
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def cancel_run(
@@ -91,7 +85,7 @@ async def cancel_run(
 
 
 @router.get(
-    "/{conversation_id}/artifacts/{doc}",
+    "/{conversation_id:path}/artifacts/{doc:path}",
     status_code=status.HTTP_501_NOT_IMPLEMENTED,
 )
 async def get_artifact(
@@ -102,3 +96,11 @@ async def get_artifact(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         content="Artifact reload lands when tools ship (Phase 3)",
     )
+
+
+@router.get("/{conversation_id:path}", response_model=Conversation)
+async def get_conversation(
+    conversation_id: str,
+    service: AgentService = Depends(get_agent_service),
+) -> Conversation:
+    return await service.get_conversation(conversation_id)
