@@ -60,16 +60,20 @@ async def send_message(
 
 @router.post(
     "/{conversation_id:path}/decision",
-    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+    status_code=status.HTTP_204_NO_CONTENT,
 )
 async def decide(
     conversation_id: str,
     body: DecisionRequest,
+    service: AgentService = Depends(get_agent_service),
 ) -> Response:
-    return Response(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        content="Confirmation / decision resume lands in Phase 3",
+    await service.decide(
+        conversation_id,
+        tool_call_id=body.tool_call_id,
+        decision=body.decision,
+        overrides=body.overrides,
     )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

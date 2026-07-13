@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException, status
 from loguru import logger
 
+from app.agent.harness.loop import resume_agent_turn
 from app.agent.harness.patcher import ConversationPatcher
 from app.agent.harness.runner import run_turn
 from app.agent.schemas.constants import HARNESS_SCHEMA_VERSION
@@ -18,13 +20,19 @@ from app.agent.schemas.conversation import (
     Message,
     MessageMetadata,
 )
-from app.agent.schemas.parts import Part
+from app.agent.schemas.parts import DecisionPart, Part
 from app.db.context import ProjectUoW
 from app.walkthrough.transport import ndjson_response
 
-# conversation_id → run id (guard concurrent runs)
-_active_runs: dict[str, str] = {}
-_cancel_flags: dict[str, asyncio.Event] = {}
+
+@dataclass
+class _ActiveRun:
+    run_id: str
+    cancel: asyncio.Event = field(default_factory=asyncio.Event)
+    resume_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
+
+
+_active_runs: dict[str, _ActiveRun] = {}
 
 
 class AgentService:
@@ -96,20 +104,52 @@ class AgentService:
                 },
             )
 
-        run_id = f"run-{uuid.uuid4().hex[:8]}"
-        _active_runs[conversation_id] = run_id
-        _cancel_flags[conversation_id] = asyncio.Event()
+        run = _ActiveRun(run_id=f"run-{uuid.uuid4().hex[:8]}")
+        _active_runs[conversation_id] = run
 
         return ndjson_response(
             lambda: self._stream_message(conversation_id, parts, effort=effort),
         )
 
+    async def decide(
+        self,
+        conversation_id: str,
+        *,
+        tool_call_id: str,
+        decision: str,
+        overrides: dict[str, Any] | None = None,
+    ) -> None:
+        run = _active_runs.get(conversation_id)
+        conversation = await self.get_conversation(conversation_id)
+        if run is None:
+            if conversation.status != "awaiting_confirmation":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="No active run awaiting confirmation",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Confirmation stream is no longer open — resync via GET",
+            )
+        await run.resume_queue.put(
+            {
+                "tool_call_id": tool_call_id,
+                "decision": decision,
+                "overrides": overrides or {},
+            },
+        )
+
     async def cancel(self, conversation_id: str) -> None:
-        flag = _cancel_flags.get(conversation_id)
-        if flag is not None:
-            flag.set()
-        # Even if no run is active, acknowledge — Phase 4 hardens this.
-        return None
+        run = _active_runs.get(conversation_id)
+        if run is not None:
+            run.cancel.set()
+            # Unblock a waiting decision with cancel
+            try:
+                run.resume_queue.put_nowait(
+                    {"decision": "cancel", "overrides": {}, "tool_call_id": ""},
+                )
+            except asyncio.QueueFull:
+                pass
 
     async def _stream_message(
         self,
@@ -119,7 +159,8 @@ class AgentService:
         effort: EffortLevel | None,
     ):
         queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
-        cancel_flag = _cancel_flags.get(conversation_id) or asyncio.Event()
+        run = _active_runs[conversation_id]
+        cancel_flag = run.cancel
 
         async def emit(frame: dict[str, Any]) -> None:
             await queue.put(frame)
@@ -133,7 +174,9 @@ class AgentService:
                     role="user",
                     parts=parts,
                 )
-                saved = await self._repo().append_message(conversation_id, user_message)
+                saved = await self._repo().append_message(
+                    conversation_id, user_message,
+                )
                 if saved is None:
                     await queue.put(
                         {
@@ -164,7 +207,6 @@ class AgentService:
                     metadata=MessageMetadata(effort=effort),
                 )
                 assistant_index = await patcher.add_message(assistant)
-                # Persist the assistant skeleton early so a crash leaves a truthful record.
                 await self._repo().save_conversation(patcher.conversation)
 
                 metadata = await run_turn(
@@ -174,14 +216,49 @@ class AgentService:
                     uow=self.uow,
                     effort=effort,
                     cancelled=cancel_flag,
+                    emit=emit,
                 )
-                if effort is not None:
+
+                # Pause stream while awaiting confirmation; resume on /decision
+                while patcher.conversation.status == "awaiting_confirmation":
+                    decision = await run.resume_queue.get()
+                    # Persist the user's decision as a part on the user side
+                    # (transcript honesty) — appended as decision part on assistant
+                    # message for simplicity of reload.
+                    dpart = DecisionPart(
+                        tool_call_id=decision.get("tool_call_id") or "",
+                        decision=decision.get("decision") or "cancel",
+                        overrides=decision.get("overrides") or {},
+                    )
+                    await patcher.add_part(assistant_index, dpart)
+
+                    if decision.get("decision") == "cancel" and cancel_flag.is_set():
+                        metadata = MessageMetadata(
+                            model_id=metadata.model_id,
+                            prompt_version=metadata.prompt_version,
+                            effort=effort,
+                            stop_reason="cancelled",
+                        )
+                        break
+
+                    metadata = await resume_agent_turn(
+                        patcher,
+                        conversation=patcher.conversation,
+                        assistant_index=assistant_index,
+                        uow=self.uow,
+                        decision=decision,
+                        effort=effort,
+                        cancelled=cancel_flag,
+                        emit=emit,
+                    )
+
+                if effort is not None and metadata.effort is None:
                     metadata.effort = effort
 
                 await patcher.finalize_message(assistant_index, metadata)
-                final_status = "idle" if metadata.stop_reason != "error" else "error"
-                if metadata.stop_reason == "cancelled":
-                    final_status = "idle"
+                final_status = "idle"
+                if metadata.stop_reason == "error":
+                    final_status = "error"
                 await patcher.set_status(final_status)
                 await self._repo().save_conversation(patcher.conversation)
                 await patcher.close_doc(conversation_id, final_status)
@@ -201,7 +278,6 @@ class AgentService:
                 )
             finally:
                 _active_runs.pop(conversation_id, None)
-                _cancel_flags.pop(conversation_id, None)
                 await queue.put(None)
 
         task = asyncio.create_task(producer())

@@ -18,7 +18,7 @@ PROMPT_VERSION = "4"
 class RunRequest(BaseModel):
     project_id: str
     node_id: str
-    depth: int = Field(ge=0, le=3)
+    depth: int = Field(ge=0, le=5)
 
 
 class Estimate(BaseModel):

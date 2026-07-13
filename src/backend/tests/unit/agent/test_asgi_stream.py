@@ -14,7 +14,7 @@ from app.agent.schemas.conversation import (
     ConversationSummary,
     Message,
 )
-from app.agent.service import AgentService, _active_runs, _cancel_flags
+from app.agent.service import AgentService, _active_runs
 from app.api.v1.conversation_routes import get_agent_service, router
 from app.core.model.nodes import ProjectNode
 from fastapi import FastAPI
@@ -137,7 +137,6 @@ def asgi_app(monkeypatch):
     )
 
     _active_runs.clear()
-    _cancel_flags.clear()
 
     repo = InMemoryConversationRepo()
     project = ProjectNode(
@@ -157,7 +156,6 @@ def asgi_app(monkeypatch):
 
     app.dependency_overrides.clear()
     _active_runs.clear()
-    _cancel_flags.clear()
 
 
 @pytest.mark.asyncio

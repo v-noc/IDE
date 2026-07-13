@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 from app.agent.harness.fake_runner import run_fake_enriched
 from app.agent.harness.loop import run_agent_turn
@@ -19,6 +20,7 @@ async def run_turn(
     uow: ProjectUoW,
     effort: EffortLevel | None = None,
     cancelled: asyncio.Event | None = None,
+    emit: Any = None,
 ) -> MessageMetadata:
     """Dispatch to fake enriched runner or real create_agent loop."""
     settings = get_settings()
@@ -39,4 +41,5 @@ async def run_turn(
         uow=uow,
         effort=effort,
         cancelled=cancelled,
+        emit=emit,
     )

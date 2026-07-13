@@ -26,7 +26,7 @@ async def list_models() -> dict:
 @router.get("/estimate", response_model=Estimate)
 async def get_estimate(
     node_id: str = Query(..., description="Canvas node id to tour from"),
-    depth: int = Query(1, ge=0, le=3, description="How many levels below the start node"),
+    depth: int = Query(1, ge=0, le=5, description="How many levels below the start node"),
     service: WalkthroughService = Depends(get_walkthrough_service),
 ) -> Estimate:
     try:
