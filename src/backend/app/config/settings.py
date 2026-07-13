@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     CUSTOM_LLM_BASE_URL: Optional[str] = None
     CUSTOM_LLM_API_KEY: Optional[str] = None
 
+    # Agent harness (falls back to WALKTHROUGH_LLM when unset)
+    AGENT_LLM: Optional[str] = None
+    AGENT_MAX_STEPS: int = 12
+    AGENT_REASONING_EFFORT: str = "medium"
+    AGENT_AUTO_RUN_LIMIT: int = 15
+    PROMPT_OVERRIDE_DIR: Optional[str] = None
+
     LANGSMITH_API_KEY: Optional[str] = None
     LANGSMITH_PROJECT: str = "v-noc-walkthrough"
 

@@ -22,6 +22,7 @@ from .structure_schema import (
     CodeContentSchema,
 )
 from .test_schema import TestConfigSchema, TestCaseSchema, TestLinkSchema
+from .conversation_schema import ConversationSchema
 
 __all__ = [
     "BaseSchema",
@@ -46,6 +47,7 @@ __all__ = [
     "TestConfigSchema",
     "TestCaseSchema",
     "TestLinkSchema",
+    "ConversationSchema",
 ]
 
 
@@ -87,6 +89,9 @@ async def ensure_schema(
     schema_obj.add_obj(TestConfigSchema.__name__, TestConfigSchema)
     schema_obj.add_obj(TestCaseSchema.__name__, TestCaseSchema)
     schema_obj.add_obj(TestLinkSchema.__name__, TestLinkSchema)
+
+    # agent conversation schema
+    schema_obj.add_obj(ConversationSchema.__name__, ConversationSchema)
 
     await schema_obj.commit(
         client,
