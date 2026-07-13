@@ -8,8 +8,8 @@ from typing import Any
 from fastapi import HTTPException, status
 from loguru import logger
 
-from app.agent.harness.echo_runner import run_echo
 from app.agent.harness.patcher import ConversationPatcher
+from app.agent.harness.runner import run_turn
 from app.agent.schemas.constants import HARNESS_SCHEMA_VERSION
 from app.agent.schemas.conversation import (
     Conversation,
@@ -18,7 +18,7 @@ from app.agent.schemas.conversation import (
     Message,
     MessageMetadata,
 )
-from app.agent.schemas.parts import Part, TextPart
+from app.agent.schemas.parts import Part
 from app.db.context import ProjectUoW
 from app.walkthrough.transport import ndjson_response
 
@@ -167,11 +167,12 @@ class AgentService:
                 # Persist the assistant skeleton early so a crash leaves a truthful record.
                 await self._repo().save_conversation(patcher.conversation)
 
-                user_text = _first_text(parts)
-                metadata = await run_echo(
+                metadata = await run_turn(
                     patcher,
+                    conversation=patcher.conversation,
                     assistant_index=assistant_index,
-                    user_text=user_text,
+                    uow=self.uow,
+                    effort=effort,
                     cancelled=cancel_flag,
                 )
                 if effort is not None:
@@ -217,10 +218,3 @@ class AgentService:
                     await task
                 except asyncio.CancelledError:
                     pass
-
-
-def _first_text(parts: list[Part]) -> str:
-    for part in parts:
-        if isinstance(part, TextPart):
-            return part.text
-    return ""

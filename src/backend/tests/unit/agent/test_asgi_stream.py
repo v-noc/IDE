@@ -124,7 +124,18 @@ class FakeUoW:
 
 
 @pytest.fixture
-def asgi_app():
+def asgi_app(monkeypatch):
+    from app.agent.llm.providers import PROVIDERS, ResolvedLLM
+
+    monkeypatch.setattr(
+        "app.agent.harness.runner.resolve_agent_llm",
+        lambda settings=None: ResolvedLLM(
+            spec=PROVIDERS["fake"],
+            model="fake-model",
+            model_id="fake:fake-model",
+        ),
+    )
+
     _active_runs.clear()
     _cancel_flags.clear()
 

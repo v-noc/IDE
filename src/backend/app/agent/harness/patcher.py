@@ -204,6 +204,26 @@ class ConversationPatcher:
             persist=True,
         )
 
+    async def set_part(
+        self,
+        message_index: int,
+        part_index: int,
+        part: Part,
+        *,
+        persist: bool = False,
+    ) -> None:
+        await self._patch(
+            self.doc_id,
+            [
+                {
+                    "op": "replace",
+                    "path": f"/messages/{message_index}/parts/{part_index}",
+                    "value": part.model_dump(mode="json"),
+                },
+            ],
+            persist=persist,
+        )
+
     async def _patch(
         self,
         doc: str,
