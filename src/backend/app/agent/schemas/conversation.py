@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +48,7 @@ class Conversation(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     status: ConversationStatus = "idle"
     messages: list[Message] = Field(default_factory=list)
+    artifacts: dict[str, Any] = Field(default_factory=dict)
     schema_version: str = HARNESS_SCHEMA_VERSION
 
 

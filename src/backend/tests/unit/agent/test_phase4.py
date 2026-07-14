@@ -15,6 +15,7 @@ from app.agent.harness.patcher import ConversationPatcher
 from app.agent.harness.stream_adapter import StreamAdapter
 from app.agent.harness.title import maybe_title, title_from_user_text
 from app.agent.harness.usage import estimate_cost_usd, extract_usage, merge_usage
+from app.core.model.conversation import DEFAULT_CONVERSATION_NAME
 from app.agent.schemas.conversation import Conversation, Message, TokenUsage
 from app.agent.schemas.parts import (
     NodeRefPart,
@@ -59,6 +60,9 @@ def test_maybe_title_only_when_empty():
     )
     assert maybe_title(conversation) == "charge flow"
 
+    conversation.title = DEFAULT_CONVERSATION_NAME
+    assert maybe_title(conversation) == "charge flow"
+
     conversation.title = "Already set"
     assert maybe_title(conversation) is None
 
@@ -66,6 +70,17 @@ def test_maybe_title_only_when_empty():
 def test_estimate_thresholds_fixture():
     data = _load("estimate_thresholds.json")
     from app.agent.schemas.parts import ToolEstimate
+    from app.agent.tools.base import ToolSpec
+    from app.agent.tools.walkthrough_tool import WalkthroughArgs
+
+    over_threshold = ToolSpec(
+        name="fixture",
+        description="fixture",
+        input_model=WalkthroughArgs,
+        kind="task",
+        confirmation="over_threshold",
+        handler=None,
+    )
 
     for case in data["cases"]:
         estimate = ToolEstimate(
@@ -75,7 +90,7 @@ def test_estimate_thresholds_fixture():
             over_cap=case["over_cap"],
         )
         got = needs_confirmation(
-            WALKTHROUGH_SPEC,
+            over_threshold,
             estimate,
             case["auto_run_limit"],
         )

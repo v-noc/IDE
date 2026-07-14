@@ -12,7 +12,7 @@ def test_walkthrough_registered():
     spec = registry.get("walkthrough")
     assert spec.name == "walkthrough"
     assert spec.kind == "task"
-    assert spec.confirmation == "over_threshold"
+    assert spec.confirmation == "always"
     assert "walkthrough" in registry.tools_blurb()
 
 
@@ -35,7 +35,7 @@ def test_needs_confirmation_threshold():
         label="3 stops · ~10 LLM calls",
         over_cap=False,
     )
-    assert needs_confirmation(WALKTHROUGH_SPEC, estimate, limit=15) is False
+    assert needs_confirmation(WALKTHROUGH_SPEC, estimate, limit=15) is True
     assert needs_confirmation(WALKTHROUGH_SPEC, estimate, limit=5) is True
 
     always = ToolSpec(
@@ -47,3 +47,8 @@ def test_needs_confirmation_threshold():
         handler=None,
     )
     assert needs_confirmation(always, estimate, limit=100) is True
+
+
+def test_walkthrough_always_confirms():
+    estimate = ToolEstimate(items=1, llm_calls=1, label="1 stop", over_cap=False)
+    assert needs_confirmation(WALKTHROUGH_SPEC, estimate, 15) is True

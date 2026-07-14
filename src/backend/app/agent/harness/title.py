@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from app.core.model.conversation import DEFAULT_CONVERSATION_NAME
 from app.agent.schemas.conversation import Conversation
 from app.agent.schemas.parts import TextPart
 
@@ -39,7 +40,8 @@ def first_user_text(conversation: Conversation) -> str:
 
 def maybe_title(conversation: Conversation) -> str | None:
     """Return a title if the conversation still needs one."""
-    if (conversation.title or "").strip():
+    current = (conversation.title or "").strip()
+    if current and current != DEFAULT_CONVERSATION_NAME:
         return None
     text = first_user_text(conversation)
     if not text:

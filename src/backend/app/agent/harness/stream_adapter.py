@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from langchain_core.messages import ToolMessage
+
 from app.agent.harness.patcher import ConversationPatcher
 from app.agent.harness.usage import estimate_cost_usd, extract_usage, merge_usage
 from app.agent.schemas.conversation import MessageMetadata, TokenUsage
@@ -78,6 +80,9 @@ class StreamAdapter:
         self._error: str | None = None
 
     async def on_message_chunk(self, message: Any) -> None:
+        if isinstance(message, ToolMessage):
+            return
+
         usage = extract_usage(message)
         if usage is not None:
             self._usage = merge_usage(self._usage, usage)

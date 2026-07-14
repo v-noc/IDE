@@ -1,24 +1,33 @@
 import { cn } from "@/lib/utils";
-import { useConversationStore } from "../store/useConversationStore";
-import { selectMessageText } from "../store/selectors/conversationSelectors";
 import { useShallow } from "zustand/react/shallow";
-import { AgentChatInput } from "./AgentChatInput";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
+import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
+import { Composer } from "../chat/Composer";
+import { ChatThread } from "../chat/ChatThread";
 import { WalkthroughPanel } from "../walkthrough";
+import { useAgentRunStore } from "../store/useAgentRunStore";
+import { useRunStream } from "../hooks/useRunStream";
+import type { NodeRefPart } from "../stream/types";
 
 interface AgentSidebarProps {
   className?: string;
 }
 
 export function AgentSidebar({ className }: AgentSidebarProps) {
-  const [viewMode, setViewMode, currentConversation] = useConversationStore(
-    useShallow((state) => [
-      state.viewMode,
-      state.setViewMode,
-      state.currentConversation,
-    ]),
+  const [viewMode, setViewMode] = useAgentRunStore(
+    useShallow((state) => [state.viewMode, state.setViewMode]),
   );
+  const { conversation, streamError } = useRunStream();
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const projectData = useProjectStore((s) => s.projectData);
+  const setSelectedNode = useProjectStore((s) => s.setSelectedNode);
 
-  const messages = currentConversation?.messages;
+  const focusNode = (part: NodeRefPart) => {
+    if (!projectData) return;
+    const node = findNodeByKey(projectData, part.node_id);
+    if (node) setSelectedNode(activeTabId, node);
+  };
 
   return (
     <aside
@@ -30,44 +39,28 @@ export function AgentSidebar({ className }: AgentSidebarProps) {
       <div className="border-b border-border px-4 py-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Walkthrough Agent
+            Agent
           </p>
           <p className="mt-1 truncate text-xs text-foreground">
-            {currentConversation?.title ?? "No conversation selected"}
+            {conversation?.title?.trim() || "New conversation"}
           </p>
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-auto p-4">
-        {viewMode === "chat" ? (
-          <section className="space-y-2">
-            {messages && messages.length > 0 ? (
-              messages.map((message) => (
-                <article
-                  key={message.id}
-                  className="rounded-md border border-border bg-muted/40 p-3"
-                >
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    {message.role}
-                  </p>
-                  <p className="text-xs leading-relaxed text-foreground">
-                    {selectMessageText(message.parts) || "No text content."}
-                  </p>
-                </article>
-              ))
-            ) : (
-              <p className="rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
-                No messages in this conversation.
-              </p>
-            )}
-          </section>
-        ) : (
+      {viewMode === "chat" ? (
+        <ChatThread
+          conversation={conversation}
+          connectionError={streamError}
+          onFocusNode={focusNode}
+        />
+      ) : (
+        <div className="flex-1 space-y-4 overflow-auto p-4">
           <WalkthroughPanel />
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="border-t border-border p-3">
-        <AgentChatInput />
+        <Composer onFocusNode={focusNode} />
         <div className="mt-3 flex justify-center">
           <div className="rounded-md border border-border p-0.5">
             <button

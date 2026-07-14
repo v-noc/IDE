@@ -10,6 +10,7 @@ from app.agent.schemas.conversation import (
 )
 from app.core.model.conversation import ConversationNode
 from app.core.model.schemas.conversation_schema import ConversationSchema
+from app.core.model.schemas import ensure_conversation_schema
 from app.core.repository.base_repo import BaseRepo
 from app.db.async_terminus_client import AsyncClient
 
@@ -22,6 +23,7 @@ class ConversationRepo(BaseRepo[ConversationNode, ConversationSchema]):
         self,
         conversation: Conversation,
     ) -> Conversation | None:
+        await ensure_conversation_schema(self.client)
         node = ConversationNode.from_conversation(conversation)
         created = await self.create_nodes(
             node,

@@ -117,6 +117,16 @@ class ConversationPatcher:
         status: str,
         message: str | None = None,
     ) -> None:
+        if doc != self.doc_id and doc in self._docs:
+            conv = self._docs[self.doc_id]
+            artifacts = conv.data.get("artifacts")
+            if not isinstance(artifacts, dict):
+                artifacts = {}
+            artifacts[doc] = deepcopy(self._docs[doc].data)
+            conv.data["artifacts"] = artifacts
+            if self.on_persist is not None:
+                await self.on_persist(self.conversation)
+
         frame = close_frame(doc, status, message)
         self.log.append(frame)
         await self.emit(frame)
@@ -230,6 +240,16 @@ class ConversationPatcher:
             ],
             persist=persist,
         )
+
+    async def patch_doc(
+        self,
+        doc: str,
+        ops: list[dict[str, Any]],
+        *,
+        persist: bool = False,
+    ) -> None:
+        """Apply ops to any open doc (conversation or artifact)."""
+        await self._patch(doc, ops, persist=persist)
 
     async def _patch(
         self,

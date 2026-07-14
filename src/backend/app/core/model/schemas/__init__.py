@@ -98,3 +98,23 @@ async def ensure_schema(
         f"Initialize schema for {title}",
         full_replace=False,
     )
+
+
+_conversation_schema_ready: set[str] = set()
+
+
+async def ensure_conversation_schema(client: AsyncClient) -> None:
+    """Register ConversationSchema on project DBs created before agent v2."""
+    db = getattr(client, "db", None) or ""
+    if db in _conversation_schema_ready:
+        return
+
+    # Partial class-only commits fail (datetime → schema#datetime witness).
+    # Re-run the full schema ensure — idempotent with full_replace=False.
+    await ensure_schema(
+        client,
+        title="V-NOC Schema",
+        description="V-NOC code analysis graph schema",
+        authors=["V-NOC Team"],
+    )
+    _conversation_schema_ready.add(db)

@@ -195,12 +195,8 @@ async def _run_pipeline_bridged(
             )
             return
         if kind == "patch":
-            # Re-emit as multi-doc patch on the artifact doc
-            from app.agent.harness.frames import patch_frame
-
-            seq = frame.get("seq", 0)
             ops = frame.get("ops") or []
-            await emit(patch_frame(session_id, seq, ops))
+            await patcher.patch_doc(session_id, ops)
             return
         await emit({**frame, "doc": session_id})
 
@@ -263,7 +259,7 @@ WALKTHROUGH_SPEC = ToolSpec(
     ),
     input_model=WalkthroughArgs,
     kind="task",
-    confirmation="over_threshold",
+    confirmation="always",
     render="walkthrough",
     handler=WalkthroughTool(),
 )

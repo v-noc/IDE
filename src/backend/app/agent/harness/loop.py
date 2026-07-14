@@ -126,8 +126,20 @@ async def run_agent_turn(
     async def on_awaiting(call_id, name, args, estimate):
         await tracker.awaiting(call_id, name, args, estimate)
 
-    async def on_running(call_id):
-        await tracker.running(call_id)
+    async def on_running(call_id, input_args=None):
+        await tracker.running(call_id, input_args)
+
+    async def on_completed(
+        call_id, *, input_args, result, artifact=None, degraded=False, duration_ms=0,
+    ):
+        await tracker.completed(
+            call_id,
+            input_args=input_args,
+            result=result,
+            artifact=artifact,
+            degraded=degraded,
+            duration_ms=duration_ms,
+        )
 
     async def on_error(call_id, message):
         await tracker.error(call_id, message)
@@ -140,6 +152,7 @@ async def run_agent_turn(
         on_tool_pending=on_pending,
         on_awaiting_confirmation=on_awaiting,
         on_tool_running=on_running,
+        on_tool_completed=on_completed,
         on_tool_error=on_error,
     )
     token = set_tool_services(services)
@@ -221,9 +234,21 @@ async def resume_agent_turn(
     async def on_awaiting(call_id, name, args, estimate):
         await tracker.awaiting(call_id, name, args, estimate)
 
-    async def on_running(call_id):
-        await tracker.running(call_id)
+    async def on_running(call_id, input_args=None):
+        await tracker.running(call_id, input_args)
         await patcher.set_status("running")
+
+    async def on_completed(
+        call_id, *, input_args, result, artifact=None, degraded=False, duration_ms=0,
+    ):
+        await tracker.completed(
+            call_id,
+            input_args=input_args,
+            result=result,
+            artifact=artifact,
+            degraded=degraded,
+            duration_ms=duration_ms,
+        )
 
     async def on_error(call_id, message):
         await tracker.error(call_id, message)
@@ -236,6 +261,7 @@ async def resume_agent_turn(
         on_tool_pending=on_pending,
         on_awaiting_confirmation=on_awaiting,
         on_tool_running=on_running,
+        on_tool_completed=on_completed,
         on_tool_error=on_error,
     )
     token = set_tool_services(services)

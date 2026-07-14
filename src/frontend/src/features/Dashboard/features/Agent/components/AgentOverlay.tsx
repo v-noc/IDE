@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Clock3, X } from "lucide-react";
+import { Clock3, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -10,23 +10,38 @@ import {
 } from "@/components/ui/popover";
 import { AgentSidebar } from "./AgentSidebar";
 import { useAgentOverlayStore } from "../store/useAgentOverlayStore";
-import { useConversationStore } from "../store/useConversationStore";
+import { useAgentRunStore } from "../store/useAgentRunStore";
+import { useConversations } from "../hooks/useRunStream";
 import { useShallow } from "zustand/react/shallow";
 
 const MIN_WIDTH = 280;
 const DEFAULT_WIDTH = 360;
 const MAX_WIDTH = 720;
 
+function formatUpdatedAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 export function AgentOverlay() {
   const { isOpen, setOpen } = useAgentOverlayStore();
-  const [conversations, currentConversationId, setCurrentConversation] =
-    useConversationStore(
+  const [summaries, activeConversationId, setActiveConversationId] =
+    useAgentRunStore(
       useShallow((state) => [
-        state.allConversations,
-        state.currentConversation?.id,
-        state.setCurrentConversation,
+        state.summaries,
+        state.activeConversationId,
+        state.setActiveConversationId,
       ]),
     );
+  const { load, create } = useConversations();
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,13 +80,12 @@ export function AgentOverlay() {
     };
   }, [isResizing]);
 
-  const filteredHistory = conversations.filter((item) => {
+  const filteredHistory = summaries.filter((item) => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return true;
     return (
       item.title.toLowerCase().includes(query) ||
-      item.date.toLowerCase().includes(query) ||
-      item.duration.toLowerCase().includes(query)
+      item.id.toLowerCase().includes(query)
     );
   });
 
@@ -92,6 +106,16 @@ export function AgentOverlay() {
           className="absolute left-0 top-0 h-full w-2 -translate-x-1 cursor-col-resize"
         />
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="New conversation"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            onClick={() => void create()}
+          >
+            <Plus size={14} />
+          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -123,23 +147,26 @@ export function AgentOverlay() {
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => setCurrentConversation(item.id)}
+                        onClick={() => {
+                          setActiveConversationId(item.id);
+                          void load(item.id);
+                        }}
                         className={cn(
                           "w-full rounded-sm px-2 py-2 text-left transition hover:bg-muted",
-                          currentConversationId === item.id && "bg-muted",
+                          activeConversationId === item.id && "bg-muted",
                         )}
                       >
                         <p className="truncate text-xs font-medium text-foreground">
-                          {item.title}
+                          {item.title.trim() || "Untitled"}
                         </p>
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                          {item.date} · {item.duration}
+                          {formatUpdatedAt(item.updated_at)} · {item.status}
                         </p>
                       </button>
                     ))
                   ) : (
                     <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-                      No chat history found.
+                      No chat history yet.
                     </p>
                   )}
                 </div>

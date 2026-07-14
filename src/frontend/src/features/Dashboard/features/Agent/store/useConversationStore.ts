@@ -1,12 +1,15 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
-import { conversationFixtures } from "../fixtures/conversations";
 import type {
   Conversation,
   ConversationSummary,
   ViewMode,
 } from "../types/conversation";
 
+/**
+ * Legacy store for cognitive-replay fixtures (client-side only).
+ * Live chat uses useMirrorStore + useAgentRunStore.
+ */
 export interface ConversationState {
   allConversations: Conversation[];
   currentConversation: Conversation | null;
@@ -17,13 +20,11 @@ export interface ConversationState {
   setViewMode: (mode: ViewMode) => void;
 }
 
-const initialConversations = conversationFixtures;
-
 export const useConversationStore = create<ConversationState>()(
   devtools(
     (set) => ({
-      allConversations: initialConversations,
-      currentConversation: initialConversations[0] ?? null,
+      allConversations: [],
+      currentConversation: null,
       viewMode: "chat",
       setConversations: (conversations) =>
         set(() => ({

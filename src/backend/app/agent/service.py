@@ -58,7 +58,7 @@ class AgentService:
         conversation = Conversation(
             id=f"ConversationSchema/{uuid.uuid4()}",
             project_id=self._project_id(),
-            title="",
+            title="Untitled",
             created_at=now,
             updated_at=now,
             status="idle",
@@ -89,6 +89,20 @@ class AgentService:
                 detail=f"Conversation not found: {conversation_id}",
             )
         return conversation
+
+    async def get_artifact(
+        self,
+        conversation_id: str,
+        doc: str,
+    ) -> dict[str, Any]:
+        conversation = await self.get_conversation(conversation_id)
+        snapshot = conversation.artifacts.get(doc)
+        if snapshot is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Artifact not found: {doc}",
+            )
+        return snapshot
 
     def send_message(
         self,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -10,6 +11,7 @@ from loguru import logger
 
 from app.agent.schemas.parts import ToolEstimate
 from app.agent.tools.base import (
+    ToolOutcome,
     get_tool_registry,
     get_tool_services,
     needs_confirmation,
@@ -88,6 +90,12 @@ class EstimateConfirmMiddleware(AgentMiddleware):
             )
 
         if needs_confirmation(spec, estimate, self.auto_run_limit):
+            logger.info(
+                "tool {} confirm (llm_calls={}, limit={})",
+                name,
+                estimate.llm_calls,
+                self.auto_run_limit,
+            )
             if services.on_awaiting_confirmation is not None:
                 await services.on_awaiting_confirmation(
                     call_id,
@@ -130,7 +138,42 @@ class EstimateConfirmMiddleware(AgentMiddleware):
                     except Exception:
                         pass
 
-        if services.on_tool_running is not None:
-            await services.on_tool_running(call_id)
+        else:
+            logger.info(
+                "tool {} auto_run (llm_calls={}, limit={})",
+                name,
+                estimate.llm_calls,
+                self.auto_run_limit,
+            )
 
-        return await handler(request)
+        if services.on_tool_running is not None:
+            await services.on_tool_running(call_id, args.model_dump())
+
+        started = time.monotonic()
+        try:
+            result = await handler(request)
+        except Exception as exc:
+            if services.on_tool_error is not None:
+                await services.on_tool_error(call_id, str(exc))
+            raise
+        duration_ms = int((time.monotonic() - started) * 1000)
+
+        if isinstance(result, ToolMessage):
+            if result.status == "error":
+                if services.on_tool_error is not None:
+                    await services.on_tool_error(call_id, str(result.content))
+            elif services.on_tool_completed is not None:
+                outcome = (
+                    result.artifact
+                    if isinstance(result.artifact, ToolOutcome)
+                    else None
+                )
+                await services.on_tool_completed(
+                    call_id,
+                    input_args=args.model_dump(),
+                    result=outcome.result if outcome else {"content": str(result.content)},
+                    artifact=outcome.artifact if outcome else None,
+                    degraded=outcome.degraded if outcome else False,
+                    duration_ms=duration_ms,
+                )
+        return result

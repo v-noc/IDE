@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response, StreamingResponse
 
@@ -90,16 +92,13 @@ async def cancel_run(
 
 @router.get(
     "/{conversation_id:path}/artifacts/{doc:path}",
-    status_code=status.HTTP_501_NOT_IMPLEMENTED,
 )
 async def get_artifact(
     conversation_id: str,
     doc: str,
-) -> Response:
-    return Response(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        content="Artifact reload lands when tools ship (Phase 3)",
-    )
+    service: AgentService = Depends(get_agent_service),
+) -> dict[str, Any]:
+    return await service.get_artifact(conversation_id, doc)
 
 
 @router.get("/{conversation_id:path}", response_model=Conversation)

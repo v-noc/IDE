@@ -117,7 +117,7 @@ def langchain_tools(registry: ToolRegistry | None = None) -> list[StructuredTool
         async def _run(
             __spec: ToolSpec = spec,
             **kwargs: Any,
-        ) -> str:
+        ) -> Any:
             services = get_tool_services()
             args = __spec.input_model.model_validate(kwargs)
             if __spec.kind == "query":
@@ -127,7 +127,7 @@ def langchain_tools(registry: ToolRegistry | None = None) -> list[StructuredTool
             # Task tools: estimate/confirm is owned by EstimateConfirmMiddleware.
             # By the time we reach here, confirmation already happened (or was skipped).
             outcome: ToolOutcome = await __spec.handler.run(args, services)
-            return str(outcome.result)
+            return str(outcome.result), outcome
 
         tools.append(
             StructuredTool.from_function(
@@ -135,6 +135,9 @@ def langchain_tools(registry: ToolRegistry | None = None) -> list[StructuredTool
                 name=spec.name,
                 description=spec.description,
                 args_schema=spec.input_model,
+                response_format=(
+                    "content_and_artifact" if spec.kind == "task" else "content"
+                ),
             ),
         )
     return tools
