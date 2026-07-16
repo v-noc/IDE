@@ -1,9 +1,10 @@
 # Shared 02 — One Run Artifact for Both Tools
 
 Describe and document runs stream and persist the same artifact shape. One
-schema, one repo, one frontend renderer (`render: "run_checklist"`) — the v2
-artifact registry's render-hint design exists precisely so two tools can share
-one renderer.
+schema, one repo, one frontend renderer (`render: "run_checklist"`). The hint
+stays on the wire as designed in v2; in the shipped frontendv2 panel the
+renderer mounts through the tool-face registry — both tools' faces render the
+same `RunChecklist` off the same mirror doc (frontend/01).
 
 ## The schema
 

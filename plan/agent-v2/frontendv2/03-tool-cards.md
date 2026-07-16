@@ -140,6 +140,12 @@ document surface.
 
 **Group (spec only).** Wrap of pill chips: grid glyph + group name + mono count.
 
+> **Superseded for describe/document (2026-07-16):** those two ship in agent-v3
+> as subtree *run* tools, not single-node calls — their real faces (config
+> forms with overwrite/intent, a live run checklist as RunningView/DoneView)
+> are specced in `plan/agent-v3/frontend/01`. The mock's single-node done faces
+> above stay as the visual reference only; group's spec still lives here.
+
 ## Error face (not in the mock — designed here)
 
 Failure is boring (README): badge `error` in the quiet danger tint; body is one
