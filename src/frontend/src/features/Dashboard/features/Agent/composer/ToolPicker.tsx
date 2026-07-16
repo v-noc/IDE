@@ -110,7 +110,7 @@ export function ToolPicker({
           type="button"
           disabled={disabled}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-agent-field border px-2.5 py-1.5 text-xs font-semibold transition-colors",
+            "inline-flex shrink-0 items-center gap-1.5 rounded-agent-field border px-2.5 py-1.5 text-xs font-semibold transition-colors",
             open
               ? "border-agent-accent bg-agent-accent-bg-subtle text-agent-accent-text"
               : "border-agent-accent-border bg-agent-accent-bg-subtle text-agent-accent-text hover:bg-agent-accent-bg",

@@ -174,38 +174,38 @@ export function Composer({ onFocusNode }: ComposerProps) {
           aria-label="Message composer"
           className="max-h-[160px] w-full resize-none border-none bg-transparent text-[13.5px] leading-5 text-agent-text placeholder:text-agent-text-faint focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
-        <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
-          {pendingAttachments.map((part) => (
-            <NodeChip
-              key={part.node_id}
-              part={part}
-              onFocus={onFocusNode}
-              onRemove={() => removeAttachment(part.node_id)}
-            />
-          ))}
-          {!pendingAttachments.length && selectedNode ? (
-            <button
-              type="button"
-              disabled={attachDisabled || awaitingDecision}
-              onClick={handleAttach}
-              className="inline-flex items-center gap-1.5 rounded-agent-field border border-agent-border-strong bg-agent-bg-raised px-2.5 py-1.5 font-agent-mono text-[12px] text-agent-text-muted transition-colors hover:text-agent-text disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span
-                className="size-1.5 rounded-sm bg-agent-text-muted"
-                aria-hidden
+        <div className="flex items-center gap-1.5 pt-1.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            {pendingAttachments.map((part) => (
+              <NodeChip
+                key={part.node_id}
+                part={part}
+                onFocus={onFocusNode}
+                onRemove={() => removeAttachment(part.node_id)}
               />
-              {selectedNode.name}
-              <span className="text-agent-text-faint">{selectedNode.node_type}</span>
-            </button>
-          ) : null}
-          <ToolPicker
-            selectedId={selectedToolId}
-            onSelect={(id: ToolId) => setSelectedToolId(id)}
-            open={toolMenuOpen}
-            onOpenChange={setToolMenuOpen}
-            disabled={awaitingDecision}
-          />
-          <div className="ml-auto flex items-center gap-1.5">
+            ))}
+            {!pendingAttachments.length && selectedNode ? (
+              <button
+                type="button"
+                disabled={attachDisabled || awaitingDecision}
+                onClick={handleAttach}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-agent-field border border-agent-border-strong bg-agent-bg-raised px-2.5 py-1.5 font-agent-mono text-[12px] text-agent-text-muted transition-colors hover:text-agent-text disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span
+                  className="size-1.5 rounded-sm bg-agent-text-muted"
+                  aria-hidden
+                />
+                {selectedNode.name}
+                <span className="text-agent-text-faint">{selectedNode.node_type}</span>
+              </button>
+            ) : null}
+            <ToolPicker
+              selectedId={selectedToolId}
+              onSelect={(id: ToolId) => setSelectedToolId(id)}
+              open={toolMenuOpen}
+              onOpenChange={setToolMenuOpen}
+              disabled={awaitingDecision}
+            />
             <EffortPicker
               value={effort}
               onChange={setEffort}
@@ -213,6 +213,8 @@ export function Composer({ onFocusNode }: ComposerProps) {
               onOpenChange={setEffortMenuOpen}
               disabled={awaitingDecision}
             />
+          </div>
+          <div className="flex shrink-0 items-center">
             {isStreaming ? (
               <button
                 type="button"

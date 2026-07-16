@@ -39,7 +39,7 @@ export function EffortPicker({
           type="button"
           disabled={disabled}
           className={cn(
-            "rounded-agent-field px-2 py-1.5 font-agent-mono text-[11px] text-agent-text-faint transition-colors hover:text-agent-text-muted",
+            "inline-flex shrink-0 items-center rounded-agent-field px-2.5 py-1.5 font-agent-mono text-[11px] text-agent-text-faint transition-colors hover:text-agent-text-muted",
             open && "text-agent-accent-text",
             disabled && "cursor-not-allowed opacity-50",
           )}
