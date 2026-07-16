@@ -8,7 +8,10 @@ first tool.
 
 This plan covers the vision, the backend, and the frontend (`frontend/` — added
 after the backend docs). The wire protocol (harness/02) is the contract between
-the two halves.
+the two halves. `frontendv2/` (added after F1–F4 shipped) is the visual redesign
+of the agent panel: the Claude-design mock made real in a clean `AgentV2/`
+feature folder — data layer moved, presentation rebuilt, all four tools visible
+but only walkthrough enabled.
 
 ## The user flow (the whole product in one story)
 
@@ -83,14 +86,22 @@ agent v2
 ├── api/ ──────────────────── the HTTP surface, in the existing house pattern
 │   └── 01 endpoints          app/api/v1/conversation_routes.py · service · DI · NDJSON stream
 │
-└── frontend/ ─────────────── the chat surface (existing Agent feature, made real)
-    ├── 01 overview           what survives (chrome, player), what's replaced (fixtures), F-phases
-    ├── 02 mirror store       docId → mirror; `append` pre-pass; rAF-coalesced stream; reload
-    ├── 03 thread & parts     part-registry rendering · markdown streaming · auto-scroll rules
-    ├── 04 thinking UI        Cursor-style: live clamped tail → "Thought for 3s" collapse
-    ├── 05 composer           node chips from canvas selection · quick actions · effort knob · send/stop
-    ├── 06 tool & confirm UI  five-faced tool card · depth slider with real max · live re-estimate
-    └── 07 artifacts          render-hint registry · bridge that mounts the existing player
+├── frontend/ ─────────────── the chat surface (existing Agent feature, made real)
+│   ├── 01 overview           what survives (chrome, player), what's replaced (fixtures), F-phases
+│   ├── 02 mirror store       docId → mirror; `append` pre-pass; rAF-coalesced stream; reload
+│   ├── 03 thread & parts     part-registry rendering · markdown streaming · auto-scroll rules
+│   ├── 04 thinking UI        Cursor-style: live clamped tail → "Thought for 3s" collapse
+│   ├── 05 composer           node chips from canvas selection · quick actions · effort knob · send/stop
+│   ├── 06 tool & confirm UI  five-faced tool card · depth slider with real max · live re-estimate
+│   └── 07 artifacts          render-hint registry · bridge that mounts the existing player
+│
+└── frontendv2/ ───────────── the redesign (design/agent-panel.dc.html made real)
+    ├── 01 structure          AgentV2 feature folder · React conventions · design tokens
+    ├── 02 panel & thread     chrome, header, messages, auto-scroll
+    ├── 03 tool cards         one shell, six states, per-tool faces behind a registry
+    ├── 04 composer & picker  tool registry · coming-soon gating · toolHint semantics
+    ├── 05 canvas playback    step card, bottom pill, node glow — executor untouched
+    └── 06 build order        V0–V4 phases · dev switch · v1 retirement checklist
 ```
 
 ## Design stance (carried from the MVP, one level up)

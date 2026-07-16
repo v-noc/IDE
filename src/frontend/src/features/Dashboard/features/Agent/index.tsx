@@ -1,3 +1,5 @@
-import { AgentOverlay } from "./components/AgentOverlay";
+import "./theme/tokens.css";
+
+import { AgentOverlay } from "./panel/AgentOverlay";
 
 export default AgentOverlay;

@@ -88,6 +88,7 @@ async def run_agent_turn(
     assistant_index: int,
     uow: ProjectUoW,
     effort: EffortLevel | None = None,
+    tool_hint: str | None = None,
     cancelled: asyncio.Event | None = None,
     emit: Any = None,
 ) -> MessageMetadata:
@@ -162,7 +163,11 @@ async def run_agent_turn(
         chat, uow.project, repos, node_refs, attached, tools_blurb,
     )
 
-    messages = build_history(conversation, attached_blocks=attached)
+    messages = build_history(
+        conversation,
+        attached_blocks=attached,
+        tool_hint=tool_hint,
+    )
     applied_effort = effort or settings.AGENT_REASONING_EFFORT
     adapter = StreamAdapter(
         patcher,

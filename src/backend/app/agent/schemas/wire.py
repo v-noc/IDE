@@ -10,6 +10,7 @@ from app.agent.schemas.parts import Part
 
 class MessageOptions(BaseModel):
     effort: EffortLevel | None = None
+    tool_hint: str | None = None
 
 
 class SendMessageRequest(BaseModel):

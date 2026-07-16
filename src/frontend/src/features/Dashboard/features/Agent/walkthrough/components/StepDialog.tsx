@@ -1,5 +1,6 @@
+import "../../theme/tokens.css";
+
 import { AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,6 @@ import { useWalkthroughStore } from "../store/useWalkthroughStore";
 import { GeneratingShimmer } from "./GeneratingShimmer";
 import { StepMarkdown } from "./StepMarkdown";
 
-/** Fixed dialog size — matches the canvas code expand dialog feel. */
 const DIALOG_W = "min(90vw, 48rem)";
 const DIALOG_H = "min(80vh, 36rem)";
 
@@ -68,20 +68,20 @@ export function StepDialog() {
       }}
     >
       <DialogContent
-        className="flex max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+        className="agent-v2 flex max-w-none flex-col gap-0 overflow-hidden border-agent-border-strong bg-agent-bg-tool p-0 text-agent-text sm:max-w-none"
         style={{ width: DIALOG_W, height: DIALOG_H }}
       >
-        <DialogHeader className="shrink-0 space-y-0 border-b border-border px-5 py-4">
+        <DialogHeader className="shrink-0 space-y-0 border-b border-agent-border px-5 py-4">
           <div className="flex items-start justify-between gap-3">
-            <DialogTitle className="truncate text-base font-medium">
+            <DialogTitle className="truncate text-base font-semibold text-agent-text">
               {step?.title ?? "Walkthrough"}
             </DialogTitle>
-            <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex shrink-0 items-center gap-2 font-agent-mono text-xs text-agent-text-muted">
               {step?.degraded ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="inline-flex items-center gap-1 text-amber-500">
-                      <AlertTriangle className="h-3.5 w-3.5" />
+                    <span className="inline-flex text-agent-warn">
+                      <AlertTriangle className="size-3.5" />
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -96,7 +96,7 @@ export function StepDialog() {
           </div>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 text-sm leading-relaxed">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 text-sm leading-relaxed text-agent-text-body">
           {waitingForText ? (
             <GeneratingShimmer />
           ) : (
@@ -104,28 +104,31 @@ export function StepDialog() {
           )}
         </div>
 
-        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-5 py-4">
-          <Button type="button" variant="ghost" size="sm" onClick={exit}>
-            Exit
-          </Button>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-agent-border px-5 py-4">
+          <button
+            type="button"
+            onClick={exit}
+            className="rounded-agent-field px-2.5 py-2 text-sm text-agent-text-muted hover:bg-agent-bg-raised hover:text-agent-text-body"
+          >
+            Exit tour
+          </button>
           <div className="flex items-center gap-2">
-            <Button
+            <button
               type="button"
-              variant="outline"
-              size="sm"
               disabled={!canPrev}
               onClick={prev}
+              className="rounded-agent-field border border-agent-border-strong bg-agent-bg-inset px-4 py-2 text-sm font-semibold text-agent-text-body disabled:opacity-50"
             >
               Prev
-            </Button>
-            <Button
+            </button>
+            <button
               type="button"
-              size="sm"
               disabled={!canNext && !waitingForText}
               onClick={next}
+              className="rounded-agent-field border border-agent-btn-border bg-agent-btn px-4 py-2 text-sm font-semibold text-agent-on-btn hover:bg-agent-btn-hover disabled:opacity-50"
             >
               Next
-            </Button>
+            </button>
           </div>
         </div>
       </DialogContent>

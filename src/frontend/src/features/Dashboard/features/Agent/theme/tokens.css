@@ -1,0 +1,144 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap");
+
+.agent-v2 {
+  --agent-bg-canvas: #0e0f11;
+  --agent-bg-panel: #141518;
+  --agent-bg-card: #191b1f;
+  --agent-bg-tool: #1a1c21;
+  --agent-bg-inset: #15161a;
+  --agent-bg-raised: #22252b;
+  --agent-border: #22252b;
+  --agent-border-subtle: #23262c;
+  --agent-border-strong: #2c2f36;
+  --agent-text: #e6e8ec;
+  --agent-text-body: #c3c8d1;
+  --agent-text-muted: #8b919d;
+  --agent-text-faint: #5c6270;
+  --agent-text-label: #6b7280;
+  --agent-text-agent-label: #4ea877;
+  --agent-accent: #3ecf72;
+  --agent-accent-text: #7fdba3;
+  --agent-accent-link: #61c98a;
+  --agent-accent-bg: rgb(62 207 114 / 0.1);
+  --agent-accent-bg-subtle: rgb(62 207 114 / 0.08);
+  --agent-accent-border: rgb(62 207 114 / 0.25);
+  --agent-accent-border-strong: rgb(62 207 114 / 0.3);
+  --agent-btn: #2c9a58;
+  --agent-btn-hover: #34ab63;
+  --agent-btn-border: #2f9d5c;
+  --agent-on-btn: #0b1a10;
+  --agent-warn: #e2b95a;
+  --agent-warn-bg: rgb(226 185 90 / 0.09);
+  --agent-warn-border: rgb(226 185 90 / 0.25);
+  --agent-warn-card-border: #3a3320;
+  --agent-danger: #d46a6a;
+  --agent-danger-bg: rgb(212 106 106 / 0.09);
+  --agent-danger-border: rgb(212 106 106 / 0.25);
+  --agent-r-card: 12px;
+  --agent-r-field: 8px;
+  --agent-r-pill: 99px;
+  --agent-header-border: #1e2026;
+  --agent-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, "Liberation Mono", monospace;
+
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--agent-text);
+  background-color: var(--agent-bg-panel);
+}
+
+@theme inline {
+  --font-agent-mono: var(--agent-font-mono);
+  --radius-agent-card: var(--agent-r-card);
+  --radius-agent-field: var(--agent-r-field);
+  --radius-agent-pill: var(--agent-r-pill);
+
+  --color-agent-bg-panel: var(--agent-bg-panel);
+  --color-agent-bg-card: var(--agent-bg-card);
+  --color-agent-bg-tool: var(--agent-bg-tool);
+  --color-agent-bg-inset: var(--agent-bg-inset);
+  --color-agent-bg-raised: var(--agent-bg-raised);
+  --color-agent-border: var(--agent-border);
+  --color-agent-border-subtle: var(--agent-border-subtle);
+  --color-agent-border-strong: var(--agent-border-strong);
+  --color-agent-header-border: var(--agent-header-border);
+  --color-agent-text: var(--agent-text);
+  --color-agent-text-body: var(--agent-text-body);
+  --color-agent-text-muted: var(--agent-text-muted);
+  --color-agent-text-faint: var(--agent-text-faint);
+  --color-agent-text-label: var(--agent-text-label);
+  --color-agent-text-agent-label: var(--agent-text-agent-label);
+  --color-agent-accent: var(--agent-accent);
+  --color-agent-accent-text: var(--agent-accent-text);
+  --color-agent-accent-link: var(--agent-accent-link);
+  --color-agent-accent-bg: var(--agent-accent-bg);
+  --color-agent-accent-bg-subtle: var(--agent-accent-bg-subtle);
+  --color-agent-accent-border: var(--agent-accent-border);
+  --color-agent-accent-border-strong: var(--agent-accent-border-strong);
+  --color-agent-btn: var(--agent-btn);
+  --color-agent-btn-hover: var(--agent-btn-hover);
+  --color-agent-btn-border: var(--agent-btn-border);
+  --color-agent-on-btn: var(--agent-on-btn);
+  --color-agent-warn: var(--agent-warn);
+  --color-agent-warn-bg: var(--agent-warn-bg);
+  --color-agent-warn-border: var(--agent-warn-border);
+  --color-agent-warn-card-border: var(--agent-warn-card-border);
+  --color-agent-danger: var(--agent-danger);
+  --color-agent-danger-bg: var(--agent-danger-bg);
+  --color-agent-danger-border: var(--agent-danger-border);
+}
+
+@keyframes agent-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.agent-v2 .agent-status-dot--pulse {
+  animation: agent-pulse-dot 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-v2 .agent-status-dot--pulse {
+    animation: none;
+  }
+
+  .agent-v2 .agent-tool-badge--pulse {
+    animation: none;
+  }
+
+  .agent-v2 .agent-tool-progress-fill {
+    animation: none;
+    background: var(--agent-accent);
+  }
+}
+
+@keyframes agent-bar-slide {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 24px 0;
+  }
+}
+
+.agent-v2 .agent-tool-badge--pulse {
+  animation: agent-pulse-dot 1.6s ease-in-out infinite;
+}
+
+.agent-v2 .agent-tool-progress-fill {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--agent-accent),
+    var(--agent-accent) 8px,
+    color-mix(in srgb, var(--agent-accent) 55%, transparent) 8px,
+    color-mix(in srgb, var(--agent-accent) 55%, transparent) 16px
+  );
+  background-size: 24px 24px;
+  animation: agent-bar-slide 1s linear infinite;
+}

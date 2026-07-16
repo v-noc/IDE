@@ -44,6 +44,7 @@ def build_history(
     conversation: Conversation,
     *,
     attached_blocks: dict[str, str] | None = None,
+    tool_hint: str | None = None,
 ) -> list[BaseMessage]:
     """Deterministic parts → model messages. Never rewrites user text."""
     if not conversation.messages:
@@ -73,6 +74,8 @@ def build_history(
             enrich_node_refs=enrich,
             attached_blocks=attached_blocks if enrich else None,
         )
+        if message.role == "user" and index == last_user_index and tool_hint:
+            content = f"{content}\n\n<tool_hint>{tool_hint}</tool_hint>".strip()
         if not content.strip():
             continue
         if message.role == "user":

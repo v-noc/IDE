@@ -19,6 +19,7 @@ async def run_turn(
     assistant_index: int,
     uow: ProjectUoW,
     effort: EffortLevel | None = None,
+    tool_hint: str | None = None,
     cancelled: asyncio.Event | None = None,
     emit: Any = None,
 ) -> MessageMetadata:
@@ -40,6 +41,7 @@ async def run_turn(
         assistant_index=assistant_index,
         uow=uow,
         effort=effort,
+        tool_hint=tool_hint,
         cancelled=cancelled,
         emit=emit,
     )

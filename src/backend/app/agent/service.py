@@ -110,6 +110,7 @@ class AgentService:
         parts: list[Part],
         *,
         effort: EffortLevel | None = None,
+        tool_hint: str | None = None,
     ):
         if conversation_id in _active_runs:
             raise HTTPException(
@@ -124,7 +125,12 @@ class AgentService:
         _active_runs[conversation_id] = run
 
         return ndjson_response(
-            lambda: self._stream_message(conversation_id, parts, effort=effort),
+            lambda: self._stream_message(
+                conversation_id,
+                parts,
+                effort=effort,
+                tool_hint=tool_hint,
+            ),
         )
 
     async def decide(
@@ -167,6 +173,7 @@ class AgentService:
         parts: list[Part],
         *,
         effort: EffortLevel | None,
+        tool_hint: str | None = None,
     ):
         queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
         run = _active_runs[conversation_id]
@@ -225,6 +232,7 @@ class AgentService:
                     assistant_index=assistant_index,
                     uow=self.uow,
                     effort=effort,
+                    tool_hint=tool_hint,
                     cancelled=cancel_flag,
                     emit=emit,
                 )

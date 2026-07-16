@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import type { ConversationSummary, EffortLevel, NodeRefPart } from "../stream/types";
+import type { ToolId } from "../tools/registry";
 
 export type AgentViewMode = "chat" | "walkthrough";
 
@@ -16,6 +17,7 @@ interface AgentRunState {
   streamStatus: StreamConnectionStatus;
   streamError: string | null;
   effort: EffortLevel;
+  selectedToolId: ToolId;
   pendingAttachments: NodeRefPart[];
   setActiveConversationId: (id: string | null) => void;
   setSummaries: (summaries: ConversationSummary[]) => void;
@@ -25,6 +27,7 @@ interface AgentRunState {
     error?: string | null,
   ) => void;
   setEffort: (effort: EffortLevel) => void;
+  setSelectedToolId: (toolId: ToolId) => void;
   addAttachment: (part: NodeRefPart) => void;
   removeAttachment: (nodeId: string) => void;
   clearAttachments: () => void;
@@ -41,6 +44,7 @@ export const useAgentRunStore = create<AgentRunState>()(
       streamStatus: "idle",
       streamError: null,
       effort: "medium",
+      selectedToolId: "walkthrough",
       pendingAttachments: [],
       setActiveConversationId: (id) =>
         set({ activeConversationId: id }, false, "setActiveConversationId"),
@@ -54,6 +58,8 @@ export const useAgentRunStore = create<AgentRunState>()(
           "setStreamStatus",
         ),
       setEffort: (effort) => set({ effort }, false, "setEffort"),
+      setSelectedToolId: (selectedToolId) =>
+        set({ selectedToolId }, false, "setSelectedToolId"),
       addAttachment: (part) =>
         set(
           (state) => {

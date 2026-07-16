@@ -215,7 +215,7 @@ export async function streamMessage(
   parts: Part[],
   onFrames: (frames: WireFrame[]) => void,
   signal?: AbortSignal,
-  options?: { effort?: string },
+  options?: { effort?: string; toolHint?: string },
 ): Promise<void> {
   const dispatcher = createRafDispatcher(onFrames);
 
@@ -230,7 +230,13 @@ export async function streamMessage(
         },
         body: JSON.stringify({
           parts,
-          options: options?.effort ? { effort: options.effort } : undefined,
+          options:
+            options?.effort || options?.toolHint
+              ? {
+                  ...(options.effort ? { effort: options.effort } : {}),
+                  ...(options.toolHint ? { tool_hint: options.toolHint } : {}),
+                }
+              : undefined,
         }),
         signal,
       },

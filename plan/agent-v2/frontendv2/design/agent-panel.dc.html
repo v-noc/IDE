@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#101113;color:#e6e8ec;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;height:100%;}
+  *{box-sizing:border-box;}
+  a{color:#61c98a;text-decoration:none;} a:hover{color:#7fdba3;text-decoration:underline;}
+  ::-webkit-scrollbar{width:10px;height:10px;} ::-webkit-scrollbar-thumb{background:#2b2e34;border-radius:6px;border:2px solid #17181b;} ::-webkit-scrollbar-track{background:transparent;}
+  textarea:focus,input:focus,button:focus{outline:none;}
+  textarea::placeholder,input::placeholder{color:#5c6270;}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:#2b2e34;width:100%;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#3ecf72;border:3px solid #17181b;box-shadow:0 0 0 1px #3ecf72;cursor:pointer;}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#3ecf72;border:3px solid #17181b;box-shadow:0 0 0 1px #3ecf72;cursor:pointer;}
+  @keyframes pulseDot{0%,100%{opacity:1;}50%{opacity:.35;}}
+  @keyframes barSlide{0%{background-position:0 0;}100%{background-position:24px 0;}}
+</style>
+</helmet>
+<div data-screen-label="Agent workspace" style="display:flex; height:100vh; width:100%; overflow:hidden; background:#101113;">
+  <sc-if value="{{ showCanvas }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="Canvas" style="flex:1; position:relative; overflow:hidden; background-color:#0e0f11; background-image:radial-gradient(#212329 1px, transparent 1px); background-size:22px 22px;">
+      <div style="position:absolute; top:0; left:0; right:0; height:44px; display:flex; align-items:center; gap:8px; padding:0 16px; font-family:'JetBrains Mono',monospace; font-size:12px; color:#8b919d; border-bottom:1px solid #1d1f24; background:rgba(14,15,17,.8); backdrop-filter:blur(6px);">
+        <span style="color:#5c6270;">sample_project2</span><span style="color:#3a3e46;">/</span><span style="color:#c9cdd4;">main</span>
+        <a href="#" style="font-size:11px; color:#61c98a;">promote</a>
+      </div>
+      <div style="position:absolute; left:52%; top:42%; transform:translate(-50%,-50%); width:300px; border-radius:10px; background:#191b1f; border:1px solid {{ nodeBorder }}; box-shadow:{{ nodeShadow }}; overflow:hidden; transition:box-shadow .3s, border-color .3s;">
+        <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; background:#20232a; border-bottom:1px solid #262931;">
+          <button style="width:22px; height:22px; border-radius:6px; border:1px solid #33373f; background:#1a1c21; color:#8b919d; cursor:pointer; font-size:10px; display:flex; align-items:center; justify-content:center;">▾</button>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#9ba1ab" stroke-width="1.5"><rect x="3" y="1.8" width="10" height="12.4" rx="1.5"></rect><line x1="5.5" y1="6" x2="10.5" y2="6"></line><line x1="5.5" y1="9" x2="10.5" y2="9"></line></svg>
+          <span style="font-weight:600; font-size:14px; color:#e6e8ec;">main</span>
+          <button style="margin-left:auto; width:24px; height:22px; border-radius:6px; border:1px solid #33373f; background:#1a1c21; color:#8b919d; cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:9px;">&lt;/&gt;</button>
+        </div>
+        <div style="padding:12px; font-size:12.5px; color:#9ba1ab;">File main — program-level functions for this project.</div>
+        <div style="display:flex; gap:12px; padding:8px 12px; border-top:1px solid #22252b; font-family:'JetBrains Mono',monospace; font-size:10px; color:#5c6270;">
+          <span>created jul 13 · 4:05 pm</span><span>updated jul 13 · 4:05 pm</span>
+        </div>
+      </div>
+      <sc-if value="{{ playbackActive }}" hint-placeholder-val="{{ false }}">
+        <div data-screen-label="Walkthrough step card" style="position:absolute; left:48px; top:120px; width:400px; border-radius:14px; background:#1a1c21; border:1px solid #2b2e35; box-shadow:0 24px 60px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4); overflow:hidden;">
+          <div style="display:flex; align-items:center; gap:10px; padding:14px 18px 0;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#3ecf72; box-shadow:0 0 8px rgba(62,207,114,.6);"></span>
+            <span style="font-weight:650; font-size:16px; color:#f0f2f5;">{{ stepTitle }}</span>
+            <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#8b919d; background:#22252b; border:1px solid #2c2f36; padding:3px 8px; border-radius:6px;">{{ stepCounter }}</span>
+          </div>
+          <div style="padding:12px 18px 4px; font-size:14px; line-height:1.65; color:#c3c8d1;">{{ stepText }}</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; padding:6px 18px 4px;">
+            <sc-for list="{{ stepChips }}" as="chip" hint-placeholder-count="2">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#a8e8bf; background:rgba(62,207,114,.08); border:1px solid rgba(62,207,114,.22); padding:2px 7px; border-radius:5px;">{{ chip }}</span>
+            </sc-for>
+          </div>
+          <div style="display:flex; gap:4px; padding:12px 18px 0;">
+            <sc-for list="{{ stepDots }}" as="dot" hint-placeholder-count="9">
+              <span style="height:3px; flex:1; border-radius:2px; background:{{ dot.color }};"></span>
+            </sc-for>
+          </div>
+          <div style="display:flex; align-items:center; padding:14px 18px 16px;">
+            <button onClick="{{ exitPlayback }}" style="border:none; background:transparent; color:#8b919d; font-size:13px; cursor:pointer; padding:8px 10px; border-radius:8px;" style-hover="color:#c9cdd4; background:#22252b;">Exit tour</button>
+            <div style="margin-left:auto; display:flex; gap:8px;">
+              <button onClick="{{ prevStep }}" style="border:1px solid #2c2f36; background:#1f2126; color:#c9cdd4; font-size:13px; font-weight:550; cursor:pointer; padding:8px 16px; border-radius:8px;" style-hover="background:#26292f;">Prev</button>
+              <button onClick="{{ nextStep }}" style="border:1px solid #2f9d5c; background:#2c9a58; color:#0b1a10; font-size:13px; font-weight:650; cursor:pointer; padding:8px 18px; border-radius:8px;" style-hover="background:#34ab63;">Next</button>
+            </div>
+          </div>
+        </div>
+        <div style="position:absolute; left:50%; bottom:20px; transform:translateX(-50%); display:flex; align-items:center; gap:12px; padding:8px 8px 8px 16px; border-radius:99px; background:rgba(24,26,30,.92); border:1px solid #2b2e35; box-shadow:0 8px 30px rgba(0,0,0,.5); backdrop-filter:blur(8px);">
+          <span style="width:7px; height:7px; border-radius:50%; background:#3ecf72; animation:pulseDot 2s infinite;"></span>
+          <span style="font-weight:600; font-size:13px; color:#e6e8ec;">{{ stepTitle }}</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#8b919d;">{{ stepCounter }}</span>
+          <button onClick="{{ exitPlayback }}" style="border:1px solid #2c2f36; background:#22252b; color:#9ba1ab; font-size:12px; cursor:pointer; padding:5px 12px; border-radius:99px;" style-hover="color:#e6e8ec;">Exit</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+  <div data-screen-label="Agent panel" style="width:420px; min-width:420px; display:flex; flex-direction:column; background:#141518; border-left:1px solid #22252b; position:relative;">
+    <div style="display:flex; align-items:center; gap:8px; padding:0 18px; height:48px; border-bottom:1px solid #1e2026;">
+      <span style="width:7px; height:7px; border-radius:50%; background:#3ecf72;"></span>
+      <span style="font-weight:650; font-size:13px; letter-spacing:.04em; color:#e6e8ec;">AGENT</span>
+      <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#5c6270;">session 372f9c6e</span>
+    </div>
+    <div ref="{{ chatRef }}" style="flex:1; overflow-y:auto; padding:16px 16px 8px; display:flex; flex-direction:column; gap:12px;">
+      <sc-for list="{{ messages }}" as="m" hint-placeholder-count="3">
+        <sc-if value="{{ m.isUser }}" hint-placeholder-val="{{ false }}">
+          <div style="flex-shrink:0; border-radius:12px; background:#191b1f; border:1px solid #23262c; padding:12px 14px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <span style="font-size:10.5px; font-weight:700; letter-spacing:.08em; color:#6b7280;">YOU</span>
+              <sc-for list="{{ m.chips }}" as="chip" hint-placeholder-count="1">
+                <span style="display:inline-flex; align-items:center; gap:5px; font-family:'JetBrains Mono',monospace; font-size:11px; color:#c3c8d1; background:#22252b; border:1px solid #2c2f36; padding:2px 8px; border-radius:99px;"><span style="width:6px; height:6px; border-radius:2px; background:#8b919d;"></span>{{ chip.label }} <span style="color:#5c6270;">{{ chip.kind }}</span></span>
+              </sc-for>
+            </div>
+            <div style="font-size:13.5px; line-height:1.55; color:#dfe2e7;">{{ m.text }}</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ m.isAgent }}" hint-placeholder-val="{{ false }}">
+          <div style="flex-shrink:0; padding:2px 4px;">
+            <div style="font-size:10.5px; font-weight:700; letter-spacing:.08em; color:#4ea877; margin-bottom:6px;">AGENT</div>
+            <div style="font-size:13.5px; line-height:1.6; color:#c3c8d1;">{{ m.text }}</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ m.isTool }}" hint-placeholder-val="{{ false }}">
+          <div style="flex-shrink:0; border-radius:12px; background:#1a1c21; border:1px solid {{ m.cardBorder }}; overflow:hidden;">
+            <button onClick="{{ m.onToggle }}" style="display:flex; align-items:center; gap:10px; width:100%; padding:11px 14px; border:none; background:transparent; cursor:pointer; text-align:left;" style-hover="background:#1e2026;">
+              <span style="width:26px; height:26px; min-width:26px; border-radius:7px; display:flex; align-items:center; justify-content:center; background:rgba(62,207,114,.1); border:1px solid rgba(62,207,114,.2); color:#7fdba3;">
+                <sc-if value="{{ m.isW }}" hint-placeholder-val="{{ true }}"><svg width="11" height="11" viewBox="0 0 16 16"><path d="M5 3v10l8-5z" fill="currentColor"></path></svg></sc-if>
+                <sc-if value="{{ m.isDesc }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="3" width="12" height="1.8" rx="0.9"></rect><rect x="2" y="7" width="9" height="1.8" rx="0.9"></rect><rect x="2" y="11" width="11" height="1.8" rx="0.9"></rect></svg></sc-if>
+                <sc-if value="{{ m.isDoc }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="1.8" width="10" height="12.4" rx="1.5"></rect><line x1="5.5" y1="6" x2="10.5" y2="6"></line><line x1="5.5" y1="9.5" x2="10.5" y2="9.5"></line></svg></sc-if>
+                <sc-if value="{{ m.isG }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1.2"></rect><rect x="9" y="2" width="5" height="5" rx="1.2"></rect><rect x="2" y="9" width="5" height="5" rx="1.2"></rect><rect x="9" y="9" width="5" height="5" rx="1.2"></rect></svg></sc-if>
+              </span>
+              <span style="display:flex; flex-direction:column; gap:1px; min-width:0;">
+                <span style="font-weight:600; font-size:13px; color:#e6e8ec;">{{ m.name }}</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#6b7280; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.meta }}</span>
+              </span>
+              <span style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+                <span style="{{ m.badgeStyle }}">{{ m.badgeLabel }}</span>
+                <span style="color:#5c6270; font-size:10px; transform:{{ m.chevron }}; transition:transform .2s;">▾</span>
+              </span>
+            </button>
+            <sc-if value="{{ m.expanded }}" hint-placeholder-val="{{ false }}">
+              <div style="border-top:1px solid #22252b; padding:14px; display:flex; flex-direction:column; gap:14px;">
+                <sc-if value="{{ m.isPending }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="display:flex; align-items:baseline;">
+                      <span style="font-size:12px; font-weight:600; color:#c3c8d1;">Depth</span>
+                      <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11px; color:#8b919d;">{{ m.depthLabel }}</span>
+                    </div>
+                    <input type="range" min="1" max="{{ m.depthMax }}" step="1" value="{{ m.depth }}" onChange="{{ m.onDepth }}">
+                  </div>
+                  <sc-if value="{{ m.isW }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                      <span style="font-size:12px; font-weight:600; color:#c3c8d1;">Detail</span>
+                      <div style="display:flex; gap:0; background:#15161a; border:1px solid #26292f; border-radius:8px; padding:3px;">
+                        <sc-for list="{{ m.detailOpts }}" as="opt" hint-placeholder-count="3">
+                          <button onClick="{{ opt.onClick }}" style="{{ opt.style }}">{{ opt.label }}</button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ m.isDoc }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                      <div style="display:flex; align-items:baseline;">
+                        <span style="font-size:12px; font-weight:600; color:#c3c8d1;">Intent</span>
+                        <span style="margin-left:auto; font-size:10.5px; color:#6b7280;">suggested — edit or approve</span>
+                      </div>
+                      <textarea rows="3" value="{{ m.intent }}" onChange="{{ m.onIntent }}" style="width:100%; resize:vertical; background:#15161a; border:1px solid #26292f; border-radius:8px; padding:9px 11px; font-size:12.5px; line-height:1.5; color:#dfe2e7; font-family:inherit;" style-focus="border-color:#3ecf72;"></textarea>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ m.isG }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                      <sc-for list="{{ m.steppers }}" as="st" hint-placeholder-count="3">
+                        <div style="display:flex; flex-direction:column; gap:6px; background:#15161a; border:1px solid #26292f; border-radius:8px; padding:8px 8px 7px;">
+                          <span style="font-size:10px; font-weight:600; letter-spacing:.02em; color:#8b919d; text-align:center;">{{ st.label }}</span>
+                          <div style="display:flex; align-items:center; justify-content:space-between; gap:4px;">
+                            <button onClick="{{ st.onDec }}" style="width:22px; height:22px; border-radius:6px; border:1px solid #2c2f36; background:#1f2126; color:#9ba1ab; cursor:pointer; font-size:13px; line-height:1;" style-hover="color:#e6e8ec; background:#26292f;">−</button>
+                            <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:#e6e8ec;">{{ st.value }}</span>
+                            <button onClick="{{ st.onInc }}" style="width:22px; height:22px; border-radius:6px; border:1px solid #2c2f36; background:#1f2126; color:#9ba1ab; cursor:pointer; font-size:13px; line-height:1;" style-hover="color:#e6e8ec; background:#26292f;">+</button>
+                          </div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <div style="display:flex; align-items:center; gap:10px; padding-top:2px;">
+                    <span style="font-size:11px; color:#6b7280;">Above the auto-run limit, so approval is needed.</span>
+                    <div style="margin-left:auto; display:flex; gap:8px;">
+                      <button onClick="{{ m.onCancel }}" style="border:1px solid #2c2f36; background:transparent; color:#9ba1ab; font-size:12.5px; font-weight:550; cursor:pointer; padding:7px 14px; border-radius:8px;" style-hover="color:#e6e8ec; background:#22252b;">Cancel</button>
+                      <button onClick="{{ m.onRun }}" style="display:inline-flex; align-items:center; gap:6px; border:1px solid #2f9d5c; background:#2c9a58; color:#0b1a10; font-size:12.5px; font-weight:650; cursor:pointer; padding:7px 16px; border-radius:8px;" style-hover="background:#34ab63;"><svg width="9" height="9" viewBox="0 0 16 16"><path d="M5 3v10l8-5z" fill="currentColor"></path></svg>{{ m.runLabel }}</button>
+                    </div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.isRunning }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="height:5px; border-radius:3px; background:#22252b; overflow:hidden;">
+                      <div style="height:100%; border-radius:3px; width:{{ m.progressPct }}; background:repeating-linear-gradient(45deg,#3ecf72 0 8px,#35b463 8px 16px); background-size:24px 24px; animation:barSlide 1s linear infinite; transition:width .3s;"></div>
+                    </div>
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#8b919d;">{{ m.progressLabel }}</span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.isDoneW }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button onClick="{{ m.onPlayback }}" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border:1px solid #2f9d5c; background:#2c9a58; color:#0b1a10; font-size:13.5px; font-weight:650; cursor:pointer; padding:11px; border-radius:9px;" style-hover="background:#34ab63;"><svg width="10" height="10" viewBox="0 0 16 16"><path d="M5 3v10l8-5z" fill="currentColor"></path></svg>{{ m.playbackLabel }}</button>
+                    <div style="font-size:11px; color:#6b7280; text-align:center; margin-top:-4px;">{{ m.readyLabel }}</div>
+                    <div style="font-size:10.5px; font-weight:700; letter-spacing:.08em; color:#6b7280; margin-top:2px;">TOUR OUTLINE</div>
+                    <div style="display:flex; flex-direction:column; border:1px solid #22252b; border-radius:9px; overflow:hidden;">
+                      <sc-for list="{{ m.outline }}" as="o" hint-placeholder-count="6">
+                        <div style="display:flex; align-items:center; gap:8px; padding:7px 12px; padding-left:{{ o.pad }}; background:{{ o.bg }}; border-bottom:1px solid #1e2026;">
+                          <span style="color:{{ o.markColor }}; font-size:{{ o.markSize }}; width:12px; text-align:center;">{{ o.mark }}</span>
+                          <span style="font-size:{{ o.labelSize }}; font-weight:{{ o.labelWeight }}; color:{{ o.labelColor }};">{{ o.label }}</span>
+                          <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#5c6270;">{{ o.kind }}</span>
+                          <sc-if value="{{ o.stop }}" hint-placeholder-val="{{ false }}">
+                            <a href="#" style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#61c98a;">⇢ {{ o.stop }}</a>
+                          </sc-if>
+                        </div>
+                      </sc-for>
+                    </div>
+                    <div style="font-size:11px; color:#6b7280; border-top:1px solid #1e2026; padding-top:9px;">approved · walkthrough created</div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.isDoneDesc }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:12.5px; line-height:1.6; color:#c3c8d1; background:#15161a; border:1px solid #26292f; border-radius:9px; padding:11px 13px;">{{ m.resultText }}</div>
+                </sc-if>
+                <sc-if value="{{ m.isDoneDoc }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; align-items:center; gap:10px; background:#15161a; border:1px solid #26292f; border-radius:9px; padding:10px 13px;">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#7fdba3" stroke-width="1.6"><rect x="3" y="1.8" width="10" height="12.4" rx="1.5"></rect><line x1="5.5" y1="6" x2="10.5" y2="6"></line><line x1="5.5" y1="9.5" x2="10.5" y2="9.5"></line></svg>
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#dfe2e7;">main.doc.md</span>
+                    <span style="font-size:11px; color:#6b7280;">1,240 words</span>
+                    <a href="#" style="margin-left:auto; font-size:12px; font-weight:600;">Open</a>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.isDoneG }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <sc-for list="{{ m.groups }}" as="g" hint-placeholder-count="3">
+                      <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#dfe2e7; background:#15161a; border:1px solid #26292f; padding:5px 10px; border-radius:99px;"><svg width="10" height="10" viewBox="0 0 16 16" fill="#7fdba3"><rect x="2" y="2" width="5" height="5" rx="1.2"></rect><rect x="9" y="2" width="5" height="5" rx="1.2"></rect><rect x="2" y="9" width="5" height="5" rx="1.2"></rect><rect x="9" y="9" width="5" height="5" rx="1.2"></rect></svg>{{ g.name }} <span style="color:#5c6270; font-family:'JetBrains Mono',monospace; font-size:10px;">{{ g.count }}</span></span>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </sc-for>
+    </div>
+    <div style="padding:12px 14px 14px; border-top:1px solid #1e2026; position:relative;">
+      <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeMenu }}" style="position:fixed; inset:0; z-index:5;"></div>
+        <div style="position:absolute; bottom:64px; left:14px; width:280px; z-index:6; background:#1d1f24; border:1px solid #2c2f36; border-radius:12px; box-shadow:0 16px 48px rgba(0,0,0,.55); overflow:hidden; padding:5px;">
+          <div style="font-size:10px; font-weight:700; letter-spacing:.08em; color:#6b7280; padding:8px 10px 6px;">TOOLS</div>
+          <sc-for list="{{ toolMenu }}" as="t" hint-placeholder-count="4">
+            <button onClick="{{ t.onPick }}" style="display:flex; align-items:center; gap:10px; width:100%; padding:9px 10px; border:none; border-radius:8px; background:{{ t.bg }}; cursor:pointer; text-align:left;" style-hover="background:#26292f;">
+              <span style="width:26px; height:26px; min-width:26px; border-radius:7px; display:flex; align-items:center; justify-content:center; background:rgba(62,207,114,.1); border:1px solid rgba(62,207,114,.2); color:#7fdba3;">
+                <sc-if value="{{ t.isW }}" hint-placeholder-val="{{ true }}"><svg width="11" height="11" viewBox="0 0 16 16"><path d="M5 3v10l8-5z" fill="currentColor"></path></svg></sc-if>
+                <sc-if value="{{ t.isDesc }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="3" width="12" height="1.8" rx="0.9"></rect><rect x="2" y="7" width="9" height="1.8" rx="0.9"></rect><rect x="2" y="11" width="11" height="1.8" rx="0.9"></rect></svg></sc-if>
+                <sc-if value="{{ t.isDoc }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="1.8" width="10" height="12.4" rx="1.5"></rect><line x1="5.5" y1="6" x2="10.5" y2="6"></line><line x1="5.5" y1="9.5" x2="10.5" y2="9.5"></line></svg></sc-if>
+                <sc-if value="{{ t.isG }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1.2"></rect><rect x="9" y="2" width="5" height="5" rx="1.2"></rect><rect x="2" y="9" width="5" height="5" rx="1.2"></rect><rect x="9" y="9" width="5" height="5" rx="1.2"></rect></svg></sc-if>
+              </span>
+              <span style="display:flex; flex-direction:column; gap:1px;">
+                <span style="font-size:13px; font-weight:600; color:#e6e8ec;">{{ t.name }}</span>
+                <span style="font-size:11px; color:#8b919d;">{{ t.desc }}</span>
+              </span>
+              <span style="margin-left:auto; color:#3ecf72; font-size:13px;">{{ t.check }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <div style="background:#191b1f; border:1px solid #26292f; border-radius:12px; padding:10px 12px 8px;" style-focus="border-color:#3a3e46;">
+        <textarea rows="2" value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onKey }}" placeholder="{{ placeholder }}" style="width:100%; resize:none; border:none; background:transparent; font-size:13.5px; line-height:1.5; color:#e6e8ec; font-family:inherit;"></textarea>
+        <div style="display:flex; align-items:center; gap:6px; padding-top:6px;">
+          <button style="display:inline-flex; align-items:center; gap:6px; border:1px solid #2c2f36; background:#1f2126; color:#9ba1ab; font-size:12px; cursor:pointer; padding:6px 10px; border-radius:8px;" style-hover="color:#e6e8ec;"><span style="width:6px; height:6px; border-radius:2px; background:#8b919d;"></span>main <span style="color:#5c6270;">file</span></button>
+          <button onClick="{{ toggleMenu }}" style="display:inline-flex; align-items:center; gap:7px; border:1px solid {{ pickerBorder }}; background:rgba(62,207,114,.07); color:#7fdba3; font-size:12px; font-weight:600; cursor:pointer; padding:6px 10px; border-radius:8px;" style-hover="background:rgba(62,207,114,.12);"><svg width="10" height="10" viewBox="0 0 16 16"><path d="M5 3v10l8-5z" fill="currentColor"></path></svg>{{ selectedName }}<span style="font-size:9px; color:#4ea877;">▾</span></button>
+          <span style="margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:11px; color:#5c6270;">◇ medium</span>
+          <button onClick="{{ onSend }}" style="width:32px; height:32px; border-radius:9px; border:1px solid #2f9d5c; background:#2c9a58; color:#0b1a10; cursor:pointer; display:flex; align-items:center; justify-content:center;" style-hover="background:#34ab63;"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 13V3"></path><path d="M4 7l4-4 4 4"></path></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showCanvas&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Layout&quot;}, &quot;autoExpand&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Behavior&quot;}}">
+const TOOLS = {
+  walkthrough: { name: 'Code walkthrough', short: 'Walkthrough', desc: 'Guided step-by-step tour of a node', run: 'Run tour', meta: '6 stops · ~9 LLM calls', total: 9, unit: 'steps', depthMax: 4, treeMax: 4,
+    ack: "I'll generate a step-by-step walkthrough of the attached file so you can inspect its functions and calls.",
+    prompt: 'Generate a walkthrough of this node.' },
+  describe: { name: 'Description generator', short: 'Describe', desc: 'Concise description of a node', run: 'Generate', meta: '1 node · ~2 LLM calls', total: 2, unit: 'calls', depthMax: 3, treeMax: 3,
+    ack: "I'll write a concise description of the attached node.",
+    prompt: 'Describe this node.' },
+  document: { name: 'Document generator', short: 'Document', desc: 'Full document, with editable intent', run: 'Generate doc', meta: '~5 LLM calls', total: 5, unit: 'sections', depthMax: 3, treeMax: 3,
+    ack: "I'll draft a document for the attached node. Review the suggested intent below — edit it or approve as-is.",
+    prompt: 'Generate a document for this node.' },
+  group: { name: 'Grouper', short: 'Group', desc: 'Organize children into groups', run: 'Create groups', meta: '14 children · ~6 LLM calls', total: 6, unit: 'passes', depthMax: 3, treeMax: 3,
+    ack: "I'll organize this node's children into logical groups using the limits below.",
+    prompt: 'Group the children of this node.' }
+};
+const TOUR_STEPS = [
+  { title: 'main', text: 'This file is the main module and contains the program-level functions for this project. It defines three functions and two top-level call sites.', chips: ['main', 'runner', 'dd'] },
+  { title: 'dd (call)', text: 'The first call site invokes dd at import time. It resolves the decorator chain before anything else runs.', chips: ['main.dd'] },
+  { title: 'runner', text: 'runner orchestrates the pipeline: it loads the config, builds the task list, and dispatches each task.', chips: ['runner', 'config'] },
+  { title: 'main()', text: 'The entrypoint parses CLI args and hands control to runner. Errors bubble up here and are formatted for the user.', chips: ['main.main'] },
+  { title: 'dd internals', text: 'dd wraps its target with logging and timing. Note the closure over the target name.', chips: ['dd'] },
+  { title: 'call graph', text: 'Both call sites target functions in this same module — there are no external edges from main.', chips: ['main.main', 'main.dd'] },
+  { title: 'error paths', text: 'Failures in runner raise TaskError, caught in main() and reported with the failing task id.', chips: ['TaskError'] },
+  { title: 'extension points', text: 'New tasks register via the decorator; nothing else in the file needs to change.', chips: ['@dd'] },
+  { title: 'recap', text: 'main is a thin CLI shell around runner, with dd providing cross-cutting logging. Good starting point for tracing any task.', chips: ['main'] }
+];
+const OUTLINE = [
+  { label: 'main', kind: 'file', depth: 0, mark: 'dot' },
+  { label: 'dd', kind: 'call', depth: 1, mark: 'check' },
+  { label: 'dd', depth: 2, mark: 'sub' },
+  { label: 'main', kind: 'call', depth: 1, mark: 'check' },
+  { label: 'main', depth: 2, mark: 'sub' },
+  { label: 'main', kind: 'function', depth: 1, mark: 'dot', stop: 'stop 3' },
+  { label: 'runner', kind: 'function', depth: 1, mark: 'check' },
+  { label: 'runner', depth: 2, mark: 'sub' },
+  { label: 'dd', kind: 'function', depth: 1, mark: 'dot', stop: 'stop 2' }
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      messages: [
+        { kind: 'user', text: TOOLS.walkthrough.prompt, chips: [{ label: 'main', kind: 'file' }] },
+        { kind: 'agent', text: TOOLS.walkthrough.ack },
+        { kind: 'tool', id: 1, tool: 'walkthrough', status: 'pending', expanded: (props.autoExpand ?? true), progress: 0,
+          config: { depth: 1, detail: 'Normal', intent: '', minGroups: 2, maxGroups: 5, minChildren: 3 } }
+      ],
+      nextId: 2, selected: 'walkthrough', menuOpen: false, draft: '',
+      playback: { active: false, step: 0 }
+    };
+    this.timers = {};
+    this.chatRef = (el) => { this.chatEl = el; };
+  }
+  componentDidUpdate() {
+    const n = this.state.messages.length;
+    if (this.chatEl && n !== this._lastN) { this._lastN = n; this.chatEl.scrollTop = this.chatEl.scrollHeight; }
+  }
+  componentWillUnmount() { Object.values(this.timers).forEach(clearInterval); }
+  patchTool(id, patch) {
+    this.setState(s => ({ messages: s.messages.map(m => m.id === id ? { ...m, ...patch } : m) }));
+  }
+  patchConfig(id, patch) {
+    this.setState(s => ({ messages: s.messages.map(m => m.id === id ? { ...m, config: { ...m.config, ...patch } } : m) }));
+  }
+  run(id, tool) {
+    this.patchTool(id, { status: 'running', progress: 0, expanded: true });
+    const total = TOOLS[tool].total;
+    this.timers[id] = setInterval(() => {
+      const m = this.state.messages.find(x => x.id === id);
+      if (!m) return clearInterval(this.timers[id]);
+      if (m.progress + 1 >= total) {
+        clearInterval(this.timers[id]);
+        this.patchTool(id, { progress: total, status: 'done' });
+        const doneMsg = { walkthrough: 'Walkthrough created.', describe: 'Description saved to the node.', document: 'Document created.', group: 'Groups created.' }[tool];
+        this.setState(s => ({ messages: [...s.messages, { kind: 'agent', text: doneMsg }] }));
+        if (tool === 'walkthrough') this.setState({ playback: { active: true, step: 0 } });
+      } else this.patchTool(id, { progress: m.progress + 1 });
+    }, 420);
+  }
+  send() {
+    const tool = this.state.selected, t = TOOLS[tool];
+    const text = this.state.draft.trim() || t.prompt;
+    this.setState(s => ({
+      draft: '', menuOpen: false, nextId: s.nextId + 1,
+      messages: [...s.messages,
+        { kind: 'user', text, chips: [{ label: 'main', kind: 'file' }] },
+        { kind: 'agent', text: t.ack },
+        { kind: 'tool', id: s.nextId, tool, status: 'pending', expanded: true, progress: 0,
+          config: { depth: 1, detail: 'Normal', intent: 'Explain what the main module does, its three functions, and how the top-level call sites wire them together.', minGroups: 2, maxGroups: 5, minChildren: 3 } }]
+    }));
+  }
+  toolVM(m) {
+    const t = TOOLS[m.tool], id = m.id, c = m.config;
+    const pending = m.status === 'pending', running = m.status === 'running', done = m.status === 'done';
+    const badge = {
+      pending: ['needs approval', 'color:#e2b95a; background:rgba(226,185,90,.09); border:1px solid rgba(226,185,90,.25);'],
+      running: ['running', 'color:#7fdba3; background:rgba(62,207,114,.09); border:1px solid rgba(62,207,114,.3); animation:pulseDot 1.6s infinite;'],
+      done: ['done', 'color:#7fdba3; background:rgba(62,207,114,.09); border:1px solid rgba(62,207,114,.25);'],
+      cancelled: ['cancelled', 'color:#8b919d; background:#22252b; border:1px solid #2c2f36;']
+    }[m.status];
+    const seg = 'flex:1; border:none; border-radius:6px; padding:6px 0; font-size:12px; cursor:pointer; font-weight:550;';
+    return {
+      isTool: true, key: 'tool' + id,
+      isW: m.tool === 'walkthrough', isDesc: m.tool === 'describe', isDoc: m.tool === 'document', isG: m.tool === 'group',
+      name: t.name, meta: '372f9c6e · ' + t.meta, runLabel: t.run,
+      cardBorder: pending ? '#3a3320' : '#23262c',
+      badgeLabel: badge[0],
+      badgeStyle: 'font-size:10px; font-weight:650; letter-spacing:.03em; padding:3px 8px; border-radius:99px; white-space:nowrap; ' + badge[1],
+      chevron: m.expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+      expanded: m.expanded, isPending: pending, isRunning: running,
+      isDoneW: done && m.tool === 'walkthrough', isDoneDesc: done && m.tool === 'describe',
+      isDoneDoc: done && m.tool === 'document', isDoneG: done && m.tool === 'group',
+      depth: c.depth, depthMax: t.depthMax,
+      depthLabel: c.depth + ' (this tree: max ' + t.treeMax + ')',
+      onToggle: () => this.patchTool(id, { expanded: !m.expanded }),
+      onCancel: () => this.patchTool(id, { status: 'cancelled', expanded: false }),
+      onRun: () => this.run(id, m.tool),
+      onDepth: (e) => this.patchConfig(id, { depth: +e.target.value }),
+      detailOpts: ['Quick', 'Normal', 'Detailed'].map(label => ({
+        label,
+        style: seg + (c.detail === label ? 'background:#2c2f36; color:#f0f2f5;' : 'background:transparent; color:#8b919d;'),
+        onClick: () => this.patchConfig(id, { detail: label })
+      })),
+      intent: c.intent, onIntent: (e) => this.patchConfig(id, { intent: e.target.value }),
+      steppers: [
+        { label: 'MIN GROUPS', key: 'minGroups', min: 1, max: c.maxGroups },
+        { label: 'MAX GROUPS', key: 'maxGroups', min: c.minGroups, max: 12 },
+        { label: 'MIN CHILDREN', key: 'minChildren', min: 2, max: 10 }
+      ].map(st => ({
+        label: st.label, value: c[st.key],
+        onDec: () => this.patchConfig(id, { [st.key]: Math.max(st.min, c[st.key] - 1) }),
+        onInc: () => this.patchConfig(id, { [st.key]: Math.min(st.max, c[st.key] + 1) })
+      })),
+      progressPct: Math.round(m.progress / t.total * 100) + '%',
+      progressLabel: m.progress + ' / ' + t.total + ' ' + t.unit + ' · running…',
+      playbackLabel: this.state.playback.active ? 'Exit playback' : 'Play walkthrough',
+      readyLabel: t.total + ' steps ready',
+      onPlayback: () => this.setState(s => ({ playback: { active: !s.playback.active, step: 0 } })),
+      outline: OUTLINE.map((o, i) => ({
+        label: o.label, kind: o.kind ? '(' + o.kind + ')' : '', stop: o.stop || false,
+        pad: o.depth === 0 ? '12px' : o.depth === 1 ? '28px' : '46px',
+        bg: i === 0 && this.state.playback.active ? 'rgba(62,207,114,.06)' : 'transparent',
+        mark: o.mark === 'check' ? '✓' : o.mark === 'sub' ? '▸' : '●',
+        markColor: o.mark === 'check' ? '#4ea877' : o.mark === 'sub' ? '#5c6270' : '#3a3e46',
+        markSize: o.mark === 'check' ? '11px' : o.mark === 'sub' ? '9px' : '7px',
+        labelSize: o.mark === 'sub' ? '12px' : '12.5px',
+        labelWeight: o.mark === 'sub' ? '450' : '600',
+        labelColor: o.mark === 'sub' ? '#9ba1ab' : '#dfe2e7'
+      })),
+      resultText: 'main is the program-level module: it defines runner (pipeline orchestration), main (CLI entrypoint), and dd (a logging/timing decorator), plus two top-level call sites that wire them together.',
+      groups: [{ name: 'Pipeline', count: '6' }, { name: 'CLI', count: '4' }, { name: 'Decorators', count: '4' }]
+    };
+  }
+  renderVals() {
+    const s = this.state, pb = s.playback;
+    const step = TOUR_STEPS[pb.step];
+    return {
+      showCanvas: this.props.showCanvas ?? true,
+      chatRef: this.chatRef,
+      messages: s.messages.map(m =>
+        m.kind === 'user' ? { isUser: true, text: m.text, chips: m.chips } :
+        m.kind === 'agent' ? { isAgent: true, text: m.text } : this.toolVM(m)),
+      menuOpen: s.menuOpen,
+      toggleMenu: () => this.setState({ menuOpen: !s.menuOpen }),
+      closeMenu: () => this.setState({ menuOpen: false }),
+      toolMenu: Object.keys(TOOLS).map(k => ({
+        isW: k === 'walkthrough', isDesc: k === 'describe', isDoc: k === 'document', isG: k === 'group',
+        name: TOOLS[k].name, desc: TOOLS[k].desc,
+        bg: k === s.selected ? '#22252b' : 'transparent',
+        check: k === s.selected ? '✓' : '',
+        onPick: () => this.setState({ selected: k, menuOpen: false })
+      })),
+      selectedName: TOOLS[s.selected].short,
+      pickerBorder: s.menuOpen ? '#3ecf72' : 'rgba(62,207,114,.3)',
+      draft: s.draft,
+      placeholder: 'Ask the agent, or run ' + TOOLS[s.selected].name.toLowerCase() + '…',
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      onKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); } },
+      onSend: () => this.send(),
+      playbackActive: pb.active,
+      stepTitle: step.title, stepText: step.text, stepChips: step.chips,
+      stepCounter: (pb.step + 1) + ' / ' + TOUR_STEPS.length,
+      stepDots: TOUR_STEPS.map((_, i) => ({ color: i <= pb.step ? '#3ecf72' : '#2b2e34' })),
+      nextStep: () => this.setState(x => ({ playback: { active: true, step: Math.min(TOUR_STEPS.length - 1, x.playback.step + 1) } })),
+      prevStep: () => this.setState(x => ({ playback: { active: true, step: Math.max(0, x.playback.step - 1) } })),
+      exitPlayback: () => this.setState({ playback: { active: false, step: 0 } }),
+      nodeBorder: pb.active ? 'rgba(62,207,114,.6)' : '#262931',
+      nodeShadow: pb.active ? '0 0 0 3px rgba(62,207,114,.15), 0 12px 40px rgba(0,0,0,.5)' : '0 12px 40px rgba(0,0,0,.4)'
+    };
+  }
+}
+</script>
+</body>
+</html>

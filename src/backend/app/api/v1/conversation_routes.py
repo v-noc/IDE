@@ -49,8 +49,14 @@ async def send_message(
     # Ensure the conversation exists before opening the stream.
     await service.get_conversation(conversation_id)
     effort = body.options.effort if body.options else None
+    tool_hint = body.options.tool_hint if body.options else None
     try:
-        return service.send_message(conversation_id, body.parts, effort=effort)
+        return service.send_message(
+            conversation_id,
+            body.parts,
+            effort=effort,
+            tool_hint=tool_hint,
+        )
     except HTTPException:
         raise
     except Exception as exc:

@@ -92,7 +92,10 @@ export function useRunStream() {
   }, [activeConversationId, projectId, setStreamStatus]);
 
   const send = useCallback(
-    async (parts: Part[]) => {
+    async (
+      parts: Part[],
+      sendOptions?: { toolHint?: string },
+    ) => {
       if (!projectId) {
         toast.error("Open a project before chatting");
         return;
@@ -118,7 +121,10 @@ export function useRunStream() {
             useMirrorStore.getState().applyFrames(frames);
           },
           controller.signal,
-          { effort: useAgentRunStore.getState().effort },
+          {
+            effort: useAgentRunStore.getState().effort,
+            toolHint: sendOptions?.toolHint,
+          },
         );
         setStreamStatus("idle");
         void refresh();
