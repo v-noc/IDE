@@ -163,6 +163,8 @@ async def _run_pipeline_bridged(
         project_id=project.id,
         node_id=args.node_id,
         depth=args.depth,
+        user_query=args.user_query,
+        verbosity=args.verbosity,
     )
     session = new_session(
         request,

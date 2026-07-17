@@ -5,6 +5,7 @@ from app.agent.tools.base import (
     needs_confirmation,
 )
 from app.agent.tools.walkthrough_tool import WalkthroughArgs, WALKTHROUGH_SPEC
+from app.walkthrough.schemas import RunRequest
 
 
 def test_walkthrough_registered():
@@ -52,3 +53,21 @@ def test_needs_confirmation_threshold():
 def test_walkthrough_always_confirms():
     estimate = ToolEstimate(items=1, llm_calls=1, label="1 stop", over_cap=False)
     assert needs_confirmation(WALKTHROUGH_SPEC, estimate, 15) is True
+
+
+def test_walkthrough_run_request_threads_knobs():
+    args = WalkthroughArgs(
+        node_id="FunctionSchema/f1",
+        depth=2,
+        user_query="how retries work",
+        verbosity="detailed",
+    )
+    request = RunRequest(
+        project_id="ProjectSchema/p",
+        node_id=args.node_id,
+        depth=args.depth,
+        user_query=args.user_query,
+        verbosity=args.verbosity,
+    )
+    assert request.verbosity == "detailed"
+    assert request.user_query == "how retries work"

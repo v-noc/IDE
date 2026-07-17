@@ -26,6 +26,43 @@ GLOSSARY = (
     '  Grouped under "X" in a child list means X is such a box — nothing more.'
 )
 
+INTENT_RULE = (
+    "If a user intent is provided, angle your explanation toward it where the code "
+    "is genuinely relevant; never skip or distort what the block actually does."
+)
+
+LENGTH_RULES: dict[str, dict[str, str]] = {
+    "intro_full": {
+        "quick": "Aim for 2-4 sentences.",
+        "normal": (
+            "Write two short paragraphs (3-5 sentences each), separated by a blank line."
+        ),
+        "detailed": (
+            "Write two to three paragraphs. Go deeper on the node's role, its "
+            "collaborators, and why it exists — still from the outside, never into "
+            "block-level mechanics."
+        ),
+    },
+    "intro_contextual": {
+        "quick": "Aim for 2-3 sentences,",
+        "normal": "Write one full paragraph (4-6 sentences),",
+        "detailed": (
+            "Write two paragraphs — the call itself, then how it fits the caller's "
+            "flow —"
+        ),
+    },
+    "block_text": {
+        "quick": "Aim for 2-4 sentences.",
+        "normal": (
+            "Write two short paragraphs: what the block does, then why the code needs it."
+        ),
+        "detailed": (
+            "Write two to three paragraphs. Cover the branches and error paths visible "
+            "in the block — depth over padding; never narrate line by line."
+        ),
+    },
+}
+
 INTRO_FULL_SYSTEM = """\
 {persona}
 
@@ -35,7 +72,7 @@ Your job for this message: introduce ONE node from the outside, before the tour
 steps into it.
 
 Rules:
-1. Aim for 2-4 sentences. First sentence: what this {node_type} IS and what it is for.
+1. {length_rule} First sentence: what this {node_type} IS and what it is for.
 2. Explain from outside: purpose, role among its siblings, what it contains or
    calls — by name only. Do not walk through how the code works; the tour does
    that next, block by block.
@@ -46,6 +83,7 @@ Rules:
 4. Never invent names, parameters, or behavior not visible in the context.
 5. Do not mention: line numbers, file paths, "the context", "the documentation",
    these rules, or that you are an AI.
+6. {intent_rule}
 
 You return one JSON object: reasoning (1-2 sentences, your private read of the
 node — not shown to the user), then intro (the popup text)."""
@@ -59,13 +97,14 @@ Your job for this message: explain ONE call site. The body being called was
 already explained earlier in the tour (or is external); do NOT re-explain it.
 
 Rules:
-1. Aim for 2-3 sentences, in the caller's context: what goes in, what comes back, and
+1. {length_rule} in the caller's context: what goes in, what comes back, and
    why the caller needs it at this point.
 2. If a reference is provided ("explained at stop N"), mention it naturally:
    "covered earlier", "as we saw at stop N".
 3. Never describe the callee's internals. Never invent parameters or return
    values not visible in the provided context.
 4. Same bans as always: no line numbers, no paths, no rules, no AI talk.
+5. {intent_rule}
 
 You return one JSON object: reasoning (private), then intro (the popup text)."""
 
@@ -112,7 +151,7 @@ Rules:
 1. Your subject is ONLY lines {block_start}-{block_end}. The full code and the
    documentation are given so you understand the whole before explaining the
    part — never explain lines outside your block.
-2. Aim for 2-4 sentences. Explain what the block does and why the code needs it —
+2. {length_rule} Explain what the block does and why the code needs it —
    intent over syntax. Never narrate line by line ("first it..., then it...,
    then it...").
 3. Documentation tells you intent; the code tells you mechanics. If they
@@ -123,16 +162,17 @@ Rules:
 5. Do not repeat what previous blocks covered (their summaries are listed).
 6. No line numbers in the text (the highlight shows them), no paths, no rules,
    no AI talk.
+7. {intent_rule}
 
 You return one JSON object with a single key: text (the popup body)."""
 
 INTRO_FULL_PROMPT = ChatPromptTemplate.from_messages(
     [("system", INTRO_FULL_SYSTEM)],
-).partial(persona=PERSONA, glossary=GLOSSARY)
+).partial(persona=PERSONA, glossary=GLOSSARY, intent_rule=INTENT_RULE)
 
 INTRO_CONTEXTUAL_PROMPT = ChatPromptTemplate.from_messages(
     [("system", INTRO_CONTEXTUAL_SYSTEM)],
-).partial(persona=PERSONA, glossary=GLOSSARY)
+).partial(persona=PERSONA, glossary=GLOSSARY, intent_rule=INTENT_RULE)
 
 BLOCK_PLAN_PROMPT = ChatPromptTemplate.from_messages(
     [("system", BLOCK_PLAN_SYSTEM)],
@@ -140,7 +180,7 @@ BLOCK_PLAN_PROMPT = ChatPromptTemplate.from_messages(
 
 BLOCK_TEXT_PROMPT = ChatPromptTemplate.from_messages(
     [("system", BLOCK_TEXT_SYSTEM)],
-).partial(persona=PERSONA, glossary=GLOSSARY)
+).partial(persona=PERSONA, glossary=GLOSSARY, intent_rule=INTENT_RULE)
 
 
 def _sections(*pairs: tuple[str, str | None]) -> str:
@@ -168,16 +208,34 @@ def _names_in_block(ctx: NodeContext) -> str | None:
     return "\n".join(in_range)
 
 
-def intro_system_prompt(ctx: NodeContext) -> str:
+def _user_intent_section(user_query: str) -> str | None:
+    query = user_query.strip()
+    if not query:
+        return None
+    return f"<user_intent>{query}</user_intent>"
+
+
+def intro_system_prompt(
+    ctx: NodeContext,
+    verbosity: str = "normal",
+) -> str:
     if ctx.mode == "contextual":
-        return _render_system(INTRO_CONTEXTUAL_PROMPT)
-    return _render_system(INTRO_FULL_PROMPT, node_type=ctx.node_type)
+        length_rule = LENGTH_RULES["intro_contextual"][verbosity]
+        return _render_system(INTRO_CONTEXTUAL_PROMPT, length_rule=length_rule)
+    length_rule = LENGTH_RULES["intro_full"][verbosity]
+    return _render_system(
+        INTRO_FULL_PROMPT,
+        node_type=ctx.node_type,
+        length_rule=length_rule,
+    )
 
 
-def intro_user_prompt(ctx: NodeContext) -> str:
+def intro_user_prompt(ctx: NodeContext, user_query: str = "") -> str:
+    intent = _user_intent_section(user_query)
     if ctx.mode == "contextual":
         parts = [
             _sections(
+                ("user intent", intent),
                 ("call site", f"{ctx.header}\n{ctx.description}".strip()),
                 ("caller", ctx.caller_line),
                 ("earlier", ctx.first_seen_ref),
@@ -191,6 +249,7 @@ def intro_user_prompt(ctx: NodeContext) -> str:
         where = f"{where}\nParent: {ctx.parent_line}"
 
     body = _sections(
+        ("user intent", intent),
         ("node", f"{ctx.header}\n{ctx.description}".strip()),
         ("documentation (may be truncated)", ctx.docs_excerpt or None),
         ("code (may be trimmed)", ctx.intro_code),
@@ -221,15 +280,20 @@ def block_plan_user_prompt(ctx: NodeContext) -> str:
     )
 
 
-def block_text_system_prompt(ctx: NodeContext) -> str:
+def block_text_system_prompt(
+    ctx: NodeContext,
+    verbosity: str = "normal",
+) -> str:
+    length_rule = LENGTH_RULES["block_text"][verbosity]
     return _render_system(
         BLOCK_TEXT_PROMPT,
         block_start=ctx.block_start,
         block_end=ctx.block_end,
+        length_rule=length_rule,
     )
 
 
-def block_text_user_prompt(ctx: NodeContext) -> str:
+def block_text_user_prompt(ctx: NodeContext, user_query: str = "") -> str:
     your_block = None
     if ctx.block_start is not None and ctx.block_end is not None:
         your_block = (
@@ -245,6 +309,7 @@ def block_text_user_prompt(ctx: NodeContext) -> str:
     names = _names_in_block(ctx)
 
     body = _sections(
+        ("user intent", _user_intent_section(user_query)),
         ("node", ctx.header),
         ("documentation (may be truncated)", ctx.docs_excerpt or None),
         ("code", ctx.numbered_code or "(code unavailable)"),

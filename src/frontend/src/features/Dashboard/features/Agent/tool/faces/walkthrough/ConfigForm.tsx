@@ -45,13 +45,14 @@ export function WalkthroughConfigForm({
     Math.min(maxDepth, Math.max(minDepth, suggested)),
   );
   const [verbosity, setVerbosity] = useState<DetailLevel>(
-    ((input.verbosity as DetailLevel) || "normal") as DetailLevel,
+    ((input.verbosity ?? knobs.verbosity) as DetailLevel) || "normal",
   );
   const [liveLabel, setLiveLabel] = useState(estimate.label);
 
   const originalDepth =
     typeof input.depth === "number" ? (input.depth as number) : suggested;
-  const originalVerbosity = (input.verbosity as DetailLevel) || "normal";
+  const originalVerbosity =
+    ((input.verbosity ?? knobs.verbosity) as DetailLevel) || "normal";
 
   useEffect(() => {
     if (!projectId || typeof input.node_id !== "string") return;

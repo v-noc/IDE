@@ -71,6 +71,45 @@ def test_route_after_advance():
 
 
 @pytest.mark.asyncio
+async def test_pipeline_configurable_includes_knobs(monkeypatch):
+    visit = _visit(0)
+    visit_list = VisitList(start_node_id="fn-0", depth=1, nodes=[visit])
+    session = new_session(
+        RunRequest(
+            project_id="p",
+            node_id="fn-0",
+            depth=1,
+            verbosity="detailed",
+            user_query="how retries work",
+        ),
+        visit_list,
+        branch="main",
+        commit_id="main@head",
+        model_id="fake:fake-model",
+    )
+    contexts = {visit.order: build_context(visit, visit_list_len=1)}
+    captured: dict = {}
+
+    async def fake_ainvoke(_state, config):
+        captured.update(config)
+
+    monkeypatch.setattr(
+        "app.walkthrough.orchestrator.GRAPH.ainvoke",
+        fake_ainvoke,
+    )
+
+    code_service = AsyncMock()
+    code_service.get_code = AsyncMock(return_value={"code": "line 10\nline 11"})
+    patcher = Patcher(session, AsyncMock())
+    await run_pipeline(session, patcher, code_service=code_service, contexts=contexts)
+
+    assert captured["configurable"]["verbosity"] == "detailed"
+    assert captured["configurable"]["user_query"] == "how retries work"
+    assert captured["metadata"]["verbosity"] == "detailed"
+    assert captured["metadata"]["user_query"] == "how retries work"
+
+
+@pytest.mark.asyncio
 async def test_long_tour_completes_without_recursion_error():
     """Pins recursion_limit sizing — default 25 would die on a real tour."""
     nodes = [_visit(i) for i in range(30)]

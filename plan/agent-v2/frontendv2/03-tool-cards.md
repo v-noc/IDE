@@ -144,7 +144,13 @@ document surface.
 > as subtree *run* tools, not single-node calls — their real faces (config
 > forms with overwrite/intent, a live run checklist as RunningView/DoneView)
 > are specced in `plan/agent-v3/frontend/01`. The mock's single-node done faces
-> above stay as the visual reference only; group's spec still lives here.
+> above stay as the visual reference only.
+>
+> **Superseded for group (2026-07-17):** the grouper ships as the first
+> two-gate tool — its real faces (steppers + category at gate 1, an editable
+> proposal `ReviewView` at gate 2, pills + dimension line when done) are
+> specced in `plan/grouper/04`. The mock's steppers and pills remain its
+> visual reference.
 
 ## Error face (not in the mock — designed here)
 
