@@ -1,12 +1,11 @@
 import { memo, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Code2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface NodeHeaderProps {
   name: string;
   icon: ReactNode;
-  iconColor: string;
-  borderColor: string;
-  textColor: string;
+  iconColor?: string;
   expandable?: boolean;
   expanded?: boolean;
   onToggle?: () => void;
@@ -15,27 +14,39 @@ interface NodeHeaderProps {
   onCodeToggle?: () => void;
   status?: "error" | "warning" | "success" | "idle";
   diffStatus?: "added" | "removed" | "modified" | null;
+  taskOpenCount?: number;
+  taskHot?: boolean;
+  onTaskBadgeClick?: () => void;
 }
 
 const statusColors: Record<string, string> = {
-  error: "#ef4444",
-  warning: "#f59e0b",
-  success: "#10b981",
+  error: "bg-destructive",
+  warning: "bg-chart-4",
+  success: "bg-primary",
 };
 
-const diffColors: Record<string, { bg: string; text: string; label: string }> =
-  {
-    added: { bg: "bg-green-100", text: "text-green-700", label: "Added" },
-    removed: { bg: "bg-red-100", text: "text-red-700", label: "Removed" },
-    modified: { bg: "bg-blue-100", text: "text-blue-700", label: "Updated" },
-  };
+const diffColors: Record<string, { className: string; label: string }> = {
+  added: {
+    className: "border-primary/30 bg-primary/15 text-primary",
+    label: "Added",
+  },
+  removed: {
+    className: "border-destructive/30 bg-destructive/15 text-destructive",
+    label: "Removed",
+  },
+  modified: {
+    className: "border-chart-3/30 bg-chart-3/15 text-chart-3",
+    label: "Updated",
+  },
+};
+
+const iconBtnClass =
+  "nodrag nopan flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-muted/60 text-primary transition-colors hover:bg-accent";
 
 export const NodeHeader = memo(function NodeHeader({
   name,
   icon,
   iconColor,
-  borderColor,
-  textColor,
   expandable,
   expanded,
   onToggle,
@@ -44,12 +55,12 @@ export const NodeHeader = memo(function NodeHeader({
   onCodeToggle,
   status,
   diffStatus,
+  taskOpenCount,
+  taskHot,
+  onTaskBadgeClick,
 }: NodeHeaderProps) {
   return (
-    <div
-      className="flex items-center justify-between  gap-3 border-b px-4 py-3.5 bg-slate-50/30 w-full overflow-clip"
-      style={{ borderColor: diffStatus ? "transparent" : borderColor }}
-    >
+    <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
       {expandable && (
         <button
           type="button"
@@ -60,43 +71,56 @@ export const NodeHeader = memo(function NodeHeader({
             e.preventDefault();
             onToggle?.();
           }}
-          className={`nodrag nopan flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
-            expanded ? "bg-slate-200/5" : "bg-slate-100/15"
-          }`}
-          style={{
-            borderColor,
-          }}
+          className={iconBtnClass}
         >
-          {expanded ? (
-            <ChevronDown size={18} style={{ color: iconColor }} />
-          ) : (
-            <ChevronRight size={18} style={{ color: iconColor }} />
-          )}
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
       )}
 
-      <div className="flex items-center gap-2.5 flex-1 overflow-hidden">
-        <span className="text-xl" style={{ color: iconColor }}>
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span
+          className="text-lg text-primary [&_svg]:text-primary"
+          style={iconColor ? { color: iconColor } : undefined}
+        >
           {icon}
         </span>
-        <span
-          className="text-base font-bold tracking-wide text-slate-800 overflow-clip truncate"
-          style={{ color: textColor }}
-        >
+        <span className="truncate text-sm font-semibold text-foreground">
           {name}
         </span>
+        {taskOpenCount != null && taskOpenCount > 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTaskBadgeClick?.();
+            }}
+            className={cn(
+              "nodrag nopan shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
+              taskHot
+                ? "border-chart-4/40 bg-chart-4/15 text-chart-4"
+                : "border-primary/35 bg-primary/10 text-primary",
+            )}
+          >
+            {taskOpenCount}
+          </button>
+        )}
       </div>
 
       {status && status !== "idle" && (
         <span
-          className="h-3 w-3 rounded-full ring-2 ring-white"
-          style={{ backgroundColor: statusColors[status] }}
+          className={cn(
+            "h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-card",
+            statusColors[status],
+          )}
         />
       )}
 
       {diffStatus && diffColors[diffStatus] && (
         <span
-          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shadow-sm ${diffColors[diffStatus].bg} ${diffColors[diffStatus].text} border border-current/20`}
+          className={cn(
+            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide border",
+            diffColors[diffStatus].className,
+          )}
         >
           {diffColors[diffStatus].label}
         </span>
@@ -111,15 +135,9 @@ export const NodeHeader = memo(function NodeHeader({
             e.preventDefault();
             onCodeToggle?.();
           }}
-          className={`nodrag nopan flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 transition-all hover:scale-110 ${
-            showCode ? "bg-slate-200/5" : "bg-slate-100/15"
-          }`}
-          style={{
-            borderColor,
-            color: iconColor,
-          }}
+          className={cn(iconBtnClass, showCode && "bg-accent")}
         >
-          <Code2 size={16} style={{ color: iconColor }} />
+          <Code2 size={15} />
         </button>
       )}
     </div>

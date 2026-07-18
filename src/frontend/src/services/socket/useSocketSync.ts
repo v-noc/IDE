@@ -38,15 +38,34 @@ export function useSocketSync() {
       });
     };
 
+    const onTasksChanged = (data: { project_id: string }) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.board(data.project_id),
+      });
+    };
+
+    const onTasksSummaryChanged = (data: { project_id: string }) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.anchorSummary(data.project_id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.tasks.board(data.project_id),
+      });
+    };
+
     // Subscribe to events
     socket.on("code:updated", onCodeUpdated);
     socket.on("logs:new", onLogsNew);
     socket.on("project:updated", onProjectUpdated);
+    socket.on("tasks.changed", onTasksChanged);
+    socket.on("tasks.summary_changed", onTasksSummaryChanged);
 
     return () => {
       socket.off("code:updated", onCodeUpdated);
       socket.off("logs:new", onLogsNew);
       socket.off("project:updated", onProjectUpdated);
+      socket.off("tasks.changed", onTasksChanged);
+      socket.off("tasks.summary_changed", onTasksSummaryChanged);
     };
   }, [socket, isConnected, queryClient])
 }

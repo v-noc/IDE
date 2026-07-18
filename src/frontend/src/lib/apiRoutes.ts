@@ -11,6 +11,7 @@ const API_ROUTES = {
     VERSIONING: '/versioning',
     TESTS: '/tests',
     PLAYGROUNDS: '/playgrounds',
+    TASKS: '/tasks',
 };
 
 export default API_ROUTES; 

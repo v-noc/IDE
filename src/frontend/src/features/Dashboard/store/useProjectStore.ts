@@ -6,8 +6,9 @@ import { createSelectionSlice, type SelectionSlice } from './slices/selectionSli
 import { createFocusSlice, type FocusSlice } from './slices/focusSlice';
 import { createUISlice, type UISlice } from './slices/uiSlice';
 import { createDataSlice, type DataSlice } from './slices/dataSlice';
+import { createTasksSlice, type TasksSlice } from './slices/tasksSlice';
 
-export type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & {
+export type ProjectStore = SelectionSlice & FocusSlice & UISlice & DataSlice & TasksSlice & {
   cleanupTabData: (tabId: string) => void;
 };
 
@@ -18,6 +19,7 @@ const useProjectStore = create<ProjectStore>()(
       ...createFocusSlice(set, get, store),
       ...createUISlice(set, get, store),
       ...createDataSlice(set, get, store),
+      ...createTasksSlice(set, get, store),
 
       cleanupTabData: (tabId: string) =>
         set((state: ProjectStore) => {
@@ -31,6 +33,10 @@ const useProjectStore = create<ProjectStore>()(
           delete state.activeNodeId[tabId];
           delete state.isDocSidebarOpen[tabId];
           delete state.docSidebarSize[tabId];
+          delete state.lensTaskId[tabId];
+          delete state.taskView[tabId];
+          delete state.listCollapsed[tabId];
+          delete state.listScrollToBacklog[tabId];
         }),
     })),
     { name: 'project-store' }

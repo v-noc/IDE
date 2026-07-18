@@ -23,6 +23,7 @@ from .structure_schema import (
 )
 from .test_schema import TestConfigSchema, TestCaseSchema, TestLinkSchema
 from .conversation_schema import ConversationSchema
+from .task_schema import BoardSchema, TaskSchema
 
 __all__ = [
     "BaseSchema",
@@ -48,6 +49,8 @@ __all__ = [
     "TestCaseSchema",
     "TestLinkSchema",
     "ConversationSchema",
+    "TaskSchema",
+    "BoardSchema",
 ]
 
 
@@ -93,6 +96,10 @@ async def ensure_schema(
     # agent conversation schema
     schema_obj.add_obj(ConversationSchema.__name__, ConversationSchema)
 
+    # task management schema
+    schema_obj.add_obj(TaskSchema.__name__, TaskSchema)
+    schema_obj.add_obj(BoardSchema.__name__, BoardSchema)
+
     await schema_obj.commit(
         client,
         f"Initialize schema for {title}",
@@ -118,3 +125,20 @@ async def ensure_conversation_schema(client: AsyncClient) -> None:
         authors=["V-NOC Team"],
     )
     _conversation_schema_ready.add(db)
+
+
+_task_schema_ready: set[str] = set()
+
+
+async def ensure_task_schema(client: AsyncClient) -> None:
+    """Register task schemas on project DBs created before task management."""
+    db = getattr(client, "db", None) or ""
+    if db in _task_schema_ready:
+        return
+    await ensure_schema(
+        client,
+        title="V-NOC Schema",
+        description="V-NOC code analysis graph schema",
+        authors=["V-NOC Team"],
+    )
+    _task_schema_ready.add(db)

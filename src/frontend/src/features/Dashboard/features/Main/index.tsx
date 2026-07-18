@@ -14,6 +14,9 @@ import { useVersioningStore } from "@/features/Dashboard/features/Versioning/sto
 import { useCommitHistory } from "@/features/Dashboard/features/Versioning/hooks/useCommitHistory";
 import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTaskBoard } from "@/features/Dashboard/features/Tasks/service/useTasks";
+import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/findNodeWithDescendantCache";
+import { useQueryClient } from "@tanstack/react-query";
 
 /**
  * Workspace Container - Manages the state, logic, and data flow for the central central area.
@@ -36,6 +39,9 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
 
   const [tabValue, setTabValue] = useState("docs");
   const [isSandboxOpen, setIsSandboxOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const pushFocus = useProjectStore((s) => s.pushFocus);
+  const projectData = useProjectStore((s) => s.projectData);
   const isVersioningOpen = useVersioningStore((s) => s.isOpen);
   const setHistoryScope = useVersioningStore((s) => s.setHistoryScope);
   const clearHistoryScope = useVersioningStore((s) => s.clearHistoryScope);
@@ -61,6 +67,27 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
     selectedNode,
     secondarySelectedNode,
   );
+
+  const { data: taskBoard } = useTaskBoard(projectId ?? undefined);
+  const doneColumnIds = new Set(
+    taskBoard?.board.columns.filter((c) => c.is_done).map((c) => c.id) ?? [],
+  );
+  const openTaskCount =
+    taskBoard?.tasks.filter((t) => !doneColumnIds.has(t.status)).length ?? 0;
+
+  const handleNavigateToNode = (nodeId: string) => {
+    setTabValue("canvas");
+    const projectKey = projectData?.id ?? "";
+    const node = findNodeByIdWithDescendantCache(
+      queryClient,
+      projectData,
+      projectKey,
+      nodeId,
+    );
+    if (node) {
+      pushFocus(tabId, node);
+    }
+  };
 
   const historyScope = useMemo(() => {
     if (tabValue === "docs") {
@@ -150,6 +177,8 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
           selectedDocument={selectedDocument}
           nodeId={nodeKey}
           projectId={projectId ?? ""}
+          openTaskCount={openTaskCount}
+          onNavigateToNode={handleNavigateToNode}
           headerSlot={
             <WorkspaceHeader
               displayPath={displayPath}

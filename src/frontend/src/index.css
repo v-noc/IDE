@@ -39,83 +39,55 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-selection: var(--selection);
 }
 
 :root {
   --radius: 0.625rem;
-  /* Light: zinc neutrals + emerald primary */
-  --background: oklch(0.99 0.002 286);
-  --foreground: oklch(0.21 0.006 286);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.006 286);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.006 286);
+  /* V-NOC dark IDE — shadcn tokens (canvas mock: #191b1f card, #262931 border) */
+  --background: #121212;
+  --foreground: #e6e8ec;
+  --card: #191b1f;
+  --card-foreground: #e6e8ec;
+  --popover: #191b1f;
+  --popover-foreground: #e6e8ec;
   --primary: #63ad5e;
   --primary-foreground: #fafafa;
-  --secondary: oklch(0.96 0.006 286);
-  --secondary-foreground: oklch(0.25 0.006 286);
-  --muted: oklch(0.96 0.006 286);
-  --muted-foreground: oklch(0.45 0.012 286);
-  --accent: oklch(0.94 0.025 145);
-  --accent-foreground: oklch(0.28 0.08 145);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0.006 286);
-  --input: oklch(0.91 0.006 286);
-  --ring: #63ad5e;
-  --chart-1: oklch(0.62 0.18 145);
-  --chart-2: oklch(0.72 0.14 195);
-  --chart-3: oklch(0.55 0.12 230);
-  --chart-4: oklch(0.7 0.15 80);
-  --chart-5: oklch(0.65 0.16 330);
-  --sidebar: oklch(0.98 0.004 286);
-  --sidebar-foreground: oklch(0.21 0.006 286);
-  --sidebar-primary: #63ad5e;
-  --sidebar-primary-foreground: #fafafa;
-  --sidebar-accent: oklch(0.94 0.025 145);
-  --sidebar-accent-foreground: oklch(0.28 0.08 145);
-  --sidebar-border: oklch(0.91 0.006 286);
-  --sidebar-ring: #63ad5e;
-}
-
-.dark {
-  /* IDE-style dashboard: editor/header #1a1a1a, sidebars #242424, accent #63AD5E (white on primary) */
-  --background: #1a1a1a;
-  --foreground: #e8e8e8;
-  --card: #242424;
-  --card-foreground: #e8e8e8;
-  --popover: #242424;
-  --popover-foreground: #e8e8e8;
-  --primary: #63ad5e;
-  --primary-foreground: #fafafa;
-  --secondary: #2a2a2a;
-  --secondary-foreground: #e8e8e8;
-  --muted: #2a2a2a;
-  --muted-foreground: #9ca3a0;
-  --accent: #323232;
-  --accent-foreground: #e8e8e8;
+  --secondary: #1f2126;
+  --secondary-foreground: #e6e8ec;
+  --muted: #1f2126;
+  --muted-foreground: #9ba1ab;
+  --accent: #252830;
+  --accent-foreground: #e6e8ec;
   --destructive: oklch(0.65 0.2 25);
-  --border: #333333;
-  --input: #333333;
+  --border: #262931;
+  --input: #1f2126;
   --ring: #63ad5e;
+  --selection: #3b82f6;
   --chart-1: #63ad5e;
   --chart-2: #22d3ee;
   --chart-3: #60a5fa;
   --chart-4: #fbbf24;
   --chart-5: #a78bfa;
-  --sidebar: #242424;
-  --sidebar-foreground: #e8e8e8;
+  --sidebar: #191b1f;
+  --sidebar-foreground: #e6e8ec;
   --sidebar-primary: #63ad5e;
   --sidebar-primary-foreground: #fafafa;
-  --sidebar-accent: #2a2a2a;
-  --sidebar-accent-foreground: #e8e8e8;
-  --sidebar-border: #333333;
+  --sidebar-accent: #1f2126;
+  --sidebar-accent-foreground: #e6e8ec;
+  --sidebar-border: #262931;
   --sidebar-ring: #63ad5e;
+  --navbar-color: #121212;
+  --left-sidebar-color: #191b1f;
+  --right-sidebar-color: #191b1f;
+  --background-color: #121212;
+  --text-color: #e6e8ec;
+  --icon-color: #63ad5e;
+  --card-color: #191b1f;
+}
 
-  /* Merged with `useResolvedTheme` when project sets per-node colors */
-  --navbar-color: #1a1a1a;
-  --left-sidebar-color: #242424;
-  --right-sidebar-color: #242424;
-  --background-color: #1a1a1a;
+.dark {
+  color-scheme: dark;
 }
 
 @layer base {
@@ -124,8 +96,40 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+
+  .dark input,
+  .dark select,
+  .dark textarea,
+  input,
+  select,
+  textarea {
+    background-color: var(--input);
+    border-color: var(--border);
+    border-radius: var(--radius);
+  }
+
+  .dark ::selection {
+    background-color: color-mix(in oklch, var(--selection) 35%, transparent);
+    color: var(--foreground);
+  }
+}
+
+/* Canvas node cards — one shadow recipe from the design mock */
+.canvas-node {
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.4);
+}
+
+.canvas-node:hover {
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.48);
+}
+
+/* Canvas — dot grid on the graph workspace */
+.react-flow {
+  background-image: radial-gradient(circle, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
 }
 
 /* @xyflow/react — pane + zoom bar match shadcn tokens (CanvasView sets colorMode from theme) */

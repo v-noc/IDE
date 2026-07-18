@@ -119,7 +119,7 @@ export const useEnhancedTreeLayout = ({
             />
           ),
           cornerIcon: getIcons(node.node_type),
-          bgColor: nodeStyle.cardColor ?? nodeStyle.backgroundColor ?? "white",
+          bgColor: nodeStyle.cardColor ?? nodeStyle.backgroundColor ?? "var(--card)",
           textColor: nodeStyle.textColor,
           iconColor: nodeStyle.iconColor,
           borderColor: nodeStyle.borderColor,

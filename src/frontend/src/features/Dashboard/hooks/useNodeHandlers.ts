@@ -44,6 +44,7 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
 
   // Modal store
   const openModal = useSidebarModalStore((s: any) => s.openModal);
+  const openNewTaskModal = useProjectStore((s) => s.openNewTaskModal);
 
   // Toggle expansion
   const handleToggle = useCallback((e: React.MouseEvent) => {
@@ -129,6 +130,16 @@ export function useNodeHandlers(nodeId: string, tabId: string) {
     }
     if (action === "copy-link") {
       handleContextAction("copy-link");
+      return;
+    }
+    if (action === "new-task") {
+      const n = getNode();
+      if (!n) return;
+      openNewTaskModal({
+        anchorNodeId: n.id,
+        anchorQname: (n as any).qname ?? n.name,
+        anchorKind: n.node_type,
+      });
       return;
     }
     // All other actions (add-call, create-group, manage-group, prompt-builder)

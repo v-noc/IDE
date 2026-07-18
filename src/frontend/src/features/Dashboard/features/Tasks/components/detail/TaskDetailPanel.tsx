@@ -18,12 +18,12 @@ import {
   findTaskInBoard,
 } from "../../service/useTasks";
 import { TaskTypeBadge } from "../TaskTypeBadge";
+import { PriorityBars } from "../PriorityBars";
 import {
   AMBER,
   BORDER,
   GREEN,
   KIND_ICON,
-  PRIORITY_COLORS,
   SURFACE,
   TEXT,
 } from "../../theme";
@@ -40,6 +40,7 @@ import {
 
 interface TaskDetailPanelProps {
   projectId: string;
+  tabId: string;
   onNavigateToNode?: (nodeId: string) => void;
 }
 
@@ -53,10 +54,12 @@ const sectionHeading: React.CSSProperties = {
 
 export function TaskDetailPanel({
   projectId,
+  tabId,
   onNavigateToNode,
 }: TaskDetailPanelProps) {
   const selectedTaskId = useProjectStore((s) => s.selectedTaskId);
   const setSelectedTaskId = useProjectStore((s) => s.setSelectedTaskId);
+  const setLensTaskId = useProjectStore((s) => s.setLensTaskId);
   const projectData = useProjectStore((s) => s.projectData);
 
   const { data: board } = useTaskBoard(projectId);
@@ -419,6 +422,11 @@ export function TaskDetailPanel({
             addNote.mutate({ taskId: task.id, text: noteText.trim() });
             setNoteText("");
           }}
+          onFocusCanvas={() => {
+            setLensTaskId(tabId, task.id);
+            const firstResolved = task.anchors.find((a) => a.is_resolved !== false);
+            if (firstResolved) onNavigateToNode?.(firstResolved.node_id);
+          }}
         />
       </div>
 
@@ -495,18 +503,7 @@ function FieldsGrid({ task, columns }: { task: Task; columns: BoardColumn[] }) {
         },
         {
           label: "Priority",
-          value: (
-            <span
-              style={{
-                color:
-                  task.priority === "none"
-                    ? TEXT.label
-                    : PRIORITY_COLORS[task.priority],
-              }}
-            >
-              {task.priority}
-            </span>
-          ),
+          value: <PriorityBars priority={task.priority} />,
         },
         {
           label: "Created",
@@ -1001,11 +998,13 @@ function ActivitySection({
   noteText,
   onNoteTextChange,
   onSubmitNote,
+  onFocusCanvas,
 }: {
   notes: Task["notes"];
   noteText: string;
   onNoteTextChange: (v: string) => void;
   onSubmitNote: () => void;
+  onFocusCanvas: () => void;
 }) {
   return (
     <div>
@@ -1030,23 +1029,32 @@ function ActivitySection({
           ))}
         </div>
       )}
-      <input
-        value={noteText}
-        onChange={(e) => onNoteTextChange(e.target.value)}
-        placeholder="Add a note…"
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onSubmitNote();
-        }}
-        className="w-full rounded-lg outline-none focus:border-[#3ecf72]"
-        style={{
-          backgroundColor: SURFACE.input,
-          border: `1px solid ${BORDER.input}`,
-          borderRadius: 8,
-          padding: "8px 11px",
-          fontSize: 12,
-          color: TEXT.heading,
-        }}
-      />
+      <div className="flex gap-2">
+        <input
+          value={noteText}
+          onChange={(e) => onNoteTextChange(e.target.value)}
+          placeholder="Add a note…"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onSubmitNote();
+          }}
+          className="min-w-0 flex-1 rounded-lg outline-none focus:border-[#3ecf72]"
+          style={{
+            backgroundColor: SURFACE.input,
+            border: `1px solid ${BORDER.input}`,
+            borderRadius: 8,
+            padding: "8px 11px",
+            fontSize: 12,
+            color: TEXT.heading,
+          }}
+        />
+        <button
+          type="button"
+          onClick={onFocusCanvas}
+          className="shrink-0 rounded-md border border-green-700/50 px-2 py-1 text-xs text-green-500 hover:bg-green-950/30"
+        >
+          Focus on canvas
+        </button>
+      </div>
     </div>
   );
 }
