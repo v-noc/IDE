@@ -195,22 +195,29 @@ const EnhancedNode = memo(function EnhancedNode({
       </NodeToolbar>
 
       <div
-        data-node-id={nodeId}
-        data-walkthrough-node-anchor={isCurrentStepNodeVisible ? "" : undefined}
         className={cn(
-          "canvas-node walkthrough-node relative min-w-[300px] max-w-[320px] overflow-hidden rounded-(--radius) border border-border bg-card text-card-foreground transition-shadow",
+          "rounded-(--radius)",
           selected &&
-            "ring-2 ring-chart-4 ring-offset-2 ring-offset-background",
-          isCurrentStepNodeVisible && "walkthrough-active-node",
+            "ring-2 ring-selection ring-offset-2 ring-offset-background",
         )}
-        style={hasStatusOverride ? statusStyles : undefined}
       >
-        <NodeContextMenu
-          nodeId={data.nodeId ?? ""}
-          nodeType={data.nodeType ?? ""}
-          manuallyCreated={data.manuallyCreated}
-          onAction={onAction}
+        <div
+          data-node-id={nodeId}
+          data-walkthrough-node-anchor={
+            isCurrentStepNodeVisible ? "" : undefined
+          }
+          className={cn(
+            "canvas-node walkthrough-node relative min-w-[300px] max-w-[320px] overflow-hidden rounded-(--radius) border border-border bg-card text-card-foreground transition-shadow",
+            isCurrentStepNodeVisible && "walkthrough-active-node",
+          )}
+          style={hasStatusOverride ? statusStyles : undefined}
         >
+          <NodeContextMenu
+            nodeId={data.nodeId ?? ""}
+            nodeType={data.nodeType ?? ""}
+            manuallyCreated={data.manuallyCreated}
+            onAction={onAction}
+          >
           <div style={contentStyles}>
             <NodeHeader
               name={data.name}
@@ -267,14 +274,19 @@ const EnhancedNode = memo(function EnhancedNode({
               updatedAt={data.metadata?.updatedAt}
             />
           </div>
-        </NodeContextMenu>
+          </NodeContextMenu>
 
-        <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-        <Handle
-          type="source"
-          position={Position.Right}
-          style={{ opacity: 0 }}
-        />
+          <Handle
+            type="target"
+            position={Position.Left}
+            style={{ opacity: 0 }}
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            style={{ opacity: 0 }}
+          />
+        </div>
       </div>
     </>
   );

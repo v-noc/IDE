@@ -173,27 +173,37 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     lazyChildrenByParentId,
   });
 
-  const nodesWithWalkthroughLayer = useMemo(() => {
-    if (!isTourPlaying || !walkthroughForegroundNodeId) {
-      return initialNodes;
-    }
+  const nodesWithState = useMemo(() => {
+    const primaryId = centerNode?.id;
     const secondaryId = secondarySelectedNode?.id;
+
     return initialNodes.map((node) => {
-      const isForeground = node.id === walkthroughForegroundNodeId;
+      const isCanvasSelected =
+        node.id === primaryId || node.id === secondaryId;
+
+      if (isTourPlaying && walkthroughForegroundNodeId) {
+        const isForeground = node.id === walkthroughForegroundNodeId;
+        return {
+          ...node,
+          zIndex: isForeground ? 50 : 0,
+          selected: isForeground || isCanvasSelected,
+        };
+      }
+
       return {
         ...node,
-        zIndex: isForeground ? 50 : 0,
-        selected: isForeground || node.id === secondaryId,
+        selected: isCanvasSelected,
       };
     });
   }, [
     initialNodes,
+    centerNode?.id,
+    secondarySelectedNode?.id,
     isTourPlaying,
     walkthroughForegroundNodeId,
-    secondarySelectedNode?.id,
   ]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(nodesWithWalkthroughLayer);
+  const [nodes, setNodes, onNodesChange] = useNodesState(nodesWithState);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const centerTarget = useMemo(() => {
@@ -211,13 +221,13 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const followSelectionRef = useRef(false);
 
   const syncDiffOverlay = useEffectEvent(() => {
-    setNodes(nodesWithWalkthroughLayer);
+    setNodes(nodesWithState);
     setEdges(initialEdges);
   });
 
   useEffect(() => {
     syncDiffOverlay();
-  }, [nodesWithWalkthroughLayer, initialEdges]);
+  }, [nodesWithState, initialEdges]);
 
   useEffect(() => {
     if (!centerNode?.id) return;
