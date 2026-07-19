@@ -1,4 +1,5 @@
 import json
+from typing import Set
 
 import orjson
 
@@ -7,17 +8,15 @@ from .base import BaseSchema
 
 
 class TaskSchema(BaseSchema):
-    """TerminusDB document for tasks.
-
-    Nested collections are stored as JSON strings — same pattern as
-    ConversationSchema.messages_json / LogSchema.payload.
-    """
+    """TerminusDB document for tasks."""
 
     key: str
     task_type: str
     status: str
     priority: str
     rank: str
+    subtasks: Set["TaskSchema"]
+    blocked_by: Set["TaskSchema"]
     labels_json: str = "[]"
     subtask_ids_json: str = "[]"
     blocked_by_ids_json: str = "[]"
@@ -37,6 +36,8 @@ class TaskSchema(BaseSchema):
             status=node.status,
             priority=node.priority,
             rank=node.rank,
+            subtasks=set(node.subtask_ids),
+            blocked_by=set(node.blocked_by_ids),
             labels_json=orjson.dumps(sorted(node.labels)).decode(),
             subtask_ids_json=orjson.dumps(sorted(node.subtask_ids)).decode(),
             blocked_by_ids_json=orjson.dumps(sorted(node.blocked_by_ids)).decode(),
@@ -67,6 +68,8 @@ class TaskSchema(BaseSchema):
                 "status": self.status,
                 "priority": self.priority,
                 "rank": self.rank,
+                "subtasks": self.subtasks,
+                "blocked_by": self.blocked_by,
                 "labels_json": orjson.dumps(labels_data).decode(),
                 "subtask_ids_json": orjson.dumps(subtask_data).decode(),
                 "blocked_by_ids_json": orjson.dumps(blocked_data).decode(),

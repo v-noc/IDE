@@ -111,7 +111,6 @@ const Dashboard = () => {
           selectedTaskId ? (
             <TaskDetailPanel
               projectId={projectId ?? ""}
-              tabId={activeTabId}
               onNavigateToNode={handleTaskNavigateToNode}
             />
           ) : isVersioningOpen ? (

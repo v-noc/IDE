@@ -168,7 +168,10 @@ class TaskService:
         now = datetime.now(timezone.utc)
 
         if title is not None:
-            task.name = title
+            stripped = title.strip()
+            if not stripped:
+                raise TaskServiceError("A task needs a title.", 422)
+            task.name = stripped
         if description is not None:
             task.description = description
         if task_type is not None and task_type != task.task_type:
@@ -210,7 +213,22 @@ class TaskService:
         task = await self._get_task_or_raise(task_id)
         old_status = task.status
         task.status = status
+        all_tasks = await self.repos.task_repo.get_all(doc_type="TaskSchema")
+        column_tasks = sorted(
+            [t for t in all_tasks if t.status == status and t.id != task_id],
+            key=lambda t: t.rank,
+        )
         task.rank = rank
+        if any(t.rank == rank for t in column_tasks):
+            for i, col_task in enumerate(column_tasks):
+                if col_task.rank == rank:
+                    next_rank = (
+                        column_tasks[i + 1].rank
+                        if i + 1 < len(column_tasks)
+                        else None
+                    )
+                    task.rank = mid_rank(rank, next_rank)
+                    break
         task.updated_at = datetime.now(timezone.utc)
         if old_status != status:
             column_title = next(
@@ -314,39 +332,71 @@ class TaskService:
     async def add_anchor(self, task_id: str, node_id: str) -> dict[str, Any]:
         task = await self._get_task_or_raise(task_id)
         anchor = await self._snapshot_anchor(node_id)
+        if any(a.node_id == anchor.node_id for a in task.anchors):
+            return await self._get_enriched_task(task_id)
         task.anchors.append(anchor)
-        task.updated_at = datetime.now(timezone.utc)
-        await self._save_task(task)
-        await self._emit_changed(summary=True)
-        return await self._get_enriched_task(task_id)
-
-    async def remove_anchor(self, task_id: str, index: int) -> dict[str, Any]:
-        task = await self._get_task_or_raise(task_id)
-        if index < 0 or index >= len(task.anchors):
-            raise TaskServiceError(f"Anchor index {index} out of range", 404)
-        task.anchors.pop(index)
-        task.updated_at = datetime.now(timezone.utc)
-        await self._save_task(task)
-        await self._emit_changed(summary=True)
-        return await self._get_enriched_task(task_id)
-
-    async def re_anchor(
-        self,
-        task_id: str,
-        index: int,
-        node_id: str,
-    ) -> dict[str, Any]:
-        task = await self._get_task_or_raise(task_id)
-        if index < 0 or index >= len(task.anchors):
-            raise TaskServiceError(f"Anchor index {index} out of range", 404)
-        old = task.anchors[index]
-        new_anchor = await self._snapshot_anchor(node_id)
-        task.anchors[index] = new_anchor
         task.updated_at = datetime.now(timezone.utc)
         task.notes = [
             *task.notes,
             TaskNote(
-                text=f"Re-anchored {old.qname} → {new_anchor.qname}",
+                text=f"anchored to {anchor.qname}",
+                at=task.updated_at,
+                origin="system",
+            ),
+        ]
+        await self._save_task(task)
+        await self._emit_changed(summary=True)
+        return await self._get_enriched_task(task_id)
+
+    async def remove_anchor(self, task_id: str, node_id: str) -> dict[str, Any]:
+        task = await self._get_task_or_raise(task_id)
+        before = len(task.anchors)
+        removed_qnames = [a.qname for a in task.anchors if a.node_id == node_id]
+        task.anchors = [a for a in task.anchors if a.node_id != node_id]
+        if len(task.anchors) == before:
+            return await self._get_enriched_task(task_id)
+        qname = removed_qnames[0] if removed_qnames else node_id
+        task.updated_at = datetime.now(timezone.utc)
+        task.notes = [
+            *task.notes,
+            TaskNote(
+                text=f"unlinked {qname}",
+                at=task.updated_at,
+                origin="system",
+            ),
+        ]
+        await self._save_task(task)
+        await self._emit_changed(summary=True)
+        return await self._get_enriched_task(task_id)
+
+    async def move_anchor(
+        self,
+        task_id: str,
+        *,
+        from_node_id: str,
+        to_node_id: str,
+    ) -> dict[str, Any]:
+        task = await self._get_task_or_raise(task_id)
+        src = next((a for a in task.anchors if a.node_id == from_node_id), None)
+        if src is None:
+            raise TaskServiceError(
+                f"{task.key} has no anchor on {from_node_id}",
+                404,
+            )
+        new_anchor = await self._snapshot_anchor(to_node_id)
+        other_anchors = [a for a in task.anchors if a is not src]
+        if any(a.node_id == new_anchor.node_id for a in other_anchors):
+            task.anchors = [a for a in task.anchors if a is not src]
+            note_text = f"anchor {src.qname} merged into {new_anchor.qname}"
+        else:
+            idx = task.anchors.index(src)
+            task.anchors[idx] = new_anchor
+            note_text = f"re-anchored {src.qname} → {new_anchor.qname}"
+        task.updated_at = datetime.now(timezone.utc)
+        task.notes = [
+            *task.notes,
+            TaskNote(
+                text=note_text,
                 at=task.updated_at,
                 origin="system",
             ),
@@ -707,18 +757,33 @@ class TaskService:
                 422,
             )
         schema_prefix = node_id.split("/")[0] if "/" in node_id else ""
+        if schema_prefix == "CallSchema":
+            target = raw.get("target_function") or raw.get("target_class")
+            if not target:
+                raise TaskServiceError(
+                    "This call's target no longer exists on this branch — "
+                    "anchor the function or class directly.",
+                    422,
+                )
+            target_id = target if isinstance(target, str) else target.get("@id")
+            return await self._snapshot_anchor(target_id)
         kind_map = {
             "FunctionSchema": "function",
             "ClassSchema": "class",
             "FileSchema": "file",
             "FolderSchema": "folder",
-            "CallSchema": "call",
         }
-        kind = kind_map.get(schema_prefix, "function")
+        kind = kind_map.get(schema_prefix)
+        if kind is None:
+            raise TaskServiceError(
+                f"{node_id} does not exist on this branch — pick a live node.",
+                422,
+            )
         qname = raw.get("qname") or raw.get("name") or node_id
         return TaskAnchor(node_id=node_id, qname=qname, kind=kind)
 
     async def _resolve_anchor_ids(self, node_ids: set[str]) -> set[str]:
+        # TODO batch via WOQL when boards grow
         if not node_ids:
             return set()
         resolved: set[str] = set()
@@ -905,7 +970,16 @@ class TaskService:
                 for bid in task.blocked_by_ids
                 if bid in task_by_id
             ],
-            "blocks": self._blocks_ids(task.id, task_by_id),
+            "blocks": [
+                {
+                    "id": bid,
+                    "key": task_by_id[bid].key,
+                    "title": task_by_id[bid].name,
+                    "status": task_by_id[bid].status,
+                }
+                for bid in self._blocks_ids(task.id, task_by_id)
+                if bid in task_by_id
+            ],
             "notes": [n.model_dump(mode="json") for n in task.notes],
             "blocked": self._is_blocked(task, task_by_id, done_columns),
             "subtask_progress": self._subtask_progress(

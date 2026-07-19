@@ -69,7 +69,7 @@ export const tasksApi = {
     taskId: string,
     payload: UpdateTaskPayload,
   ): Promise<Task> => {
-    return api(`${API_ROUTES.TASKS}/${taskId}${projectQs(projectId)}`, {
+    return api(`${API_ROUTES.TASKS}/${projectQs(projectId, { task_id: taskId })}`, {
       method: "PATCH",
       body: payload,
     });
@@ -80,14 +80,16 @@ export const tasksApi = {
     taskId: string,
     payload: MoveTaskPayload,
   ): Promise<Task> => {
-    return api(`${API_ROUTES.TASKS}/${taskId}/move${projectQs(projectId)}`, {
+    return api(`${API_ROUTES.TASKS}/move${projectQs(projectId, { task_id: taskId })}`, {
       method: "POST",
       body: payload,
     });
   },
 
   deleteTask: async (projectId: string, taskId: string): Promise<void> => {
-    await api(`${API_ROUTES.TASKS}/${taskId}${projectQs(projectId)}`, { method: "DELETE" });
+    await api(`${API_ROUTES.TASKS}/${projectQs(projectId, { task_id: taskId })}`, {
+      method: "DELETE",
+    });
   },
 
   addSubtask: async (
@@ -95,7 +97,7 @@ export const tasksApi = {
     parentId: string,
     payload: { child_id?: string; title?: string; anchors?: { node_id: string }[] },
   ): Promise<Task> => {
-    return api(`${API_ROUTES.TASKS}/${parentId}/subtasks${projectQs(projectId)}`, {
+    return api(`${API_ROUTES.TASKS}/subtasks${projectQs(projectId, { task_id: parentId })}`, {
       method: "POST",
       body: payload,
     });
@@ -106,9 +108,10 @@ export const tasksApi = {
     parentId: string,
     childId: string,
   ): Promise<void> => {
-    await api(`${API_ROUTES.TASKS}/${parentId}/subtasks/${childId}${projectQs(projectId)}`, {
-      method: "DELETE",
-    });
+    await api(
+      `${API_ROUTES.TASKS}/subtasks${projectQs(projectId, { task_id: parentId, child_id: childId })}`,
+      { method: "DELETE" },
+    );
   },
 
   addBlockedBy: async (
@@ -116,7 +119,7 @@ export const tasksApi = {
     taskId: string,
     blockerId: string,
   ): Promise<Task> => {
-    return api(`${API_ROUTES.TASKS}/${taskId}/blocked-by${projectQs(projectId)}`, {
+    return api(`${API_ROUTES.TASKS}/blocked-by${projectQs(projectId, { task_id: taskId })}`, {
       method: "POST",
       body: { blocker_id: blockerId },
     });
@@ -127,21 +130,32 @@ export const tasksApi = {
     taskId: string,
     nodeId: string,
   ): Promise<Task> => {
-    return api(`${API_ROUTES.TASKS}/${taskId}/anchors${projectQs(projectId)}`, {
+    return api(`${API_ROUTES.TASKS}/anchors${projectQs(projectId, { task_id: taskId })}`, {
       method: "POST",
       body: { node_id: nodeId },
     });
   },
 
-  reAnchor: async (
+  removeAnchor: async (
     projectId: string,
     taskId: string,
-    index: number,
     nodeId: string,
+  ): Promise<void> => {
+    await api(
+      `${API_ROUTES.TASKS}/anchors${projectQs(projectId, { task_id: taskId, node_id: nodeId })}`,
+      { method: "DELETE" },
+    );
+  },
+
+  moveAnchor: async (
+    projectId: string,
+    taskId: string,
+    fromNodeId: string,
+    toNodeId: string,
   ): Promise<Task> => {
-    return api(`${API_ROUTES.TASKS}/${taskId}/anchors/${index}/re-anchor${projectQs(projectId)}`, {
+    return api(`${API_ROUTES.TASKS}/anchors/move${projectQs(projectId, { task_id: taskId })}`, {
       method: "POST",
-      body: { node_id: nodeId },
+      body: { from_node_id: fromNodeId, to_node_id: toNodeId },
     });
   },
 
@@ -150,7 +164,7 @@ export const tasksApi = {
     taskId: string,
     text: string,
   ): Promise<Task> => {
-    return api(`${API_ROUTES.TASKS}/${taskId}/notes${projectQs(projectId)}`, {
+    return api(`${API_ROUTES.TASKS}/notes${projectQs(projectId, { task_id: taskId })}`, {
       method: "POST",
       body: { text },
     });

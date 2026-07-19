@@ -47,7 +47,7 @@ export interface Task {
   anchors: TaskAnchor[];
   subtasks: TaskSubtaskRef[];
   blocked_by: TaskRef[];
-  blocks: string[];
+  blocks: TaskRef[];
   notes: TaskNote[];
   blocked: boolean;
   subtask_progress: SubtaskProgress;

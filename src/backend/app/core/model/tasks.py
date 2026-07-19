@@ -47,16 +47,18 @@ class TaskNode(BaseModel):
         labels = _parse_id_set(
             raw_dict.get("labels_json") or raw_dict.get("labels"),
         )
-        subtask_ids = _parse_id_set(
-            raw_dict.get("subtask_ids_json")
-            or raw_dict.get("subtask_ids")
-            or raw_dict.get("subtasks"),
-        )
-        blocked_by_ids = _parse_id_set(
-            raw_dict.get("blocked_by_ids_json")
-            or raw_dict.get("blocked_by_ids")
-            or raw_dict.get("blocked_by"),
-        )
+        subtask_ids = _parse_id_set(raw_dict.get("subtasks"))
+        if not subtask_ids:
+            subtask_ids = _parse_id_set(
+                raw_dict.get("subtask_ids_json")
+                or raw_dict.get("subtask_ids"),
+            )
+        blocked_by_ids = _parse_id_set(raw_dict.get("blocked_by"))
+        if not blocked_by_ids:
+            blocked_by_ids = _parse_id_set(
+                raw_dict.get("blocked_by_ids_json")
+                or raw_dict.get("blocked_by_ids"),
+            )
 
         anchors_raw = raw_dict.get("anchors_json") or raw_dict.get("anchors") or "[]"
         if isinstance(anchors_raw, str):

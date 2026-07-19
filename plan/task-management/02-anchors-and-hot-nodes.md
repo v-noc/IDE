@@ -21,6 +21,40 @@ At create the service reads the node once and snapshots `qname` + `kind` into
 the anchor subdocument. If the node id doesn't exist, the add is refused —
 anchors are born resolved.
 
+### Toggle — idempotent by construction
+
+Link and unlink are the highest-frequency gesture in the whole feature
+(popover checkboxes, attach search, the Anchor-current-node chip), so the
+semantics are toggle-safe by law:
+
+- `add_anchor(task, node_id)` when the anchor already exists → **no-op**, not
+  an error, not a duplicate (anchors are a set keyed by `node_id`, 01).
+- `remove_anchor(task, node_id)` when absent → no-op. Removal takes a
+  `node_id`, never a list index — an index shifts under concurrent edits; a
+  node id cannot.
+- Both append a system note only when they actually changed something
+  ("anchored ƒ main.dd" / "detached ƒ main.dd"), so toggling twice leaves no
+  trace and the activity log never lies.
+
+Every UI link surface is therefore a dumb checkbox over these two calls, with
+optimistic flip + rollback (04's mutation pattern).
+
+### Move — transfer an anchor between nodes
+
+`TaskService.move_anchor(task, from_node_id, to_node_id)` — **one atomic
+update, one commit**: remove the `from` anchor, add the `to` anchor with a
+fresh snapshot, append one system note ("moved anchor main.dd → main.runner").
+Rules:
+
+- Target must be a live node (same refusal as add). Source may be live **or
+  dead** — moving off a dangling anchor is exactly the repair flow.
+- If the target is already anchored, the move collapses to a remove (set
+  semantics) and the note says so.
+- Entry points: drag a task row from a node's popover onto another node card
+  (05), the *Move…* picker on a detail-panel anchor row, and *Re-anchor* —
+  which is nothing but `move_anchor` where the source is unresolved. One
+  service path, three gestures, identical history.
+
 ### Resolution — derived, batched
 
 `is_resolved` is **computed at read time**: an anchor is resolved iff its
@@ -40,16 +74,16 @@ Why derived beats stored (the mock stores a boolean):
 When unresolved, the UI renders the snapshot (`ƒ main.load_config ⚠`) — the
 task never loses its human meaning even though the graph lost the node.
 
-### Re-anchor
+### Re-anchor — the unresolved case of move
 
 Detail-panel action on an unresolved anchor:
 
 1. Backend suggests candidates: name/qname search over live nodes (existing
    code-search paths), seeded with the snapshot qname's last segment
    (`load_config`), same-kind matches ranked first.
-2. User picks a candidate (or searches freely). `TaskService.re_anchor`
-   replaces `node_id` and refreshes the snapshot in one update; a system note
-   is appended ("re-anchored main.load_config → main.load_settings").
+2. User picks a candidate (or searches freely) → `move_anchor(dead_id,
+   picked_id)`; snapshot refreshes, system note appended ("re-anchored
+   main.load_config → main.load_settings").
 3. No auto-re-anchor in v1. A rename detector (same qname tail + same file)
    could propose confidently — but it must stay a *proposal*; silently moving
    a task's meaning is worse than a visible ⚠. Seam for later.

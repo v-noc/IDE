@@ -52,7 +52,8 @@ class BoardColumnSchema(DocumentTemplate):       # subdocument of BoardSchema
     id: str               # "backlog" | "todo" | ... (stable, never renamed)
     title: str            # user-editable display name
     color: str
-    is_done: bool         # the semantic flag everything derives from
+    is_done: bool         # done-ness — everything derives from this
+    is_backlog: bool      # the pen — kanban never renders it; List view owns it
 
 class BoardSchema(BaseSchema):
     columns: List[BoardColumnSchema]
@@ -65,8 +66,11 @@ Notes on the shape:
   precedent (`is_root: str` to dodge the xsd:boolean issue) says this codebase
   prefers plain strings validated in pydantic. Validation lives in the
   pydantic models; the db stores strings.
-- **`anchors` is a list of subdocuments**, ordered (first anchor = the primary
-  one shown on compact cards).
+- **`anchors` is a list of subdocuments** with set semantics: **at most one
+  anchor per `node_id`** (the service dedupes; add-existing is a no-op). Order
+  is kept for display only — first anchor = the primary one shown on compact
+  cards. All anchor operations are keyed by `node_id`, never by list index;
+  that is what makes every linking surface a safe toggle (02).
 - **`notes` replaces a full activity/event system.** v1 activity = system
   sentences appended by `TaskService` ("moved to In progress", "anchor became
   unresolved") plus user notes. Same list, `origin: "system" | "user"`.
@@ -120,19 +124,34 @@ rebalances the column on midpoint exhaustion (rare; log when it happens).
 One field update per drag — no renumbering writes, which keeps drag-and-drop
 a single small commit.
 
-## Done-ness: `is_done` on the column
+## Column semantics: `is_done` and `is_backlog`
 
-Everything downstream derives from it:
+Two flags, both on the column, both driving derived values — status stays a
+plain column id and tasks never carry semantic booleans themselves:
 
 | Derived value | Rule |
 |---|---|
-| open task | `status` column has `is_done == False` |
+| open task | `status` column has `is_done == False` — **backlog tasks are open** (a parked task anchored to a node is still converging work; hot counts include it. An "active-only" hotness toggle is a seam, not v1) |
 | progress `2/5` | done = closure members in `is_done` columns, deduped |
 | blocked | any `blocked_by` task open |
 | hot node (02) | counts **open** tasks only |
+| on the kanban (04) | column has `is_backlog == False` |
+| List view sections (04) | Active = non-backlog columns (grouped by status) · Backlog = the `is_backlog` column, rank-ordered |
 
-Column ids are stable; titles are what users rename. Deleting a column
-requires naming a destination column for its tasks (service refuses
+Backlog laws:
+
+- **Exactly one backlog column** per board, created by the bootstrap,
+  protected: it can be renamed/recolored but not deleted and not un-flagged
+  in v1 (`PATCH /tasks/board` refuses with a sentence, 03). Zero backlog
+  columns would strand the List view's bottom section; two is ambiguity
+  nobody asked for.
+- Moving a task to/from backlog is an ordinary `move` (status + rank) — no
+  special endpoint, no special state. The board simply never paints that
+  column; the List view's divide is where the crossing happens (04).
+- `is_backlog` and `is_done` are mutually exclusive (validator).
+
+Column ids are stable; titles are what users rename. Deleting a non-backlog
+column requires naming a destination column for its tasks (service refuses
 otherwise).
 
 ## Human keys

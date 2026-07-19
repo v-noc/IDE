@@ -1,11 +1,9 @@
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi_cache.decorator import cache
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import get_task_service
-from app.core.cache_setup import DEFAULT_TTL
 from app.core.services.task_service import TaskService, TaskServiceError
 
 router = APIRouter()
@@ -52,8 +50,9 @@ class AnchorRequest(BaseModel):
     node_id: str
 
 
-class ReAnchorRequest(BaseModel):
-    node_id: str
+class MoveAnchorRequest(BaseModel):
+    from_node_id: str
+    to_node_id: str
 
 
 class NoteRequest(BaseModel):
@@ -69,7 +68,6 @@ def _handle_service_error(exc: TaskServiceError) -> None:
 
 
 @router.get("/board")
-@cache(expire=DEFAULT_TTL)
 async def get_board(
     task_service: TaskService = Depends(get_task_service),
 ):
@@ -96,10 +94,10 @@ async def create_task(
         _handle_service_error(exc)
 
 
-@router.patch("/{task_id}")
+@router.patch("/")
 async def update_task(
-    task_id: str,
-    request: UpdateTaskRequest,
+    task_id: str = Query(..., description="Task id (e.g. TaskSchema/{uuid})"),
+    request: UpdateTaskRequest = ...,
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -115,10 +113,10 @@ async def update_task(
         _handle_service_error(exc)
 
 
-@router.post("/{task_id}/move")
+@router.post("/move")
 async def move_task(
-    task_id: str,
-    request: MoveTaskRequest,
+    task_id: str = Query(..., description="Task id (e.g. TaskSchema/{uuid})"),
+    request: MoveTaskRequest = ...,
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -131,9 +129,9 @@ async def move_task(
         _handle_service_error(exc)
 
 
-@router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(
-    task_id: str,
+    task_id: str = Query(..., description="Task id (e.g. TaskSchema/{uuid})"),
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -143,10 +141,10 @@ async def delete_task(
     return None
 
 
-@router.post("/{task_id}/subtasks")
+@router.post("/subtasks")
 async def add_subtask(
-    task_id: str,
-    request: SubtaskRequest,
+    task_id: str = Query(..., description="Parent task id"),
+    request: SubtaskRequest = ...,
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -173,10 +171,10 @@ async def add_subtask(
         _handle_service_error(exc)
 
 
-@router.delete("/{task_id}/subtasks/{child_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/subtasks", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_subtask(
-    task_id: str,
-    child_id: str,
+    task_id: str = Query(..., description="Parent task id"),
+    child_id: str = Query(..., description="Child task id"),
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -186,10 +184,10 @@ async def remove_subtask(
     return None
 
 
-@router.post("/{task_id}/blocked-by")
+@router.post("/blocked-by")
 async def add_blocked_by(
-    task_id: str,
-    request: BlockedByRequest,
+    task_id: str = Query(..., description="Task id"),
+    request: BlockedByRequest = ...,
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -198,10 +196,10 @@ async def add_blocked_by(
         _handle_service_error(exc)
 
 
-@router.delete("/{task_id}/blocked-by/{blocker_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/blocked-by", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_blocked_by(
-    task_id: str,
-    blocker_id: str,
+    task_id: str = Query(..., description="Task id"),
+    blocker_id: str = Query(..., description="Blocker task id"),
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -211,10 +209,10 @@ async def remove_blocked_by(
     return None
 
 
-@router.post("/{task_id}/anchors")
+@router.post("/anchors")
 async def add_anchor(
-    task_id: str,
-    request: AnchorRequest,
+    task_id: str = Query(..., description="Task id"),
+    request: AnchorRequest = ...,
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -223,34 +221,36 @@ async def add_anchor(
         _handle_service_error(exc)
 
 
-@router.delete("/{task_id}/anchors/{index}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/anchors", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_anchor(
-    task_id: str,
-    index: int,
+    task_id: str = Query(..., description="Task id"),
+    node_id: str = Query(..., description="Anchor node id"),
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
-        await task_service.remove_anchor(task_id, index)
+        await task_service.remove_anchor(task_id, node_id)
     except TaskServiceError as exc:
         _handle_service_error(exc)
     return None
 
 
-@router.post("/{task_id}/anchors/{index}/re-anchor")
-async def re_anchor(
-    task_id: str,
-    index: int,
-    request: ReAnchorRequest,
+@router.post("/anchors/move")
+async def move_anchor(
+    task_id: str = Query(..., description="Task id"),
+    request: MoveAnchorRequest = ...,
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
-        return await task_service.re_anchor(task_id, index, request.node_id)
+        return await task_service.move_anchor(
+            task_id,
+            from_node_id=request.from_node_id,
+            to_node_id=request.to_node_id,
+        )
     except TaskServiceError as exc:
         _handle_service_error(exc)
 
 
 @router.get("/anchor-summary")
-@cache(expire=DEFAULT_TTL)
 async def anchor_summary(
     task_service: TaskService = Depends(get_task_service),
 ):
@@ -274,10 +274,10 @@ async def suggest_dependencies(
     return await task_service.suggest_dependencies(node_id)
 
 
-@router.post("/{task_id}/notes")
+@router.post("/notes")
 async def add_note(
-    task_id: str,
-    request: NoteRequest,
+    task_id: str = Query(..., description="Task id"),
+    request: NoteRequest = ...,
     task_service: TaskService = Depends(get_task_service),
 ):
     try:
@@ -286,7 +286,7 @@ async def add_note(
         _handle_service_error(exc)
 
 
-@router.patch("/board")
+@router.patch("/board-columns")
 async def update_board(
     request: UpdateBoardRequest,
     task_service: TaskService = Depends(get_task_service),

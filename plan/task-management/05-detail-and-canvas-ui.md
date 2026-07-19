@@ -32,7 +32,7 @@ data path.
 | Fields grid | STATUS (column dot + name, dropdown of columns → `move`) · PRIORITY (dropdown) · CREATED / UPDATED (read-only). |
 | Labels | chips + inline add/remove → PATCH. |
 | Description | markdown; render read view, click-to-edit textarea, PATCH on blur. Reuse the docs editor's markdown renderer if trivially importable; else a minimal renderer — do not grow a second editor stack for v1. |
-| **Anchored nodes** | rows: kind icon · qname · state chips · actions. Resolved → `Show on canvas` (tab→canvas, focus + auto-expand). Hot → `hot · 2 tasks` amber chip (anchor-summary data). Unresolved → amber-tinted row, `⚠ unresolved`, `Re-anchor` button → candidate picker dialog (`GET /tasks/re-anchor-candidates`, search input seeded with snapshot qname; reuse `SelectNodeDialog` patterns). `+ Add anchor` at the bottom → node search. |
+| **Anchored nodes** | Top of the section, when the workspace tab has an active node not already anchored: an **`⚓ Anchor current node — ƒ main.dd`** one-click chip (idempotent add; the chip flips to "anchored ✓" and becomes the detach toggle). Rows: kind icon · qname · state chips · actions. Resolved → `Show on canvas` (tab→canvas, focus + auto-expand) · `Move…` (node picker → `anchors/move`) · unlink (idempotent remove). Hot → `hot · 2 tasks` amber chip (anchor-summary data). Unresolved → amber-tinted row, `⚠ unresolved`, `Re-anchor` button → candidate picker dialog (`GET /tasks/re-anchor-candidates`, seeded with snapshot qname; picking calls the same `anchors/move`). `+ Add anchor` at the bottom → node search (reuse `SelectNodeDialog` patterns). |
 | **Subtasks** | `SUBTASKS · 2/5` (closure-deduped from API). Rows: checkbox (toggles child between its column and the first `is_done` column — the mock's toggle semantic, made explicit) · title (click → `selectedTaskId = child`, panel navigates in place) · `⑂ shared` purple chip when `shared` · status. Buttons: `+ Add subtask` (inline title input → create-and-link) · `✦ Suggest from dependencies` (06). |
 | **Dependencies** | `blocked by` (red label) / `blocks` (amber label) rows from derived fields; click navigates; add via task search popover → `blocked-by` endpoints. |
 | **Activity** | notes list (system + user, mono timestamps) + `Add a note…` input → notes endpoint. |
@@ -57,10 +57,34 @@ the task badge is one more, driven by the anchor-summary query keyed by
 - Zero tasks → nothing rendered; the graph stays quiet by default.
 
 Badge click opens the **popover** (anchored to the chip, shadcn popover):
-`OPEN TASKS · dd` header with `● hot node` suffix when hot; one row per task
-(type badge · title · status, mock layout); row click sets `selectedTaskId`.
-Outside click closes. The popover reads titles from the board query cache —
-no extra fetch.
+`OPEN TASKS · dd` header with `● hot node` suffix when hot. The popover is
+the node's **linking surface**, not just a list:
+
+- **One row per anchored task** (type badge · title · status, mock layout);
+  row click sets `selectedTaskId`. Each row carries a **link toggle** —
+  unchecking detaches the task from this node (idempotent remove, optimistic
+  flip, badge count follows immediately).
+- **`＋ Attach task…`** row at the bottom: inline search over open tasks
+  (title + `VN-n` key, board query cache — no fetch); picking one anchors it
+  to this node (idempotent add). The same row offers *"New task here…"* as
+  its empty-state action, jumping to the modal (06).
+- **Drag-transfer**: a popover row is draggable; dropping it onto another
+  node card calls `anchors/move(this_node → target_node)` — the anchor
+  travels, both badges update, the task's activity records it. Node cards
+  register as drop targets only while a task-row drag is live (same
+  `nodrag`/`nopan` care the header buttons already take with React Flow).
+  The `Move…` picker in the detail panel is the no-drag fallback for the
+  same operation.
+- A node with **zero tasks** still opens a minimal popover from the context
+  menu's *Attach task* action (see below) — attach search + "New task here"
+  — so linking never requires visiting the board.
+
+Outside click closes. The popover reads everything from the board and
+anchor-summary query caches.
+
+`NodeContextMenu` gains **`Attach task`** next to *New task here* (06): same
+popover, opened for nodes that have no badge yet — link-to-node and
+link-off-node are both one gesture from the canvas.
 
 ## Task lens
 

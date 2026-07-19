@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 import SelectNodeDialog from "@/features/Dashboard/components/SelectNodeDialog";
 import type { AnyNodeTree } from "@/types/project";
 import type { BoardColumn, DependencySuggestion, Task, TaskAnchor } from "@/types/tasks";
@@ -40,7 +41,6 @@ import {
 
 interface TaskDetailPanelProps {
   projectId: string;
-  tabId: string;
   onNavigateToNode?: (nodeId: string) => void;
 }
 
@@ -54,12 +54,12 @@ const sectionHeading: React.CSSProperties = {
 
 export function TaskDetailPanel({
   projectId,
-  tabId,
   onNavigateToNode,
 }: TaskDetailPanelProps) {
   const selectedTaskId = useProjectStore((s) => s.selectedTaskId);
   const setSelectedTaskId = useProjectStore((s) => s.setSelectedTaskId);
   const setLensTaskId = useProjectStore((s) => s.setLensTaskId);
+  const activeTabId = useTabStore((s) => s.activeTabId);
   const projectData = useProjectStore((s) => s.projectData);
 
   const { data: board } = useTaskBoard(projectId);
@@ -423,7 +423,7 @@ export function TaskDetailPanel({
             setNoteText("");
           }}
           onFocusCanvas={() => {
-            setLensTaskId(tabId, task.id);
+            setLensTaskId(activeTabId, task.id);
             const firstResolved = task.anchors.find((a) => a.is_resolved !== false);
             if (firstResolved) onNavigateToNode?.(firstResolved.node_id);
           }}

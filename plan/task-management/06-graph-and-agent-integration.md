@@ -6,12 +6,21 @@ the ledger of what stays out.
 
 ## "New task here" (canvas → task)
 
-`Dashboard/components/NodeContextMenu.tsx` gains one action in the existing
-`onAction` union: `"new-task"`, rendered after *Prompt builder*. It opens
-`NewTaskModal` (04) with:
+`Dashboard/components/NodeContextMenu.tsx` gains two actions in the existing
+`onAction` union, rendered after *Prompt builder*:
+
+- **`"new-task"`** → opens `NewTaskModal` (04).
+- **`"attach-task"`** → opens the node's task popover in attach mode (05) —
+  link an *existing* task to this node in two clicks, no board visit.
+
+`NewTaskModal` opens with:
 
 - **Anchor pre-filled** from the node the menu opened on — removable chip,
-  `+ add` opens node search (reuse `SelectNodeDialog` machinery).
+  `+ add` opens node search (reuse `SelectNodeDialog` machinery). The same
+  pre-fill applies when the modal opens from the **board** while the tab has
+  an active node or a node/tab scope (04): creating a task while "standing
+  on" a node anchors it there by default. Pre-filled means removable — one
+  click detaches before create.
 - Title (autofocused), type, priority, description — one screen, no wizard.
 - **Suggested subtasks** section (below the anchor): the node's direct
   dependencies, each row `checkbox · kind icon · qname`. Checked rows are
@@ -91,7 +100,8 @@ exactly (`plan/grouper/03-review-gate.md`):
 
 | Not building | Why |
 |---|---|
-| Multi-board, sprints, swimlanes | One board per project until the single board hurts (README decision 4). |
+| Multi-board, swimlanes | One board per project until the single board hurts (README decision 4). |
+| Sprints/iterations | **Named seam, shape sketched**: `SprintSchema` (name, start/end, state: planned/active/closed) + optional `sprint` ref on tasks. The List view's Active/Backlog divide (04) is built to receive it — Active becomes one table per sprint (active sprint first), Backlog stays the bottom section, and the kanban scopes to the active sprint. Nothing in the v1 schema or views changes shape; sprints only add a grouping level. Not v1: ship the divide, learn how it's used, then decide. |
 | Assignees, watchers, notifications | Single-user IDE; no identity model exists to hang them on. |
 | Task ↔ commit auto-linking ("this commit closes VN-12") | Real feature, but it belongs to the versioning surface; tasks already ride commits (03). |
 | Cross-branch task sync | Seam named in 01; wait for real pain. |

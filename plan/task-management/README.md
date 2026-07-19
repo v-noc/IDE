@@ -19,27 +19,44 @@ plus the data model, anchor lifecycle, and API the mock hand-waves.
    opens with the anchor pre-filled (`ƒ main.dd`), plus a *Suggested subtasks*
    list built from the node's real callees — checked ones become subtasks
    anchored to those dependencies. No LLM involved; the graph already knows.
-2. The task lands on the **Tasks** tab (new tab after Canvas): five columns,
-   drag-and-drop, type/priority/label filters, an anchored-node search.
-3. `Refactor dd()` is added under the epic *Refactor main module* **and**
+2. The task lands on the **Tasks** tab (new tab after Canvas), which has
+   **two views over one payload**. **Board** is the execution kanban —
+   `To do | In progress | In review | Done`, drag-and-drop, and **no backlog
+   column**: parked work doesn't get a lane on the execution surface.
+   **List** is the planning table, GitHub-Projects style: an **Active**
+   section on top (status-grouped rows), **Backlog** at the bottom, and
+   dragging a row across the divide is how work enters or leaves the board.
+   A search box (`/` to focus) matches titles, `VN-n` keys, labels, and
+   anchor qnames across both views. The tab opens **scoped, exactly like the
+   commit history**: *This tab* by default (only tasks anchored under the
+   tab's node), one pill flips to *This node* (the active node only) or
+   *All* — remembered per tab.
+3. **Linking is a toggle, not a ceremony.** The node popover lists open tasks
+   with a link toggle — check to anchor the task to this node, uncheck to
+   detach — plus an *Attach task…* search row over every open task. On the
+   task side, when a node is active in the workspace, the detail panel offers
+   a one-click **Anchor current node** chip.
+4. `Refactor dd()` is added under the epic *Refactor main module* **and**
    under *Fix logging bug*. Subtasks form a **DAG, not a tree** — the row
    shows a `⑂ shared` chip instead of pretending the second parent doesn't
    exist.
-4. Now two open tasks anchor to `main.dd`. The server's anchor summary flips
+5. Now two open tasks anchor to `main.dd`. The server's anchor summary flips
    the node **hot**: amber count chip + amber glow on the canvas card, amber
    badge in the sidebar tree, `1 hot node` in the board header, and `main.dd`
    tops the sidebar **Blockers** list.
-5. Clicking the chip opens a popover listing the converging tasks; clicking a
+6. Clicking the chip opens a popover listing the converging tasks; clicking a
    task opens the **detail panel** in the right-sidebar slot: anchors (with
-   *Show on canvas* / *Re-anchor*), subtasks with checkboxes, blocked-by /
-   blocks, activity.
-6. **Task lens**: from the detail panel the user focuses the task — the canvas
+   *Show on canvas* / *Move* / *Re-anchor*), subtasks with checkboxes,
+   blocked-by / blocks, activity. Dragging a task row **out of the popover
+   onto another node card moves the anchor there** — transfer is one gesture,
+   recorded in the task's activity.
+7. **Task lens**: from the detail panel the user focuses the task — the canvas
    dims except the task's anchored nodes, a floating bar names the task,
    *Exit lens* restores.
-7. A refactor renames `load_config`. The reparse deletes the old node; the
+8. A refactor renames `load_config`. The reparse deletes the old node; the
    anchor keeps its last-known qname and shows **⚠ unresolved** with a
-   *Re-anchor* action that suggests candidates by name. The task never
-   silently loses its meaning.
+   *Re-anchor* action that suggests candidates by name — re-anchor is just a
+   move whose source node is dead. The task never silently loses its meaning.
 
 ## Your idea → the shipped shape (what this plan changes and why)
 
@@ -52,6 +69,12 @@ plus the data model, anchor lifecycle, and API the mock hand-waves.
 | `rank: string` for drag ordering | **LexoRank-style key**, scoped to (board, column) | Midpoint string keys make a move one field update, no renumbering the column (01). |
 | Detail panel "same slot as Agent panel, or a drawer next to it" | **Same right-sidebar slot, exclusive** — opening a task swaps the Agent panel out; closing restores it | 384px of drawer next to 420px of agent panel leaves no canvas. The slot already exists (`Dashboard/components/Layout.tsx` `rightSidebar`); exclusivity is one store field (05). |
 | "Suggested subtasks" from dependencies | **Deterministic graph query** (callees + children), no LLM | House law: deterministic first. An LLM task-planner is a later agent tool behind the grouper's two-gate pattern, not a checkbox list (06). |
+| "load current node tasks only, or current tab, or all — like the commits" | Board **scope pill** (*This node · This tab · All*): one optional `scope_node_id` on the board read, subtree membership resolved server-side, pill state persisted per workspace tab | The commits view already taught this grammar (`historyScope` per tab; `node_id` param where a `ProjectSchema/` id means all — `versioning/commits.py`). Same muscle memory, same wire shape (03, 04). |
+| "easily link task to node and off" | Anchors keyed by `node_id` with **idempotent add/remove** — every surface renders linking as a toggle (popover checkbox, attach search, detail chip) | A toggle is only safe when the operations are idempotent and keyed by the node, not a list index. Double-click can't corrupt; retry can't duplicate (02, 03). |
+| "easy way to transfer task from one node to another" | First-class **`anchors/move`** (atomic remove+add, snapshot refresh, system note); drag a popover row onto another node card; *Re-anchor* = the same move with a dead source | Transfer that preserves task history beats detach+reattach; one endpoint serves the drag gesture, the picker, and the unresolved repair flow (02, 05). |
+| "backlog should not be on the kanban" | Backlog column gets **`is_backlog`** and the board never renders it; a muted `Backlog 12` link jumps to the List view's backlog section | The kanban is the execution surface; an unbounded pen column drowns the four lanes that mean something. Jira made the same split for the same reason (01, 04). |
+| "list table — sprint table above, backlog list below" | **List view**: GitHub-Projects-style table, **Active** section (status-grouped, collapsible) above a hard divide, **Backlog** (rank-ordered) below; drag across the divide = ordinary status move | Planning and executing are different postures; one payload, two projections, zero new endpoints. When sprints land (seam in 06), Active becomes per-sprint tables and nothing else changes shape (04). |
+| "add search" | One **search box** for both views: title, `VN-n` key, labels, anchor qnames; `/` to focus; counts gray to `1 of 7`, never silently hide | One input that understands qnames replaces the mock's separate anchored-node box — two adjacent search boxes is a design smell. Client-side over the loaded payload; server `?q=` is a seam (04). |
 
 ## What already exists (and is used, not rebuilt)
 
@@ -70,22 +93,30 @@ plus the data model, anchor lifecycle, and API the mock hand-waves.
 ```
 task management
 │
-├── 01 data model             TaskSchema · TaskAnchor subdocument · Board/columns (is_done)
-│   │                         task DAG (subtasks · blocked_by) · LexoRank · VN-n keys
+├── 01 data model             TaskSchema · TaskAnchor subdocument · Board/columns
+│   │                         (is_done · is_backlog + protection laws) · task DAG
+│   │                         (subtasks · blocked_by) · LexoRank · VN-n keys
 │   └── placement             project db, branch-riding · soft refs to nodes · why not
 │                             typed links · deletion semantics
-├── 02 anchors & hot nodes    anchor lifecycle · derived resolution · re-anchor flow
+├── 02 anchors & hot nodes    anchor lifecycle · idempotent toggle · move/transfer
+│   │                         · derived resolution · re-anchor = move with dead source
 │   │                         · reparse interplay (no parser hooks in v1)
 │   └── convergence           the hot rule (≥2 open through closure, deduped) · one
 │                             anchor-summary query · blockers ranking · invalidation
 ├── 03 api                    routes/service/repo in the house pattern · endpoint table
-│                             · validation sentences · caching · socket events
-├── 04 board ui               Tasks tab · feature folder · react-query + slice split
-│                             · board/column/card components · dnd + optimistic move
-│                             · card states · filter bar
-├── 05 detail & canvas ui     right-slot arbitration · detail panel sections · node
-│                             badge + popover · hot glow · task lens · sidebar badges
-│                             + Blockers section
+│                             · board scope param (commits grammar) · anchor
+│                             add/remove/move · validation sentences · caching · socket
+├── 04 board & list ui        Tasks tab · view switcher (Board · List, per-tab) ·
+│   │                         scope pill (This node · This tab · All, per-tab) ·
+│   │                         search (/ to focus, both views) · filter bar
+│   ├── board view            workflow columns only — backlog never renders ·
+│   │                         dnd + optimistic move · card states
+│   └── list view             Active (status groups) ↑ · divide · Backlog ↓ ·
+│                             drag across the divide · inline add rows · sort
+├── 05 detail & canvas ui     right-slot arbitration · detail panel sections · Anchor-
+│                             current-node chip · interactive popover (toggle · attach
+│                             search · drag-transfer) · hot glow · task lens · sidebar
+│                             badges + Blockers section
 └── 06 graph & agent          "New task here" modal · suggested subtasks (deterministic)
                               · task context for the agent · future plan_tasks tool
                               · out-of-scope ledger
@@ -117,6 +148,39 @@ task management
    anchored node, checkbox-picked, each new subtask anchored to its
    dependency. LLM task planning is an agent tool later, behind estimate +
    review gates (06).
+8. **Scope follows the commits grammar.** One optional `scope_node_id` on the
+   board read; absent (or the project id) = all, otherwise the node's subtree,
+   resolved server-side. The pill state persists per workspace tab exactly
+   like `historyScope`. Default is *This tab* — the board you see matches the
+   code you're looking at.
+9. **Linking is idempotent and keyed by node.** Anchor add/remove take a
+   `node_id`, never a list index; adding an existing anchor or removing an
+   absent one is a no-op, which is what makes every surface a safe toggle.
+   Transfer is a first-class atomic `move` recorded in activity; re-anchor is
+   `move` where the source is dead.
+10. **Backlog is a pen, not a workflow stage.** Exactly one protected
+    `is_backlog` column per board (rename-only; mutually exclusive with
+    `is_done`). The kanban never renders it; the List view's bottom section
+    owns it; crossing the divide is an ordinary status move. Backlog tasks
+    still count as open — parked work converging on a node is still the
+    blocker signal.
+11. **Two views, one payload, one mutation set.** Board and List are
+    projections of the same query cache sharing the same move/create
+    mutations — a view is never a second data path. View choice, scope, and
+    collapse state persist per workspace tab.
+12. **One search box.** Title, key, labels, and anchor qnames through a
+    single client-side predicate shared by both views; `/` focuses it. The
+    mock's separate anchored-node input folds into it. Server search is a
+    seam, and the input's contract doesn't change when it lands.
+
+## Implementation status (2026-07-18)
+
+T1–T2 landed with two behavior bugs, and T3 landed as a skeleton. The audit
+of the shipped code against this plan — three root-caused bugs (browser
+cache staleness, per-task routes 404ing on `TaskSchema/…` ids, the New-task
+modal unmounted outside the Tasks tab) plus the catalogue of skipped
+surfaces — lives in **[`fixes/`](fixes/README.md)**, with fix order and
+verification gates. 03 carries two inline corrections learned from it.
 
 ## Build order
 
@@ -124,8 +188,8 @@ Each phase ends runnable; later phases only add.
 
 | Phase | Contents | Demo gate |
 |---|---|---|
-| **T1 — Data + API core** | `task_schema.py` + models · `TaskRepo`/`BoardRepo` in `Repositories` · `TaskService` (CRUD, move, DAG-validated edges, anchor add/remove) · `task_routes.py` under `/tasks` · default board bootstrap | HTTP tests: create the mock's board (epic + shared subtask + blocked pair), move a card, get a cycle refused with its sentence |
-| **T2 — Board UI** | `Tasks` tab in `WorkspaceTabs` · `features/Dashboard/features/Tasks/` (board, columns, cards, filter bar) · react-query hooks + optimistic move · New-task modal (title/type/priority only) | The mock's board screenshot, live: drag between columns, filter by type, create a task |
-| **T3 — Anchors + detail + canvas** | anchor endpoints + anchor-summary · detail panel in the right slot (all sections except activity) · canvas badge + popover · sidebar badges · "New task here" context action with pre-filled anchor + suggested subtasks | Two tasks on `main.dd` → amber everywhere, popover lists both, detail panel round-trips subtask toggles |
-| **T4 — Convergence polish** | hot glow styling · task lens · Blockers sidebar section · re-anchor flow (unresolved state + candidate picker) · activity/notes · anchored-node board filter · cache invalidation over socket | Rename a function on disk → anchor shows ⚠, re-anchor fixes it; lens dims the canvas to the task's nodes |
+| **T1 — Data + API core** | `task_schema.py` + models · `TaskRepo`/`BoardRepo` in `Repositories` · `TaskService` (CRUD, move, DAG-validated edges, idempotent anchor add/remove + `anchors/move`) · board `scope_node_id` resolution · `task_routes.py` under `/tasks` · default board bootstrap | HTTP tests: create the mock's board (epic + shared subtask + blocked pair), move a card, cycle refused with its sentence, scoped board read returns only the subtree's tasks |
+| **T2 — Board + List UI** | `Tasks` tab in `WorkspaceTabs` · `features/Dashboard/features/Tasks/` · **view switcher** · board view (workflow columns only, backlog link-out) · **list view** (Active groups ↑ / Backlog ↓, drag across the divide, inline add) · **search** (`/`, shared predicate) · **scope pill wired to the tab, `historyScope`-style** · react-query hooks + optimistic move · New-task modal (title/type/priority, anchor pre-filled from the tab's active node) | The corrected mock, live: board shows four columns with `Backlog 2` as a link; flip to List, drag *Add runner tests* across the divide into To do and watch it appear on the board; type `dd` in search and both views narrow; flip This tab ↔ All and counts change |
+| **T3 — Anchors + detail + canvas** | anchor-summary · detail panel in the right slot (all sections except activity) · **Anchor-current-node chip** · canvas badge + **interactive popover (link toggles + Attach search)** · sidebar badges · "New task here" context action with pre-filled anchor + suggested subtasks | Two tasks on `main.dd` → amber everywhere; check/uncheck a popover toggle and watch the badge count follow; detail panel round-trips subtask toggles |
+| **T4 — Convergence polish** | hot glow styling · task lens · Blockers sidebar section · **drag-transfer from popover to node card** + Move picker · re-anchor flow (unresolved state + candidate picker) · activity/notes · anchored-node board filter · cache invalidation over socket | Drag a task row from `dd`'s popover onto `runner` → anchor moves, both badges update, activity says so; rename a function on disk → anchor shows ⚠, re-anchor fixes it; lens dims the canvas to the task's nodes |
 | **T5 — Agent seam** (separate effort) | task context block in the context factory · `plan_tasks` tool behind the two-gate pattern · registry entry | Out of this plan's demo path; specced in 06 |
