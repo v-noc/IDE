@@ -38,6 +38,7 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
   data: TreeDataItem[] | TreeDataItem;
   initialSelectedItemId?: string;
   onSelectChange?: (item: TreeDataItem | undefined) => void;
+  onExpandedChange?: (itemId: string, expanded: boolean) => void;
   expandAll?: boolean;
   defaultNodeIcon?: any;
   defaultLeafIcon?: any;
@@ -50,6 +51,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
       data,
       initialSelectedItemId,
       onSelectChange,
+      onExpandedChange,
       expandAll,
       defaultLeafIcon,
       defaultNodeIcon,
@@ -128,6 +130,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
           ref={ref}
           selectedItemId={selectedItemId}
           handleSelectChange={handleSelectChange}
+          onExpandedChange={onExpandedChange}
           expandedItemIds={expandedItemIds}
           defaultLeafIcon={defaultLeafIcon}
           defaultNodeIcon={defaultNodeIcon}
@@ -152,6 +155,7 @@ TreeView.displayName = "TreeView";
 type TreeItemProps = TreeProps & {
   selectedItemId?: string;
   handleSelectChange: (item: TreeDataItem | undefined) => void;
+  onExpandedChange?: (itemId: string, expanded: boolean) => void;
   expandedItemIds: string[];
   defaultNodeIcon?: any;
   defaultLeafIcon?: any;
@@ -167,6 +171,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
       data,
       selectedItemId,
       handleSelectChange,
+      onExpandedChange,
       expandedItemIds,
       defaultNodeIcon,
       defaultLeafIcon,
@@ -191,6 +196,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                   selectedItemId={selectedItemId}
                   expandedItemIds={expandedItemIds}
                   handleSelectChange={handleSelectChange}
+                  onExpandedChange={onExpandedChange}
                   defaultNodeIcon={defaultNodeIcon}
                   defaultLeafIcon={defaultLeafIcon}
                   handleDragStart={handleDragStart}
@@ -220,6 +226,7 @@ TreeItem.displayName = "TreeItem";
 const TreeNode = ({
   item,
   handleSelectChange,
+  onExpandedChange,
   expandedItemIds,
   selectedItemId,
   defaultNodeIcon,
@@ -230,6 +237,7 @@ const TreeNode = ({
 }: {
   item: TreeDataItem;
   handleSelectChange: (item: TreeDataItem | undefined) => void;
+  onExpandedChange?: (itemId: string, expanded: boolean) => void;
   expandedItemIds: string[];
   selectedItemId?: string;
   defaultNodeIcon?: any;
@@ -273,7 +281,14 @@ const TreeNode = ({
     <AccordionPrimitive.Root
       type="multiple"
       value={value}
-      onValueChange={(s) => setValue(s)}
+      onValueChange={(s) => {
+        const wasExpanded = value.includes(item.id);
+        const isExpanded = s.includes(item.id);
+        setValue(s);
+        if (wasExpanded !== isExpanded) {
+          onExpandedChange?.(item.id, isExpanded);
+        }
+      }}
     >
       <AccordionPrimitive.Item value={item.id}>
         <AccordionTrigger
@@ -315,6 +330,7 @@ const TreeNode = ({
             data={item.children ? item.children : item}
             selectedItemId={selectedItemId}
             handleSelectChange={handleSelectChange}
+            onExpandedChange={onExpandedChange}
             expandedItemIds={expandedItemIds}
             defaultLeafIcon={defaultLeafIcon}
             defaultNodeIcon={defaultNodeIcon}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +14,14 @@ import { TreeView, type TreeDataItem } from "@/components/ui/tree-view";
 import { DynamicIcon } from "@/components/DynamicIcon";
 import getIcons from "@/features/Dashboard/utils/getIcons";
 import { pipe, filter as rFilter, map as rMap } from "remeda";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
+import {
+  canLazyLoadCodeChildren,
+  getCodeDescendantsQueryOptions,
+} from "@/features/Dashboard/service/codeDescendants";
+import { mergeStructureAndLazyChildren } from "@/features/Dashboard/utils/mergeCodeTreeChildren";
+import queryKeys from "@/lib/queryKeys";
 
 interface SelectNodeDialogProps {
   isOpen?: boolean;
@@ -21,6 +30,20 @@ interface SelectNodeDialogProps {
   selectNodeType: NodeType[];
   onSelect: (node: AnyNodeTree) => void;
 }
+
+function useDebouncedValue<T>(value: T, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(id);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+function getNodeChildren(node: AnyNodeTree): AnyNodeTree[] | undefined {
+  return (node as { children?: AnyNodeTree[] }).children;
+}
+
 const SelectNodeDialog = ({
   isOpen,
   onClose,
@@ -30,29 +53,101 @@ const SelectNodeDialog = ({
 }: SelectNodeDialogProps) => {
   const [selectedNode, setSelectedNode] = useState<AnyNodeTree | null>(null);
   const [query, setQuery] = useState("");
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
 
-  function useDebouncedValue<T>(value: T, delayMs: number) {
-    const [debounced, setDebounced] = useState(value);
-    useEffect(() => {
-      const id = setTimeout(() => setDebounced(value), delayMs);
-      return () => clearTimeout(id);
-    }, [value, delayMs]);
-    return debounced;
-  }
+  const queryClient = useQueryClient();
+  const projectId = useProjectStore((s) => s.projectData?.id ?? "");
+  const branch = useVersioningStore((s) => s.branch);
+  const ref = useVersioningStore((s) => s.checkedOutCommitId);
+  const compareTo = useVersioningStore((s) => s.compareToCommitId);
 
   const debouncedQuery = useDebouncedValue(query, 250);
 
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedNode(null);
+      setQuery("");
+      setExpandedIds([]);
+    }
+  }, [isOpen]);
+
+  const handleExpandedChange = useCallback((itemId: string, expanded: boolean) => {
+    setExpandedIds((prev) => {
+      if (expanded) {
+        return prev.includes(itemId) ? prev : [...prev, itemId];
+      }
+      return prev.filter((id) => id !== itemId);
+    });
+  }, []);
+
+  const descendantQueries = useQueries({
+    queries: expandedIds.map((parentId) => ({
+      ...getCodeDescendantsQueryOptions(
+        projectId,
+        parentId,
+        branch,
+        ref,
+        compareTo,
+      ),
+      enabled: Boolean(projectId) && Boolean(isOpen),
+    })),
+  });
+
+  const descendantsDataKey = descendantQueries
+    .map((q) => q.dataUpdatedAt)
+    .join("|");
+
+  const lazyChildrenByParentId = useMemo(() => {
+    const m = new Map<string, AnyNodeTree[]>();
+    expandedIds.forEach((parentId, i) => {
+      const roots = descendantQueries[i]?.data?.children;
+      if (roots?.length) {
+        m.set(parentId, roots as unknown as AnyNodeTree[]);
+      }
+    });
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedIds, descendantsDataKey]);
+
+  const getCachedLazyChildren = useCallback(
+    (nodeId: string): AnyNodeTree[] | undefined => {
+      const cached = queryClient.getQueryData<{
+        children?: AnyNodeTree[];
+      }>(
+        queryKeys.code.descendants(
+          projectId,
+          nodeId,
+          branch,
+          ref,
+          compareTo,
+        ),
+      );
+      const children = cached?.children;
+      return children?.length
+        ? (children as unknown as AnyNodeTree[])
+        : undefined;
+    },
+    [queryClient, projectId, branch, ref, compareTo],
+  );
+
+  const getMergedChildren = useCallback(
+    (node: AnyNodeTree, includeCached: boolean): AnyNodeTree[] => {
+      const lazyLoaded =
+        lazyChildrenByParentId.get(node.id) ??
+        (includeCached ? getCachedLazyChildren(node.id) : undefined);
+      return mergeStructureAndLazyChildren(
+        getNodeChildren(node),
+        lazyLoaded,
+      ).filter((child) => child.node_type !== "call");
+    },
+    [lazyChildrenByParentId, getCachedLazyChildren],
+  );
+
   const toTreeDataItem = useCallback(
     (node: AnyNodeTree): TreeDataItem => {
-      const rawChildren = (node as unknown as Record<string, unknown>)
-        .children as unknown;
-      const children = Array.isArray(rawChildren)
-        ? (rawChildren as unknown[])
-            .filter(
-              (child: unknown) => (child as AnyNodeTree).node_type !== "call",
-            )
-            .map((child) => toTreeDataItem(child as AnyNodeTree))
-        : undefined;
+      const mergedChildren = getMergedChildren(node, false);
+      const hasLazyHint = canLazyLoadCodeChildren(node);
+      const hasChildren = mergedChildren.length > 0 || hasLazyHint;
 
       const IconComp = () => (
         <DynamicIcon
@@ -61,11 +156,17 @@ const SelectNodeDialog = ({
         />
       );
 
+      const childItems = hasChildren
+        ? mergedChildren.length > 0
+          ? mergedChildren.map((child) => toTreeDataItem(child))
+          : []
+        : undefined;
+
       return {
         id: node.id,
         name: `${node.name} (${node.node_type})`,
         icon: IconComp,
-        children,
+        children: childItems,
         onClick: () => {
           if (selectNodeType.includes(node.node_type)) {
             setSelectedNode(node);
@@ -73,13 +174,12 @@ const SelectNodeDialog = ({
         },
       };
     },
-    [selectNodeType],
+    [getMergedChildren, selectNodeType],
   );
 
   const treeData = useMemo<TreeDataItem[]>(() => {
     const q = debouncedQuery.trim();
 
-    // No search: render hierarchical tree (excluding calls as before)
     if (q.length === 0) {
       return pipe(
         list,
@@ -88,7 +188,6 @@ const SelectNodeDialog = ({
       );
     }
 
-    // With search: flatten all descendants and filter by name, show as leaves with path text
     const queryLc = q.toLowerCase();
 
     type FlatRecord = { node: AnyNodeTree; parents: string[] };
@@ -98,15 +197,12 @@ const SelectNodeDialog = ({
       parents: string[] = [],
     ): FlatRecord[] =>
       nodes.flatMap((n) => {
-        // Exclude call nodes and their subtrees
         if (n.node_type === "call") return [];
-        const children = (n as unknown as { children?: AnyNodeTree[] })
-          .children;
+        const children = getMergedChildren(n, true);
         const nextParents = [...parents, n.name];
         const self: FlatRecord = { node: n, parents };
-        const childRecords = Array.isArray(children)
-          ? flattenAll(children, nextParents)
-          : [];
+        const childRecords =
+          children.length > 0 ? flattenAll(children, nextParents) : [];
         return [self, ...childRecords];
       });
 
@@ -138,7 +234,7 @@ const SelectNodeDialog = ({
         },
       } as TreeDataItem;
     });
-  }, [list, toTreeDataItem, debouncedQuery, selectNodeType]);
+  }, [list, toTreeDataItem, debouncedQuery, selectNodeType, getMergedChildren]);
 
   const handleSubmit = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -147,6 +243,8 @@ const SelectNodeDialog = ({
     }
     onClose?.();
   };
+
+  const isLoadingChildren = descendantQueries.some((q) => q.isFetching);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -162,12 +260,21 @@ const SelectNodeDialog = ({
           />
         </div>
         <div className="mt-2 max-h-72 overflow-auto rounded-md border p-1">
-          <TreeView data={treeData} className="text-sm" />
+          <TreeView
+            data={treeData}
+            className="text-sm"
+            onExpandedChange={handleExpandedChange}
+          />
+          {isLoadingChildren && (
+            <p className="px-2 py-1 text-xs text-muted-foreground">
+              Loading…
+            </p>
+          )}
         </div>
         <div className="mt-2 text-xs text-muted-foreground">
           {selectedNode
             ? `Selected: ${selectedNode.name} (${selectedNode.node_type})`
-            : `Pick a ${selectNodeType.join(" or ")} from the list.`}
+            : `Expand files to browse functions and classes, or search by name.`}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
