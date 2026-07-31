@@ -10,6 +10,7 @@ from .v1.versioning import router as versioning_router
 from .v1 import container_routes
 # from .v1 import call_routes
 from .v1 import group_routes
+from .v1 import conversation_routes
 from app.walkthrough import routes as walkthrough_routes
 
 router = APIRouter()
@@ -53,6 +54,12 @@ router.include_router(container_routes.router,
 # router.include_router(call_routes.router, prefix="/calls", tags=["calls"])
 
 router.include_router(group_routes.router, prefix="/groups", tags=["groups"])
+
+router.include_router(
+    conversation_routes.router,
+    prefix="/conversations",
+    tags=["conversations"],
+)
 
 router.include_router(
     walkthrough_routes.router,

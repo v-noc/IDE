@@ -10,7 +10,7 @@ import {
 import { ProgressIndicator } from "./ProgressIndicator";
 import HistoryButton from "../../Versioning/components/HistoryButton";
 import GitHubStarButton from "@/components/GitHubStarButton";
-import { AgentToggleButton } from "../../Agent/components/AgentToggleButton";
+import { PanelToggle } from "../../Agent/panel/PanelToggle";
 
 interface NavbarProps {
   projectId?: string;
@@ -46,7 +46,7 @@ const Navbar = ({ projectId }: NavbarProps) => {
       </Menubar>
       <div className="flex items-center gap-2 mr-4">
         <ProgressIndicator projectId={projectId} />
-        <AgentToggleButton />
+        <PanelToggle />
         <HistoryButton />
         <GitHubStarButton />
       </div>

@@ -238,15 +238,36 @@
   outline-offset: 2px;
 }
 
+.walkthrough-active-node {
+  border-color: rgb(62 207 114 / 0.6) !important;
+  box-shadow:
+    0 0 0 3px rgb(62 207 114 / 0.15),
+    0 12px 40px rgb(0 0 0 / 0.5);
+  transition:
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.walkthrough-playing .walkthrough-node.walkthrough-active-node {
+  opacity: 1;
+  filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walkthrough-active-node {
+    transition: none;
+  }
+}
+
 /* Walkthrough spotlight: dim everything except the current stop */
-.walkthrough-playing .react-flow__node:not(:has(.walkthrough-current-node)) {
+.walkthrough-playing .react-flow__node:not(:has(.walkthrough-active-node)) {
   opacity: 0.3;
   filter: saturate(0.6);
   z-index: 0 !important;
   transition: opacity 0.25s ease, filter 0.25s ease;
 }
 
-.walkthrough-playing .react-flow__node:has(.walkthrough-current-node) {
+.walkthrough-playing .react-flow__node:has(.walkthrough-active-node) {
   opacity: 1;
   filter: none;
   z-index: 50 !important;
@@ -256,7 +277,7 @@
   transition: opacity 0.25s ease, filter 0.25s ease;
 }
 
-.walkthrough-playing .walkthrough-node.walkthrough-current-node {
+.walkthrough-playing .walkthrough-node.walkthrough-active-node {
   opacity: 1;
   filter: none;
 }

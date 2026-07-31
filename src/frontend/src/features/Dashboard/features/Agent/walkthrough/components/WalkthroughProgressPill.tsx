@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { useShallow } from "zustand/react/shallow";
 import { useWalkthroughStore } from "../store/useWalkthroughStore";
 
@@ -12,16 +11,24 @@ export function WalkthroughProgressPill() {
   const total = playerSteps.length;
 
   return (
-    <div className="pointer-events-auto flex h-10 items-center gap-3 rounded-full border border-border bg-background/95 px-4 text-sm shadow-md backdrop-blur">
-      <span className="font-medium text-foreground">
+    <div className="agent-v2 pointer-events-auto flex items-center gap-3 rounded-agent-pill border border-agent-border-strong bg-[rgba(24,26,30,0.92)] px-4 py-2 shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-md">
+      <span
+        className="agent-status-dot--pulse size-[7px] shrink-0 rounded-full bg-agent-accent"
+        aria-hidden
+      />
+      <span className="text-[13px] font-semibold text-agent-text">
         {step?.title ?? "Walkthrough"}
       </span>
-      <span className="text-xs text-muted-foreground">
+      <span className="font-agent-mono text-[11px] text-agent-text-muted">
         {position} / {total || "…"}
       </span>
-      <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={exit}>
+      <button
+        type="button"
+        onClick={exit}
+        className="rounded-agent-pill border border-agent-border-strong bg-agent-bg-raised px-3 py-1 text-xs text-agent-text-muted transition-colors hover:text-agent-text"
+      >
         Exit
-      </Button>
+      </button>
     </div>
   );
 }

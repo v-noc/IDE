@@ -22,6 +22,7 @@ from .structure_schema import (
     CodeContentSchema,
 )
 from .test_schema import TestConfigSchema, TestCaseSchema, TestLinkSchema
+from .conversation_schema import ConversationSchema
 
 __all__ = [
     "BaseSchema",
@@ -46,6 +47,7 @@ __all__ = [
     "TestConfigSchema",
     "TestCaseSchema",
     "TestLinkSchema",
+    "ConversationSchema",
 ]
 
 
@@ -88,8 +90,31 @@ async def ensure_schema(
     schema_obj.add_obj(TestCaseSchema.__name__, TestCaseSchema)
     schema_obj.add_obj(TestLinkSchema.__name__, TestLinkSchema)
 
+    # agent conversation schema
+    schema_obj.add_obj(ConversationSchema.__name__, ConversationSchema)
+
     await schema_obj.commit(
         client,
         f"Initialize schema for {title}",
         full_replace=False,
     )
+
+
+_conversation_schema_ready: set[str] = set()
+
+
+async def ensure_conversation_schema(client: AsyncClient) -> None:
+    """Register ConversationSchema on project DBs created before agent v2."""
+    db = getattr(client, "db", None) or ""
+    if db in _conversation_schema_ready:
+        return
+
+    # Partial class-only commits fail (datetime → schema#datetime witness).
+    # Re-run the full schema ensure — idempotent with full_replace=False.
+    await ensure_schema(
+        client,
+        title="V-NOC Schema",
+        description="V-NOC code analysis graph schema",
+        authors=["V-NOC Team"],
+    )
+    _conversation_schema_ready.add(db)

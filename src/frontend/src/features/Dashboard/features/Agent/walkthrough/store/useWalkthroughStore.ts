@@ -16,9 +16,11 @@ import {
   flattenSession,
   firstStepIdForVisit,
 } from "./flatten";
+import { toast } from "sonner";
 import { captureSavedView, restoreSavedView } from "../executor/restoreView";
 import { prepareTour } from "../executor/prepareTour";
 import { queryClient } from "@/lib/queryClient";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 
 interface WalkthroughState {
   phase: WalkthroughPhase;
@@ -180,6 +182,12 @@ export const useWalkthroughStore = create<WalkthroughState>()(
           return;
         }
 
+        if (!current.tabId) {
+          set((state) => {
+            state.tabId = useTabStore.getState().activeTabId;
+          });
+        }
+
         set((state) => {
           if (!state.savedView && state.tabId) {
             state.savedView = captureSavedView(state.tabId);
@@ -191,6 +199,7 @@ export const useWalkthroughStore = create<WalkthroughState>()(
         void (async () => {
           const { tabId, session } = get();
           if (!tabId || !session) {
+            toast.error("No canvas tab to play the walkthrough in");
             set((state) => {
               state.preparing = false;
             });
@@ -261,6 +270,13 @@ export const useWalkthroughStore = create<WalkthroughState>()(
 
         if (get().preparing) return;
 
+        const current = get();
+        if (!current.tabId) {
+          set((state) => {
+            state.tabId = useTabStore.getState().activeTabId;
+          });
+        }
+
         set((state) => {
           if (!state.savedView && state.tabId) {
             state.savedView = captureSavedView(state.tabId);
@@ -271,6 +287,7 @@ export const useWalkthroughStore = create<WalkthroughState>()(
         void (async () => {
           const { tabId, session, tourPrepared } = get();
           if (!tabId || !session) {
+            toast.error("No canvas tab to play the walkthrough in");
             set((state) => {
               state.preparing = false;
             });
