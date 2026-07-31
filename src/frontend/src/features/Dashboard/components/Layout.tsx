@@ -89,7 +89,7 @@ export default function Layout({
               defaultSize={25}
               minSize={20}
               maxSize={40}
-              className="bg-card"
+              className="min-w-0 overflow-hidden bg-card"
             >
               {rightSidebar}
             </ResizablePanel>
