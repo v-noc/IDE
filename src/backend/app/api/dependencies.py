@@ -10,6 +10,7 @@ from app.core.services.document_service import DocumentService
 from app.core.services.test_service import TestService
 from app.core.services.play_ground_service import PlayGroundService
 from app.core.services.container_service import ContainerService
+from app.core.services.task_service import TaskService
 from app.db.client import get_terminus_client
 from app.db.async_terminus_client import AsyncClient
 from app.core.model.nodes import ProjectNode
@@ -39,6 +40,9 @@ async def get_project_node(
 ) -> ProjectNode:
 
     project = await project_service.get(project_id)
+
+    if not project and not project_id.startswith("ProjectSchema/"):
+        project = await project_service.get(f"ProjectSchema/{project_id}")
 
     if not project:
         raise HTTPException(
@@ -120,3 +124,9 @@ def get_container_service(
     uow: ProjectUoW = Depends(get_project_uow),
 ) -> ContainerService:
     return ContainerService(uow)
+
+
+def get_task_service(
+    uow: ProjectUoW = Depends(get_project_uow),
+) -> TaskService:
+    return TaskService(uow)

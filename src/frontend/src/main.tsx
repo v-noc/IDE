@@ -11,7 +11,13 @@ import { ThemeProvider } from '@/components/theme-provider'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      forcedTheme="dark"
+      enableSystem={false}
+      disableTransitionOnChange
+    >
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
         <Analytics />

@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -6,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { NodeRow } from "./NodeRow";
 import { NodeChildren } from "./NodeChildren";
 import { useNodeStyle } from "@/features/Dashboard/hooks/useNodeStyle";
+import { useAnchorSummary } from "@/features/Dashboard/features/Tasks/service/useTasks";
 import type { ContainerNodeTree } from "@/types/project";
 
 interface NodeContentProps {
@@ -45,6 +47,9 @@ export const NodeContent = memo(function NodeContent({
   showLazyChildrenSkeleton = false,
 }: NodeContentProps) {
   const style = useNodeStyle(node);
+  const { projectId } = useParams();
+  const { data: anchorSummary } = useAnchorSummary(projectId);
+  const nodeTaskSummary = anchorSummary?.nodes[node.id];
   const diffStatus = node.status ?? "none";
   const diffClass =
     diffStatus === "added"
@@ -70,8 +75,8 @@ export const NodeContent = memo(function NodeContent({
             "mx-1 my-0.5",
             nestingLevel > 0 && "ml-2",
             diffClass,
-            isSelected && "ring-1 ring-blue-500/80",
-            isActive && "ring-2 ring-blue-600",
+            isSelected && "ring-1 ring-selection/80",
+            isActive && "ring-2 ring-selection",
           )}
           style={{
             backgroundColor:
@@ -97,6 +102,8 @@ export const NodeContent = memo(function NodeContent({
             iconColor={iconColor}
             onToggle={handleToggle}
             onClick={handleSelectNode}
+            taskOpenCount={nodeTaskSummary?.open_count}
+            taskHot={nodeTaskSummary?.hot}
           />
 
           {hasChildren && (

@@ -27,9 +27,8 @@ const defaultBasic: BasicInfoData = {
   icon: undefined,
 };
 const defaultCustom: Omit<CustomizationData, "navbarColor" | "leftSidebarColor" | "rightSidebarColor" | "backgroundColor" | "textColor" | "fontSize"> = {
-  iconColor: "#000000",
-
-  cardColor: "#ffffff",
+  iconColor: "#63ad5e",
+  cardColor: "#1e1e1e",
 };
 
 const DEBOUNCE_MS = 500;

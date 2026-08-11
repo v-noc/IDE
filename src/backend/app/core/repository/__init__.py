@@ -17,6 +17,8 @@ from .code_elements.test_repo import TestRepo
 from .code_elements.play_ground_repo import PlayGroundRepo
 from .container_repo import ContainerRepo
 from .conversation_repo import ConversationRepo
+from .task_repo import TaskRepo
+from .board_repo import BoardRepo
 
 
 class Repositories:
@@ -42,3 +44,5 @@ class Repositories:
 
         self.container_repo = ContainerRepo(client)
         self.conversation_repo = ConversationRepo(client)
+        self.task_repo = TaskRepo(client)
+        self.board_repo = BoardRepo(client)

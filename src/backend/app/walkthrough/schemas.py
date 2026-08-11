@@ -12,13 +12,15 @@ VisitMode = Literal["full", "contextual"]
 SessionStatus = Literal["generating", "complete", "error", "aborted"]
 
 SCHEMA_VERSION = "2"
-PROMPT_VERSION = "4"
+PROMPT_VERSION = "5"
 
 
 class RunRequest(BaseModel):
     project_id: str
     node_id: str
     depth: int = Field(ge=0, le=5)
+    user_query: str = ""
+    verbosity: Literal["quick", "normal", "detailed"] = "normal"
 
 
 class Estimate(BaseModel):

@@ -72,11 +72,14 @@ async def intro_node(state: WalkState, config: RunnableConfig) -> dict[str, Any]
     else:
         ctx.intro_code = numbered_code
 
+    verbosity = cfg.get("verbosity", "normal")
+    user_query = cfg.get("user_query", "")
+
     intro_result, intro_errors = await structured_call(
         "intro",
         IntroOut,
-        intro_system_prompt(ctx),
-        intro_user_prompt(ctx),
+        intro_system_prompt(ctx, verbosity),
+        intro_user_prompt(ctx, user_query),
     )
     await _record_errors(patcher, errors, intro_errors)
     intro_degraded = intro_result is None
@@ -188,11 +191,14 @@ async def explain_block_node(state: WalkState, config: RunnableConfig) -> dict[s
         block_end=block.end_line,
         previous_block_lines=previous_block_lines,
     )
+    verbosity = cfg.get("verbosity", "normal")
+    user_query = cfg.get("user_query", "")
+
     text_result, text_errors = await structured_call(
         "block_text",
         BlockTextOut,
-        block_text_system_prompt(text_ctx),
-        block_text_user_prompt(text_ctx),
+        block_text_system_prompt(text_ctx, verbosity),
+        block_text_user_prompt(text_ctx, user_query),
     )
     await _record_errors(patcher, errors, text_errors)
     text_degraded = text_result is None or plan_degraded

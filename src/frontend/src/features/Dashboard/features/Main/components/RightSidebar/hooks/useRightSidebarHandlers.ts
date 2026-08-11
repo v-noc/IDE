@@ -15,9 +15,9 @@ export function useRightSidebarHandlers() {
             iconColor: data.iconColor,
             cardColor: data.cardColor,
             navbarColor: data.navbarColor,
-            leftSidebarColor: data.leftSidebarColor ?? "#f9f9f9",
-            rightSidebarColor: data.rightSidebarColor ?? "#f9f9f9",
-            backgroundColor: data.backgroundColor ?? "#f9f9f9",
+            leftSidebarColor: data.leftSidebarColor ?? "#1e1e1e",
+            rightSidebarColor: data.rightSidebarColor ?? "#1e1e1e",
+            backgroundColor: data.backgroundColor ?? "#121212",
             textColor: data.textColor,
         };
         updateTheme(theme);

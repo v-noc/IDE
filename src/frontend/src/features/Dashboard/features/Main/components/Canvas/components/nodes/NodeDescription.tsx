@@ -2,21 +2,20 @@ import { memo } from "react";
 
 interface NodeDescriptionProps {
   description?: string;
-  textColor?: string;
+  /** Fallback label when no description — e.g. "File main" */
+  fallbackLabel?: string;
 }
 
 export const NodeDescription = memo(function NodeDescription({
   description,
-  textColor,
+  fallbackLabel,
 }: NodeDescriptionProps) {
+  const text = description?.trim() || fallbackLabel;
+
   return (
-    <div className="px-4 py-3.5 space-y-2.5 bg-whit/30">
-      {description ? (
-        <p className="text-xs leading-relaxed " style={{ color: textColor }}>{description}</p>
-      ) : (
-        <div className="text-xs text-slate-400 italic" style={{ color: textColor }}>
-          No description available
-        </div>
+    <div className="px-3 py-3 text-[12.5px] leading-relaxed text-muted-foreground">
+      {text ?? (
+        <span className="italic opacity-70">No description available</span>
       )}
     </div>
   );

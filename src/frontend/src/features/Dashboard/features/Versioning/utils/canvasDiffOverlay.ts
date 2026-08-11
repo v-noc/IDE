@@ -197,7 +197,7 @@ export function createFallbackNode(
       name: source.name || source.id,
       mainIcon: React.createElement(DynamicIcon, { iconName }),
       cornerIcon: getIcons(source.node_type),
-      bgColor: nodeStyle.cardColor ?? nodeStyle.backgroundColor ?? "white",
+      bgColor: nodeStyle.cardColor ?? nodeStyle.backgroundColor ?? "var(--card)",
       textColor: nodeStyle.textColor ?? "#1C1B1F",
       iconColor: nodeStyle.iconColor ?? "#49454F",
       borderColor: nodeStyle.borderColor ?? "#E7E0EC",

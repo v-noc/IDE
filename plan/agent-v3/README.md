@@ -52,7 +52,9 @@ agent v3
 │                             · call-edge grounding · <user_intent> lens
 │
 └── frontend/
-    └── 01 checklist UI       live run checklist · bottom-up fill · undo button · doc links
+    └── 01 faces & checklist  registry flag flips · wireId alignment · ConfigForm/
+                              RunningView/DoneView faces · ONE RunChecklist for both
+                              tools · bottom-up fill · undo button · doc links
 ```
 
 ## Decisions inherited from v2 (not re-argued here)
@@ -63,6 +65,14 @@ persist per item, truthful partials · degrade-never-abort *except* where noted
 try→retry-with-errors · context via the factory presets (context-engineering/02) ·
 prompts in the registry with per-prompt versions · artifacts as mirror docs on the
 multi-doc stream.
+
+**The frontend v3 lands in is the frontendv2 redesign** (plan/agent-v2/frontendv2 —
+shipped 2026-07-16 in `features/Dashboard/features/Agent/`). Describe and document
+are already *visible* in the composer's tool picker as "coming soon"
+(`tools/registry.ts`); their card shell, badges, decision flow, and progress
+rendering already exist. v3's entire frontend cost is: flip the two status flags,
+align frontend tool ids with the wire names (`wireId`), and register two faces +
+one shared checklist renderer (frontend/01). No panel, thread, or composer changes.
 
 ## The quality gradient (why describe comes first, always)
 
@@ -95,6 +105,6 @@ slot; removing poisoned descriptions later is much harder.
 
 | Phase | Contents | Demo gate |
 |---|---|---|
-| **A — Describe** | shared post-order walk · ToolRun artifact + repo · `describe_nodes` · checklist renderer | "Describe everything under `payments/`, depth 2" → confirm ~30 calls → checklist fills bottom-up → re-run a walkthrough: child lines visibly better |
-| **B — Document** | `document_nodes` · call-edge context (factory gains `calls` include) · doc viewer links | "Document `PaymentService` — I care about the retry path" → doc whose *children-interaction* section cites real call edges, retry parts emphasized |
+| **A — Describe** | shared post-order walk · ToolRun artifact + repo · `describe_nodes` · `wireId` alignment + describe flag flip + face · RunChecklist renderer | "Describe everything under `payments/`, depth 2" → confirm ~30 calls → checklist fills bottom-up → re-run a walkthrough: child lines visibly better |
+| **B — Document** | `document_nodes` · call-edge context (factory gains `calls` include) · document flag flip + face (intent textarea) · doc viewer links | "Document `PaymentService` — I care about the retry path" → doc whose *children-interaction* section cites real call edges, retry parts emphasized |
 | **C — Safety polish** | run-level undo (revert endpoint + button) · overwrite mode · evals (validator first-pass rate, % described) | run describe twice: second run skips existing; undo the first run: graph back to before, artifact says so |

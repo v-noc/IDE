@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EditorCode from "./Code";
 import { DocumentEditor } from "./Docs/DocumentEditor";
 import Canvas from "./Canvas";
+import { TasksBoard } from "@/features/Dashboard/features/Tasks";
 import type { DocumentData } from "@/services/documents";
 
 interface WorkspaceTabsProps {
@@ -11,10 +12,11 @@ interface WorkspaceTabsProps {
   tabValue: string;
   onTabValueChange: (value: string) => void;
   headerSlot: React.ReactNode;
-  // Document props
   selectedDocument: DocumentData | null | undefined;
   nodeId?: string;
   projectId?: string;
+  openTaskCount?: number;
+  onNavigateToNode?: (nodeId: string) => void;
 }
 
 /**
@@ -30,6 +32,8 @@ export function WorkspaceTabs({
   selectedDocument,
   nodeId,
   projectId = "",
+  openTaskCount = 0,
+  onNavigateToNode,
 }: WorkspaceTabsProps) {
   return (
     <Tabs
@@ -59,6 +63,12 @@ export function WorkspaceTabs({
           className="rounded-none bg-(--background-color) border-x border-b border-border border-r-0 border-t-2 border-t-transparent text-muted-foreground data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
         >
           Canvas
+        </TabsTrigger>
+        <TabsTrigger
+          value="tasks"
+          className="rounded-none bg-(--background-color) border-x border-b border-border border-r-0 border-t-2 border-t-transparent text-muted-foreground data-[state=active]:border-t-primary data-[state=active]:text-foreground data-[state=active]:shadow-none data-[state=active]:bg-transparent"
+        >
+          Tasks{openTaskCount > 0 ? ` ${openTaskCount}` : ""}
         </TabsTrigger>
         <div className="border-b border-border border-l h-full w-full"> </div>
       </TabsList>
@@ -100,6 +110,16 @@ export function WorkspaceTabs({
             <Canvas tabId={tabId} />
           </div>
         </div>
+      </TabsContent>
+      <TabsContent
+        value="tasks"
+        className="flex flex-col overflow-hidden bg-(--background-color) border-t border-border flex-1"
+      >
+        <TasksBoard
+          projectId={projectId}
+          tabId={tabId}
+          onNavigateToNode={onNavigateToNode}
+        />
       </TabsContent>
     </Tabs>
   );

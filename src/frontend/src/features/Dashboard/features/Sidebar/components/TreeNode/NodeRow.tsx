@@ -18,6 +18,8 @@ interface NodeRowProps {
   iconColor: string;
   onToggle: (e: React.MouseEvent) => void;
   onClick: () => void;
+  taskOpenCount?: number;
+  taskHot?: boolean;
 }
 
 export const NodeRow = memo(function NodeRow({
@@ -28,6 +30,8 @@ export const NodeRow = memo(function NodeRow({
   iconColor,
   onToggle,
   onClick,
+  taskOpenCount,
+  taskHot,
 }: NodeRowProps) {
   const diffStatus = node.status ?? "none";
   const iconName =
@@ -88,6 +92,18 @@ export const NodeRow = memo(function NodeRow({
           {node.name}
         </span>
       </div>
+
+      {taskOpenCount != null && taskOpenCount > 0 && (
+        <span
+          className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+          style={{
+            color: taskHot ? "#e2a03f" : "#4ade80",
+            backgroundColor: taskHot ? "rgba(226,160,63,0.15)" : "rgba(74,222,128,0.12)",
+          }}
+        >
+          {taskOpenCount}
+        </span>
+      )}
     </li>
   );
 

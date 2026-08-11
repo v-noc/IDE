@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
 import { SidebarDialogs } from "@/features/Dashboard/components/SidebarDialogs";
 import VersioningPanel from "@/features/Dashboard/features/Versioning/components/VersioningPanel";
+import { TaskDetailPanel } from "@/features/Dashboard/features/Tasks/components/detail/TaskDetailPanel";
+import { findNodeByIdWithDescendantCache } from "@/features/Dashboard/utils/findNodeWithDescendantCache";
+import { useQueryClient } from "@tanstack/react-query";
 import { useVersioningStore } from "@/features/Dashboard/features/Versioning/store/useVersioningStore";
 import AgentOverlay from "@/features/Dashboard/features/Agent";
 import VersioningStatusBanner from "@/features/Dashboard/features/Versioning/components/VersioningStatusBanner";
@@ -39,6 +42,22 @@ const Dashboard = () => {
 
   const tabStack = useTabStore(useShallow(selectTabStack));
   const isVersioningOpen = useVersioningStore((s) => s.isOpen);
+  const selectedTaskId = useProjectStore((s) => s.selectedTaskId);
+  const queryClient = useQueryClient();
+  const pushFocus = useProjectStore((s) => s.pushFocus);
+
+  const handleTaskNavigateToNode = (nodeId: string) => {
+    const projectKey = projectData?.id ?? "";
+    const node = findNodeByIdWithDescendantCache(
+      queryClient,
+      projectData,
+      projectKey,
+      nodeId,
+    );
+    if (node) {
+      pushFocus(activeTabId, node);
+    }
+  };
 
   // Socket and Data Sync hooks
   useSocketSync();
@@ -89,7 +108,14 @@ const Dashboard = () => {
         navbar={<Navbar projectId={projectId} />}
         leftSidebar={<SideBar />}
         rightSidebar={
-          isVersioningOpen ? <VersioningPanel tabId={activeTabId} /> : undefined
+          selectedTaskId ? (
+            <TaskDetailPanel
+              projectId={projectId ?? ""}
+              onNavigateToNode={handleTaskNavigateToNode}
+            />
+          ) : isVersioningOpen ? (
+            <VersioningPanel tabId={activeTabId} />
+          ) : undefined
         }
       />
       <SidebarDialogs />

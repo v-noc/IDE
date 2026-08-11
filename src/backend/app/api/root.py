@@ -11,6 +11,7 @@ from .v1 import container_routes
 # from .v1 import call_routes
 from .v1 import group_routes
 from .v1 import conversation_routes
+from .v1 import task_routes
 from app.walkthrough import routes as walkthrough_routes
 
 router = APIRouter()
@@ -65,4 +66,10 @@ router.include_router(
     walkthrough_routes.router,
     prefix="/walkthroughs",
     tags=["walkthroughs"],
+)
+
+router.include_router(
+    task_routes.router,
+    prefix="/tasks",
+    tags=["tasks"],
 )

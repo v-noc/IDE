@@ -1,4 +1,5 @@
 import React, { memo, useMemo } from "react";
+import { useParams } from "react-router-dom";
 import { Handle, NodeToolbar, Position } from "@xyflow/react";
 import { StepPopover } from "@/features/Dashboard/features/Agent/walkthrough/components/StepPopover";
 import { useWalkthroughStore } from "@/features/Dashboard/features/Agent/walkthrough/store/useWalkthroughStore";
@@ -10,6 +11,13 @@ import { useNodeCode } from "./useNodeCode";
 import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu";
 import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import {
+  useAnchorSummary,
+  useTaskBoard,
+} from "@/features/Dashboard/features/Tasks/service/useTasks";
+import { HOT_AMBER } from "@/features/Dashboard/features/Tasks/theme";
+import { cn } from "@/lib/utils";
 
 export interface NodeMetadata {
   createdAt?: string;
@@ -59,6 +67,29 @@ const EnhancedNode = memo(function EnhancedNode({
 
   const activeTabId = useTabStore((s) => s.activeTabId);
   const nodeId = data.nodeId ?? "";
+  const { projectId } = useParams();
+  const { data: anchorSummary } = useAnchorSummary(projectId);
+  const { data: taskBoard } = useTaskBoard(projectId);
+  const setSelectedTaskId = useProjectStore((s) => s.setSelectedTaskId);
+  const lensTaskId = useProjectStore((s) => s.lensTaskId[activeTabId]);
+  const nodeTaskSummary = nodeId ? anchorSummary?.nodes[nodeId] : undefined;
+
+  const lensMemberIds = useMemo(() => {
+    if (!lensTaskId || !taskBoard) return null;
+    const lensTask = taskBoard.tasks.find((t) => t.id === lensTaskId);
+    if (!lensTask) return null;
+    const ids = new Set<string>();
+    const collect = (taskId: string) => {
+      const t = taskBoard.tasks.find((x) => x.id === taskId);
+      if (!t) return;
+      for (const a of t.anchors) {
+        if (a.is_resolved !== false) ids.add(a.node_id);
+      }
+      for (const s of t.subtasks) collect(s.id);
+    };
+    collect(lensTask.id);
+    return ids;
+  }, [lensTaskId, taskBoard]);
   const anchorType = useWalkthroughStore((s) => {
     const step = s.playerSteps[s.cursor];
     if (s.phase !== "playing" || !step || step.nodeId !== nodeId) return null;
@@ -67,8 +98,7 @@ const EnhancedNode = memo(function EnhancedNode({
   });
   const isNodePopover = anchorType === "node";
   const isCurrentStepNodeVisible = useWalkthroughStore(
-    (s) =>
-      s.phase === "playing" && s.playerSteps[s.cursor]?.nodeId === nodeId,
+    (s) => s.phase === "playing" && s.playerSteps[s.cursor]?.nodeId === nodeId,
   );
 
   const { statusStyles, contentStyles } = useMemo(() => {
@@ -114,8 +144,27 @@ const EnhancedNode = memo(function EnhancedNode({
       sStyles.boxShadow = `0 0 10px ${colors[status]}55`;
     }
 
+    if (nodeTaskSummary?.hot) {
+      sStyles.borderColor = HOT_AMBER;
+      sStyles.boxShadow = `0 0 12px ${HOT_AMBER}66`;
+    }
+
+    if (lensMemberIds) {
+      if (!lensMemberIds.has(nodeId)) {
+        sStyles.opacity = 0.15;
+      } else {
+        sStyles.boxShadow = `0 0 0 2px #4ade8066`;
+      }
+    }
+
     return { statusStyles: sStyles, contentStyles: cStyles };
-  }, [data.metadata?.status, data.diffStatus]);
+  }, [
+    data.metadata?.status,
+    data.diffStatus,
+    nodeTaskSummary?.hot,
+    lensMemberIds,
+    nodeId,
+  ]);
 
   const { onAction } = useNodeHandlers(data.nodeId ?? "", activeTabId);
 
@@ -123,6 +172,16 @@ const EnhancedNode = memo(function EnhancedNode({
     nodeCode.toggleCode();
     data.onCodeToggle?.();
   };
+
+  const hasStatusOverride = Object.keys(statusStyles).length > 0;
+  const descriptionFallback =
+    data.nodeType && data.name
+      ? `${data.nodeType.charAt(0).toUpperCase()}${data.nodeType.slice(1)} ${data.name}`
+      : undefined;
+  const customIconColor =
+    data.iconColor && data.iconColor !== "var(--primary)"
+      ? data.iconColor
+      : undefined;
 
   return (
     <>
@@ -136,90 +195,99 @@ const EnhancedNode = memo(function EnhancedNode({
       </NodeToolbar>
 
       <div
-      data-node-id={nodeId}
-      data-walkthrough-node-anchor={isCurrentStepNodeVisible ? "" : undefined}
-      className={`walkthrough-node relative min-w-[380px] max-w-[420px] overflow-hidden rounded-lg border-2 shadow-lg bg-white transition-all hover:shadow-xl ${
-        selected ? "ring-4 ring-amber-400 ring-offset-1" : ""
-      } ${isCurrentStepNodeVisible ? "walkthrough-active-node" : ""}`}
-      style={{
-        backgroundColor: statusStyles.backgroundColor || data.bgColor,
-        color: statusStyles.color || data.textColor,
-        borderColor: selected
-          ? "#f59e0b"
-          : statusStyles.borderColor || data.borderColor,
-        ...statusStyles,
-      }}
-    >
-      <NodeContextMenu
-        nodeId={data.nodeId ?? ""}
-        nodeType={data.nodeType ?? ""}
-        manuallyCreated={data.manuallyCreated}
-        onAction={onAction}
+        className={cn(
+          "rounded-(--radius)",
+          selected &&
+            "ring-2 ring-selection ring-offset-2 ring-offset-background",
+        )}
       >
-        <div style={contentStyles}>
-          <NodeHeader
-            name={data.name}
-            icon={data.mainIcon}
-            iconColor={(statusStyles.color as string) || data.iconColor}
-            borderColor={
-              (statusStyles.borderColor as string) || data.borderColor
-            }
-            textColor={(statusStyles.color as string) || data.textColor}
-            expandable={data.expandable}
-            expanded={data.expanded}
-            onToggle={data.onToggle}
-            hasCode={Boolean(nodeCode.hasCode)}
-            showCode={nodeCode.showCode}
-            onCodeToggle={handleCodeToggle}
-            status={data.metadata?.status}
-            diffStatus={data.diffStatus as any}
-          />
-
-          {nodeCode.showCode && nodeCode.hasCode ? (
-            <NodeCodeView
-              code={nodeCode.code}
-              fileName={nodeCode.fileName}
-              language={nodeCode.language}
-              onChange={nodeCode.setCode}
-              onSave={nodeCode.handleSave}
-              hasChanges={nodeCode.hasChanges}
-              isSaving={nodeCode.isSaving}
-              isLoading={nodeCode.isLoading}
-              showDiff={nodeCode.showDiff}
-              originalContent={nodeCode.originalContent}
-              modifiedContent={nodeCode.modifiedContent}
-              isLoadingDiff={nodeCode.isLoadingDiff}
-              diffError={nodeCode.diffError}
-              borderColor={
-                (statusStyles.borderColor as string) || data.borderColor
-              }
-              iconColor={(statusStyles.color as string) || data.iconColor}
-              nodeId={data.nodeId ?? ""}
-              nodeStartLine={nodeCode.nodeStartLine}
-              isWalkthroughPlaying={nodeCode.isWalkthroughPlaying}
-            />
-          ) : (
-            <NodeDescription
-              description={data.metadata?.description}
-              textColor={data.textColor}
-            />
+        <div
+          data-node-id={nodeId}
+          data-walkthrough-node-anchor={
+            isCurrentStepNodeVisible ? "" : undefined
+          }
+          className={cn(
+            "canvas-node walkthrough-node relative min-w-[300px] max-w-[320px] overflow-hidden rounded-(--radius) border border-border bg-card text-card-foreground transition-shadow",
+            isCurrentStepNodeVisible && "walkthrough-active-node",
           )}
+          style={hasStatusOverride ? statusStyles : undefined}
+        >
+          <NodeContextMenu
+            nodeId={data.nodeId ?? ""}
+            nodeType={data.nodeType ?? ""}
+            manuallyCreated={data.manuallyCreated}
+            onAction={onAction}
+          >
+          <div style={contentStyles}>
+            <NodeHeader
+              name={data.name}
+              icon={data.mainIcon}
+              iconColor={customIconColor}
+              expandable={data.expandable}
+              expanded={data.expanded}
+              onToggle={data.onToggle}
+              hasCode={Boolean(nodeCode.hasCode)}
+              showCode={nodeCode.showCode}
+              onCodeToggle={handleCodeToggle}
+              status={data.metadata?.status}
+              diffStatus={data.diffStatus as any}
+              taskOpenCount={nodeTaskSummary?.open_count}
+              taskHot={nodeTaskSummary?.hot}
+              onTaskBadgeClick={() => {
+                const firstTaskId = nodeTaskSummary?.open_task_ids[0];
+                if (firstTaskId) setSelectedTaskId(firstTaskId);
+              }}
+            />
 
-          <NodeFooter
-            createdAt={data.metadata?.createdAt}
-            updatedAt={data.metadata?.updatedAt}
-            textColor={(statusStyles.color as string) || data.textColor}
-            borderColor={
-              (statusStyles.borderColor as string) || data.borderColor
-            }
-            iconColor={(statusStyles.color as string) || data.iconColor}
+            {nodeCode.showCode && nodeCode.hasCode ? (
+              <NodeCodeView
+                code={nodeCode.code}
+                fileName={nodeCode.fileName}
+                language={nodeCode.language}
+                onChange={nodeCode.setCode}
+                onSave={nodeCode.handleSave}
+                hasChanges={nodeCode.hasChanges}
+                isSaving={nodeCode.isSaving}
+                isLoading={nodeCode.isLoading}
+                showDiff={nodeCode.showDiff}
+                originalContent={nodeCode.originalContent}
+                modifiedContent={nodeCode.modifiedContent}
+                isLoadingDiff={nodeCode.isLoadingDiff}
+                diffError={nodeCode.diffError}
+                borderColor={
+                  (statusStyles.borderColor as string) || data.borderColor
+                }
+                iconColor={(statusStyles.color as string) || data.iconColor}
+                nodeId={data.nodeId ?? ""}
+                nodeStartLine={nodeCode.nodeStartLine}
+                isWalkthroughPlaying={nodeCode.isWalkthroughPlaying}
+              />
+            ) : (
+              <NodeDescription
+                description={data.metadata?.description}
+                fallbackLabel={descriptionFallback}
+              />
+            )}
+
+            <NodeFooter
+              createdAt={data.metadata?.createdAt}
+              updatedAt={data.metadata?.updatedAt}
+            />
+          </div>
+          </NodeContextMenu>
+
+          <Handle
+            type="target"
+            position={Position.Left}
+            style={{ opacity: 0 }}
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            style={{ opacity: 0 }}
           />
         </div>
-      </NodeContextMenu>
-
-      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
-      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
-    </div>
+      </div>
     </>
   );
 });

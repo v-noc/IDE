@@ -8,15 +8,15 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const treeVariants = cva(
-  "group hover:before:opacity-100 before:absolute before:rounded-lg before:left-0 px-2 before:w-full before:opacity-0 before:bg-accent/70 before:h-[2rem] before:-z-10"
+  "group hover:before:opacity-100 before:absolute before:rounded-lg before:left-0 px-2 before:w-full before:opacity-0 before:bg-accent/70 before:h-[2rem] before:-z-10",
 );
 
 const selectedTreeVariants = cva(
-  "before:opacity-100 before:bg-accent/70 text-accent-foreground"
+  "before:opacity-100 before:bg-accent/70 text-accent-foreground",
 );
 
 const dragOverVariants = cva(
-  "before:opacity-100 before:bg-primary/20 text-primary-foreground"
+  "before:opacity-100 before:bg-primary/20 text-primary-foreground",
 );
 
 interface TreeDataItem {
@@ -38,6 +38,7 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
   data: TreeDataItem[] | TreeDataItem;
   initialSelectedItemId?: string;
   onSelectChange?: (item: TreeDataItem | undefined) => void;
+  onExpandedChange?: (itemId: string, expanded: boolean) => void;
   expandAll?: boolean;
   defaultNodeIcon?: any;
   defaultLeafIcon?: any;
@@ -50,6 +51,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
       data,
       initialSelectedItemId,
       onSelectChange,
+      onExpandedChange,
       expandAll,
       defaultLeafIcon,
       defaultNodeIcon,
@@ -57,14 +59,14 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
       onDocumentDrag,
       ...props
     },
-    ref
+    ref,
   ) => {
     const [selectedItemId, setSelectedItemId] = React.useState<
       string | undefined
     >(initialSelectedItemId);
 
     const [draggedItem, setDraggedItem] = React.useState<TreeDataItem | null>(
-      null
+      null,
     );
 
     const handleSelectChange = React.useCallback(
@@ -74,7 +76,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
           onSelectChange(item);
         }
       },
-      [onSelectChange]
+      [onSelectChange],
     );
 
     const handleDragStart = React.useCallback((item: TreeDataItem) => {
@@ -88,7 +90,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         }
         setDraggedItem(null);
       },
-      [draggedItem, onDocumentDrag]
+      [draggedItem, onDocumentDrag],
     );
 
     const expandedItemIds = React.useMemo(() => {
@@ -100,7 +102,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
 
       function walkTreeItems(
         items: TreeDataItem[] | TreeDataItem,
-        targetId: string
+        targetId: string,
       ) {
         if (items instanceof Array) {
           for (let i = 0; i < items.length; i++) {
@@ -128,6 +130,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
           ref={ref}
           selectedItemId={selectedItemId}
           handleSelectChange={handleSelectChange}
+          onExpandedChange={onExpandedChange}
           expandedItemIds={expandedItemIds}
           defaultLeafIcon={defaultLeafIcon}
           defaultNodeIcon={defaultNodeIcon}
@@ -145,13 +148,14 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         ></div>
       </div>
     );
-  }
+  },
 );
 TreeView.displayName = "TreeView";
 
 type TreeItemProps = TreeProps & {
   selectedItemId?: string;
   handleSelectChange: (item: TreeDataItem | undefined) => void;
+  onExpandedChange?: (itemId: string, expanded: boolean) => void;
   expandedItemIds: string[];
   defaultNodeIcon?: any;
   defaultLeafIcon?: any;
@@ -167,6 +171,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
       data,
       selectedItemId,
       handleSelectChange,
+      onExpandedChange,
       expandedItemIds,
       defaultNodeIcon,
       defaultLeafIcon,
@@ -175,7 +180,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
       draggedItem,
       ...props
     },
-    ref
+    ref,
   ) => {
     if (!(data instanceof Array)) {
       data = [data];
@@ -191,6 +196,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                   selectedItemId={selectedItemId}
                   expandedItemIds={expandedItemIds}
                   handleSelectChange={handleSelectChange}
+                  onExpandedChange={onExpandedChange}
                   defaultNodeIcon={defaultNodeIcon}
                   defaultLeafIcon={defaultLeafIcon}
                   handleDragStart={handleDragStart}
@@ -213,13 +219,14 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
         </ul>
       </div>
     );
-  }
+  },
 );
 TreeItem.displayName = "TreeItem";
 
 const TreeNode = ({
   item,
   handleSelectChange,
+  onExpandedChange,
   expandedItemIds,
   selectedItemId,
   defaultNodeIcon,
@@ -230,6 +237,7 @@ const TreeNode = ({
 }: {
   item: TreeDataItem;
   handleSelectChange: (item: TreeDataItem | undefined) => void;
+  onExpandedChange?: (itemId: string, expanded: boolean) => void;
   expandedItemIds: string[];
   selectedItemId?: string;
   defaultNodeIcon?: any;
@@ -239,7 +247,7 @@ const TreeNode = ({
   draggedItem: TreeDataItem | null;
 }) => {
   const [value, setValue] = React.useState(
-    expandedItemIds.includes(item.id) ? [item.id] : []
+    expandedItemIds.includes(item.id) ? [item.id] : [],
   );
   const [isDragOver, setIsDragOver] = React.useState(false);
 
@@ -273,14 +281,21 @@ const TreeNode = ({
     <AccordionPrimitive.Root
       type="multiple"
       value={value}
-      onValueChange={(s) => setValue(s)}
+      onValueChange={(s) => {
+        const wasExpanded = value.includes(item.id);
+        const isExpanded = s.includes(item.id);
+        setValue(s);
+        if (wasExpanded !== isExpanded) {
+          onExpandedChange?.(item.id, isExpanded);
+        }
+      }}
     >
       <AccordionPrimitive.Item value={item.id}>
         <AccordionTrigger
           className={cn(
             treeVariants(),
             selectedItemId === item.id && selectedTreeVariants(),
-            isDragOver && dragOverVariants()
+            isDragOver && dragOverVariants(),
           )}
           onClick={() => {
             handleSelectChange(item);
@@ -315,6 +330,7 @@ const TreeNode = ({
             data={item.children ? item.children : item}
             selectedItemId={selectedItemId}
             handleSelectChange={handleSelectChange}
+            onExpandedChange={onExpandedChange}
             expandedItemIds={expandedItemIds}
             defaultLeafIcon={defaultLeafIcon}
             defaultNodeIcon={defaultNodeIcon}
@@ -352,7 +368,7 @@ const TreeLeaf = React.forwardRef<
       draggedItem,
       ...props
     },
-    ref
+    ref,
   ) => {
     const [isDragOver, setIsDragOver] = React.useState(false);
 
@@ -397,7 +413,7 @@ const TreeLeaf = React.forwardRef<
           className,
           selectedItemId === item.id && selectedTreeVariants(),
           isDragOver && dragOverVariants(),
-          item.disabled && "opacity-50 cursor-not-allowed pointer-events-none"
+          item.disabled && "opacity-50 cursor-not-allowed pointer-events-none",
         )}
         onClick={() => {
           if (item.disabled) return;
@@ -429,7 +445,7 @@ const TreeLeaf = React.forwardRef<
         </TreeActions>
       </div>
     );
-  }
+  },
 );
 TreeLeaf.displayName = "TreeLeaf";
 
@@ -442,7 +458,7 @@ const AccordionTrigger = React.forwardRef<
       ref={ref}
       className={cn(
         "flex flex-1 w-full items-center py-2 transition-all first:[&[data-state=open]>svg]:first-of-type:rotate-90",
-        className
+        className,
       )}
       {...props}
     >
@@ -461,7 +477,7 @@ const AccordionContent = React.forwardRef<
     ref={ref}
     className={cn(
       "overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down",
-      className
+      className,
     )}
     {...props}
   >
@@ -503,7 +519,7 @@ const TreeActions = ({
     <div
       className={cn(
         isSelected ? "block" : "hidden",
-        "absolute right-3 group-hover:block"
+        "absolute right-3 group-hover:block",
       )}
     >
       {children}

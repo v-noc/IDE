@@ -74,8 +74,17 @@ const queryKeys = {
   },
   documents: {
     all: ['documents'] as const,
-    list: (nodeKey: string, projectKey?: string) => [...queryKeys.documents.all, 'list', nodeKey, projectKey ?? ''] as const,
+    list: (nodeKey: string, projectKey?: string) =>
+      [...queryKeys.documents.all, 'list', nodeKey, projectKey ?? ''] as const,
     detail: (docId: string) => [...queryKeys.documents.all, 'detail', docId] as const,
+  },
+  tasks: {
+    all: ['tasks'] as const,
+    board: (projectId: string) => [...queryKeys.tasks.all, 'board', projectId] as const,
+    anchorSummary: (projectId: string) =>
+      [...queryKeys.tasks.all, 'anchor-summary', projectId] as const,
+    suggestDeps: (projectId: string, nodeId: string) =>
+      [...queryKeys.tasks.all, 'suggest-deps', projectId, nodeId] as const,
   },
   versioning: {
     all: ['versioning'] as const,

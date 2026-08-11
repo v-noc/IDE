@@ -1,80 +1,80 @@
 import type { CallNodeTree, ContainerNodeTree } from "@/types/project";
 
+/** Legacy light-theme values saved on nodes — map to CSS tokens in the dark IDE. */
+const LEGACY_LIGHT_COLORS = new Set([
+  "white",
+  "#fff",
+  "#ffffff",
+  "#f9f9f9",
+  "#fafafa",
+  "#f5f5f5",
+]);
+
+function normalizeThemeColor(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim().toLowerCase();
+  if (LEGACY_LIGHT_COLORS.has(trimmed)) return undefined;
+  return value;
+}
+
 const getNodeStyle = (node: ContainerNodeTree) => {
-  // If node has theme overrides, prefer them
   const themed = node.theme_config || {};
   let node_type = node.node_type;
   if (node_type == "call" && (node as CallNodeTree).target) {
     node_type = (node as CallNodeTree).target?.node_type || "function";
   }
 
-  /** Theme tokens — follow `index.css` for both light and dark */
+  /** Theme tokens — follow `index.css` */
   const defaults = (() => {
+    const card = "var(--card)";
+    const panel = "var(--secondary)";
+    const shared = {
+      color: "var(--foreground)",
+      iconColor: "var(--primary)",
+      textColor: "var(--foreground)",
+      borderColor: "var(--border)",
+    };
+
     switch (node_type) {
       case "project":
         return {
           backgroundColor: "var(--muted)",
-          color: "var(--foreground)",
-          iconColor: "var(--primary)",
           cardColor: "var(--muted)",
-          borderColor: "var(--border)",
-          textColor: "var(--foreground)",
+          iconColor: "var(--primary)",
+          ...shared,
         };
       case "folder":
-        return {
-          backgroundColor: "var(--secondary)",
-          color: "var(--foreground)",
-          iconColor: "var(--muted-foreground)",
-          cardColor: "var(--secondary)",
-          textColor: "var(--foreground)",
-          borderColor: "var(--border)",
-        };
       case "file":
         return {
-          backgroundColor: "var(--secondary)",
-          color: "var(--foreground)",
+          backgroundColor: panel,
+          cardColor: card,
           iconColor: "var(--muted-foreground)",
-          cardColor: "var(--secondary)",
-          borderColor: "var(--border)",
-          textColor: "var(--foreground)",
+          ...shared,
         };
       case "function":
-        return {
-          backgroundColor: "var(--secondary)",
-          color: "var(--foreground)",
-          iconColor: "var(--primary)",
-          cardColor: "var(--secondary)",
-          textColor: "var(--foreground)",
-          borderColor: "var(--border)",
-        };
       case "class":
         return {
-          backgroundColor: "var(--secondary)",
-          color: "var(--foreground)",
-          iconColor: "var(--primary)",
-          cardColor: "var(--secondary)",
-          textColor: "var(--foreground)",
-          borderColor: "var(--border)",
+          backgroundColor: panel,
+          cardColor: card,
+          ...shared,
         };
-
       default:
         return {
-          backgroundColor: "var(--secondary)",
-          color: "var(--foreground)",
+          backgroundColor: panel,
+          cardColor: card,
           iconColor: "var(--muted-foreground)",
-          borderColor: "var(--border)",
-          cardColor: "var(--secondary)",
-          textColor: "var(--foreground)",
+          ...shared,
         };
     }
   })();
 
   return {
-    cardColor: themed.cardColor || defaults.cardColor,
-    backgroundColor: themed.backgroundColor || defaults.backgroundColor,
-    color: themed.textColor || defaults.color,
-    iconColor: themed.iconColor || defaults.iconColor,
-    textColor: themed.textColor || defaults.textColor,
+    cardColor: normalizeThemeColor(themed.cardColor) || defaults.cardColor,
+    backgroundColor:
+      normalizeThemeColor(themed.backgroundColor) || defaults.backgroundColor,
+    color: normalizeThemeColor(themed.textColor) || defaults.color,
+    iconColor: normalizeThemeColor(themed.iconColor) || defaults.iconColor,
+    textColor: normalizeThemeColor(themed.textColor) || defaults.textColor,
     borderColor: defaults.borderColor,
   };
 };
