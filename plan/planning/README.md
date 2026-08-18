@@ -38,18 +38,20 @@ the reason to build this rather than copying a todo list.
 
 ## The single most important decision
 
-Everything in this folder follows from one decision, which took several rounds
-of argument to reach: **there is only one kind of work object, and it is called
-a Task. Tasks contain tasks.**
+Everything in this folder follows from one decision: **there is only one kind
+of work object, and it is called a Task. Tasks contain tasks.**
 
-An earlier draft of this design had four kinds of object, which were Task,
-Subtask, Plan, and Plan Item. That draft failed. It failed because a Plan owned
-its steps, so the moment you replaced a plan you either destroyed real work or
-you had to invent rescue rules to keep that work alive. Those rescue rules were
-the signal that the shape itself was wrong. When a design needs special cases
-to survive an ordinary event, the design is the problem and not the event.
+A task is recursive. A task can hold a list of child tasks, each of those
+children can hold its own children, and there is no separate type for a small
+piece of work. A task can also hold more than one **version** of its approach,
+where a version is one answer to the question "how are we going to do this?".
+Exactly one version is active at a time, and a version does not own its
+children. It only refers to them, in a deliberate order.
 
-The recursive model has no such seam:
+That last point carries most of the weight of the design. Because children are
+real tasks that exist in their own right, you can rewrite the approach, replace
+it with a different one, or abandon it completely, and no work is lost, no card
+disappears from the board, and nothing needs a rescue rule.
 
 ```
    TASK ───────────────────────────────────────────────────────────┐
@@ -65,15 +67,11 @@ The recursive model has no such seam:
      └── and every child in that list is ... a TASK ◄───────────────┘
 ```
 
-A subtask is not a separate type. A subtask is simply a task that some other
-task's version refers to. A plan is not a separate type either. What used to be
-called a plan is now a **version** of a task, and what used to be called a plan
-item is now just a **child task**.
-
-Because children are real tasks that exist in their own right, and a version
-only *refers* to them, you can throw away a version without throwing away any
-work at all. That single property is the thing the four-object model could
-never achieve, and it is why this model is worth the trouble of rethinking.
+The word *subtask* still exists, but only as a way of speaking. A subtask is
+simply a task that another task's active version refers to. It is a position in
+the tree, not a different kind of thing, so a subtask has every capability a
+task has: its own description, its own document, its own children, its own
+versions, and its own place on the board.
 
 ## What a task carries
 
@@ -185,9 +183,8 @@ earlier file has already explained.
 plan/planning/
 │
 ├── 00-mental-model.md
-│      The argument itself. The four-object draft, the exact places where its
-│      boundaries blurred, the tests used to separate the concepts, why the
-│      one-entity model won, and what merging costs.
+│      The idea in full. What a task is, why work is recursive, what a version
+│      is for, how deep a tree should go, and the tradeoffs this shape brings.
 │
 ├── 01-concepts.md
 │      Careful definitions of Task, Version, Child reference, Anchor, Context
