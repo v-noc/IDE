@@ -53,25 +53,7 @@ another branch" is the kind of split that produces bugs nobody can reproduce.
 
 ---
 
-## 4. Whether draft versions should take part in conflict detection
-
-Right now they do not. A draft is a thought, and its links collide with
-nothing.
-
-**The argument for including them.** Two people writing two drafts over the same
-class would like to know about each other early, and early is the whole point.
-
-**The argument against.** Alternatives written by one person would fight with
-each other on screen, and a person exploring three approaches would see three
-conflicts that do not exist.
-
-**Lean: keep drafts out, but consider a narrow exception** where a draft
-conflicts only with **active** versions of **other** tasks, never with drafts
-and never within the same task. That covers the useful case without the noise.
-
----
-
-## 5. Whether a declared scope is enforced
+## 4. Whether a declared scope is enforced
 
 The model records what a task says it will touch, and afterwards the commits say
 what it did.
@@ -155,38 +137,7 @@ false alarms, that is also useful information about the codebase.
 
 ---
 
-## 11. Whether a dependency ever needs to point at a version
-
-The design says dependencies point at tasks, because a version can be replaced
-at any moment and a pointer into one breaks exactly when it is needed.
-
-**The case that keeps coming back.** Somebody wants to record "I am waiting for
-the specific thing described in the third step of their current approach".
-
-**Lean: keep pointing at tasks, and let the node links carry the precision.**
-The reason is already recorded on both sides: one task needs a node, the other
-creates it. If that turns out not to be enough in practice, the smallest
-addition would be an optional note on the dependency saying what is being
-waited for, which is text and cannot rot into a broken reference.
-
----
-
-## 12. How much an agent should fill in automatically
-
-An agent proposing a version could add links by reading the code, and it would
-usually be right.
-
-**The risk.** Links are what everything else derives from. An agent that adds
-forty links, three of which are wrong, produces confident wrong readiness and
-confident wrong conflicts, and nobody will audit forty rows.
-
-**Lean: agents propose links inside a draft version, and a person activating
-that version is the approval.** That way approval happens once, at a moment
-somebody is already reading, rather than forty times.
-
----
-
-## 13. Where conversation lives
+## 11. Where conversation lives
 
 Chat between a person and an agent about a task is not part of this model.
 

@@ -117,48 +117,7 @@ how many children will become root tasks.
 
 ---
 
-## 3. Version writes
-
-### Create a version
-
-Takes a name, and either nothing, for a fresh idea, or an existing version to
-fork from. A fork copies the document, the links, and the child **references**.
-It does not copy child tasks.
-
-New versions start as drafts. A draft has no effect on the board, on conflicts,
-or on readiness.
-
-### Edit a version
-
-Its name, summary, document, links, and child list. Editing the active version
-is the normal way a plan changes, and it does not create a new version.
-
-### Activate a version
-
-Takes the version to activate. Points the task at it, marks the previous one
-superseded, and writes a note naming both.
-
-Guarantees that nothing else changes: no task is deleted, no status is touched,
-no child is modified. Everything people expect to follow is computed afterwards.
-
-Refuses if the version belongs to a different task, and refuses to activate a
-discarded version without an explicit undo of the discard, so that reviving an
-abandoned idea is a deliberate act.
-
-### Discard a version
-
-Marks a draft as discarded. Refuses on the active version, since a task always
-has exactly one active version, and says to activate another one first.
-
-### Delete a version
-
-Only for versions that were never activated, and only when a task has more than
-one. Superseded versions are kept, because code in the repository came from
-them.
-
----
-
-## 4. Children
+## 3. Children
 
 ### Add a child reference
 
@@ -192,7 +151,7 @@ create and a set of adds, with a note recording the split.
 
 ---
 
-## 5. Links and anchors
+## 4. Links and anchors
 
 ### Add a link
 
@@ -228,7 +187,7 @@ by activation.
 
 ---
 
-## 6. Dependencies
+## 5. Dependencies
 
 ### Add a dependency
 
@@ -249,7 +208,7 @@ Idempotent. Writes a note on both sides.
 
 ---
 
-## 7. Conflicts
+## 6. Conflicts
 
 ### Read conflicts
 
@@ -275,7 +234,7 @@ anything, in which case the record is kept and shown as historical.
 
 ---
 
-## 8. What every write does besides its own job
+## 7. What every write does besides its own job
 
 ```
    1. Writes a note when the change is worth remembering, and only then.
@@ -292,7 +251,7 @@ plan in another panel, and it uses the socket layer that already exists.
 
 ---
 
-## 9. Operations deliberately left out
+## 8. Operations deliberately left out
 
 | Not built | Why |
 |---|---|

@@ -38,46 +38,44 @@ Ten candidates. Here is what happens to each of them.
 
 ---
 
-## Kept: contains, as an ordered list on a version
+## Kept: parent, stored on the child as `parent_id`
 
-**What it is.** A version holds an ordered list of references to child tasks.
-This is how a task becomes part of another task.
+**What it is.** One task is a child of another task, forming a tree.
 
-**Why it is stored.** It cannot be derived from anything. Somebody decided that
-"Comment model" is part of "Add comments", and that decision is the structure
-of the work.
+**Why it is stored.** The structure of the work is not derivable from anything
+else. Somebody decided that "Comment model" is part of "Add comments", and that
+decision is the structure of work.
 
-**Why it lives on the version rather than on the task.** Because the breakdown
-*is* part of the approach. Two different approaches to the same promise have
-different steps, and if the child list lived on the task there would be nowhere
-to put the second breakdown.
-
-**Why it is a reference rather than ownership.** This is the property the whole
-design rests on. Because the version only points at children, you can rewrite
-an approach, replace it, or abandon it, and every child task continues to exist
-with its own status and history. Nothing has to be rescued, copied, or
-reattached.
+**Why it lives on the child.** A task has exactly one parent. Storing the edge
+on the child (as `parent_id`) enforces this at the field level: either the field
+is null (top-level) or it points to exactly one parent. There is no sharing, no
+task appearing in two places, and no degenerate cases to handle.
 
 ```
-   VERSION 1 of "Add comments"          VERSION 2 of "Add comments"
-     1 ─► VN-8   Comment model            1 ─► VN-15  Add comments list to Post
-     2 ─► VN-9   Comment write path       2 ─► VN-12  Show comments on page
-     3 ─► VN-12  Show comments on page         ▲
-             ▲                                 │
-             └─────────  the same task  ───────┘
-                         referenced by both
+   TASK  VN-3  "Add comments"
+     parent_id = null    (top-level)
+     
+     TASK  VN-8  "Comment model"
+       parent_id = VN-3
+       
+     TASK  VN-9  "Comment write path"
+       parent_id = VN-3
 ```
 
-**The direction it is stored in.** The reference lives on the parent's version,
-pointing down. The child holds nothing. This is deliberate: a child can be
-referenced by several parents, so storing a single parent field on the child
-would either be a lie or would forbid sharing. "Who are this task's parents?"
-is answered by an index, described in [09](09-architecture.md).
+**Why not multiple parents.** The original design tried to support shared
+children, where one task could appear under multiple parents. This created
+orphan cases, complex dedup logic, and cascading delete ambiguity. Single parent
+is simpler and honest: if two pieces of work need to share a step, one depends
+on the other.
 
-**Tradeoff.** Storing the edge only downward means finding a task's parents
-costs a lookup instead of reading a field. In exchange, shared work is
-representable, and there is exactly one copy of the truth rather than a
-parent field and a children list that can disagree.
+**Containment is real structure.** Children are ordered by a `position` field
+(lexorank, like `rank` for board columns), so the tree is completely
+deterministic. There is no hidden conflict between two versions' child lists.
+
+**Tradeoff.** Finding a task's parents is a simple read of one field. Finding
+its position in the tree requires walking up `parent_id` links. Both operations
+are O(depth), and depth is bounded by the user's ability to navigate, which is
+much smaller than total tasks.
 
 ---
 
@@ -100,21 +98,22 @@ function, not at the large task that contains it.
      child of VN-3 Comments                      child of VN-1 Authentication
 ```
 
-**The one guard.** A task may never depend on its own ancestor or its own
-descendant.
+**The guard.** A task may never depend on its own ancestor. Containment already
+expresses "this is part of that". If VN-9 depends on its ancestor VN-3, then
+VN-3 cannot finish until VN-9 is done (containment), and VN-9 cannot start
+until VN-3 is done (dependency). Neither can ever finish.
+
+A task depending on its own descendant is redundant (containment already says
+the same thing), so the system drops it silently and writes an event.
 
 ```
    REFUSED                              WHY
    ───────                              ───
-   VN-3  ──contains──►  VN-11           VN-3 is not finished until VN-11 is
-   VN-11 ──depends_on─► VN-3            VN-11 cannot start until VN-3 is
+   VN-3  contains  VN-11                VN-3 is not finished until VN-11 is
+   VN-11 depends_on VN-3                VN-11 cannot start until VN-3 is
 
-                                        Neither can ever finish.
+                                        Deadlock. Refused.
 ```
-
-Containment already expresses "this is part of that". Ordering inside a family
-is expressed by the child list order and by dependencies between siblings, and
-never by an edge that points back up the tree.
 
 **Tradeoff.** Allowing dependencies at any depth means the dependency graph can
 become large and cross-cutting, and a person looking at a high-level card may
@@ -143,9 +142,9 @@ in the moment it is asked.
    DERIVED      VN-5 blocks VN-9      ← the reverse view, computed
 ```
 
-The current system already has a field called `blocked_by`. Keeping that field
-name is fine; what matters is that it means "depends on" and that there is only
-one of it. This is covered in [15 — Migration](15-migration-from-today.md).
+The current system has a field called `blocked_by`. Keeping that field name is
+fine; what matters is that it means "depends on" and that there is only one of
+it.
 
 ---
 
@@ -195,13 +194,13 @@ question that fills a database with noise.
 
 ---
 
-## Kept, as modes rather than as separate relationship types: context and affects
+## Kept, as modes rather than separate types: node links with modes
 
-**What they are.** A version points at graph nodes, and every pointer carries a
-mode.
+**What they are.** A task points at graph nodes, and every pointer carries a
+mode: `about`, `read`, `create`, `modify`, or `delete`.
 
-**Why they are one mechanism and not two.** Because the most valuable question
-in the whole system is asked from the code side, not from the work side.
+**Why they are one mechanism.** Because the most valuable question in the whole
+system is asked from the code side, not from the work side.
 
 ```
    Standing on  function createComment()  and asking:
@@ -221,13 +220,20 @@ One list with a mode column answers it in a single pass. Two separate
 relationship types answer it in two passes that have to be kept in step in
 every place the question is asked.
 
-**Why the modes are exactly these five.** `about` is the vague one, used by
-anchors, and it never triggers collision warnings. `read` means look but do not
-change. `create`, `modify`, and `delete` are the three things you can do to a
-node, and they are distinguished because they behave differently: two `create`
-links on the same name are a duplicate, a `delete` under somebody else's
-`modify` is severe, and a `create` is the one mode that is allowed to point at
-a node that does not exist yet.
+**Why the modes are exactly these five.**
+
+- `about` is vague, used by anchors, and never triggers collision warnings.
+- `read` means look but do not change.
+- `create`, `modify`, and `delete` are the three things you can do to a
+  node, and they are distinguished because they behave differently:
+  - Two `create` links on the same name are a duplicate.
+  - A `delete` under somebody else's `modify` is severe.
+  - A `create` is the one mode allowed to point at a node that does not exist yet.
+
+**Anchors are node links with mode `about`.** They live on the task (not on a
+version, since parenthood does not change when you rethink the approach). They
+are soft references, stored as id plus a name snapshot, so a deleted node
+produces a readable warning instead of a broken reference.
 
 **Tradeoff.** Five modes is more than one, and people will sometimes choose the
 wrong one. The design accepts this because a wrong mode is detectable. After the
@@ -238,27 +244,6 @@ recovered.
 
 ---
 
-## Kept: anchor, as the `about` mode on the task
-
-**What it is.** A soft pointer saying roughly where in the code this work
-lives.
-
-**Why it stays even though `read` and `modify` exist.** Anchors are written
-early, when nobody knows the verbs yet. Somebody right-clicks a file on the
-canvas and says "new task here". At that moment the honest statement is "this
-work is around here", and forcing a choice between `read` and `modify` would
-make people guess and then be wrong.
-
-Anchors also live on the **task** rather than on a version, because where work
-lives does not change when the approach changes. A version can come and go, and
-the anchor stays.
-
-**Tradeoff.** There are now two places a task points at code, which needs
-explaining once. The distinction is stable enough to be worth it: *the anchor
-is where the work lives, the links are what an approach will do.*
-
----
-
 ## Cut: duplicates
 
 **Why it was proposed.** People file the same work twice, and every tracker has
@@ -266,7 +251,7 @@ a way to mark that.
 
 **Why it is cut.** Marking a duplicate is a housekeeping action, not a
 relationship worth modelling. In this system the natural resolution is simply
-to merge: point the surviving task's version at whatever children the duplicate
+to merge: point the surviving task's children at whatever the duplicate
 had, copy anything useful out of its document, and delete the duplicate with a
 note saying it was merged into VN-9.
 
@@ -284,9 +269,9 @@ over.
 
 **Why it is cut.** In a model where everything is a task, there is nothing to
 delegate. The step already is a task. If it grows, you give it children. If it
-belongs under a different parent, you move the reference. No third thing is
-needed to connect a small work object to a large one, because there is only one
-kind of work object.
+belongs under a different parent, you move it. No third thing is needed to
+connect a small work object to a large one, because there is only one kind of
+work object.
 
 ---
 
@@ -302,15 +287,16 @@ Anything a person can throw away must not be the target of a stored reference.
 ```
    DURABLE                       FRAGILE
    ───────                       ───────
-   a task                        a version's list of steps
-   a graph node id + name        a graph node id on its own
+   a task                        a graph node id on its own
+   a graph node id + name        a version's list of steps (removed)
 ```
 
-Tasks are durable, so dependencies point at tasks. Graph nodes are fragile,
-because the parser deletes and recreates them whenever a file changes, so every
-pointer into the graph is stored as a soft id **plus a snapshot of the name and
-kind**. When the node disappears, the pointer becomes a visible warning that
-still reads sensibly, instead of a broken reference nobody can interpret.
+Tasks are durable, so dependencies point at tasks and parents are tasks. Graph
+nodes are fragile, because the parser deletes and recreates them whenever a
+file changes, so every pointer into the graph is stored as a soft id **plus a
+snapshot of the name and kind**. When the node disappears, the pointer becomes
+a visible warning that still reads sensibly, instead of a broken reference
+nobody can interpret.
 
 ### Law 2 — One fact, one place
 
@@ -319,8 +305,8 @@ careful code prevents it forever. So:
 
 - `depends_on` is stored once, in one direction, and the reverse view is
   computed.
-- Containment is stored once, on the parent's version, and parenthood is
-  computed.
+- `parent_id` is stored once on the child, and the children list is computed
+  from the reverse index.
 - A collision between two tasks is not stored at all, only the human decision
   about it.
 - Progress, blocking, readiness, and contested nodes are never stored.
@@ -331,24 +317,25 @@ careful code prevents it forever. So:
 
 ```
    STORED RELATIONSHIPS  (there are three)
-   ───────────────────────────────────────
-   version ──ordered list of references──► task        containment
-   task    ──depends_on───────────────────► task        ordering
-   version ──link with a mode─────────────► graph node  code involvement
-   task    ──anchor (mode: about)─────────► graph node  where the work lives
+   ────────────────────────────────────────
+   child ──parent_id────────────────►  task         containment
+   task  ──depends_on──────────────►  task         ordering
+   task  ──node_link with mode────►  graph node    code involvement
+                                        (includes anchors: mode "about")
 
    DERIVED, ON EVERY READ
    ──────────────────────
-   parents of a task              from the containment index
-   blocks (the reverse view)      from depends_on
-   blocked / ready                from depends_on plus link states
-   progress                       from the active version's children
-   effective links of a parent    from the union of its descendants' links
-   contested nodes                from write-mode links on the same node
-   orphaned / shared              from how many active versions refer to a task
+   children of a task               from parent_id index in reverse
+   parents of a task                from parent_id (at most one)
+   blocks (the reverse view)        from depends_on
+   blocked / ready                  from depends_on plus link states
+   progress                         from the task's children
+   effective links of a parent      from the union of its descendants' links
+   contested nodes                  from write-mode links on the same node
+   depth / breadcrumb path          from walking up parent_id to root
 ```
 
-Four stored arrows. Everything else the product shows is computed from them.
+Three stored arrows. Everything else the product shows is computed from them.
 
 The next file, [03 — Data model](03-data-model.md), turns this into concrete
 fields, and marks clearly which ones are written and which ones are calculated.

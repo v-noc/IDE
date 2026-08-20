@@ -148,6 +148,102 @@ Automatic binding is only applied for an exact match on name and kind, and
 everything else is a suggestion a person confirms. Silently binding a plan to
 the wrong node would be far worse than leaving a link pending.
 
+### Create link identity: (qname, kind)
+
+A create link's identity is its **intended name and kind**, not a node id
+(which does not exist yet). This means create links are indexed two ways:
+
+**By node_id** — for fulfilled links that point at a real node.
+**By (qname, kind)** — for pending links waiting for a node to appear.
+
+When looking up tasks that touch a particular node, the system checks both
+indexes. This is what surfaces "someone plans to create something here" before
+it exists.
+
+```
+   unfulfilled link index              fulfilled link index
+   ─────────────────────              ────────────────────
+   (app.models.Comment, class) → VN-8  node_abc123 → VN-16 (create)
+                              → VN-44  node_def456 → VN-9  (modify)
+```
+
+### Binding a create link to the real node
+
+When the parser produces a node matching both the qname and kind, the link
+binds automatically. **The first binding writes an event** carrying the node id,
+kind, and graph revision:
+
+```
+{ type: "verified",
+  payload: {
+    link_qnames: ["app.models.Comment"],
+    node_ids: ["node_abc123"],
+    graph_revision: "xyz789"
+  },
+  at: ..., author: ... }
+```
+
+Recording the graph revision means a task verified at one moment in time stays
+marked verified even if the node is later deleted and recreated. The task shows
+"verified at revision xyz789, node since removed" rather than silently
+un-verifying.
+
+### Four edge cases handled explicitly
+
+**Node already exists when the create link is written.** Warn: "app.models.Comment already exists — did you mean modify?" Do not create a link that fulfils instantly. The distinction between create and modify matters.
+
+**Two open tasks plan to create the same qname and kind.** Duplicate warning, not a dependency. This fires at planning time, before merge conflicts. One task is probably unnecessary, but the system shows both and lets a human decide.
+
+**Container doesn't exist either** (new class in a new file). Fine. Two pending creates, no ordering needed, both fulfil together when the file appears in the graph.
+
+**A node appears at the qname but with wrong kind.** Do not fulfil. Show as a mismatch — the plan or the implementation drifted. Offer a rebind.
+
+### Rebind suggestions for broken links
+
+A link breaks when its node is deleted or renamed. The system offers a one-click
+rebind when a new node appears with:
+- Similar leaf name (edit distance)
+- Same kind
+- Same container (same file/class)
+- Nothing else linking to it yet
+
+Example:
+
+```
+   Link broke:     modify function app.services.createComment
+   Suggestion:     modify function app.services.create_comment  (snake_case typo)
+   [ rebind to suggestion ]  [ manually choose another ]  [ remove link ]
+```
+
+Suggest, never bind silently. A wrong rebind silently changes what the task means.
+
+### Restrict which kinds are linkable
+
+`call` nodes churn constantly as function bodies change. Linking to calls is
+rarely meaningful. Restrict `create`, `modify`, and `delete` to:
+
+```
+   linkable:     folder, file, class, function
+   read only:    call
+   anchors:      all kinds via mode "about"
+```
+
+This prevents the long tail of broken links to deleted calls from cluttering
+the interface.
+
+### Ghost nodes on the canvas
+
+Render a pending create as a dashed node in its container's position on the
+canvas. It is the cheapest visual proof that the plan and the graph are the
+same object — you watch it turn solid when the code lands.
+
+```
+   file  app/models.py
+     ├── class  Post           ▮ solid
+     ├── class  User           ▮ solid
+     └── class  Comment        ▯ dashed (pending, VN-8 plans to create)
+```
+
 ### Two tasks that both plan to create the same node
 
 If two pending create links name the same thing, that is one of the strongest

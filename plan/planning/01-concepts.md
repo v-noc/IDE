@@ -4,16 +4,16 @@ This file defines every term the design uses. Each concept gets a definition, a
 statement of what it is deliberately **not**, an example, and where it makes a
 difference, the tradeoff involved in defining it that way.
 
-The list is short on purpose. There are three things you store, two
-relationships between them, and one pointer into the code graph. Everything
-else in the product is computed from those.
+The list is short on purpose. There is one kind of thing you store (Task), three
+stored edges between things, and that is all. Everything else in the product is
+computed from those.
 
 ```
-   THINGS YOU STORE                RELATIONSHIPS               POINTER
-   ────────────────                ─────────────               ───────
-   Task                            version → child tasks       task → graph node
-   Version                         task → task (depends_on)      with a mode
-   Conflict decision
+   THINGS YOU STORE                STORED EDGES
+   ────────────────                ──────────────
+   Task                            child ──parent_id──► task
+   Conflict decision               task  ──depends_on──► task
+                                   task  ──node_link──► graph node (with mode)
 ```
 
 ---
@@ -58,8 +58,8 @@ from.
   shows up as depth in the tree, and depth can change at any time.
 - *A different type when it is small.* There is no separate object for a small
   piece of work. A leaf task is a task.
-- *Owned by whoever created it.* A task can be referred to as a child by more
-  than one parent version, and it survives when any of them changes.
+- *Owned by whoever created it.* A task carries its own status and history
+  independent of who is working on it.
 
 **Tradeoff.** Making every piece of work a full task means every piece of work
 carries fields it may not need, and a five-minute step ends up with a document
@@ -69,63 +69,27 @@ two sets of rules, and arguments about which type to use.
 
 ---
 
-## Version
+## Parent and position
 
-**A version is one answer to the question "how are we going to do this?"**
+**A task has exactly one parent, stored as `parent_id`. The parent field is null
+for top-level tasks. Siblings are ordered by `position` (lexorank).**
 
-A version holds the approach: the long document, the code the approach reads,
-the code the approach changes, and the ordered list of child tasks the approach
-needs. A task always has at least one version, and exactly one version is
-active at any moment.
-
-```
-   TASK  "Add comments"
-     ├── version 1  "Separate Comment class"     ★ ACTIVE
-     └── version 2  "Store comments in Post"     draft
-```
-
-While a task has only one version, the interface never says the word "version".
-The document, the context list, the affects list, and the children look like
-plain fields on the task. The concept only becomes visible when somebody
-deliberately creates an alternative.
-
-**A version is not:**
-
-- *An owner of its children.* This is the most important sentence in the file.
-  A version holds an ordered list of references to child tasks. The children
-  exist independently, and deleting or retiring a version never deletes them.
-- *A snapshot of the past.* Versions are not a history feature. Task history
-  lives in commits and in notes. A version is a live alternative that somebody
-  might activate.
-- *A copy of the task.* It does not duplicate the title, status, priority, or
-  dependencies. Those live on the task and are shared.
-- *Required to be more than one.* Most tasks have exactly one version forever,
-  and that is the normal case rather than a degenerate one.
-
-**Tradeoff.** Putting the document, links, and children on the version rather
-than directly on the task adds one hop of indirection to every read. In return,
-a person can write down two competing approaches side by side, compare them,
-choose one, and keep the rejected one as a record of what was considered. The
-indirection is hidden while a task has one version, which is almost always.
-
----
-
-## Child reference
-
-**A child reference is one entry in a version's ordered list, pointing at
-another task.**
-
-It is the only way one task becomes part of another. There is no separate
-parent field on the child. If you want to know who a task's parents are, you
-ask which versions refer to it, which the system indexes.
+This creates a tree: every task knows who its parent is, and children of a task
+are found by querying "which tasks have `parent_id = this task's id?", ordered
+by their `position` values.
 
 ```
-   VERSION 1 of VN-3 "Add comments"
-     position 1  ──►  VN-8   Comment model
-     position 2  ──►  VN-9   Comment write path
-     position 3  ──►  VN-10  Comment read path
-     position 4  ──►  VN-11  Comment moderation
-     position 5  ──►  VN-12  Show comments on the post page
+   TASK  VN-3  "Add comments"
+     parent_id = null            (top-level)
+     position = "1"
+     
+     TASK  VN-8  "Comment model"
+       parent_id = VN-3          (child of VN-3)
+       position = "1.1"
+       
+     TASK  VN-9  "Comment write path"
+       parent_id = VN-3          (child of VN-3)
+       position = "1.2"
 ```
 
 The order is real information. It is the author's advice about a sensible
@@ -134,19 +98,17 @@ The order is **not** a constraint, and it never blocks anything. Two children
 that need nothing from each other can be worked on at the same time, and
 readiness is worked out from real dependencies rather than from position.
 
-**A child reference is not:**
+**Parent is not:**
 
-- *Exclusive.* The same task can be referenced by two versions of the same
-  parent, and by versions of different parents. That is how work shared between
-  two approaches, or genuinely shared between two areas, is represented.
-- *A dependency.* Being second in the list does not mean waiting for the first.
-- *A copy.* Removing a reference removes the reference, not the task.
+- *Shared.* A task has exactly one parent. If two pieces of work need to share a
+  step, one depends on the other.
+- *Implicit from order.* The parent field stores the edge explicitly. Position
+  is advice about sequence, not a dependency.
 
-**Tradeoff.** Because parenthood is a reference rather than a field on the
-child, a task can end up with two parents, and the tree is really a directed
-graph. That is more honest, since shared work genuinely exists, but it means
-the interface must show when a task has more than one parent, and progress
-counting has to avoid counting the same task twice.
+**Tradeoff.** Single parent makes the tree structure simple and unambiguous. If
+work is genuinely shared between two approaches, it should be stored under one
+parent and the other side should depend on it. This is more honest about what
+the relationship actually means.
 
 ---
 
@@ -173,8 +135,7 @@ with its last known name rather than turning into a broken reference.
 
 - *A statement that the task will change that code.* That is what affected
   nodes are for.
-- *Part of a version.* Anchors sit on the task, because where the work lives
-  does not change when the approach changes.
+- *Part of a version.* There are no versions. Anchors sit on the task.
 - *A hard database link.* The parser rewrites the graph constantly. A hard link
   would either block the parser or break.
 
@@ -182,7 +143,7 @@ with its last known name rather than turning into a broken reference.
 
 ## Node link, and the five modes
 
-**A node link is a pointer from a version to a graph node, carrying a mode that
+**A node link is a pointer from a task to a graph node, carrying a mode that
 says what the work does to that node.**
 
 This is one mechanism that produces two lists on screen.
@@ -196,8 +157,7 @@ This is one mechanism that produces two lists on screen.
 | `delete` | This node exists and this work will remove it. | **Affects** | yes |
 
 ```
-   VERSION 1 of VN-9 "Comment write path"
-
+   TASK VN-9 "Comment write path"
      CONTEXT                         AFFECTS
      ───────                         ───────
      read  ──► class Post            create ──► function createComment()
@@ -276,16 +236,16 @@ The list of them is short and each one is defined precisely in later files.
 | blocked | A task this one depends on is not finished |
 | waiting on code | A `read` or `modify` link points at a node that does not exist yet |
 | ready | Not blocked and not waiting |
-| progress | How many children of the active version are finished |
+| progress | How many children are finished |
 | verified | Every `create` link now points at a node that really exists |
-| orphaned | No active version of any task refers to this one |
-| shared | More than one active version refers to this one |
+| depth | Distance from the root |
+| breadcrumb | Path from the root to this task |
 | contested | Two pieces of open work have write modes on the same node |
 
 The reason none of these are stored is that all of them can change without
 anybody touching the task. A reparse deletes a node, somebody else finishes
-their work, a version is activated elsewhere. A stored flag would be wrong
-within minutes and nobody would know which stored flags were stale.
+their work, a parent or child is moved. A stored flag would be wrong within
+minutes and nobody would know which stored flags were stale.
 
 **Tradeoff.** Deriving means computing, and computing costs time on every read.
 The design accepts that and pays for it with batching and caching, described in
@@ -305,8 +265,8 @@ people involved have talked about it. So the only thing stored is the decision.
 
 ```
    COMPUTED   function createComment() ← modify by VN-11 and by VN-30
-   STORED     "VN-11 and VN-30 on createComment(): accepted by Yared,
-               reason: VN-30 lands first and VN-11 rebases"
+   STORED     "VN-11 and VN-30 on createComment(): ordered by Yared,
+               reason: VN-11 waits for VN-30"
 ```
 
 **A conflict decision is not:**
@@ -327,14 +287,14 @@ is the idea of a **level**. The board has a current task whose children it is
 showing, starting at the root, and a breadcrumb for moving up and down.
 
 ```
-   ▸ root                      showing every task with no parent
-   ▸ root ▸ Comments           showing the children of the active version of VN-3
+   ▸ root                      showing every task with parent_id = null
+   ▸ root ▸ Comments           showing the children of VN-3
    ▸ root ▸ Comments ▸ Model   showing the children of VN-8
 ```
 
 **Status** stays exactly what it is today, which is the id of a board column.
-It lives on the task, not on the version, because moving a card between columns
-is a statement about the work and not about the approach.
+It lives on the task, because moving a card between columns is a statement about
+the work.
 
 **The board is not:**
 
@@ -346,20 +306,29 @@ is a statement about the work and not about the approach.
 
 ---
 
-## Note
+## Event
 
-**A note is one entry in a task's activity list, written either by a person or
-by the system.**
+**An event is a typed history entry, recording something that happened to the
+task.**
 
-This already exists and does not change. System notes are short factual
-sentences appended when something happens, such as a status change, an anchor
-being added, or a version being activated. User notes are whatever somebody
-types. Both live in the same list so the history reads in one sequence.
+Events replace prose notes. They are machine-readable and can be rendered into
+English at display time. System events are written automatically (status
+changed, link added, dependency added), and user events are typed by people
+(comments, notes).
 
-Notes are the reason the system can afford to derive so much. When a version is
-activated or a dependency is added, the fact that it happened is recorded as a
-sentence, even though the current state is computed. You keep the story without
-storing the state twice.
+```
+   { type: "status_changed", payload: {from: "todo", to: "doing"}, … }
+   { type: "link_added", payload: {mode: "create", qname: "app.services.createComment"}, … }
+   { type: "comment", payload: {text: "This is going to be tricky"}, … }
+```
+
+**An event is not:**
+
+- *A permanent record that something was true.* Events record decisions and
+  changes, not conclusions. `blocked` is derived from `depends_on`, not from a
+  `blocked` event.
+- *A journal.* The event list tells a story of changes and decisions, not a
+  second-by-second log.
 
 ---
 
@@ -368,14 +337,15 @@ storing the state twice.
 | Concept | Stored? | Lives on | Can it disappear without warning? |
 |---|---|---|---|
 | Task | yes | itself | only if a person deletes it |
-| Version | yes | a task | only if a person deletes it |
-| Child reference | yes | a version | when the version is edited |
+| Parent (parent_id) | yes | the child task | only if a person deletes or reparents it |
+| Position | yes | the task | when the child list order changes |
 | Anchor | yes | a task | its target node can, leaving a warning |
-| Node link | yes | a version | its target node can, leaving a warning |
+| Node link | yes | a task | its target node can, leaving a warning |
 | Dependency | yes | a task | only if a person deletes it |
+| Event | yes | a task | only if a person deletes the whole task |
 | Conflict decision | yes | its own record | no |
-| Blocked, ready, progress, contested, and the rest | **no** | computed | they change constantly, which is why they are not stored |
+| Blocked, ready, progress, contested, depth, breadcrumb, and the rest | **no** | computed | they change constantly, which is why they are not stored |
 
 The next file, [02 — Relationships](02-relationships.md), works through the
-candidate relationship types one at a time and explains why only two of them
+candidate relationship types one at a time and explains why only three of them
 survive as stored edges.

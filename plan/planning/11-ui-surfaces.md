@@ -164,54 +164,7 @@ become links.
 
 ---
 
-## 4. Versions in the interface
-
-While a task has one version, the word never appears. The document, the lists,
-and the children are simply the task's.
-
-The moment a second version exists, a switcher appears in the panel header:
-
-```
-  ┌────────────────────────────────────────────────────────────────┐
-  │ VN-11  Comment moderation                              ✕       │
-  │ ▸ root ▸ Add comments ▸ VN-11                                  │
-  │ ⑂ v1 Keyword filter ★active   |   v2 Manual review queue       │
-  │                                        [compare]  [new version]│
-```
-
-Reading a version that is not active changes everything below the header, and
-the panel says so plainly with a band across the top:
-
-```
-  │ ⚠ you are reading v2, which is a draft. It is not the plan.     │
-```
-
-Without that band, somebody edits a draft believing it is the plan, and the
-model's cheapest feature becomes its most dangerous one.
-
-### Comparison
-
-```
-  ┌──────────────────────────┬──────────────────────────────────────┐
-  │ v1  Separate Comment class│ v2  Comments inside Post             │
-  ├──────────────────────────┼──────────────────────────────────────┤
-  │ creates  class Comment    │ creates  —                           │
-  │          fn createComment │                                      │
-  │ modifies fn renderPost    │ modifies class Post ⚑ 2 tasks read it│
-  │ children 5                │ children 2                           │
-  │          VN-12 shared ────┼──────── VN-12 shared                 │
-  └──────────────────────────┴──────────────────────────────────────┘
-                        [ activate v2 ]
-```
-
-The link rows are what decide arguments, because they show real consequences.
-Here, one approach adds new code while the other rewrites a class that two
-other tasks are already reading, and that fact appears without anybody
-analysing anything.
-
----
-
-## 5. On the canvas
+## 4. On the canvas
 
 The graph is where this product is different, so work has to be visible there.
 
@@ -257,7 +210,7 @@ work before doing it.
 
 ---
 
-## 6. The sidebar
+## 5. The sidebar
 
 Two additions to what exists.
 
@@ -283,7 +236,7 @@ that a situation was handled rather than wondering whether it was noticed.
 
 ---
 
-## 7. Creating work from the graph
+## 6. Creating work from the graph
 
 The cheapest way to get good links is to create tasks from the place the work
 is about.
@@ -301,7 +254,7 @@ and produces the data every derived feature depends on.
 
 ---
 
-## 8. Rules the interface must follow
+## 7. Rules the interface must follow
 
 These are the ones that prevent the model from becoming confusing.
 

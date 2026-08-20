@@ -38,40 +38,44 @@ the reason to build this rather than copying a todo list.
 
 ## The single most important decision
 
-Everything in this folder follows from one decision: **there is only one kind
-of work object, and it is called a Task. Tasks contain tasks.**
+Everything in this folder follows from one decision: **a task has exactly one
+parent. No shared children, no task appearing in two places at once.**
 
-A task is recursive. A task can hold a list of child tasks, each of those
-children can hold its own children, and there is no separate type for a small
-piece of work. A task can also hold more than one **version** of its approach,
-where a version is one answer to the question "how are we going to do this?".
-Exactly one version is active at a time, and a version does not own its
-children. It only refers to them, in a deliberate order.
+This simplifies everything. Because a task can only exist in one place in the
+tree, you can delete a parent and know exactly what disappears — the whole
+subtree below it. You can move a task by changing one field on the child. When
+two pieces of work would share a step, one of them now depends on the other
+instead, which is honest: dependencies are the right tool for shared work.
 
-That last point carries most of the weight of the design. Because children are
-real tasks that exist in their own right, you can rewrite the approach, replace
-it with a different one, or abandon it completely, and no work is lost, no card
-disappears from the board, and nothing needs a rescue rule.
+A task owns its document and its link plan directly. There is no separate
+version object, no choice of "active" approach, and no rewriting to recover
+lost work. The model is simpler to understand, simpler to store, and because
+child ordering is explicit and deterministic, there is no orphan concept at all.
 
 ```
-   TASK ───────────────────────────────────────────────────────────┐
-     │                                                              │
-     │  identity and intent, shared by every approach:              │
-     │     key · title · description · type · status · priority     │
-     │     labels · anchors · depends_on · notes                    │
-     │                                                              │
-     │  the approach itself, held by the active version:            │
-     │     document · context nodes · affected nodes                │
-     │     ordered list of CHILD TASKS                              │
-     │                                                              │
-     └── and every child in that list is ... a TASK ◄───────────────┘
+   TASK ───────────────────────────────────
+     │
+     │  identity and intent:
+     │     key · title · description · type
+     │     status · priority · labels
+     │     parent_id (null = root level)
+     │     position (order among siblings)
+     │
+     │  the approach and its trace:
+     │     document · node_links[] · anchors[]
+     │     depends_on[] (dependencies)
+     │
+     │  ordered list of CHILD TASKS via:
+     │     parent_id = this.id + order by position
+     │
+     └── and every child is ... a TASK
 ```
 
 The word *subtask* still exists, but only as a way of speaking. A subtask is
-simply a task that another task's active version refers to. It is a position in
-the tree, not a different kind of thing, so a subtask has every capability a
-task has: its own description, its own document, its own children, its own
-versions, and its own place on the board.
+simply a task whose `parent_id` points to another task. It is a position in the
+tree, not a different kind of thing, so a subtask has every capability a task
+has: its own description, its own document, its own children, and its own place
+on the board.
 
 ## What a task carries
 

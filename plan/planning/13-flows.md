@@ -170,70 +170,78 @@ Nothing binds automatically unless the name and kind match exactly.
 
 ---
 
-## Flow 6 — Change your mind about the approach
+## Flow 6 — Restructure the tree when the breakdown was wrong
 
-Halfway through, storing comments inside the post document starts looking
-better than a separate class.
+Halfway through executing VN-3, it becomes clear that the original breakdown
+does not match the real constraints. VN-8 and VN-9 can be parallelized, and
+VN-11 belongs in a different order.
 
 ```
-   1. Open VN-3 → [ new version ] → start fresh, or fork v1.
+   1. On the board for VN-3, drag VN-11 before VN-9 to reorder them.
+      
+      The position field updates. Everything that depends on order (readiness
+      suggestions) recomputes immediately.
 
-   2. Write v2: its own document, its own links, its own children.
-      Reuse what still applies:  add VN-12 "Show comments on the post page"
-      to v2 as well. It is the same task, referenced twice.
+   2. Realise VN-8 and VN-9 should both be children of a new grouping task
+      VN-25 "Comment data model".
+      
+      Create VN-25, then reparent VN-8 and VN-9 by dragging them under it.
 
-   3. Compare v1 and v2 side by side. The link rows show the real difference:
-      v1 adds a class; v2 rewrites class Post, which two other tasks read.
-
-   4. Activate v2.
+   3. Update VN-3's document to reflect the new structure. The approach is
+      recorded as it now exists.
 ```
 
 What the system does:
 
 ```
-   points VN-3 at v2
-   marks v1 superseded, with a timestamp
-   writes a note naming both versions
-
-   and then, computed rather than performed:
-     the board level for VN-3 now lists v2's children
-     VN-8 and VN-9, referenced only by v1, are marked orphaned
-     VN-12, referenced by both, is untouched and keeps its status
-     v1's links stop counting for conflicts; v2's start
-     a new contested marker appears on class Post
+   on drag, updates parent_id or position
+   writes an event on the moved task: "parent_changed" or "reordered"
+   recomputes ready, blocked, progress, rollup on the entire tree
+   no task is deleted, no work is lost
 ```
 
-Nothing was deleted, and no work was lost. VN-8 was already done, and it stays
-done, with a chip explaining that it is not part of any active plan. That chip
-is useful information: it says there is a `Comment` class in the codebase that
-the current approach does not use.
+Everything stays as it was. The structure changes to match reality as people
+learn more. The document is the place to record why the structure is what it is.
 
 ---
 
-## Flow 7 — A task turns out to be too big
+## Flow 7 — Break down a task that turns out to be too big
 
-VN-11 "Comment moderation" was one line in a plan. Now somebody looks properly
-and there is a real decision inside it.
+VN-11 "Comment moderation" was supposed to be one piece, but partway through,
+it becomes clear there are two genuinely different ways to do it.
 
 ```
    1. Open VN-11. It has no children yet.
 
-   2. Realise there are two genuinely different ways to do it.
-      Create two versions:
-         v1  "Keyword filter"        ← simple, ships this week
-         v2  "Manual review queue"   ← better, needs an admin page
+   2. Realise there are two genuinely different approaches:
+      "Keyword filter" (simple, ships fast)
+      "Manual review queue" (better, needs admin page)
 
-   3. Write both documents. Activate v1.
+   3. Update VN-11's document to describe both approaches and the tradeoff.
+      Explain why keyword filter ships first.
 
-   4. Give v1 children, in order:
-         1  Detect banned words
-         2  Hide a comment from the post page
+   4. Create two children:
+         VN-26  Detect banned words          ← part of keyword filter
+         VN-27  Hide a comment from the page ← shared by both approaches
+      
+      VN-27 is already done under the keyword filter.
+
+   5. Assign them to people. VN-26 is ready to start. VN-27 is blocked
+      until someone finishes the reading work.
 ```
 
-Nothing was converted into anything. VN-11 was always a task, and giving it
-versions and children is the same operation it would be at any other level. The
-board level inside VN-3 now shows VN-11 with a `⑂ 2 versions` marker and a
-`▸ 2 inside` marker.
+What happens:
+
+```
+   parent_id on VN-26 and VN-27 points to VN-11
+   the board level inside VN-3 now shows VN-11 with "▸ 2 inside" marker
+   progress recomputes: VN-11 now shows 1/2 children done
+   ready/blocked recomputes: VN-27 knows what it needs from the graph
+```
+
+VN-11 was always a task. Adding children to it is the same operation it would
+be at any level. The document holds the thinking about why it breaks down
+this way and what the tradeoff is.
 
 ---
 

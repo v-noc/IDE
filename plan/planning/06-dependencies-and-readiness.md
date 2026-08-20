@@ -44,33 +44,50 @@ truth. Sometimes it is. The point is that the model does not force it.
 
 ---
 
-## 2. The two guards
+## 2. The three guards (asymmetric)
 
-### Guard 1 — no dependency between a task and its own ancestor or descendant
+The guards prevent deadlocks and redundant edges. They are asymmetric: the
+system treats ancestor and descendant relationships differently.
+
+### Guard 1 — no dependency on an ancestor (deadlock prevention)
 
 ```
    REFUSED                                 WHY
    ───────                                 ───
-   VN-3   ──contains──►    VN-11           VN-3 is not finished until VN-11 is
+   VN-3   is parent of  VN-11              VN-3 is not finished until VN-11 is
    VN-11  ──depends_on──►  VN-3            VN-11 cannot start until VN-3 is
 
-                                           Neither one can ever finish.
+                                           Deadlock. Neither can ever finish.
 ```
 
-Containment already says "this is part of that". Putting a dependency on top of
-it produces a deadlock that no amount of careful status management can escape.
+Containment already says "VN-11 is part of VN-3" (VN-3 waits for VN-11). Adding
+a dependency that says "VN-11 waits for VN-3" creates an impossible situation.
 
 The refusal explains itself in the interface, and names the alternative:
 
 > *VN-11 is part of VN-3, so it cannot depend on it. If VN-11 has to wait for
-> something specific inside VN-3, point the dependency at that task instead.*
+> something specific inside VN-3, that means you do not understand the scope yet.
+> Widen VN-3's scope or split VN-11 into work that can proceed independently.*
 
-That sentence is doing real teaching work. It moves people from vague
-containment thinking to the precise edge they actually meant.
+### Guard 2 — dependency on a descendant is redundant (silently dropped)
 
-### Guard 2 — no cycles
+```
+   ALLOWED BUT DROPPED                    WHY
+   ───────────────────                    ───
+   VN-11  is child of  VN-3               VN-3 is not finished until VN-11 is
+   VN-3   ──depends_on──►  VN-11          (already true from containment)
 
-The existing system already checks this and the check does not change. A
+                                          Redundant. System drops it and writes
+                                          an event noting the redundancy.
+```
+
+Containment already orders the work: VN-3 contains VN-11, so VN-3 waits for
+VN-11 anyway. Adding an explicit dependency is noise, not a deadlock. The system
+silently discards it and records the action in an event.
+
+### Guard 3 — no dependency cycles
+
+The system checks this independently of the ancestor/descendant guards. A
 dependency that would create a loop is refused with the path that would have
 formed, so the person can see which existing edge to remove.
 
@@ -82,19 +99,19 @@ formed, so the person can see which existing edge to remove.
 
 ## 3. Position in a list never blocks anything
 
-A version's children are written in a deliberate order, and that order is
-useful. It is the author's advice about a sensible sequence, and it is what a
-person or an agent reads to decide where to begin.
+A task's children are stored in a deliberate order, and that order is useful.
+It is the author's advice about a sensible sequence, and it is what a person or
+an agent reads to decide where to begin.
 
 It is **not** a constraint, and the system never treats it as one.
 
 ```
-   VERSION 1 of VN-3  Add comments
-     1. VN-8   Comment model
-     2. VN-9   Comment write path
-     3. VN-10  Comment read path
-     4. VN-11  Comment moderation
-     5. VN-12  Show comments on the post page
+   TASK VN-3  Add comments
+     position 1. VN-8   Comment model
+     position 2. VN-9   Comment write path
+     position 3. VN-10  Comment read path
+     position 4. VN-11  Comment moderation
+     position 5. VN-12  Show comments on the post page
 ```
 
 Reading that list, positions 2 and 3 look sequential. They are not. The write
@@ -102,13 +119,9 @@ path and the read path both need the model from position 1, and neither needs
 anything from the other, so once position 1 is done both can be worked on at
 the same time by two different people.
 
-If the numbering created blocking, the system would invent a constraint that
-nobody stated, and the only way to express real parallel work would be to give
-several children the same position, which is a worse way of saying nothing.
-
 > **Two pieces of work are parallel exactly when neither needs anything the
 > other produces. That is a fact about the work, and the system reads it from
-> dependencies and from link states rather than from the numbering.**
+> dependencies and from link states rather than from position.**
 
 ---
 

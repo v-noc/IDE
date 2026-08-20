@@ -146,89 +146,7 @@ task can ever point at a node kind that does not exist.
 
 ---
 
-## 4. Why a task can have more than one version
-
-Sometimes there is more than one sensible way to do something, and the choice
-between them is the most valuable thinking in the whole task. That thinking
-needs somewhere to live, and it needs to survive after the choice is made, so
-that six months later somebody can see not only what was built but what was
-considered and rejected.
-
-A **version** is one answer to the question "how are we going to do this?".
-
-```
-   TASK  "Add comments"
-     │
-     ├── version 1   "Separate Comment class"          ★ ACTIVE
-     │      document   the long write-up of this approach
-     │      context    class Post · class User
-     │      affects    create class Comment
-     │                 create function createComment()
-     │      children   1 ─► TASK "Comment model"
-     │                 2 ─► TASK "Comment write path"
-     │                 3 ─► TASK "Comment read path"
-     │                 4 ─► TASK "Comment moderation"
-     │                 5 ─► TASK "Show comments on the post page"
-     │
-     └── version 2   "Store comments inside the Post document"   draft
-            document   a different write-up, with its own reasoning
-            affects    modify class Post
-            children   1 ─► TASK "Add a comments list to Post"
-                       2 ─► TASK "Show comments on the post page"   ◄─ same task
-```
-
-Two things about that picture matter more than anything else in this document.
-
-**A version refers to its children. It does not own them.** The tasks in the
-list exist in their own right. They have their own identity, their own status,
-their own history, and their own place on the board. A version is a curated,
-ordered list of pointers to them.
-
-**The same child can appear in more than one version.** "Show comments on the
-post page" is needed either way, so both versions point at the same task. If it
-was already finished under version 1, it is still finished under version 2,
-automatically, because it is the same task and nothing was copied.
-
-Together these two facts mean that switching approach is a cheap, safe, and
-ordinary thing to do. Activate version 2 and nothing is deleted. "Comment
-moderation" is still a task with whatever status it had, it simply is not
-referred to by the active version any more, which the interface can show as a
-quiet note on the card rather than as a disappearance.
-
-### Only some fields belong to a version
-
-A version exists to describe an approach, so only the fields that genuinely
-differ between two approaches belong to it. Everything that describes what the
-work *is*, rather than how it will be done, belongs to the task and is shared
-by every version.
-
-| Field | Belongs to | Reason |
-|---|---|---|
-| key, title, description | Task | "Add comments" is the same promise whichever approach wins |
-| type, priority, labels, status | Task | The board's view of the work does not change because the method changed |
-| anchors | Task | Roughly where the work lives is stable across approaches |
-| depends_on | Task | Whether authentication must land first is a fact about the promise |
-| **document** | Version | The write-up of the approach is the approach |
-| **context nodes** | Version | Different approaches read different code |
-| **affected nodes** | Version | Different approaches change different code |
-| **ordered children** | Version | Different approaches have different steps |
-
-In everyday use you never think about versions, because **every task is created
-with exactly one version and that version is active**. While there is only one,
-the interface shows the document, the context list, the affects list, and the
-children as if they were plain fields on the task, and the word "version" is
-not shown anywhere. A second version appears only when somebody deliberately
-asks for an alternative, which is rare and always intentional.
-
-The tradeoff is worth naming plainly. The cost is one extra layer of
-indirection in the data model, and the cost of explaining that layer to
-somebody who eventually meets it. The benefit is that alternatives, revisions,
-and abandoned approaches are all supported by the same mechanism, with no
-second entity type and no rules for rescuing orphaned work.
-
----
-
-## 5. The board shows one level at a time
+## 4. The board shows one level at a time
 
 A recursive tree could easily produce a board with two hundred cards on it,
 which would be useless. The board avoids that by behaving like a file explorer:
@@ -327,8 +245,8 @@ Containment already describes that relationship. Adding a dependency on top of
 it creates a deadlock in which the parent waits for the child while the child
 waits for the parent, so the system refuses the edge and explains why.
 
-**Position in a list never blocks anything.** A version's children are written
-in a sensible reading order, and that order is genuine advice about where to
+**Position in a list never blocks anything.** A task's children are ordered in
+a sensible reading order, and that order is genuine advice about where to
 start. It is not a constraint. Two children that need nothing from each other
 can be worked on at the same time, and the system works that out from the
 actual dependencies rather than from the numbering.
@@ -367,10 +285,10 @@ up with the record of what the code actually says.
 
 ---
 
-## 9. What this shape costs
+## 8. What this shape costs
 
-It would be dishonest to present the recursive model as free. Three costs come
-with it, and none of them can be removed completely. They can only be managed.
+It would be dishonest to present the recursive model as free. Two costs come
+with it, and neither can be removed completely. They can only be managed.
 
 **Counting becomes ambiguous.** In a flat system, "eleven open tasks" means one
 thing. In a tree, eleven could be the roots, or the leaves, or everything. Every
@@ -380,21 +298,15 @@ currently visible, but the ambiguity never disappears entirely.
 
 **Nothing structurally prevents a badly shaped tree.** There is no floor. A
 person can keep breaking work down until every line of code has a card. Section
-6 is the defence, and it is guidance rather than enforcement, which means the
+5 is the defence, and it is guidance rather than enforcement, which means the
 interface has to keep nudging rather than blocking.
 
-**Versions can appear at any depth.** A task three levels down can have two
-versions of its own. That is powerful, and it is confusing if the interface
-does not constantly show which version of which task you are looking at. The
-breadcrumb has to carry that information, and the design in
-[11 — UI surfaces](11-ui-surfaces.md) treats it as a requirement rather than a
-nicety.
-
-Against those costs, one entity type means one set of rules to learn, one place
-where dependencies live, one shape of query, one board, and one detail panel.
-Work can grow or shrink without being converted into something else, and
-changing your mind about an approach never destroys anything. That is the trade
-this design makes deliberately.
+Against those costs, one entity type with a single parent means one set of rules
+to learn, one place where dependencies live, one simple tree structure, and one
+shape of query. Work can grow or shrink without being converted into something
+else. Changing your mind about the approach does not require choosing between
+versions; it means moving tasks around and updating the plan in the document.
+That is the trade this design makes deliberately.
 
 ---
 

@@ -46,33 +46,37 @@ rather than a decision that has to be made now.
 
 ---
 
-## 2. Three indexes
+## 2. Two stored indexes, three logical lookups
 
-Almost every derived value in this design comes from one of three lookups. Each
-one is a straightforward index; the design just has to say clearly which
-direction each is stored in and which direction is computed.
+Almost every derived value in this design comes from one of three lookups. They
+are stored efficiently in two places: child tasks carry parent pointers, and
+parent tasks carry link and dependency lists.
 
 ```
-   ① CONTAINMENT INDEX
-      stored     version ──► ordered child task references
-      computed   task ──► its parents
+   ① CONTAINMENT (stored as parent_id on the child)
+      stored     child ──parent_id──► task
+      computed   task ──► its parents (at most one)
                  task ──► its depth and breadcrumb
-                 task ──► shared or orphaned
+                 task ──► its children (reverse of parent_id)
 
-   ② LINK INDEX
-      stored     version ──► node links, each with a mode
+   ② LINKS AND DEPENDENCIES (stored on the task)
+      stored     task ──► node_links[], each with a mode
+                 task ──► depends_on[]
+
       computed   node ──► every task that links to it, with modes
                  task ──► effective links, including descendants
-
-   ③ DEPENDENCY INDEX
-      stored     task ──► depends_on
-      computed   task ──► what it blocks
-                 task ──► blocked or ready
+                 task ──► what it blocks (reverse of depends_on)
+                 task ──► blocked or ready (from depends_on + links)
 ```
 
-The pattern is the same in all three: **store one direction, compute the
-other.** Storing both directions would mean two copies of one fact, and two
-copies eventually disagree.
+The pattern is the same: **store one direction, compute the other.** Storing
+both directions would mean two copies of one fact, and two copies eventually
+disagree.
+
+Containment is now simpler than before: a task has exactly one parent, so there
+is no deduplication needed when rolling up links or progress. A child task
+queries its parent by its own parent_id field, and a parent queries its
+children by scanning for tasks with its id in their parent_id.
 
 The link index is the one that carries the product's most distinctive feature,
 because it is what answers "who is about to touch this node" from anywhere in
@@ -91,7 +95,8 @@ When somebody opens a board level, the server does roughly this:
 
 ```
    1. Read the level's tasks
-      the children of the current task's active version, or the roots.
+      the children of the current task (where parent_id = current_id), or tasks
+      where parent_id is null for the root level.
 
    2. Collect every id that will be needed
       child task ids, dependency target ids, node ids from links.
@@ -103,7 +108,7 @@ When somebody opens a board level, the server does roughly this:
 
    4. Compute everything in memory, in one pass
       blocked · waiting · ready · progress · rollups · contested ·
-      orphaned · shared · verified
+      verified
 
    5. Return one payload
 ```
@@ -133,9 +138,8 @@ one of them, and nothing recomputes anything for itself.
               the contested nodes list
 
    TASK DETAIL
-     one task, fully expanded: active version, document, links with their
-     states, children with their conditions, dependencies both ways,
-     conflicts, notes
+     one task, fully expanded: document, links with their states, children
+     with their conditions, dependencies both ways, conflicts, events
      read by: the detail panel
 ```
 

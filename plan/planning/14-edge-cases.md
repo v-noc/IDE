@@ -25,66 +25,78 @@ task. Small work stays small.
 
 ---
 
-## 2. A task has several versions
+## 2. A task tries to depend on its own ancestor
 
-**What happens.** One is active. The others are drafts, superseded, or
-discarded. The interface shows a switcher, and any non-active version is read
-behind a warning band saying it is not the plan.
+VN-11 "Comment moderation" is a child of VN-3 "Add comments". Somebody writes
+a dependency saying VN-3 depends on VN-11.
 
-**Verdict: good**, with one interface requirement that cannot be skipped. If
-the band is missing, somebody will edit a draft believing it is the plan. That
-is why [11](11-ui-surfaces.md) treats it as a rule rather than a nicety.
-
----
-
-## 3. A version is abandoned
-
-**What happens.** A draft that is dropped becomes `discarded`. A version that
-was active and got replaced becomes `superseded`. Neither is deleted.
-
-The distinction matters because a superseded version has code in the repository
-that came from it, and a discarded one does not. Somebody reading the history
-needs to tell those apart.
-
-**Verdict: good.** Keeping rejected ideas is one of the most valuable things a
-planning tool can do, and it costs almost nothing.
-
----
-
-## 4. The active version changes
-
-**What happens.** The task's pointer moves, the old version is marked
-superseded, and a note is written. Nothing else is performed. Everything else
-is computed afterwards: the board level lists different children, orphans
-appear, conflicts recompute.
-
-**Verdict: good, and this is the case the whole model was shaped around.**
-Because a version refers to children rather than owning them, changing your
-mind is a pointer move rather than a migration.
-
----
-
-## 5. A child was finished, and then the version changed
-
-VN-8 "Comment model" is done. The new approach does not use it.
-
-**What happens.** Nothing to VN-8. It stays done, with its history. It gains a
-grey chip saying it is not part of any active plan, and the panel can say
-something more useful than that:
+**What happens.** The system refuses with a sentence explaining the issue and
+the solution:
 
 ```
-   ⌫ VN-8 is not part of any active plan
-     it created:  class app.models.Comment   ← still in the codebase
-     nothing in any active plan mentions this class
+   VN-3 cannot depend on VN-11, because VN-11 is a child of VN-3.
+   Containment already says VN-3 waits for VN-11.
+   
+   If VN-11 must wait for something, add a dependency on that thing instead.
 ```
 
-**Verdict: good, and better than expected.** Because finished work names the
-nodes it created, abandoning an approach surfaces the code left behind. An
-ordinary board would simply lose track of it.
+**Verdict: good.** The guard prevents a deadlock. The sentence teaches the
+right model.
 
 ---
 
-## 6. A child affects a node that another task is modifying
+## 3. A task depends on its own descendant
+
+VN-3 is a parent of VN-11, and VN-11 is a parent of VN-20. Somebody writes a
+dependency saying VN-3 depends on VN-20.
+
+**What happens.** The system drops the edge silently and writes an event:
+
+```
+{ type: "dependency_removed",
+  payload: { reason: "redundant: target is a descendant" },
+  at: ..., author: ... }
+```
+
+Containment already expresses this relationship (VN-3 waits for everything
+under it). The edge is noise.
+
+**Verdict: good.** The system does not block the user, but it does clean up
+redundant edges automatically.
+
+---
+
+## 4. Cascade delete removes a subtree
+
+A parent VN-3 "Add comments" is deleted. It has children VN-8, VN-9, VN-11,
+and VN-11 has its own children VN-20, VN-21.
+
+**What happens.** Soft delete: all seven tasks (VN-3, VN-8, VN-9, VN-11,
+VN-20, VN-21, and any descendants of those) get `deleted_at` set to now, all
+with the same `deleted_batch_id`.
+
+Before confirming, the system warns about dependencies:
+
+```
+Deleting VN-3 removes 7 tasks.
+2 tasks outside this subtree depend on tasks inside it:
+   VN-14  ──depends_on──►  VN-11
+   VN-16  ──depends_on──►  VN-8
+These tasks will no longer be blocked.
+```
+
+The user can:
+- Confirm the delete (inbound edges are removed)
+- Cancel and reconsider
+
+To undo, a single restore by `deleted_batch_id` brings back the whole subtree.
+
+**Verdict: good.** Atomic soft delete with undo is far safer than orphaning
+work.
+
+---
+
+## 5. A child affects a node that another task is modifying
 
 **What happens.** Both tasks link the node with a write mode, so the pair is
 contested. Both cards show it, the node shows it, and four resolutions are
@@ -94,7 +106,7 @@ offered, one of which creates a real dependency.
 
 ---
 
-## 7. Two tasks modify the same node, and both are already in progress
+## 6. Two tasks modify the same node, and both are already in progress
 
 **What happens.** Same as above, except neither can simply wait. The likely
 resolution is `accepted` with a reason, or `resolved` by narrowing one scope.
@@ -106,7 +118,7 @@ time.
 
 ---
 
-## 8. A task is blocked by another task
+## 7. A task is blocked by another task
 
 **What happens.** One stored edge, computed blocking, chips on both sides with
 breadcrumbs, and rollup to the parent so nothing hides in the tree.
