@@ -353,6 +353,5 @@ changed, link added, dependency added), and user events are typed by people
 | Conflict decision | yes | its own record | no |
 | Blocked, ready, progress, contested, depth, breadcrumb, and the rest | **no** | computed | they change constantly, which is why they are not stored |
 
-The next file, [02 — Relationships](02-relationships.md), works through the
-candidate relationship types one at a time and explains why only three of them
-survive as stored edges.
+The next file, [02 — Relationships](02-relationships.md), defines the three
+stored relationships in full and shows what the system derives from them.

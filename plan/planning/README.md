@@ -207,8 +207,9 @@ plan/planning/
 │      Dependency, and Event, including what each one is NOT.
 │
 ├── 02-relationships.md
-│      The relationship catalog. Nine candidate relationship types were on the
-│      table. Three survive as stored edges. This file explains each cut.
+│      The relationship catalog. Three stored edges — parent, depends_on, and
+│      node links with a mode — what each derives, and the gate a fourth
+│      would have to pass.
 │
 ├── 03-data-model.md
 │      Every field of every entity in tables, split clearly into what is
@@ -219,7 +220,7 @@ plan/planning/
 │      word "done" means at each level.
 │
 ├── 05-graph-links.md
-│      How work points at code: the five link modes, links that point at code
+│      How work points at code: the four link modes, links that point at code
 │      which does not exist yet, binding and rebinding, verification stamped
 │      with a graph revision, link rollup, and the two lookup directions.
 │
@@ -280,8 +281,8 @@ plan/planning/
 **Fewer relationship types beat more of them.** Every relationship type you add
 is a question the user has to answer correctly for the rest of the product's
 life. If two relationship types can be confused with each other, the database
-fills up with data that means nothing. Nine candidate relationship types went
-into this design and only three survived as things you store.
+fills up with data that means nothing. This design stores three relationships
+and computes everything else.
 
 **Store the decisions people make, and compute the facts.** Whether a node is
 being fought over by two pieces of work is a fact, so the system computes it

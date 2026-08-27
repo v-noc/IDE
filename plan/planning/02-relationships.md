@@ -1,85 +1,75 @@
 # 02 — Relationships
 
-A relationship type is not free. Every one you add is a question the user has
-to answer correctly for as long as the product exists, and if two relationship
-types can be confused with each other, the database quietly fills with data
-that means nothing. Queries built on that data then produce confident wrong
-answers, which is worse than having no data at all.
+A relationship type is not free. Every one that exists is a question the user
+has to answer correctly for as long as the product does, and if two of them can
+be confused with each other, the database quietly fills with data that means
+nothing. Queries built on that data then produce confident wrong answers, which
+is worse than having no data at all.
 
-So this file works through every relationship the planning system could
-plausibly have, and keeps only the ones that earn their place. The test each
-one has to pass is the same:
+So the model stores three relationships and computes everything else. Each of
+the three earns its place by passing the same test:
 
-> **Does this relationship record something that cannot be worked out from what
-> is already stored, and does it change a decision somebody makes?**
+> **Does this record something that cannot be worked out from what is already
+> stored, and does it change a decision somebody makes?**
 
-If it can be computed, it should be computed. If it does not change anybody's
-behaviour, it should not exist.
+If it can be computed, it is computed. If it does not change anybody's
+behaviour, it does not exist.
+
+```
+   STORED  (there are three)
+   ─────────────────────────────────────────────────────────────
+   child ──parent_id──────────►  task         how work nests
+   task  ──depends_on─────────►  task         what must come first
+   task  ──node_link + mode───►  graph node   which code it touches
+                                   read · create · affects · delete
+```
+
+Three arrows. The rest of this file defines each one, and the last two sections
+show what is derived from them and what has to be true before a fourth is ever
+added.
 
 ---
 
-## The candidates
-
-These are the relationship types that came up while designing this, including
-the obvious ones from other task tools.
-
-```
-   between work and work            between work and code
-   ─────────────────────            ─────────────────────
-   contains  (parent/child)         context
-   depends_on                       affects
-   blocked_by                       references
-   related_to
-   duplicates
-   delegates
-```
-
-Nine candidates. Here is what happens to each of them.
-
----
-
-## Kept: parent, stored on the child as `parent_id`
+## 1 — parent, stored on the child as `parent_id`
 
 **What it is.** One task is a child of another task, forming a tree.
 
 **Why it is stored.** The structure of the work is not derivable from anything
 else. Somebody decided that "Comment model" is part of "Add comments", and that
-decision is the structure of work.
+decision *is* the structure of the work.
 
 **Why it lives on the child.** A task has exactly one parent. Storing the edge
-on the child (as `parent_id`) enforces this at the field level: either the field
-is null (top-level) or it points to exactly one parent. There is no sharing, no
+on the child enforces this at the field level: either the field is null, and the
+task is top-level, or it points at exactly one parent. There is no sharing, no
 task appearing in two places, and no degenerate cases to handle.
 
 ```
    TASK  VN-3  "Add comments"
      parent_id = null    (top-level)
-     
+
      TASK  VN-8  "Comment model"
        parent_id = VN-3
-       
+
      TASK  VN-9  "Comment write path"
        parent_id = VN-3
 ```
 
-**Why not multiple parents.** The original design tried to support shared
-children, where one task could appear under multiple parents. This created
-orphan cases, complex dedup logic, and cascading delete ambiguity. Single parent
-is simpler and honest: if two pieces of work need to share a step, one depends
-on the other.
+When two pieces of work genuinely need to share a step, one of them depends on
+the other. Dependencies are the tool for shared work; containment is not.
 
-**Containment is real structure.** Children are ordered by a `position` field
-(lexorank, like `rank` for board columns), so the tree is completely
-deterministic. There is no second, competing list of children anywhere.
+**Ordering.** Children are ordered by a `position` field (lexorank, like `rank`
+for board columns), so the tree is completely deterministic. There is no second,
+competing list of children anywhere — the child list is read from the
+`parent_id` index and sorted by `position`.
 
-**Tradeoff.** Finding a task's parents is a simple read of one field. Finding
-its position in the tree requires walking up `parent_id` links. Both operations
-are O(depth), and depth is bounded by the user's ability to navigate, which is
-much smaller than total tasks.
+**Tradeoff.** Finding a task's parent is a read of one field. Finding its place
+in the tree means walking `parent_id` upward. Both are O(depth), and depth is
+bounded by what a person can navigate, which is far smaller than the number of
+tasks.
 
 ---
 
-## Kept: depends_on, between two tasks
+## 2 — depends_on, between two tasks
 
 **What it is.** One task cannot be finished until another task is finished.
 
@@ -91,7 +81,7 @@ Nothing can derive it.
 **Why it connects tasks and only tasks.** Every piece of work in this system is
 a task, so the edge can be as precise as the real reason. If the truth is "I
 need that one function", the edge points at the small task that writes that
-function, not at the large task that contains it.
+function, not at the large task that happens to contain it.
 
 ```
    VN-9   Comment write path  ──depends_on──►  VN-5   Write current_user()
@@ -99,183 +89,109 @@ function, not at the large task that contains it.
 ```
 
 **The guard.** A task may never depend on its own ancestor. Containment already
-expresses "this is part of that". If VN-9 depends on its ancestor VN-3, then
-VN-3 cannot finish until VN-9 is done (containment), and VN-9 cannot start
-until VN-3 is done (dependency). Neither can ever finish.
-
-A task depending on its own descendant is redundant (containment already says
-the same thing), so the system drops it silently and writes an event.
+says "this is part of that", and adding a dependency on top of it produces a
+deadlock that no order of work can resolve.
 
 ```
    REFUSED                              WHY
    ───────                              ───
-   VN-3  contains  VN-11                VN-3 is not finished until VN-11 is
+   VN-3  contains   VN-11               VN-3 is not finished until VN-11 is
    VN-11 depends_on VN-3                VN-11 cannot start until VN-3 is
 
-                                        Deadlock. Refused.
+                                        Neither can ever finish. Refused.
 ```
 
-**Tradeoff.** Allowing dependencies at any depth means the dependency graph can
-become large and cross-cutting, and a person looking at a high-level card may
-not immediately see that something four levels down is blocked. The design pays
-for this by rolling blocking status up the tree, so a parent card shows that
-something inside it is stuck, with a link to the exact task.
+A task depending on its own descendant is not a deadlock, only redundant —
+containment already says the same thing — so the system drops it silently and
+writes an event.
+
+**Direction.** The edge is stored once, pointing from the task that waits to the
+task it waits for. The opposite reading, "VN-5 blocks VN-9", is the same fact
+seen from the other end and is computed when asked. So is the state *blocked*,
+which is simply "something this depends on is not done yet".
+
+**Tradeoff.** Allowing dependencies at any depth means the graph can become
+large and cross-cutting, and somebody looking at a high-level card will not
+immediately see that something four levels down is stuck. The design pays for
+this by rolling blocking status up the tree, so a parent card shows that
+something inside it is blocked, with a link to the exact task.
 
 ---
 
-## Cut: blocked_by, as a separate edge
+## 3 — node_link with a mode, from a task into the code graph
 
-**Why it was proposed.** Most task tools have both "depends on" and "blocked
-by", and they feel different when you say them out loud.
+**What it is.** A task points at a node in the code graph, and every pointer
+carries a mode saying what the work does to that node: `read`, `create`,
+`affects`, or `delete`.
 
-**Why it is cut.** They are the same edge read from opposite ends. If A depends
-on B, then B blocks A. Storing both means storing the same fact twice, and two
-copies of one fact will eventually disagree.
-
-More importantly, being *blocked* is a state rather than a relationship. A task
-is blocked when something it depends on is unfinished, and that can be computed
-in the moment it is asked.
+**Why it is one mechanism with a mode, and not several link types.** The most
+valuable question in the system is asked from the code side, not the work side —
+standing on `function createComment()` and asking who is about to touch it. One
+list with a mode column answers that in a single pass.
 
 ```
-   STORED       VN-9 ──depends_on──► VN-5
-   DERIVED      VN-9 is blocked, because VN-5 is not done
-   DERIVED      VN-5 blocks VN-9      ← the reverse view, computed
-```
-
-The current system has a field called `blocked_by`. Keeping that field name is
-fine; what matters is that it means "depends on" and that there is only one of
-it.
-
----
-
-## Cut: related_to
-
-**Why it was proposed.** It is comforting. Two pieces of work feel connected
-and there is a button to say so.
-
-**Why it is cut.** It fails both halves of the test. It cannot be acted on,
-because nobody knows what to do differently when two things are "related", and
-in this product it is very nearly derivable already.
-
-Relatedness between two tasks almost always means one of three things, and each
-of them is better expressed by something the system already has.
-
-```
-   "these two are related" usually means …
-
-   … they touch the same code    ──►  already visible. Both link to the same
-                                      node, and the node lists both.
-
-   … one must come first         ──►  that is depends_on. Say it properly.
-
-   … they are part of one theme  ──►  that is a parent task, or a label.
-```
-
-**Tradeoff.** Somebody will occasionally want to connect two tasks that share
-no code, no ordering, and no parent. For that rare case, a sentence in the
-document mentioning the other task's key is enough, and a mention can be turned
-into a clickable link without adding a relationship type to the model.
-
----
-
-## Cut: references, merged into context
-
-**Why it was proposed.** "This task references that class" sounds different
-from "this class is context for the task".
-
-**Why it is cut.** They are the same thing said twice. Both mean: to do this
-work you need to look at that code, and you are not going to change it. One
-mode, called `read`, covers it, and the interface labels the list **Context**
-because that is the word people use.
-
-Having both would immediately create the question "should I put this under
-references or under context?", which is exactly the kind of unanswerable
-question that fills a database with noise.
-
----
-
-## Kept, as modes rather than separate types: node links with modes
-
-**What they are.** A task points at graph nodes, and every pointer carries a
-mode: `read`, `create`, `affects`, or `delete`.
-
-**Why they are one mechanism.** Because the most valuable question in the whole
-system is asked from the code side, not from the work side.
-
-```
-   Standing on  function createComment()  and asking:
+   Standing on  function createComment()  and asking
    "who is about to touch this?"
 
-   ONE MECHANISM                          TWO MECHANISMS
-   ─────────────                          ──────────────
-   read the links on this node,           read the affects table,
-   group them by mode.                    then read the context table,
-                                          then merge them, forever,
-   VN-11  affects   ← a collision          in every query, in every
-   VN-30  affects   ← a collision          screen, and hope nobody
-   VN-40  read     ← worth knowing        forgets one of them.
+   VN-11  affects   ← a collision
+   VN-30  affects   ← a collision
+   VN-40  read      ← worth knowing, not a collision
 ```
 
-One list with a mode column answers it in a single pass. Two separate
-relationship types answer it in two passes that have to be kept in step in
-every place the question is asked.
+Splitting reading and writing into separate relationship types would make that
+one question into two queries that have to be kept in step in every screen
+forever, and would raise a question nobody can answer correctly — *which list
+does this belong in?* — every time a link is created.
 
 **Why the modes are exactly these four.**
 
 - `read` means look but do not change.
-- `create`, `affects`, and `delete` are the three things you can do to a
-  node, and they are distinguished because they behave differently:
+- `create`, `affects`, and `delete` are the three things work can do to a node,
+  and they are distinguished because they behave differently:
   - Two `create` links on the same name are a duplicate.
-  - A `delete` under somebody else's `affects` is severe.
-  - A `create` is the one mode allowed to point at a node that does not exist yet.
+  - A `delete` underneath somebody else's `affects` is severe.
+  - A `create` is the one mode allowed to point at a node that does not exist
+    yet.
 
-Links are soft references, stored as an id plus a name snapshot, so a deleted
-node produces a readable warning instead of a broken reference.
+On screen the read-mode links are shown as **Context** and the write-mode links
+as **Affects**, because those are the words people use. That is presentation.
+Underneath there is one list.
 
-**Tradeoff.** Four modes is more than one, and people will sometimes choose the
-wrong one. The design accepts this because a wrong mode is detectable. After the
+**Soft references.** A link is stored as a node id plus a snapshot of the node's
+name and kind. The parser deletes and recreates nodes whenever a file changes,
+so a link that hardened onto an id alone would break constantly. With the
+snapshot, a vanished node produces a readable warning instead of a dangling
+pointer.
+
+**Tradeoff.** Four modes is more than one, and people will sometimes pick the
+wrong one. The design accepts this because a wrong mode is detectable: after the
 work lands, the commits say which nodes actually changed, and the system can
 point out that a task marked something `read` and then rewrote it. A mistake
-that can be noticed is much better than a missing distinction that cannot be
-recovered.
+that can be noticed is much better than a distinction that was never recorded.
 
 ---
 
-## Cut: duplicates
+## What is derived, on every read
 
-**Why it was proposed.** People file the same work twice, and every tracker has
-a way to mark that.
+None of the following is stored. All of it is computed from the three arrows at
+the moment somebody asks, which is why none of it can ever be stale or disagree
+with the data underneath.
 
-**Why it is cut.** Marking a duplicate is a housekeeping action, not a
-relationship worth modelling. In this system the natural resolution is simply
-to merge: point the surviving task's children at whatever the duplicate
-had, copy anything useful out of its document, and delete the duplicate with a
-note saying it was merged into VN-9.
-
-If it later turns out that people need to find the old key after a merge, the
-cheapest answer is a redirect entry from an old key to a new one, which is a
-lookup table rather than a relationship in the work model.
-
----
-
-## Cut: delegates
-
-**Why it was proposed.** When a step turns out to be big, it feels like the
-step should stay where it is and point at the bigger piece of work that took it
-over.
-
-**Why it is cut.** In a model where everything is a task, there is nothing to
-delegate. The step already is a task. If it grows, you give it children. If it
-belongs under a different parent, you move it. No third thing is needed to
-connect a small work object to a large one, because there is only one kind of
-work object.
+```
+   children of a task               from the parent_id index, in reverse
+   parent of a task                 from parent_id (at most one)
+   blocks — the reverse view        from depends_on
+   blocked / ready                  from depends_on plus link states
+   progress                         from the task's children
+   where the work lives             from the nearest container of its links
+   effective links of a parent      from the union of its descendants' links
+   contested nodes                  from write-mode links on the same node
+   depth / breadcrumb path          from walking parent_id up to the root
+```
 
 ---
 
-## The two laws that came out of this
-
-Two general rules emerged while making these cuts, and they are worth stating
-on their own because they will settle future arguments too.
+## The two laws underneath
 
 ### Law 1 — Point hard references at durable things only
 
@@ -289,51 +205,42 @@ Anything a person can throw away must not be the target of a stored reference.
 ```
 
 Tasks are durable, so dependencies point at tasks and parents are tasks. Graph
-nodes are fragile, because the parser deletes and recreates them whenever a
-file changes, so every pointer into the graph is stored as a soft id **plus a
-snapshot of the name and kind**. When the node disappears, the pointer becomes
-a visible warning that still reads sensibly, instead of a broken reference
-nobody can interpret.
+nodes are fragile, because the parser deletes and recreates them whenever a file
+changes, so every pointer into the graph carries the name and kind snapshot from
+above.
 
 ### Law 2 — One fact, one place
 
 If a fact is stored twice, the two copies will disagree, and no amount of
-careful code prevents it forever. So:
-
-- `depends_on` is stored once, in one direction, and the reverse view is
-  computed.
-- `parent_id` is stored once on the child, and the children list is computed
-  from the reverse index.
-- A collision between two tasks is not stored at all, only the human decision
-  about it.
-- Progress, blocking, readiness, and contested nodes are never stored.
+careful code prevents it forever. So `depends_on` is stored in one direction
+only, `parent_id` is stored only on the child, a collision between two tasks is
+not stored at all — only the human decision about it — and progress, blocking,
+readiness and contested nodes are never stored.
 
 ---
 
-## The final catalog
+## Before a fourth arrow is added
+
+This list will be reopened, by a person copying another tracker's schema or by
+an agent asked to "add support for related tasks". Four checks stop the common
+mistakes, and they are cheap to run.
 
 ```
-   STORED RELATIONSHIPS  (there are three)
-   ────────────────────────────────────────
-   child ──parent_id────────────────►  task         containment
-   task  ──depends_on──────────────►  task         ordering
-   task  ──node_link with mode────►  graph node    code involvement
-                                        read · create · affects · delete
-
-   DERIVED, ON EVERY READ
-   ──────────────────────
-   children of a task               from parent_id index in reverse
-   parents of a task                from parent_id (at most one)
-   blocks (the reverse view)        from depends_on
-   blocked / ready                  from depends_on plus link states
-   progress                         from the task's children
-   where the work lives             from the nearest container of its links
-   effective links of a parent      from the union of its descendants' links
-   contested nodes                  from write-mode links on the same node
-   depth / breadcrumb path          from walking up parent_id to root
+   ASK                                       IF YES, IT IS NOT A RELATIONSHIP
+   ───                                       ────────────────────────────────
+   Is it an existing edge read backwards?    compute it, do not store it
+   Does an existing edge already mean this?  reuse the word already in use
+   Can two people disagree about what to     it will fill with noise
+     do when it is set?
+   Is it something you do once, rather       it is a command, not a column
+     than something that stays true?
 ```
 
-Three stored arrows. Everything else the product shows is computed from them.
+Only if all four are no does the test at the top of this file apply: it must
+record something not derivable, **and** change a decision. Both, not either.
 
-The next file, [03 — Data model](03-data-model.md), turns this into concrete
-fields, and marks clearly which ones are written and which ones are calculated.
+---
+
+The next file, [03 — Data model](03-data-model.md), turns these three arrows
+into concrete fields and marks clearly which are written and which are
+calculated.
