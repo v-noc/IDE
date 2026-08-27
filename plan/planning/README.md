@@ -15,9 +15,9 @@ empty board to finished work.
 ## Why this design exists
 
 The project already has a simple task system. It has tasks, it has subtasks, it
-has blockers, and it has soft anchors that connect a task to nodes in the code
-graph. That is a genuinely good starting point, and this design keeps all of
-it.
+has blockers, and it can already connect a task to nodes in the code graph. That
+is a genuinely good starting point, and this design builds on it rather than
+replacing it.
 
 The problem is that the current system can only record *what* somebody wants.
 It cannot record *how* the work will be done, it cannot hold two competing
@@ -62,8 +62,7 @@ child ordering is explicit and deterministic, there is no orphan concept at all.
      │     position (order among siblings)
      │
      │  the approach and its trace:
-     │     document · node_links[] · anchors[]
-     │     depends_on[] (dependencies)
+     │     document · node_links[] · depends_on[]
      │
      │  ordered list of CHILD TASKS via:
      │     parent_id = this.id + order by position
@@ -94,16 +93,13 @@ and a long document for the detail.
    │               things that were considered and rejected, the shape  │
    │               of the code, anything a reader needs. Markdown.      │
    │                                                                    │
-   │  anchors      Where this work lives in the code, roughly.          │
-   │                 file comment_service.py                            │
-   │                                                                    │
    │  context      Nodes you must read to do this work, but will not    │
    │               change. Optional.                                    │
    │                 class Post · class User · function current_user()  │
    │                                                                    │
    │  affects      Nodes this work will create, change, or delete.      │
    │                 create   function createComment()                  │
-   │                 modify   class Comment                             │
+   │                 affects  class Comment                             │
    │                                                                    │
    │  children     Ordered list of child tasks, if it has any.          │
    │  depends_on   Other tasks that must finish first.                  │
@@ -117,6 +113,14 @@ that says what the work does to that node. Modes that only read become the
 Context list on screen, and modes that write become the Affects list. Keeping
 one mechanism underneath means a single query answers "what work touches this
 node", while the two lists on screen keep the reading experience clear.
+
+There are four modes — `read`, `create`, `affects`, `delete` — and **none of
+them is vague**. Every link states something the graph can later confirm or
+contradict.
+
+Which means a task never states where it lives. That is derived from the links —
+the nearest container holding all of them — so the location can never drift out
+of step with the code the work actually touches.
 
 ## How the shape maps onto the code graph
 
@@ -147,7 +151,7 @@ this folder respects it:
 When a piece of work is about a field, the work links to the class or the
 function that contains that field, and the field itself is described in the
 task's own words. A task titled "Add an `author_id` field to Comment" links to
-the **class** `Comment` with mode `modify`, and the sentence carries the
+the **class** `Comment` with mode `affects`, and the sentence carries the
 detail. This keeps the planning layer honest about what the parser actually
 produces, and it means no plan can ever point at a node kind that cannot exist.
 
@@ -183,64 +187,67 @@ Each file goes one step further from the general idea toward the specific
 mechanics. If you read them in order, every file only uses ideas that an
 earlier file has already explained.
 
+**If you only read one file, read [rules.md](rules.md).** It is the normative
+artifact: the three stored edges, the full derived table, the guards, and the
+invariants. Everything else in this folder is the rationale behind it.
+
 ```
 plan/planning/
 │
+├── rules.md                          ◄── THE SPEC. One page. Start here.
+│      The three stored edges, everything derived, the guards, and the
+│      invariant list that the tests must enforce.
+│
 ├── 00-mental-model.md
-│      The idea in full. What a task is, why work is recursive, what a version
-│      is for, how deep a tree should go, and the tradeoffs this shape brings.
+│      The idea in full. What a task is, why work is recursive, how deep a
+│      tree should go, and the tradeoffs this shape brings.
 │
 ├── 01-concepts.md
-│      Careful definitions of Task, Version, Child reference, Anchor, Context
-│      node, Affected node, and Dependency, including what each one is NOT.
+│      Careful definitions of Task, Parent and position, Node link,
+│      Dependency, and Event, including what each one is NOT.
 │
 ├── 02-relationships.md
-│      The relationship catalog. Six candidate relationship types were on the
-│      table. Two survive as stored edges. This file explains each cut.
+│      The relationship catalog. Nine candidate relationship types were on the
+│      table. Three survive as stored edges. This file explains each cut.
 │
 ├── 03-data-model.md
 │      Every field of every entity in tables, split clearly into what is
 │      stored and what is computed at read time.
 │
 ├── 04-lifecycle-and-status.md
-│      State machines for a task and for a version, how progress rolls up the
-│      tree, and what the word "done" means at each level.
+│      Status versus condition, how progress rolls up the tree, and what the
+│      word "done" means at each level.
 │
 ├── 05-graph-links.md
 │      How work points at code: the five link modes, links that point at code
-│      which does not exist yet, what happens when the parser deletes a node,
-│      link rollup, and the two lookup directions.
+│      which does not exist yet, binding and rebinding, verification stamped
+│      with a graph revision, link rollup, and the two lookup directions.
 │
 ├── 06-dependencies-and-readiness.md
 │      The dependency design in full: one stored edge, dependencies at any
-│      depth, the ancestor guard that prevents deadlock, and why readiness is
-│      computed from needs rather than from position in a list.
-│
-├── 07-versions-and-alternatives.md
-│      Many versions of one task. Alternatives versus revisions, activation,
-│      shared children, comparison, and what happens to finished work.
+│      depth, the asymmetric guard, and why readiness is computed from needs
+│      rather than from position in a list.
 │
 ├── 08-conflicts-and-concurrency.md
 │      Two pieces of work, one node. The mode matrix, the difference between
-│      overlap, watch, and conflict, and how a human decision to ignore a
-│      conflict is recorded without corrupting the data.
+│      overlap, watch, and conflict, and how a human decision about a
+│      collision is recorded without corrupting the data.
 │
 ├── 09-architecture.md
-│      Where truth lives, which values are derived and when, the two indexes
-│      that make lookups fast, events, caching, and what is deliberately kept
-│      out of storage.
+│      Where truth lives, the three storage categories, the single evaluation
+│      function every derived value comes from, batching, and what is
+│      deliberately kept out of storage.
 │
 ├── 10-api-surface.md
 │      The operation catalog in plain language: every read, every write, and
 │      the guarantee each one makes.
 │
 ├── 11-ui-surfaces.md
-│      The level board, the task detail panel, the document editor, the
-│      version switcher, the child list, the node popover, the sidebar, and
-│      the canvas overlays.
+│      The level board, the task detail panel, the document editor, the child
+│      list, the node popover, the sidebar, and the canvas overlays.
 │
 ├── 12-agent-seams.md
-│      How an agent would read a task, propose a version, and execute work,
+│      How an agent would read a task, propose a plan, and execute work,
 │      described only as the seams the model must leave open. The agent itself
 │      is not designed here.
 │
@@ -248,35 +255,44 @@ plan/planning/
 │      Step-by-step walkthroughs of the ten situations that happen most often.
 │
 ├── 14-edge-cases.md
-│      Sixteen deliberate attempts to break the model, each with the model's
+│      Twenty-two deliberate attempts to break the model, each with the model's
 │      answer, and an honest note whenever the answer is merely acceptable.
 │
 ├── 15-migration-from-today.md
-│      What exists in the codebase right now, what changes, what is added, and
-│      what is deliberately left alone.
+│      What exists in the codebase right now, what changes, the migration
+│      steps, and the P0–P3 build order.
 │
 ├── 16-open-questions.md
 │      The questions this pass did not settle, with the options for each.
 │
 └── examples/social-media/
        The entire model applied to a small social media application, from an
-       empty board through three tasks, alternative versions, cross-tree
-       dependencies, a conflict, and every list the system can produce.
+       empty board through three tasks, cross-tree dependencies, a conflict,
+       and every list the system can produce.
 ```
+
+> **Note.** `07-versions-and-alternatives.md` was deleted when versions were
+> removed from the model, which is why the numbering skips from 06 to 08. The
+> remaining files keep their original numbers so existing links do not break.
 
 ## The principles used while designing this
 
 **Fewer relationship types beat more of them.** Every relationship type you add
 is a question the user has to answer correctly for the rest of the product's
 life. If two relationship types can be confused with each other, the database
-fills up with data that means nothing. Six candidate relationship types went
-into this design and only two survived as things you store.
+fills up with data that means nothing. Nine candidate relationship types went
+into this design and only three survived as things you store.
 
 **Store the decisions people make, and compute the facts.** Whether a node is
 being fought over by two pieces of work is a fact, so the system computes it
 fresh on every read. Whether a team agreed to ignore that fight is a decision,
-so the system stores it. The existing anchor design in this codebase already
-works this way, and following the same discipline keeps everything consistent.
+so the system stores it.
+
+**Every pointer must make a checkable claim.** A link that only says "this task
+has something to do with this node" looks like data and behaves like a comment:
+nothing downstream can verify it, warn on it, or ever mark it done. Each of the
+four modes states something the graph can later confirm or contradict. If a link
+cannot be wrong, it cannot be useful.
 
 **Point hard references at durable things and soft references at fragile
 ones.** Task to task links can be real database links, because a task only

@@ -11,7 +11,7 @@ different level of the mode matrix doing its job.
 ```
    function  app.services.createComment          ◌ planned, not written yet
         ▲                              ▲
-        │ modify                       │ modify
+        │ affects                       │ affects
         │                              │
    VN-22  Detect banned words     VN-30  Rate limiting
    ▸ Comments ▸ Moderation        ▸ root
@@ -33,7 +33,7 @@ found while both tasks are still text.
 ```
    ┌────────────────────────────────────────────────────────┐
    │ VN-22  Detect banned words                  ○ to do    │
-   │ ⚑ contested — createComment() also modified by VN-30   │
+   │ ⚑ contested — createComment() also affected by VN-30   │
    └────────────────────────────────────────────────────────┘
 
    canvas:  ◌ ƒ createComment()   ⚑2
@@ -47,7 +47,7 @@ happen at once. The resolution is to decide the order.
 
 ```
    ┌──────────────────────────────────────────────────────────────┐
-   │  createComment() — 2 tasks intend to modify it                │
+   │  createComment() — 2 tasks intend to change it                 │
    │                                                               │
    │  VN-30  Rate limiting            ○ to do                      │
    │  VN-22  Detect banned words      ○ to do                      │
@@ -106,7 +106,7 @@ about a collision.
 ```
    function  app.web.renderPost                  ● exists
         ▲                              ▲
-        │ modify                       │ modify
+        │ affects                       │ affects
         │                              │
    VN-17  Show the author         VN-12  Show comments on the page
    ▸ Posts belong to users        ▸ Add comments
@@ -124,7 +124,7 @@ benefit.
 
 ```
    ┌──────────────────────────────────────────────────────────────┐
-   │  renderPost() — 2 tasks intend to modify it                   │
+   │  renderPost() — 2 tasks intend to change it                    │
    │                                                               │
    │  ○ decide the order   ● accept   ○ resolve   ○ delegate       │
    │                                                               │
@@ -141,12 +141,12 @@ nothing else. The amber marker goes quiet on both cards and the node.
 
 If either side later widens its links, the decision no longer describes the
 situation, and the warning comes back with a note saying the earlier decision
-was made about a narrower version of the work.
+was made about a narrower scope of work.
 
 ```
    ⚑ contested — renderPost()
      an earlier decision accepted this on 14 Aug, when VN-12 only added a
-     comment list. VN-12 now also modifies the page header.
+     comment list. VN-12 now also affects the page header.
 ```
 
 The record of the conversation survives. It just stops silencing something it
@@ -159,7 +159,7 @@ no longer covers.
 ```
    class  app.models.Post                        ● exists
 
-   VN-16  Add an author_id field      ~ modify
+   VN-16  Add an author_id field      ~ affects
    VN-9   Comment write path          ◦ read
    VN-8   Comment model               ◦ read
    VN-3   Add comments                ◦ read
@@ -172,14 +172,14 @@ chip on almost everything.
 ```
    ┌────────────────────────────────────────────────────────────┐
    │ VN-9   Comment write path                       ○ to do    │
-   │ ◦ class Post — being modified by VN-16                     │
+   │ ◦ class Post — being affected by VN-16                     │
    └────────────────────────────────────────────────────────────┘
 ```
 
 Grey, small, at the bottom of the links list. Nobody is blocked and nothing
 needs deciding. What it says is worth saying once: the plan for VN-9 was written
-against a version of `Post` that is about to change, so it is worth a glance
-before starting.
+against a `Post` that is about to change, so it is worth a glance before
+starting.
 
 ---
 
@@ -234,14 +234,20 @@ ghosts.
 
 ---
 
-## A note on drafts
+## What does not take part
 
-While VN-3's v2 was a draft, it declared `modify class Post`. That never
-collided with VN-16, which is also modifying `class Post`, because drafts do
-not take part in conflict detection.
+Two scoping rules kept this list short, and both matter.
 
-The moment v2 was activated in [04](04-alternative-versions.md), the collision
-appeared. That is the correct behaviour: writing down an idea should never
-argue with somebody else's plan, and choosing it should.
+**Finished work stops colliding.** VN-4 "Password hashing" is done, so its links
+no longer argue with anybody. What it did is history, and history lives in
+commits.
+
+**A task never collides with its own family.** VN-3's rolled-up links include
+everything VN-9 and VN-22 declared, so without this rule a parent would appear
+to be fighting its own children on every node in its subtree. A family working
+on the same node is the normal case, not a problem.
+
+Both rules exist so that the three entries above are the ones actually worth a
+person's attention.
 
 Next: [07 — Lookups](07-lookups.md).

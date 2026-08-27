@@ -41,13 +41,13 @@ So the rule is:
 ```
    TASK  VN-20   "Add author_id and post_id fields to Comment"
 
-     link   mode: modify   kind: class   qname: app.models.Comment
+     link   mode: affects   kind: class   qname: app.models.Comment
      note   "adds author_id pointing at User and post_id pointing at Post,
              both required, both indexed"
 ```
 
-Everything useful survives. The system knows the class is being modified, it
-can warn if somebody else is also modifying that class, and a person reading
+Everything useful survives. The system knows the class is being affected, it
+can warn if somebody else is also affecting that class, and a person reading
 the card knows exactly which fields are involved because the sentence says so.
 
 ### Call nodes are a special case
@@ -55,37 +55,125 @@ the card knows exactly which fields are involved because the sentence says so.
 Calls are produced by the parser, not written by people, and they appear and
 disappear constantly as function bodies change. So calls may be used as
 **context** — "read this call to understand how the current code flows" — but a
-plan should not claim to create, modify, or delete a call directly. You modify
+plan should not claim to create, affect, or delete a call directly. You affect
 the function that contains the call, and the call follows.
 
-The interface can allow a `modify` link on a call and quietly record it as a
-`modify` on its parent function, which is what the person meant anyway.
+The interface can allow an `affects` link on a call and quietly record it as an
+`affects` on its parent function, which is what the person meant anyway.
 
 ---
 
-## 2. The modes
+## 2. The four modes
+
+A task points at code in exactly one way: `node_links[]`. There are four modes,
+and none of them is vague.
 
 | Mode | Meaning | Where it appears | Is it a write? |
 |---|---|---|---|
-| `about` | This work is around here somewhere | anchor chip on the task | no |
 | `read` | Must be read to do the work, will not change | **Context** list | no |
 | `create` | Does not exist yet, this work will create it | **Affects** list | yes |
-| `modify` | Exists, this work will change it | **Affects** list | yes |
+| `affects` | This node's own body or signature changes | **Affects** list | yes |
 | `delete` | Exists, this work will remove it | **Affects** list | yes |
 
 ```
-   VERSION 1 of VN-9  "Comment write path"
+   TASK VN-9  "Comment write path"
 
    CONTEXT                                  AFFECTS
    ───────                                  ───────
-   read  ──► class    Post                  create ──► function createComment()
-   read  ──► class    User                  modify ──► class    Comment
+   read  ──► class    Post                  create  ──► function createComment()
+   read  ──► class    User                  affects ──► class    Comment
    read  ──► function current_user()
 ```
 
 The split into two lists is a display choice over one stored mechanism. That
 matters because the most valuable question comes from the other direction, and
 it needs one pass over one list rather than a merge of two.
+
+### Every mode makes a checkable claim
+
+There is no vague mode. A pointer that said only "this work is around here"
+would never turn green, never conflict with anything, and never prove that
+anything was done — it would look like data and behave like a comment.
+
+Each of the four says something the graph can later confirm or contradict, which
+is the whole point of planning on top of a graph rather than in a list of
+sentences.
+
+### A task may link to any number of nodes
+
+There is no primary link and no limit.
+
+```
+   TASK VN-8  "Comment model"
+     affects  class     Comment
+     affects  class     Post
+     create   function  Comment.validate
+```
+
+Which raises a question the modes do not answer on their own: *where does this
+work live?*, for breadcrumbs and for placing a card on the canvas. That is
+**derived** rather than recorded:
+
+```
+   take the nearest container holding every linked node
+     │
+     ├── specific  (a file, or a class)   ──►  show it as the location
+     └── too broad (a top folder, the repo) ──►  show the linked nodes instead
+```
+
+Display rule only. Nothing is stored for it, nothing has to be maintained by
+hand, and the location can never drift out of step with the code the task
+actually touches.
+
+---
+
+## 3. `affects` means the node itself, never its contents
+
+> Changes to a node's **contents** are derived from the links on those contents.
+> They are never typed on the container.
+
+Adding a method to a class is **one** link:
+
+```
+   TYPED
+     create   function  Comment.validate     container: class Comment
+
+   DERIVED
+     touches  class Comment      it contains the new function
+     touches  file  models.py    it contains Comment
+```
+
+Write `affects class Comment` only if the class itself also changes — a new
+field, a changed base class, a decorator.
+
+### Why this rule is required
+
+Without it, two tasks each adding a *different* method to `Comment` would both
+write "affects class Comment", and the system would report them as colliding.
+
+```
+   WITHOUT THE RULE                      WITH THE RULE
+   ────────────────                      ─────────────
+   VN-8   affects class Comment          VN-8   create function Comment.validate
+   VN-44  affects class Comment          VN-44  create function Comment.render
+
+   ⚑ conflict — but there is none        no conflict. Two different functions.
+                                         Both still show up when you ask what
+                                         touches class Comment, as derived
+                                         containment.
+```
+
+They do not collide. Every class in the codebase would become a false alarm, and
+a warning that is usually wrong is a warning people learn to click past.
+
+### The limit, stated plainly
+
+**Derived containment never verifies anything.** Only explicit links have states.
+
+A class is not verified because a function inside it appeared. If a task wants
+its claim about `class Comment` checked, it has to make that claim directly with
+an `affects` link — which is exactly the right thing to require, because "the
+class changed" and "something inside the class changed" are different statements.
 
 ### Getting the mode wrong is recoverable
 
@@ -95,7 +183,7 @@ actually changed. Comparing the two produces a useful, gentle observation:
 
 ```
    VN-9 marked class Post as read, but the commits for this task changed it.
-   Update the link to modify?     [ yes ]  [ it was a one-off, ignore ]
+   Update the link to affects?     [ yes ]  [ it was a one-off, ignore ]
 ```
 
 A mistake that can be noticed and corrected is a much better position than a
@@ -103,7 +191,7 @@ model that never asked for the distinction at all.
 
 ---
 
-## 3. Links can point at code that does not exist yet
+## 4. Links can point at code that does not exist yet
 
 This is the core of planning. When you plan, most of the interesting code has
 not been written.
@@ -142,8 +230,8 @@ green.
 **Tradeoff, stated honestly.** Matching by name is a guess. If somebody plans
 `app.models.Comment` and writes `app.models.PostComment`, the link stays pending
 even though the work is finished. The system handles this by offering the
-closest new nodes created around the same time as candidates, in exactly the
-same way the existing re-anchor flow suggests replacements for a lost anchor.
+closest new nodes created around the same time as candidates, reusing the
+matcher that already suggests replacements for a link whose node disappeared.
 Automatic binding is only applied for an exact match on name and kind, and
 everything else is a suggestion a person confirms. Silently binding a plan to
 the wrong node would be far worse than leaving a link pending.
@@ -164,7 +252,7 @@ it exists.
    unfulfilled link index              fulfilled link index
    ─────────────────────              ────────────────────
    (app.models.Comment, class) → VN-8  node_abc123 → VN-16 (create)
-                              → VN-44  node_def456 → VN-9  (modify)
+                              → VN-44  node_def456 → VN-9  (affects)
 ```
 
 ### Binding a create link to the real node
@@ -190,7 +278,7 @@ un-verifying.
 
 ### Four edge cases handled explicitly
 
-**Node already exists when the create link is written.** Warn: "app.models.Comment already exists — did you mean modify?" Do not create a link that fulfils instantly. The distinction between create and modify matters.
+**Node already exists when the create link is written.** Warn: "app.models.Comment already exists — did you mean affects?" Do not create a link that fulfils instantly. The distinction between create and affects matters.
 
 **Two open tasks plan to create the same qname and kind.** Duplicate warning, not a dependency. This fires at planning time, before merge conflicts. One task is probably unnecessary, but the system shows both and lets a human decide.
 
@@ -210,8 +298,8 @@ rebind when a new node appears with:
 Example:
 
 ```
-   Link broke:     modify function app.services.createComment
-   Suggestion:     modify function app.services.create_comment  (snake_case typo)
+   Link broke:     affects function app.services.createComment
+   Suggestion:     affects function app.services.create_comment  (snake_case typo)
    [ rebind to suggestion ]  [ manually choose another ]  [ remove link ]
 ```
 
@@ -220,12 +308,11 @@ Suggest, never bind silently. A wrong rebind silently changes what the task mean
 ### Restrict which kinds are linkable
 
 `call` nodes churn constantly as function bodies change. Linking to calls is
-rarely meaningful. Restrict `create`, `modify`, and `delete` to:
+rarely meaningful. Restrict `create`, `affects`, and `delete` to:
 
 ```
-   linkable:     folder, file, class, function
-   read only:    call
-   anchors:      all kinds via mode "about"
+   create / affects / delete:   folder, file, class, function
+   read:                        all five kinds, including call
 ```
 
 This prevents the long tail of broken links to deleted calls from cluttering
@@ -262,12 +349,11 @@ time rather than at merge time.
 
 ---
 
-## 4. When the graph changes underneath a link
+## 5. When the graph changes underneath a link
 
 The parser rewrites the graph whenever a file changes. Nodes are deleted and
 recreated all the time. Every pointer from work into the graph is therefore
-stored as a **soft id plus a snapshot of the name and kind**, exactly as anchors
-already are today.
+stored as a **soft id plus a snapshot of the name and kind**.
 
 ```
    STORED           node_id: FunctionSchema/abc123
@@ -280,7 +366,7 @@ When the node id no longer names anything, the link does not break. It becomes
 
 ```
    ┌────────────────────────────────────────────────────┐
-   │ ⚠ modify   function app.services.createPost         │
+   │ ⚠ affects   function app.services.createPost         │
    │   this node no longer exists in the graph           │
    │   [ point at another node ]   [ remove the link ]   │
    └────────────────────────────────────────────────────┘
@@ -300,7 +386,70 @@ a confident lie.
 
 ---
 
-## 5. Links roll up the tree
+## 6. Verification, and its second source
+
+A `create` link that binds to a real node is the system checking a claim rather
+than believing it. That check is worth being careful about in two ways.
+
+### Verification is stamped, not recomputed forever
+
+If `verified` were recomputed on every read, a rename six months later would
+silently un-verify finished work. Verification is a **decision at a point in
+time** — somebody finished this, and the graph agreed — so it is recorded as an
+event:
+
+```
+   { type: "verified",
+     payload: { link_qnames: [...], node_ids: [...], graph_revision: "xyz789" },
+     at, origin, author }
+```
+
+A task shows "done, verified" if that event exists. If a verified link later
+goes unresolved, the panel says:
+
+```
+   ✓ done · verified at revision xyz789
+   ⚠ function app.services.createComment has since been removed
+```
+
+That is a note, not a reversal. The work was done; the codebase moved on. Those
+are two different facts and the interface shows both.
+
+### Tests are the second source
+
+The design's honest weakness, named in [14](14-edge-cases.md) §12, is that it
+tracks **identity, not meaning**. A function rewritten in place still satisfies
+every link pointing at it, so structural verification cannot tell the difference
+between "this was built" and "this still does what it said".
+
+The repo already tracks tests. So a task may optionally name the test nodes that
+must pass:
+
+```
+   TASK VN-9  "Comment write path"
+     verified_by_tests
+       function tests.services.test_create_comment_attaches_author
+       function tests.services.test_create_comment_rejects_missing_post
+```
+
+This does two things that link verification cannot.
+
+**It closes the rewritten-in-place hole.** A rewrite that changes behaviour
+breaks the tests, and the task stops being verified for a reason that is about
+meaning rather than structure.
+
+**It gives verification to work with no graph trace at all.** Documentation,
+configuration, and conversations create no nodes, so they have nothing to check.
+Today those tasks are simply done with nothing to verify, and the interface must
+never treat that as a warning. A task that names a test has something real to
+check even when it creates no code.
+
+Both sources are optional and neither is a gate. A task with no links and no
+tests is finished when a person says it is finished.
+
+---
+
+## 7. Links roll up the tree
 
 Nobody wants to write links twice. A parent's **effective links** are its own
 links combined with every descendant's links.
@@ -309,14 +458,14 @@ links combined with every descendant's links.
    VN-3  Add comments                    own links: none
      ├── VN-8   Comment model            create class Comment
      ├── VN-9   Comment write path       create function createComment()
-     │                                    modify class Comment
-     └── VN-12  Show comments on page    modify function renderPost()
+     │                                    affects class Comment
+     └── VN-12  Show comments on page    affects function renderPost()
 
    EFFECTIVE LINKS OF VN-3, computed:
      create  class    Comment              from VN-8
      create  function createComment()      from VN-9
-     modify  class    Comment              from VN-9
-     modify  function renderPost()         from VN-12
+     affects  class    Comment              from VN-9
+     affects  function renderPost()         from VN-12
 ```
 
 This is why nobody has to maintain links on high level tasks. A card near the
@@ -324,14 +473,13 @@ root can honestly say what its whole subtree touches, and every entry can be
 traced back to the leaf that claimed it.
 
 When the same node appears more than once, the strongest mode wins for display
-purposes, in the order `delete` beats `modify`, which beats `create`, which
-beats `read`, which beats `about`. The individual entries are all kept
-underneath, because knowing *which* leaf reads a node and which one rewrites it
-is the whole point.
+purposes, in the order `delete` beats `affects`, which beats `create`, which
+beats `read`. The individual entries are all kept underneath, because knowing
+*which* leaf reads a node and which one rewrites it is the whole point.
 
 ---
 
-## 6. The two lookups
+## 8. The two lookups
 
 Everything above exists to make these two questions cheap.
 
@@ -342,24 +490,28 @@ Everything above exists to make these two questions cheap.
    ─────────────────────────────────────────────────────────────
    CREATES      class    app.models.Comment           pending
                 function app.services.createComment   pending
-   MODIFIES     class    app.models.Comment           live
+   AFFECTS      class    app.models.Comment           live
                 function app.web.renderPost           live
    READS        class    app.models.Post              live
                 class    app.models.User              live
                 function app.auth.current_user        pending  ← from another task
-   ANCHORED     folder   app/comments
+
+   LOCATION     folder   app/comments        ← derived, nearest common container
 ```
 
-That list is assembled from the active version of VN-3 and of everything
-underneath it. A person can look at one card and know the blast radius of the
-work before starting it.
+That list is assembled from VN-3's own links and those of everything underneath
+it. A person can look at one card and know the blast radius of the work before
+starting it.
+
+The last row is not stored. `app/comments` is simply the nearest container that
+holds every node above it, worked out at read time.
 
 ### Node to tasks: who is about to touch this?
 
 ```
    class  app.models.Post
    ─────────────────────────────────────────────────────────────
-   MODIFYING    VN-16  Add author to posts        ● in progress
+   AFFECTING    VN-16  Add author to posts        ● in progress
    READING      VN-9   Comment write path         ○ to do
                 VN-10  Comment read path          ○ to do
    ABOUT        VN-2   Posts belong to users      ● in progress
@@ -377,18 +529,18 @@ the work; you care that somebody is about to rewrite the class you are reading.
 
 ---
 
-## 7. What the modes make possible
+## 9. What the modes make possible
 
 Putting the mode on the link is what turns a list of connections into something
 that can answer questions. Three examples, each of which is impossible without
 modes:
 
 ```
-   TWO WRITERS               VN-11 modify createComment()
-                             VN-30 modify createComment()
+   TWO WRITERS               VN-11 affects createComment()
+                             VN-30 affects createComment()
                              ⇒ collision. See 08.
 
-   READER UNDER A WRITER     VN-16 modify   class Post
+   READER UNDER A WRITER     VN-16 affects   class Post
                              VN-9  read     class Post
                              ⇒ VN-9's assumptions may expire. Worth a note,
                                not a block.
@@ -404,7 +556,7 @@ something people have to remember into something the system notices.
 
 ---
 
-## 8. Costs of this approach
+## 10. Costs of this approach
 
 **People have to write links.** This is real work, and if it is tedious it will
 not happen. Three things reduce it: creating a task from a node on the canvas
@@ -423,7 +575,8 @@ pass, described in [09](09-architecture.md).
 
 **Not all work has a graph trace.** Documentation, configuration, and
 discussions have no nodes. Those tasks simply have no links, and the interface
-must never treat an empty Affects list as a problem.
+must never treat an empty Affects list as a problem. `verified_by_tests` is the
+optional escape hatch for the ones that do have something checkable.
 
 The next file, [06 — Dependencies and readiness](06-dependencies-and-readiness.md),
 uses the link states defined here to work out what somebody can actually start

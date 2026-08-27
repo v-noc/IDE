@@ -17,12 +17,12 @@ The most common way work starts, and the one that produces the best data.
    1. Right-click the file  app/services/comment_service.py  on the canvas
       → "New task here"
 
-   2. The dialog opens with the anchor already filled in:
-         ⚓ file  comment_service.py
+   2. The dialog opens with the node already filled in:
+         file  comment_service.py
 
    3. One question is asked about the node:
          "Will this work read it, change it, or remove it?"
-         ○ read    ● change    ○ remove    ○ not sure yet
+         ○ read    ● change    ○ remove
 
    4. Title and description are typed. Everything else is left empty.
 ```
@@ -31,17 +31,22 @@ What the system does:
 
 ```
    creates task VN-9, key minted
-   creates version 1, active, empty document
-   adds anchor    file comment_service.py       (mode: about)
-   adds link      modify file comment_service.py
+   creates the task with an empty document
+   adds link      affects file comment_service.py
    places it at the root level, since no parent was chosen
-   writes a note  "created from the canvas"
+   writes a task_created event and a link_added event, origin: user
 ```
 
 The task now already answers "who is about to touch this file?", from one
-question asked at the moment somebody was already thinking about it. Answering
-"not sure yet" is allowed and leaves only the anchor, which is exactly how the
-current system behaves.
+question asked at the moment somebody was already thinking about it.
+
+Note what the dialog does **not** offer: a "not sure yet" option. A vague answer
+would record a pointer that could never turn green, never collide, and never
+verify anything. Somebody who truly does not know writes no link at all, which
+is a legitimate state.
+
+The task's location — `app/services/` in the breadcrumb — is not stored anywhere.
+It is the container of the one link this task has.
 
 ---
 
@@ -74,8 +79,8 @@ plan it.
 What the system does:
 
 ```
-   creates five tasks, each with its own active version
-   adds five child references to VN-3's active version, in that order
+   creates five tasks, each with parent_id = VN-3
+   assigns each a position, in that order
    indexes the pending creates by name, so duplicates can be found
    draws Comment as a dashed ghost node on the canvas next to app.models
 ```
@@ -134,7 +139,7 @@ What the system does:
 ```
    creates VN-9 ──depends_on──► VN-5
    creates VN-9 ──depends_on──► VN-8
-   writes a note on each of the three tasks
+   writes a dependency_added event on each of the three tasks
    VN-9's chip changes from amber "waiting" to red "blocked", naming VN-5
    VN-5 and VN-8 now show "blocks: VN-9"
    VN-3's card shows "1 blocked inside"
@@ -249,10 +254,10 @@ this way and what the tradeoff is.
 
 ```
    1. Somebody plans VN-30 "Rate limiting":
-         ~ modify function createComment()
+         ~ affects function createComment()
 
    2. VN-11's child VN-22 already had:
-         ~ modify function createComment()
+         ~ affects function createComment()
 
    3. Immediately, with nobody doing anything:
          the node badge on the canvas turns amber, showing 2
@@ -292,7 +297,7 @@ node and creates a new one.
 ```
    VN-12  Show comments on the post page
    ┌────────────────────────────────────────────────────────┐
-   │ ⚠ modify  function app.web.renderPost                   │
+   │ ⚠ affects  function app.web.renderPost                   │
    │   this node no longer exists in the graph               │
    │   closest matches:                                       │
    │     ƒ app.web.render_post_page        same file, similar │
@@ -302,7 +307,7 @@ node and creates a new one.
 ```
 
 The person clicks the first match. One operation moves the link, keeping its
-mode and note, and writes a note saying the link was repaired after a rename.
+mode and note, and writes a link_added event recording the repair.
 
 Nothing was repaired automatically, because a silent move changes what the plan
 means. The warning is visible and the fix is one click, which is the right
@@ -337,7 +342,7 @@ What the system does:
 
 ```
    moves VN-3 to done
-   writes a note: "closed with 2 children left open, on purpose"
+   writes a status_changed event recording that 2 children were left open
    VN-3's card shows  ✓ done · 3 of 5 · 2 left open
    VN-11 and VN-22 stay where they are, still visible inside VN-3
    VN-3's create links are checked: everything it promised exists  ⇒ verified

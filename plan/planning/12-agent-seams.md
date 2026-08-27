@@ -32,7 +32,7 @@ sentence.
 
 | The agent needs | This model already has |
 |---|---|
-| a work list | the active version's ordered children |
+| a work list | the task's children, ordered by `position` |
 | scope | the affects list, with modes |
 | context | the context list, plus the task's document |
 | a way to say what it did | link states, and the graph itself as the check |
@@ -57,28 +57,38 @@ the person are never looking at different answers.
 
 ### A planner
 
-The agent is given a task and proposes how to do it. It writes a **version**:
-a document, context links, affects links, and an ordered list of children.
+The agent is given a task and proposes how to do it: a document, context links,
+affects links, and an ordered set of children.
 
-Two seams make this safe.
+There are no draft versions to hide the proposal in, so the review gate is built
+out of the model's own parts.
 
-**Agent versions start as drafts.** A draft has no effect on the board, on
-conflicts, or on readiness. Nothing an agent proposes changes anybody's work
-until a person activates it. This mirrors the review gate the grouper tool
-already uses: propose, show, wait for approval.
+**An agent proposes into a separate task, not into the real one.** The agent
+creates a *proposal task* whose children are the steps it suggests. A proposal
+task is an ordinary task in every respect, which means it can be read, edited,
+commented on, and deleted with one cascade if it is rejected.
 
 ```
-   agent writes ──► version 2, draft, created_by: run 4f2a
+   agent writes ──► TASK "Proposal: comment write path"   created_by: run 4f2a
+                    ├── child  Write createComment()
+                    ├── child  Validate the post exists
+                    └── document explaining the approach
                     │
-                    │  a person reads it, edits it, compares it against v1
+                    │  a person reads it and edits it
                     ▼
-                    activate  ── or discard, which keeps it as a rejected idea
+   ACCEPT   reparent its children under the real task, copy the document across,
+            delete the proposal
+   REJECT   delete the proposal — one cascade, soft, undoable
 ```
 
-**`created_by` names the run.** Every task, version, link, and note records who
-made it, and an agent run is a valid author. So a person can see which parts of
-a plan were proposed rather than written, and a plan can be filtered by author
-when reviewing.
+This is the same review gate the grouper tool already uses — propose, show, wait
+for approval — built without a draft state that the rest of the model would have
+to know about.
+
+**`created_by` names the run.** Every task, link, and event records who made it,
+and an agent run is a valid author. So a person can see which parts of a plan
+were proposed rather than written, and a plan can be filtered by author when
+reviewing.
 
 ### An executor
 
@@ -96,11 +106,11 @@ records intent, and afterwards the commits say what actually happened.
 
 ```
    DECLARED            create   function app.services.createComment
-                       modify   class    app.models.Comment
+                       affects   class    app.models.Comment
 
    WHAT THE RUN DID    created  function app.services.createComment   ✓
-                       modified class    app.models.Comment           ✓
-                       modified class    app.models.Post              ← not declared
+                       affected class    app.models.Comment           ✓
+                       affected class    app.models.Post              ← not declared
 ```
 
 That last line is the useful one. It is not necessarily wrong; it is
@@ -125,10 +135,10 @@ concept.
 |---|---|
 | this step needs sub-steps | children on the task, in order |
 | I had to read this class too | a `read` link |
-| I ended up changing something extra | a `modify` link, with a note |
-| this approach will not work | a new version, as a draft, with a document explaining why |
+| I ended up changing something extra | a `affects` link, with a note |
+| this approach will not work | a comment event, and a proposal task if it has a better idea |
 | this cannot start until that lands | a suggested dependency, offered to a person |
-| I am not sure about this decision | a note on the task, and if it involves another task's work, a delegated conflict decision |
+| I am not sure about this decision | a comment event on the task, naming what it is unsure about |
 
 The fact that all six land somewhere without inventing anything is the sign the
 model is agent-ready. If an agent's normal discoveries had nowhere to go, they
@@ -138,8 +148,8 @@ would end up in chat transcripts, which nobody reads afterwards.
 
 ## 4. Undo, and why runs matter
 
-Because work lives in the same versioned database as the code graph, a run's
-writes are commits. That means an agent run can be undone as a range, which is
+Because work lives in the same database as the code graph, a run's writes are
+commits. That means an agent run can be undone as a range, which is
 the same mechanism the existing write tools use.
 
 The seam this requires: **every write an agent makes carries its run id**, so
@@ -155,16 +165,14 @@ same time produce exactly the situation [08](08-conflicts-and-concurrency.md)
 already describes, and the same four resolutions apply.
 
 ```
-   agent A executing VN-30, declared:  modify createComment()
-   agent B executing VN-11, declared:  modify createComment()
+   agent A executing VN-30, declared:  affects createComment()
+   agent B executing VN-11, declared:  affects createComment()
 
    ⚑ contested, visible to both, and to any person watching
 
    resolutions available:
      order them        → a real dependency, B waits
-     accept            → a person says it is fine
-     resolve           → one of them narrows its scope
-     delegate          → ask a person to decide
+     accept            → a person says it is fine, with a reason
 ```
 
 The valuable property is that this is visible **before either run starts
@@ -186,8 +194,9 @@ undeclared node, warned, or simply logged is a policy decision.
 children, its ancestors' documents — how much context is assembled per run is
 the agent's business.
 
-**Who approves what.** The model gives drafts and `created_by`. Whether every
-agent version needs approval, or only ones touching many nodes, is policy.
+**Who approves what.** The model gives proposal tasks and `created_by`. Whether
+every agent proposal needs approval, or only ones touching many nodes, is
+policy.
 
 **How an agent chooses what to do next.** The model offers reading order,
 readiness, priority, and dependencies. Which of those an agent weighs, and how,
@@ -195,7 +204,7 @@ is not specified here.
 
 **Conversation.** Where the chat between a person and an agent lives is not part
 of this model. Conclusions from a conversation belong on the task, as a document
-edit or a note. Transcripts belong wherever conversations already live.
+edit or a comment event. Transcripts belong wherever conversations already live.
 
 ---
 
@@ -206,11 +215,12 @@ changing the model.
 
 ```
    ① every derived value is available as data, not only rendered on screen
-   ② versions can be created as drafts that affect nothing until activated
+   ② a task can be created, filled in, and cascade-deleted cheaply, so a
+     proposal can be reviewed and thrown away without a special draft state
    ③ created_by on every record can name an agent run, not only a person
    ④ every write can carry a run id, so a run can be undone as a range
    ⑤ declared scope (links) and observed scope (commits) can be compared
-   ⑥ conflict decisions include delegation, so a question has somewhere to sit
+   ⑥ an agent's uncertainty lands as a typed event, not as a chat message
    ⑦ suggestions are always offered, never applied automatically
    ⑧ nothing an agent writes is a different shape from what a person writes
 ```

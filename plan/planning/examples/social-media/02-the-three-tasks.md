@@ -30,9 +30,6 @@ cards no matter how much detail is added underneath.
    description   People can create an account, log in, and be recognised on
                  later requests.
 
-   anchors       ⚓ folder  app/
-
-   ACTIVE VERSION  v1
    document      ## Approach
                  Passwords are hashed with a slow hash. Sessions are signed
                  cookies rather than tokens, because there is no second client
@@ -46,7 +43,14 @@ cards no matter how much detail is added underneath.
    children      1  VN-4   Password hashing
                  2  VN-5   Write current_user()
                  3  VN-6   Login page
+
+   location      app/          ← derived, not typed
 ```
+
+VN-1 was created by right-clicking `app/` on the canvas and answering "will this
+work read it, change it, or remove it?" with *change*, which wrote the one link
+above. The location line is that link's container, worked out at read time
+rather than typed by anybody.
 
 The order says something real. Hashing comes first because the other two use
 it. It does not block anything by itself, and the actual blocking comes from
@@ -84,9 +88,6 @@ checked it: `app.auth.hash_password` now exists in the graph, so VN-4 reads
    description   A post records who wrote it, and the post page shows the
                  author's name.
 
-   anchors       ⚓ class  Post
-
-   ACTIVE VERSION  v1
    document      ## Approach
                  Post gains an author_id pointing at User. Existing rows get
                  a placeholder account, since there is no way to recover who
@@ -94,6 +95,8 @@ checked it: `app.auth.hash_password` now exists in the graph, so VN-4 reads
 
    children      1  VN-16  Add an author_id field to Post
                  2  VN-17  Show the author on the post page
+
+   location      app/models.py     ← derived from the children's links
 ```
 
 ### Its children
@@ -111,9 +114,14 @@ checked it: `app.auth.hash_password` now exists in the graph, so VN-4 reads
 ```
 
 This is the clearest example of the five-node-kinds rule doing its job. VN-16 is
-entirely about a field, and it is recorded as a `modify` on the class with the
+entirely about a field, and it is recorded as an `affects` on the class with the
 field described in a sentence. Nothing about that is lossy for a reader, and it
 means the link can actually resolve.
+
+It is also the case where `affects` on a container is genuinely correct. Adding
+a field changes the class itself — its shape, its storage, its constructor — so
+the claim is about `class Post`. Contrast that with adding a *method*, which is
+a `create` link on the new function and leaves the class untouched.
 
 It also creates the project's first quiet signal. VN-16 is rewriting `class
 Post`, and two tasks in the comments tree plan to read it. That is a **watch**,
@@ -129,14 +137,21 @@ not a conflict, and it shows up as a small note rather than an alarm.
    description   People can comment on a post, see other comments, and
                  comments can be moderated.
 
-   anchors       ⚓ folder  app/
+   location      —     nothing linked yet
 ```
 
 At this moment VN-3 has no document, no links, and no children. It is a title
 and a sentence, which is a perfectly legal state, and it is where most work
 starts.
 
-Planning it properly is [03 — Planning comments](03-planning-comments.md).
+The empty location line is the point worth noticing. Nobody knows yet which code
+this will touch, so nothing claims to. There is no way to write down a vague
+gesture at `app/` that would *look* like the task is connected to the graph
+while telling nobody anything — and an empty line is the truthful version of
+"we have not worked this out yet".
+
+VN-3 gets real links the moment somebody plans it, which is
+[03 — Planning comments](03-planning-comments.md).
 
 ---
 
@@ -148,7 +163,6 @@ Planning it properly is [03 — Planning comments](03-planning-comments.md).
    description   Stop one account from posting or commenting hundreds of
                  times a minute.
 
-   ACTIVE VERSION  v1
    affects       ~ function  app.services.createPost
                  ~ function  app.services.createComment      ← does not exist yet
 ```

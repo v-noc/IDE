@@ -112,36 +112,7 @@ the relationship actually means.
 
 ---
 
-## Anchor
-
-**An anchor says roughly where in the codebase a task lives, and it survives
-every change of approach.**
-
-An anchor is a soft pointer to a graph node with the mode `about`. It is
-deliberately vague. It answers "if I am looking at this part of the code, which
-work is around here?" rather than "what exactly will change?".
-
-```
-   TASK VN-9  "Comment write path"
-     anchor  ──about──►  file  comment_service.py
-```
-
-Anchors already exist in the current system and their behaviour does not
-change. They are stored as a soft node id plus a snapshot of the node's name
-and kind, so that when the parser deletes the node, the anchor shows a warning
-with its last known name rather than turning into a broken reference.
-
-**An anchor is not:**
-
-- *A statement that the task will change that code.* That is what affected
-  nodes are for.
-- *Part of a version.* There are no versions. Anchors sit on the task.
-- *A hard database link.* The parser rewrites the graph constantly. A hard link
-  would either block the parser or break.
-
----
-
-## Node link, and the five modes
+## Node link, and the four modes
 
 **A node link is a pointer from a task to a graph node, carrying a mode that
 says what the work does to that node.**
@@ -150,18 +121,53 @@ This is one mechanism that produces two lists on screen.
 
 | Mode | Meaning | Shown as | Counts as a write? |
 |---|---|---|---|
-| `about` | This work is around here somewhere. Used by anchors. | anchor chip | no |
 | `read` | Somebody must read this to do the work, but it will not change. | **Context** | no |
 | `create` | This node does not exist yet and this work will create it. | **Affects** | yes |
-| `modify` | This node exists and this work will change it. | **Affects** | yes |
+| `affects` | This node's own body or signature changes. | **Affects** | yes |
 | `delete` | This node exists and this work will remove it. | **Affects** | yes |
+
+There is no vague mode. Every link makes a claim the graph can later confirm or
+contradict, which is what separates a plan from a list of sentences.
+
+**A task may link to any number of nodes, and no link is primary.** So *where
+does this work live?* — the question a breadcrumb and the canvas both need — is
+derived rather than recorded: take the nearest container holding every linked
+node, and show it when it is specific enough to be useful. If the nearest common
+container is a top-level folder or the repository itself, show the list of
+linked nodes instead.
+
+### `affects` means the node itself, never its contents
+
+Changes to a node's contents are derived from the links on those contents. They
+are never typed on the container.
+
+```
+   TYPED
+     create   function  Comment.validate     container: class Comment
+
+   DERIVED
+     touches  class Comment      it contains the new function
+     touches  file  models.py    it contains Comment
+```
+
+Write `affects class Comment` only when the class itself changes — a new field,
+a changed base class, a decorator.
+
+This rule is load-bearing. Without it, two tasks each adding a *different*
+method to `Comment` would both type "affects class Comment" and be reported as
+colliding when they do not collide, and every class in the codebase would become
+a permanent false alarm.
+
+The limit is worth naming: derived containment never verifies anything. Only
+explicit links have states, so a class is not verified because a function inside
+it appeared.
 
 ```
    TASK VN-9 "Comment write path"
      CONTEXT                         AFFECTS
      ───────                         ───────
      read  ──► class Post            create ──► function createComment()
-     read  ──► class User            modify ──► class Comment
+     read  ──► class User            affects ──► class Comment
      read  ──► function current_user()
 ```
 
@@ -182,7 +188,9 @@ the system knows what it touches because its children said so.
 - *A pointer at a field, a column, a parameter, or an endpoint.* Those are not
   nodes. The link points at the class or function that contains them, and the
   task's own words describe the detail.
-- *A hard database link.* Same reasoning as anchors.
+- *A hard database link.* The parser rewrites the graph constantly, so every
+  link is a soft node id plus a snapshot of the name and kind. When the node
+  disappears the link becomes a readable warning rather than a broken record.
 - *A permission.* It describes intent. Whether it is later used to scope what
   an agent is allowed to change is a separate decision, discussed in
   [12 — Agent seams](12-agent-seams.md).
@@ -234,7 +242,7 @@ The list of them is short and each one is defined precisely in later files.
 | Name | Meaning |
 |---|---|
 | blocked | A task this one depends on is not finished |
-| waiting on code | A `read` or `modify` link points at a node that does not exist yet |
+| waiting on code | A `read` or `affects` link points at a node that does not exist yet |
 | ready | Not blocked and not waiting |
 | progress | How many children are finished |
 | verified | Every `create` link now points at a node that really exists |
@@ -264,7 +272,7 @@ computes that fact fresh every time. What it cannot compute is whether the
 people involved have talked about it. So the only thing stored is the decision.
 
 ```
-   COMPUTED   function createComment() ← modify by VN-11 and by VN-30
+   COMPUTED   function createComment() ← affects by VN-11 and by VN-30
    STORED     "VN-11 and VN-30 on createComment(): ordered by Yared,
                reason: VN-11 waits for VN-30"
 ```
@@ -339,7 +347,6 @@ changed, link added, dependency added), and user events are typed by people
 | Task | yes | itself | only if a person deletes it |
 | Parent (parent_id) | yes | the child task | only if a person deletes or reparents it |
 | Position | yes | the task | when the child list order changes |
-| Anchor | yes | a task | its target node can, leaving a warning |
 | Node link | yes | a task | its target node can, leaving a warning |
 | Dependency | yes | a task | only if a person deletes it |
 | Event | yes | a task | only if a person deletes the whole task |

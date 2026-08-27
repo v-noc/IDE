@@ -65,7 +65,7 @@ Accepting them all produces this set of edges:
 
 Six edges, and every one of them has a reason recorded on both ends. Nobody had
 to remember anything, and nobody wrote "comments depends on authentication",
-which would have been the coarse and mostly wrong version of one of these.
+which would have been the coarse and mostly wrong form of one of these.
 
 Notice which edge did **not** get created:
 
@@ -198,7 +198,7 @@ blocked again on the next read, with no chance of a stale chip on either side.
 Worth showing, since it is the habit this design is trying to replace.
 
 ```
-   THE COARSE VERSION                     WHAT IT COSTS
+   THE COARSE EDGE                        WHAT IT COSTS
    ──────────────────                     ─────────────
    VN-3 ──depends_on──► VN-1              VN-8, VN-11, VN-22, VN-23 all wait
    "comments needs authentication"        for password hashing and a login
@@ -211,7 +211,7 @@ Worth showing, since it is the habit this design is trying to replace.
                                           usually wrong, and stop reading them.
 ```
 
-The precise version needs more edges, and every one of those edges is
+The precise form needs more edges, and every one of those edges is
 individually obvious, suggested by the system, and traceable to a node.
 
 Next: [06 — Conflicts](06-conflicts.md).

@@ -18,7 +18,7 @@ intend to write the same node.
 ```
    function  app.services.createComment
         ▲                          ▲
-        │ modify                   │ modify
+        │ affects                   │ affects
         │                          │
    VN-11  Comment moderation   VN-30  Rate limiting
    ○ to do                     ● in progress
@@ -43,13 +43,13 @@ overlap is.
 
 ```
                             THE OTHER TASK
-                 read      create     modify     delete
+                 read      create     affects     delete
              ┌──────────┬──────────┬──────────┬──────────┐
       read   │  quiet   │  quiet   │  watch   │  watch   │
              ├──────────┼──────────┼──────────┼──────────┤
     create   │  quiet   │ DUPLICATE│ conflict │ conflict │
   T          ├──────────┼──────────┼──────────┼──────────┤
-  H  modify  │  watch   │ conflict │ CONFLICT │ SEVERE   │
+  H  affects  │  watch   │ conflict │ CONFLICT │ SEVERE   │
   I          ├──────────┼──────────┼──────────┼──────────┤
   S  delete  │  watch   │ conflict │ SEVERE   │ duplicate│
              └──────────┴──────────┴──────────┴──────────┘
@@ -63,15 +63,15 @@ overlap is.
 | conflict | Both plan to write, in ways that will interfere | amber on both cards and on the node |
 | severe | One deletes what another is changing | red, because one side's work will simply vanish |
 
-The `about` mode never produces anything. Anchors are vague by design, and
-warning on vagueness would fill the screen with meaningless amber.
+There is no vague mode to exempt. Every link states one of four things, and the
+matrix has an answer for each pair.
 
 ### Why "watch" exists as its own level
 
 A reader under a writer is worth a quiet mention and nothing more.
 
 ```
-   VN-16  Add author to Post      modify  ──► class Post
+   VN-16  Add author to Post      affects ──► class Post
    VN-9   Comment write path      read    ──► class Post
 
    VN-9 is reading a class that is about to change. Its plan may be based on
@@ -85,28 +85,72 @@ change underneath it.
 
 ---
 
-## 3. What counts, and what does not
+## 3. Severity comes from task status
 
-Scope rules keep the signal honest. A conflict is only computed between:
+The mode matrix says how two intentions interact. It does not say how much
+either intention should be believed. A link on a task somebody is actively
+working on is a claim. The same link on a half-written idea in the backlog is a
+thought.
 
-- **open work.** A task in a done column has finished writing, so it stops
-  taking part in collision detection. What it did is now history, and history
-  belongs in commits.
-- **active versions.** A draft version is a thought, not an intention. Its
-  links do not collide with anything. This lets people write two competing
-  approaches without the two of them fighting each other on screen.
-- **the strongest link per task per node.** If a task both reads and modifies a
-  class, it counts as a modifier, once.
+**Task status already carries that difference**, so severity reads it directly:
 
-The last rule matters for the rollup. A parent's effective links include every
+| Situation | Warning |
+|---|---|
+| Two ready or in-progress tasks affect the same node | **conflict** — loud |
+| One ready, one draft | **watch** — quiet |
+| Two drafts | nothing |
+
+"Draft" means the backlog column — the one carrying `is_backlog`. Promoting a
+task out of the backlog is the moment its plan stops being an idea and starts
+being a claim, which is exactly when other people need to hear about it.
+
+### Why not a flag on the link
+
+The obvious alternative is a `source` or `typed / inferred` field on each link,
+so a link can mark itself provisional.
+
+That would be a second, parallel notion of "how serious is this", maintained by
+hand, drifting out of step with the status field that already exists and is
+already kept current because the board depends on it. Nobody updates a link's
+provisional flag when they start work; everybody moves the card.
+
+> **Use the state people already maintain. Do not invent a second one that
+> records the same thing worse.**
+
+**Known gap, accepted.** A task parked in draft forever, with links, warns
+nobody — and if it is genuinely being worked on from the backlog, the warning
+that should have fired never does. The answer is a housekeeping list — *draft
+tasks with links, unchanged for N days* — rather than a new field. A list can be
+ignored without corrupting anything; a stale flag cannot.
+
+---
+
+## 4. What else is excluded
+
+Two more scope rules keep the signal honest.
+
+- **Finished work stops colliding.** A task in a done column has finished
+  writing, so it leaves collision detection. What it did is now history, and
+  history belongs in commits.
+- **The strongest link per task per node counts once.** If a task both reads and
+  affects a class, it counts once, as a writer.
+
+The second rule matters for the rollup. A parent's effective links include every
 descendant's links, so a parent can appear to conflict with its own child if
 nobody is careful. The rule is that **a task never conflicts with its own
 ancestors or descendants**, because a family working on the same node is the
 normal case rather than a problem.
 
+Derived containment is excluded for the same reason. When VN-8 creates
+`Comment.validate`, `class Comment` shows up as touched by VN-8 — but that is
+containment, not a claim about the class, so it never triggers a warning. Only
+an explicit `affects class Comment` does. This is what stops every class in the
+codebase from being permanently amber, and it is why [05](05-graph-links.md) §3
+insists that `affects` means the node itself.
+
 ---
 
-## 4. Where a conflict is visible
+## 5. Where a conflict is visible
 
 The same computed fact appears in four places, all reading one summary rather
 than each working it out again.
@@ -129,11 +173,11 @@ than each working it out again.
 ```
 
 Clicking any of them opens the same small panel showing both tasks, what each
-one intends to do, and the four resolutions.
+one intends to do, and the two resolutions.
 
 ---
 
-## 5. The four ways a conflict ends
+## 6. The two ways a conflict ends
 
 ### Decide the order
 
@@ -145,8 +189,8 @@ one ordering edge the system already has.
 ```
    BEFORE                                AFTER
    ──────                                ─────
-   VN-11 modify createComment()          VN-11 ──depends_on──► VN-30
-   VN-30 modify createComment()
+   VN-11 affects createComment()          VN-11 ──depends_on──► VN-30
+   VN-30 affects createComment()
 
    ⚑ CONFLICT                            ⏭ SEQUENCED
                                          VN-30 goes first.
@@ -175,26 +219,27 @@ The warning goes quiet and stays quiet unless the links change. If either side
 later adds a link that makes the situation worse, the decision is shown as no
 longer covering the current situation, and the warning comes back.
 
-### Resolve it by changing the work
+### Why only two
 
-Somebody narrows a scope, moves a change into the other task, or splits a
-function in two. The links stop overlapping, and the conflict disappears on its
-own because it was never stored. The decision record explains what was done, so
-the next person understands why the shape of the work is what it is.
+Two other outcomes were on the table and were cut, because neither had a
+mechanism behind it.
 
-### Delegate it
+**Changing the work so the links no longer overlap** is not a decision the
+system needs to record. Somebody narrows a scope or splits a function, the links
+stop overlapping, and the conflict disappears on its own — it was never stored.
+The reasoning belongs in the task's document, where a reader will actually find
+it.
 
-The two people involved cannot settle it. The record names who is being asked
-to decide, and the conflict stays visible until they do.
+**Delegating the decision to somebody else** was a record with nobody attached
+and nothing that happened next. When there is a real assignment model, this can
+come back as an assignment. Until then it is a note that looks like a workflow.
 
-This is the seam that a future agent workflow would use. An agent that finds
-itself planning work over a node another agent is rewriting has somewhere to
-put the question, and a human has somewhere to answer it. Nothing about that
-workflow is designed here; the point is that the model can hold the situation.
+`ordered` writes a real dependency edge. `accepted` silences a warning under a
+stated condition. Both change what the system does. That is the bar.
 
 ---
 
-## 6. The best conflict is the one found before anybody writes code
+## 7. The best conflict is the one found before anybody writes code
 
 The strongest signal this system produces does not need any code to exist yet.
 
@@ -211,35 +256,9 @@ in different weeks, probably without knowing about each other. In every other
 tool this is found in code review, or never. Here it is found while both are
 still just text.
 
-The resolution is usually a merge: one task is deleted, or one becomes a child
-of the other, and the surviving task inherits the useful parts of both
+The resolution is usually a merge: one task is deleted, or one is reparented
+under the other, and the surviving task inherits the useful parts of both
 documents.
-
----
-
-## 7. Relationship to the existing hot node idea
-
-The current system already has something close to this: a node is **hot** when
-two or more open tasks anchor to it. That idea is kept, and this is a sharper
-version of it.
-
-```
-   TODAY                              WITH MODES
-   ─────                              ──────────
-   two tasks anchored here            two tasks intend to MODIFY this
-   ⇒ hot                              ⇒ conflict
-
-                                      one modifies, two read
-                                      ⇒ watch, quieter
-
-                                      two anchored, no links written
-                                      ⇒ still hot, same as today
-```
-
-Nothing regresses. A task with only anchors and no links still contributes to
-the hot count exactly as it does now, so the existing canvas badges and the
-sidebar blockers list keep working while links are gradually adopted. Tasks
-that have links get the sharper signal.
 
 ---
 
@@ -274,16 +293,16 @@ warning survives.
    Monday
    ──────
    Yared plans VN-30 "Rate limiting", and records:
-       modify  function app.services.createComment
+       affects  function app.services.createComment
    Nothing else touches it. No warning.
 
    Tuesday
    ───────
    Someone plans VN-11 "Comment moderation", and records:
-       modify  function app.services.createComment
+       affects  function app.services.createComment
 
    Immediately, on both cards and on the node:
-       ⚑ contested — createComment() is being modified by 2 open tasks
+       ⚑ contested — createComment() is being affected by 2 open tasks
 
    Tuesday afternoon
    ─────────────────

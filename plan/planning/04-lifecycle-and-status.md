@@ -1,8 +1,7 @@
 # 04 — Lifecycle and Status
 
-This file covers how a task moves through its life, how a version moves through
-its life, and what the word "done" means when work is a tree instead of a flat
-list.
+This file covers how a task moves through its life, and what the word "done"
+means when work is a tree instead of a flat list.
 
 There are two separate things that people usually confuse, and keeping them
 apart makes the rest simple.
@@ -47,13 +46,13 @@ which is covered in section 4.
 
 Every task carries a computed condition alongside its status. Conditions are
 never stored, because every one of them can change without anybody touching
-the task: somebody else finishes their work, a reparse deletes a node, a
-version is activated in another part of the tree.
+the task: somebody else finishes their work, a reparse deletes a node, a task
+is moved in another part of the tree.
 
 | Condition | True when | Shown as |
 |---|---|---|
 | `blocked` | Something in `depends_on` is not finished | red chip naming the blocker |
-| `waiting on code` | A `read`, `modify`, or `delete` link points at a node that does not exist yet | amber chip naming the node |
+| `waiting on code` | A `read`, `affects`, or `delete` link points at a node that does not exist yet | amber chip naming the node |
 | `ready` | Neither of the above | no chip |
 | `contested` | Another open task intends to write a node this one writes | amber chip on the card and the node |
 | `verified` | Every `create` link now points at a node that really exists | green tick next to done |
@@ -136,7 +135,7 @@ So the system asks instead of refusing.
    └───────────────────────────────────────────────────────────┘
 ```
 
-Whatever is chosen becomes a note on the parent, so the record explains itself
+Whatever is chosen becomes an event on the parent, so the record explains itself
 later.
 
 ### A tree is finished when nothing inside it is open
@@ -156,7 +155,7 @@ confused.
 
 ---
 
-## 5. How condition rolls up the tree
+## 4. How condition rolls up the tree
 
 Blocking is the one condition that must travel upward, because a person looking
 at a high level card needs to know that something inside is stuck, without
@@ -187,7 +186,7 @@ instead of per card.
 
 ---
 
-## 6. Reopening, and moving backwards
+## 5. Reopening, and moving backwards
 
 A task can move from done back to any other column. When that happens, three
 things follow automatically.
@@ -206,7 +205,7 @@ stale "blocked" flag on the other side, because there was never a flag.
 
 ---
 
-## 7. The full picture
+## 6. The full picture
 
 ```
    TASK VN-9  "Comment write path"

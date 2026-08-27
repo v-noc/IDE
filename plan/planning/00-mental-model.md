@@ -29,12 +29,13 @@ where the thinking lives.
    │                it, what was considered and rejected, the shape of the │
    │                code, anything a reader needs to actually do the work. │
    │                                                                       │
-   │  anchors       Roughly where this work lives in the codebase.         │
-   │                                                                       │
    │  context       The nodes somebody must read to do this work, but will │
    │                not change. Optional.                                  │
    │                                                                       │
    │  affects       The nodes this work will create, change, or delete.    │
+   │                                                                       │
+   │                Where the work lives is not a field. It is derived     │
+   │                from the nodes above.                                  │
    │                                                                       │
    │  children      An ordered list of smaller tasks, if it has any.       │
    │                                                                       │
@@ -119,17 +120,27 @@ Every task can point at nodes in the code graph, and each pointer carries a
 ```
    TASK "Comment write path"
         │
-        ├── read ────────►  class Post
-        ├── read ────────►  function current_user()
-        ├── create ──────►  function createComment()
-        └── modify ──────►  class Comment
+        ├── read ───────►  class Post
+        ├── read ───────►  function current_user()
+        ├── create ─────►  function createComment()
+        └── affects ────►  class Comment
 ```
 
+There are four modes — `read`, `create`, `affects`, `delete` — and no vague one.
 The modes that only read become the **Context** list when the task is displayed,
 and the modes that write become the **Affects** list. Underneath they are the
 same mechanism, which is what allows a single question to be asked from the
 other direction: *given this function, which tasks are about to touch it, and
 are any of them going to change it?*
+
+Because there is no vague mode, **every link makes a claim the graph can check**.
+That is the whole reason for putting work on top of a graph, and it is why an
+earlier "this work is around here somewhere" pointer was removed rather than
+kept for convenience.
+
+It also means the task never says where it lives. That question is answered by
+looking at the links: the nearest container holding all of them, shown when it
+is specific enough to be useful.
 
 There is one rule about the code side that never bends anywhere in this design.
 
@@ -140,7 +151,7 @@ There is one rule about the code side that never bends anywhere in this design.
 When a piece of work is about a field, it links to the class or function that
 contains the field, and the field is described in the task's own words. So a
 task titled "Add an `author_id` field to Comment" links to the class `Comment`
-with mode `modify`, and the sentence carries the detail. This keeps the
+with mode `affects`, and the sentence carries the detail. This keeps the
 planning layer honest about what the parser really produces, and it means no
 task can ever point at a node kind that does not exist.
 
@@ -178,7 +189,7 @@ the model rather than as a later interface decision.
 
 ---
 
-## 6. How deep the tree should go
+## 5. How deep the tree should go
 
 Nothing in the model stops somebody from building a tree six levels deep, so
 guidance has to do that work instead of a rule. A rule would be wrong anyway,
@@ -201,8 +212,8 @@ tasks.
                                               VN-24  Add the save call
 ```
 
-The version on the right is not more precise. It is the same information spread
-across five cards, and each of those cards now needs a status, a position, and
+The breakdown on the right is not more precise. It is the same information
+spread across five cards, and each of those cards now needs a status, a position, and
 possibly a dependency of its own. All of that belongs in the document of VN-20,
 where it reads as one paragraph and costs nothing to maintain.
 
@@ -218,7 +229,7 @@ break down.
 
 ---
 
-## 7. Dependencies point at tasks, at any depth
+## 6. Dependencies point at tasks, at any depth
 
 Work often has to happen in a certain order, and the reason is usually
 specific. It is rarely "all of authentication must be finished". It is usually
@@ -233,7 +244,7 @@ real reason, and it always points at something durable.
 ```
 
 Both ends are real tasks with their own identity and status. Either side can be
-rewritten, moved to a different parent, or given a second version, and the
+rewritten, moved to a different parent, or broken into children, and the
 dependency still means what it meant, because it points at the work itself
 rather than at somebody's current description of the work.
 
@@ -258,7 +269,7 @@ offer the dependency instead of hoping a human remembers it.
 
 ---
 
-## 8. Two tasks touching the same code
+## 7. Two tasks touching the same code
 
 Once tasks name the nodes they affect, a question that no ordinary task board
 can answer becomes easy: *is anybody else about to touch this?*
@@ -266,7 +277,7 @@ can answer becomes easy: *is anybody else about to touch this?*
 ```
    function createComment()
         ▲                    ▲
-        │ modify             │ modify
+        │ affects             │ affects
         │                    │
    VN-11 "Moderation"    VN-30 "Rate limiting"        ← both plan to change it
 ```
@@ -310,25 +321,23 @@ That is the trade this design makes deliberately.
 
 ---
 
-## 10. The whole model on one screen
+## 9. The whole model on one screen
 
 ```
                      ┌───────────────────────────────────────────────┐
    THE BOARD  ────►  │  TASK                                         │
    SHOWS ONE         │  key · title · description · type · status    │
-   LEVEL OF          │  priority · labels · anchors · depends_on     │
-   THESE             │  notes                                        │
-                     └────────────────┬──────────────────────────────┘
-                                      │ has one or more versions,
-                                      │ exactly one of them active
-                     ┌────────────────▼──────────────────────────────┐
-                     │  VERSION   (invisible while there is only one) │
-                     │  document · context nodes · affected nodes    │
-                     │  ordered list of child task references        │
-                     └───────┬────────────────────────┬──────────────┘
-                             │                        │
-                             │ children               │ links, each with a mode
-                             ▼                        ▼
+   LEVEL OF          │  priority · labels · rank · events            │
+   THESE             │  document                                     │
+                     │  parent_id ─┐   position                      │
+                     └──────┬──────┼───────────────┬─────────────────┘
+                            │      │               │
+                            │      │ points UP at  │ links, each with a mode
+                            │      │ one parent    │ read·create·affects·delete
+                            │      │               │
+              children:     │      └──────────►    │
+              the reverse   │        one TASK      │
+              of parent_id  ▼                      ▼
                      ┌────────────────┐   ┌───────────────────────────┐
                      │  TASK          │   │  GRAPH NODE               │
                      │  (recursion)   │   │  folder · file · class ·  │
@@ -339,13 +348,15 @@ That is the trade this design makes deliberately.
                                           │  task, linked to the class│
                                           │  or function holding it.  │
                                           └───────────────────────────┘
+
+              plus one more edge, task to task:   depends_on
 ```
 
-Two stored relationships hold the whole system together. A version refers to
-child tasks in order, and a task depends on another task. Everything else that
-the product needs to know — whether something is blocked, whether a node is
-contested, how much of a tree is finished, which work touches a given function
-— is computed from those two relationships plus the links into the graph.
+Three stored edges hold the whole system together. A child points up at its one
+parent, a task depends on another task, and a task links to a graph node with a
+mode. Everything else the product needs to know — whether something is blocked,
+whether a node is contested, how much of a tree is finished, which work touches
+a given function — is computed from those three.
 
 The next file, [01 — Concepts](01-concepts.md), defines each term precisely,
 including what each one is deliberately not.

@@ -23,21 +23,26 @@ error code. A sentence naming what was wrong and what to do instead.
 Takes the task whose children should be shown, or nothing for the root level.
 
 Returns the tasks at that level with everything computed: status, blocked,
-waiting on code, ready, progress, rollup counts, contested markers, shared and
-orphaned flags, and the breadcrumb path to the current level.
+waiting on code, ready, progress, rollup counts, contested markers, and the
+breadcrumb path to the current level.
 
-The root level returns every task that no active version refers to. That
-includes brand new tasks nobody has placed yet and orphans left behind by a
-version change, which is exactly right, because both are things somebody needs
-to look at.
+The root level returns every task `where parent_id is null`. Brand new tasks
+nobody has placed yet and deliberate top-level goals are the same thing, which
+is now correct rather than a conflation.
+
+Every read filters `deleted_at is null` by default.
 
 ### Task detail
 
-Takes one task. Returns everything about it: its fields, its active version
-with the document, the context and affects lists with each link's computed
-state, its children with their conditions, its dependencies in both directions
-with breadcrumbs, its conflicts, its other versions in summary form, and its
-notes.
+Takes one task. Returns everything about it: its fields, its document, the
+context and affects lists with each link's computed state, its children with
+their conditions, its dependencies **in both directions** with breadcrumbs, its
+conflicts, and its events.
+
+Both dependency directions matter more than they used to. With a single parent,
+a genuinely shared step lives under one parent and the other side sees it only
+as a dependency. Without a reverse list, that relationship is invisible from one
+end.
 
 This is the only read that returns a full document, which keeps the board
 payload small.
@@ -50,12 +55,6 @@ a dependency, and whether anything plans to create a node with that name.
 
 One call serves the canvas badges, the node popover, the sidebar tree badges,
 and the contested list. Nothing recomputes this for itself.
-
-### Version comparison
-
-Takes a task and two of its versions. Returns the four things a version owns,
-side by side: summary, document, links grouped by mode, and children with a
-marker on the ones that appear in both.
 
 ### Suggestions
 
@@ -76,66 +75,87 @@ is applied automatically.
 
 ### Create a task
 
-Takes a title, and optionally a parent to attach it to, a position in that
-parent's list, a first anchor, and a description.
+Takes a title, and optionally a parent, a position among that parent's children,
+a first link with its mode, and a description.
 
-Guarantees: a key is minted, a first version is created and made active, and if
-a parent was given, the reference is added to that parent's active version. A
-task created without a parent is a root task, which is normal and not an error.
+Guarantees: a key is minted, `parent_id` and `position` are set if a parent was
+given, and a `task_created` event is written. A task created without a parent is
+top-level, which is normal and not an error.
 
 ### Update a task's fields
 
-Title, description, type, priority, labels. Ordinary, and no rules attached.
+Title, description, type, priority, labels, document. Ordinary, and no rules
+attached.
 
 ### Move a task to another column
 
-Takes a status and a position. Writes a note. If the task has children that are
-not finished and the target column means done, it asks what should happen to the
-children rather than deciding, as described in
+Takes a status and a rank. Writes a `status_changed` event. If the task has
+children that are not finished and the target column means done, it asks what
+should happen to the children rather than deciding, as described in
 [04](04-lifecycle-and-status.md).
 
 ### Move a task to a different parent
 
-Takes the new parent and a position, and optionally the old parent to remove it
-from. Because a task can have several parents, adding and removing are separate
-things, and moving is simply both at once.
+Takes the new parent (or null for top-level) and a position. This is **one
+write**: it sets `parent_id` and `position` on the task being moved. There is no
+"remove from old parent" step, because the old parent never held a list.
 
-Refuses if the move would put a task inside itself, naming the cycle.
+Guarded on both sides, per [rules.md](rules.md) §6:
+
+| Case | Verdict |
+|---|---|
+| new parent is a descendant of the task | refuse — containment cycle, name the path |
+| the task depends on the new parent | refuse, name the dependency edge to remove |
+| the new parent depends on the task | drop that dependency, write an event |
+
+Writes a `parent_changed` event carrying the old and new parent.
 
 ### Delete a task
 
-Removes it, removes every reference to it from every version that names it, and
-removes every dependency pointing at it, writing a note on each affected task.
+**Deletes the whole subtree.** Every descendant gets `deleted_at` set and a
+shared `deleted_batch_id`, so one undo restores all of it.
 
-Children are **not** deleted. They may have other parents, and even when they do
-not, silently deleting work because its parent was deleted is the one thing this
-design refuses to do. Children with no remaining parent become root tasks, where
-they are visible.
+Before deleting, the caller gets the blast radius: how many tasks will be
+removed, and every dependency that crosses the boundary.
 
-Refuses to delete a task that has children unless the caller confirms, and says
-how many children will become root tasks.
+```
+   Deleting VN-3 removes 7 tasks.
+   2 tasks outside this subtree depend on tasks inside it:
+      VN-9  ──depends_on──►  VN-5
+      VN-14 ──depends_on──►  VN-6
+   These tasks will no longer be blocked.
+```
+
+On confirm: soft-delete the subtree, remove those inbound `depends_on` edges,
+and write an event on each affected outside task so nobody's card silently
+turns ready.
+
+If a child should survive, the answer is to reparent it out of the subtree
+first. The confirmation offers exactly that.
+
+### Restore a delete
+
+Takes a `deleted_batch_id`. Clears `deleted_at` on every task in the batch and
+writes a `restored` event.
+
+If the restored subtree's root has a `parent_id` pointing at a task that is
+still deleted, the root comes back as top-level and the event records it.
 
 ---
 
 ## 3. Children
 
-### Add a child reference
+Children are a query, not a stored list, so there are no add or remove
+operations here. Attaching a child **is** setting its `parent_id`, which is the
+reparent operation above.
 
-Takes a version, a task, and a position. Adding a task that is already in the
-list moves it to the new position rather than duplicating it.
+### Reorder siblings
 
-Refuses if the child is an ancestor of the parent, naming the cycle.
+Takes a task and its new `position`. Lexorank means inserting between two
+siblings is one write that touches no other row.
 
-### Remove a child reference
-
-Removes the pointer. The task itself is untouched and becomes orphaned if no
-other active version refers to it, which is a state rather than a problem.
-
-### Reorder children
-
-Takes the version and the new order. Order is reading advice and never blocks
-anything, so this operation has no consequences beyond display and the order an
-agent reads.
+Order is reading advice and never blocks anything, so this operation has no
+consequences beyond display and the order an agent reads.
 
 ### Promote and split
 
@@ -151,27 +171,32 @@ create and a set of adds, with a note recording the split.
 
 ---
 
-## 4. Links and anchors
+## 4. Links
+
+There is one way a task points at code, so there is one set of link operations.
 
 ### Add a link
 
-Takes a version, a node, and a mode. The node is given either by id, for
-something that exists, or by name and kind, for something that does not exist
-yet.
+Takes a task, a node, and a mode. The node is given either by id, for
+something that exists, or by **container plus leaf name plus kind**, for
+something that does not exist yet. The qname is derived from those three, never
+free-texted, because a typo leaves a link pending forever and that looks
+identical to work never being done.
 
 Adding a link that is already there with the same mode does nothing. Adding one
-that exists with a different mode changes the mode and writes a note, since
+that exists with a different mode changes the mode and writes an event, since
 that is what the caller meant.
 
 Refuses `create` on a node id that already exists, saying that the node is
-already there and asking whether `modify` was meant. Refuses `create`, `modify`
+already there and asking whether `affects` was meant. Refuses `create`, `affects`
 and `delete` on call nodes, and offers the containing function instead.
 
 ### Remove a link
 
-Keyed by the node, never by a position in a list. A position shifts when
-somebody else edits the same version, and a retry after a timeout would then
-remove the wrong thing.
+Keyed by the node — by `node_id` when it resolves, by `(qname, kind)` when it
+does not — never by a position in a list. A position shifts when somebody else
+edits the same task, and a retry after a timeout would then remove the wrong
+thing.
 
 ### Move a link
 
@@ -179,11 +204,13 @@ One operation that changes which node a link points at, keeping its mode and
 note. This is what repairs a link after a rename, and it is the same operation
 whether the old node still exists or not.
 
-### Anchors
+**All three are idempotent and keyed by the node, never by list index**, which
+is what lets any of them be retried safely after a timeout.
 
-Add, remove, and move, all keyed by node id, all idempotent, exactly as they
-work today. Anchors sit on the task rather than on a version and are unchanged
-by activation.
+There is no separate write for a container. A task that adds a method to a class
+writes one `create` link on the function; the class's involvement is derived.
+Writing `affects class Comment` is a different claim — the class itself changes
+— and the API does not conflate them.
 
 ---
 
@@ -204,7 +231,7 @@ Takes two tasks. Refuses in three cases, each with its own sentence:
 
 ### Remove a dependency
 
-Idempotent. Writes a note on both sides.
+Idempotent. Writes a `dependency_added` event on both sides.
 
 ---
 
@@ -217,14 +244,14 @@ stored.
 
 ### Record a decision
 
-Takes the node, the tasks involved, and one of the four decisions.
+Takes the node, the tasks involved, and one of the two decisions.
 
 `ordered` also creates the dependency, in one operation, so the agreement and
 its consequence cannot get out of step. If that dependency would be refused for
 any of the reasons above, the whole decision is refused and the reason is shown.
 
-`accepted`, `resolved`, and `delegated` record the decision without changing any
-work.
+`accepted` records the decision with its reason and changes no work. The warning
+stays quiet unless the links change.
 
 ### Retire a decision
 
@@ -256,11 +283,11 @@ plan in another panel, and it uses the socket layer that already exists.
 | Not built | Why |
 |---|---|
 | Bulk import of tasks | Nothing needs it yet, and it invites badly shaped trees created in one go |
-| Templates | A fork of an existing version covers most of what a template would do |
+| Templates | Copying a task and its subtree covers most of what a template would do |
 | Assignment and notifications | Postponed, listed in [16](16-open-questions.md) |
 | Automatic dependency creation | Suggestions only. An invented dependency misleads everybody who reads the board |
 | Automatic link repair after a rename | Suggestions only, for the same reason |
-| Archiving | Deleting and orphaning cover the real cases, and an archive is a third state that needs its own rules everywhere |
+| Archiving | Soft delete already keeps the record and supports undo; an archive would be a third state needing its own rules everywhere |
 
 The next file, [11 — UI surfaces](11-ui-surfaces.md), shows where each of these
 operations is triggered from.

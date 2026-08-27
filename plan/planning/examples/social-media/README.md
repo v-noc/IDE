@@ -8,10 +8,10 @@ The application starts with users and posts. Three pieces of work are added:
 people should be able to log in, posts should know who wrote them, and posts
 should have comments.
 
-That is enough to exercise everything: a tree several levels deep, two
-competing approaches, code that does not exist yet, dependencies discovered
-from the graph, two collisions resolved in two different ways, and both lookup
-directions.
+That is enough to exercise everything: a tree several levels deep, a real
+decision between two approaches recorded in a document, code that does not exist
+yet, dependencies discovered from the graph, two collisions resolved in two
+different ways, and both lookup directions.
 
 ## Read in this order
 
@@ -26,11 +26,9 @@ examples/social-media/
 │
 ├── 03-planning-comments.md
 │      The comments task planned properly: document, context, affects, and
-│      an ordered list of children. The tree grows to three levels.
-│
-├── 04-alternative-versions.md
-│      A second approach to comments, compared side by side, and what happens
-│      when it is activated and then reverted.
+│      ordered children. The tree grows to three levels, and a real decision
+│      between two approaches is recorded in a document rather than in a
+│      second object.
 │
 ├── 05-dependencies-and-readiness.md
 │      Every dependency in the project, where each came from, and exactly
@@ -64,3 +62,6 @@ examples/social-media/
 
 Everything else in this example is planned before it exists, which is the
 point.
+
+> **Note.** `04-alternative-versions.md` was deleted when versions were removed
+> from the model, which is why the numbering skips from 03 to 05.

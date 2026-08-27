@@ -42,7 +42,7 @@ carries the detail.
 ```
    TASK  VN-16   "Add an author_id field to Post"
 
-     link   modify   class  app.models.Post
+     link   affects   class  app.models.Post
      note   "adds author_id pointing at User, required, indexed"
 ```
 

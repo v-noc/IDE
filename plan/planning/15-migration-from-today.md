@@ -31,8 +31,9 @@ three.
 separate type. The recursive model is a continuation of that decision, where
 every task can have children.
 
-**Anchors are soft.** A node id plus a snapshot of the name and kind, so a
-deleted node produces a readable warning rather than a broken record. Every
+**Pointers into the graph are soft.** A node id plus a snapshot of the name and
+kind, so a deleted node produces a readable warning rather than a broken record.
+The anchor field itself is going away, but this property of it is kept and every
 link in this design follows the same rule.
 
 **Hotness is computed.** Nothing stores whether a node is contested. The
@@ -47,13 +48,13 @@ derivation discipline in this design extends that to everything.
 | Task | Task | Gains `document`, `node_links[]`, `parent_id`, `position`, `events[]` |
 | `subtask_ids` set | `parent_id` on child + `position` | Moves from parent to child; gains order |
 | `blocked_by` | `depends_on` | Same edge, clearer name, plus guards |
-| Anchors | Anchors, mode `about` | Unchanged |
+| `anchors[]` | `node_links[]` with mode `affects` | Field removed; every anchor converts |
 | Notes | Events | Typed, machine-readable, same purpose |
 | Board & columns | Board & columns | Unchanged, plus a level in the interface |
 | Version entity | *removed* | Document and links move to Task |
 | — | Single-parent tree | No DAG, no shared children, cascade delete |
 | — | Soft delete | `deleted_at`, `deleted_batch_id`, undo via restore |
-| — | Node links with modes | `create`, `modify`, `delete`, `read`, `about` |
+| — | Node links with modes | `read`, `create`, `affects`, `delete` — four, none vague |
 | — | Conflict decisions | Two outcomes: `ordered` or `accepted` |
 
 The critical lines: every child gets a `parent_id` field (not a set on parent),
@@ -153,6 +154,49 @@ Add to every task:
 Today, deleting is hard delete. After migration, deleting becomes soft delete.
 A single undo restores the whole subtree via `deleted_batch_id`.
 
+### Step 3.7 — Convert anchors to links
+
+Every existing anchor becomes a node link:
+
+```
+FOR EACH task, FOR EACH anchor:
+  create node_link(
+    node_id  = anchor.node_id,      # unchanged
+    qname    = anchor.qname,        # unchanged
+    kind     = anchor.kind,         # unchanged
+    mode     = "affects"
+  )
+  write_event(task, "link_added",
+              {mode: "affects", qname: anchor.qname,
+               note: "converted from anchor"})
+drop the anchors[] field
+```
+
+The node id and the name snapshot carry over exactly. Only the mode is new, and
+the event makes the change visible in each task's history rather than having
+links appear from nowhere.
+
+**Why `affects` and not `read`.** An anchor meant "this work is around here",
+which in practice nearly always meant the work would change that code — that is
+why people anchored it. `read` would understate it and quietly remove those
+nodes from collision detection, which is the opposite of what the shipped hot
+rule did. `affects` preserves the existing behaviour: two open tasks on one node
+still produce a signal.
+
+**Expect a burst of warnings, and check it before shipping.** Converted anchors
+enter collision detection with a real mode, so pairs that used to show a mild
+"hot" badge can now show a conflict. The status rule absorbs most of this — two
+backlog tasks say nothing at all — but the pairs where both sides are in
+progress will go loud. Run the conversion in a dry run first and count the
+conflicts it would produce. If the number is large, that is information about
+the codebase worth having before anybody sees amber everywhere.
+
+**What is not attempted.** No migration tries to guess whether an anchor should
+have been `read`, or whether it should have pointed at a function inside the
+anchored class instead. Both would be guesses, and a wrong mode written by a
+script is indistinguishable from one a person chose. People correct them as they
+touch the tasks.
+
 ---
 
 ## 4. What to check before calling it done
@@ -164,7 +208,9 @@ no dependency points at an ancestor
 no dependency cycle exists
 every existing subtask appears under exactly one parent
 deleting a task removes its whole subtree and nothing outside it
-a task with anchors and no links still contributes to the hot-node count
+every anchor that existed before migration is now an affects link
+the anchors[] field is gone, and no code reads it
+two tasks adding different methods to one class do not collide
 all existing notes converted to events, readable at display time
 ```
 
@@ -208,15 +254,19 @@ at scale cannot work until nodes are linked.
 
 **What to build:**
 
-- Add `node_links[]` to tasks with modes: `read`, `create`, `modify`, `delete`
+- Add `node_links[]` to tasks with modes: `read`, `create`, `affects`, `delete`
+- Convert every anchor to an `affects` link and drop `anchors[]` (Step 3.7)
+- Enforce that `affects` names the node itself — adding a method writes a link
+  on the function, not on the class
+- Derive the location line from the nearest common container of a task's links
 - Implement pending/fulfilled states for `create` links
 - Implement binding: when parser produces a node matching (qname, kind),
   write a `verified` event with graph revision
 - Index node links two ways: by node_id (for fulfilled) and by (qname, kind)
   (for pending)
 - Add "Ghost nodes" render on canvas for pending creates
-- Extend the hot-node summary to include link modes, keeping the current rule
-  for tasks with anchors but no links
+- Turn the anchor summary endpoint into the node work summary, reading links
+  with their modes
 
 **What this alone gives:** "waiting on code" warnings, verification that what
 you planned was actually written, and the node-to-tasks lookup with modes. This
@@ -276,9 +326,12 @@ no dependency points at an ancestor or descendant
 no dependency cycle exists
 every existing subtask appears under exactly one parent
 deleting a task removes its whole subtree atomically
-a create link bound to a real node turns "done" into "done, verified"
-a task with anchors and no links still contributes to hot-node count
 soft delete restores whole subtree via deleted_batch_id
+a create link bound to a real node turns "done" into "done, verified"
+every anchor that existed before migration is now an affects link
+the anchors[] field is gone, and no code reads it
+two tasks adding different methods to one class do not collide
+two backlog tasks affecting one node produce no warning
 ```
 
 ---
@@ -292,8 +345,9 @@ using the link index.
 **Hard links between tasks.** Task-to-task references stay real links for
 referential integrity on children and dependencies.
 
-**Soft links into the graph.** Node links are soft like anchors: id plus
-snapshot. A hard link would either block the parser or break on rename.
+**Soft pointers into the graph.** Node links stay soft, the way anchors were: an
+id plus a name snapshot. A hard link would either block the parser's deletes or
+break on rename. The anchor field goes; this property of it stays.
 
 **The board.** Columns, flags, drag-and-drop, and ranks all stay. The level is
 a view layered on top.

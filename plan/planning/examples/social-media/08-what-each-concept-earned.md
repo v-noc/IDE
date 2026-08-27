@@ -39,40 +39,46 @@ line of planning.
 
 ---
 
-## Versions — many approaches, one active
+## One parent per task
 
-**Take them away.** One plan per task, edited in place.
+**Take it away.** Let a task be a child of several parents, so genuinely shared
+work can sit in both places.
 
-**What breaks.** The comments task had two genuinely different approaches, and
-the comparison in [04](04-alternative-versions.md) is what made the choice
-obvious: one approach adds a class nothing else touches, the other rewrites a
-class three other tasks are already involved with.
+**What breaks.** Nothing visible on day one, which is why it is tempting. What
+breaks is everything downstream. Progress counting has to deduplicate. Deleting a
+parent cannot decide whether a child should survive. A task can become
+unreachable from every plan while still existing, so an orphan concept has to be
+invented, given a home on the root board, and explained to everybody.
 
-Without versions, that comparison happens in somebody's head or in a document
-nobody can find, and the rejected approach disappears entirely. Six months later
-the question "why didn't we just store comments in the post?" has no recorded
-answer.
+In this example VN-12 "Show comments on the post page" is the shared-looking one:
+comments need it, and a later post-page task will want it too. Under one parent
+it lives inside VN-3, and the post-page task simply depends on it. That says
+something truer than shared containment did — the post-page work is not
+responsible for VN-12, it is waiting on it — and it costs one edge the system
+already has.
 
-**Earned.**
+**Earned**, and it removed three concepts (`is_shared`, `is_orphaned`,
+`all_parents`) rather than adding one.
 
 ---
 
-## Reference, not ownership — versions point at children
+## Alternatives in the document, not in a second object
 
-**Take it away.** Let the approach own its steps.
+**Take it away.** Give every task a set of versions, one of them active.
 
-**What breaks.** In [04](04-alternative-versions.md), v2 was activated while
-VN-8 was already finished and VN-9 was half written. With ownership, activating
-v2 forces a choice between deleting finished work, showing work that belongs to
-an abandoned approach, or moving work across and inventing an intention nobody
-expressed.
+**What breaks.** Less than the original design assumed. VN-11 had two real
+approaches, and writing both into VN-11's document — chosen first, deferred
+second, with the reasoning for each — records exactly what a version comparison
+would have recorded.
 
-With reference, nothing happens at all. VN-8 stays done, gains a chip saying it
-is not in any active plan, and reports that the class it created is still in the
-codebase.
+What versions added on top of that was a state machine (draft, active,
+superseded, discarded), a rule about which state counts for conflict detection,
+an activation operation, and children that could be pointed at by two versions at
+once. Every one of those is a place to be wrong, and none of them helped a reader
+six months later more than a well-written section does.
 
-**Earned, and this is the load-bearing one.** It is the reason changing your
-mind is cheap in both directions.
+**Cut, and not missed.** The rejected approach is still recorded, which was the
+only thing genuinely at stake.
 
 ---
 
@@ -92,12 +98,13 @@ writing it. The model provides the place; it cannot provide the discipline.
 
 ## Node links with modes
 
-**Take them away.** Keep anchors, which say only "this work is around here".
+**Take them away.** Let a task point at nodes without saying what it does to
+them — just "this work is connected to this node".
 
 **What breaks.** Almost everything computed in this example:
 
 ```
-   waiting on code                 gone — anchors carry no direction
+   waiting on code                 gone — a bare pointer carries no direction
    suggested dependencies          gone — nothing knows who creates what
    verification of finished work   gone — no claim to check
    conflict detection              reduced to "two tasks are near this node"
@@ -192,11 +199,12 @@ notification into a decision.
 
 **Take it away.** Store conflicts as records.
 
-**What breaks.** In [04](04-alternative-versions.md) the active version changed
-twice. Each switch changed which links count, so collisions appeared and
-vanished. Stored conflict records would have to be created and cleaned up on
-every activation, on every link edit, and on every reparse, and any missed
-cleanup leaves a warning about a situation that no longer exists.
+**What breaks.** Collisions appear and vanish constantly here without anybody
+touching a conflict: VN-11 finishing changes what VN-30 collides with, a reparse
+changes which links resolve, and a scope narrowed in a document changes the whole
+picture. Stored conflict records would have to be created and cleaned up on every
+link edit, every status change, and every reparse, and any missed cleanup leaves
+a warning about a situation that no longer exists.
 
 Computing them means the display is always right and nothing can go stale.
 
@@ -204,19 +212,52 @@ Computing them means the display is always right and nothing can go stale.
 
 ---
 
-## Anchors, kept alongside links
+## `affects` meaning the node, not its contents
 
-**Take them away.** Say everything with typed links.
+**Take it away.** Let a task write `affects class Comment` whenever it changes
+anything inside `Comment`.
 
-**What breaks.** VN-3 was created with only `⚓ folder app/`, before anybody knew
-what it would touch. Forcing a mode at that moment means guessing, and a guess
-recorded as `modify` would produce a false collision.
+**What breaks.** VN-8 and VN-22 both work inside `class Comment` — one creating
+the model, one adding a check to `createComment`. Under the loose reading, both
+would claim to affect the class, and the system would report a collision that
+does not exist.
 
-Anchors are how work starts. Links are how it gets specific.
+Now generalise that. Almost all work adds or changes a method, so almost every
+class two people are working near would show a permanent conflict:
 
-**Earned**, though it is the smallest margin in this file. The distinction has
-to be explained once, and the payment for that is that vague early work is
-recorded honestly instead of being recorded wrongly.
+```
+   LOOSE READING                          THIS DESIGN
+   ─────────────                          ───────────
+   VN-8   affects class Comment           VN-8   create function Comment.validate
+   VN-22  affects class Comment           VN-22  affects function createComment
+
+   ⚑ conflict — but there is none         no conflict, and both still appear
+                                          when you ask what touches Comment
+```
+
+Conflict detection would not degrade gracefully; it would become noise, and
+noise gets clicked past. Everything in [06](06-conflicts.md) depends on the
+warnings being rare enough to read.
+
+**Earned, and load bearing.**
+
+---
+
+## Severity coming from task status
+
+**Take it away.** Treat every link as equally serious.
+
+**What breaks.** VN-30 "Rate limiting" sat untouched in the backlog for weeks
+while it declared `affects createComment()`. Under a flat reading it would have
+been arguing with VN-11 that whole time, over a plan nobody had committed to.
+
+The alternative that suggests itself — a `provisional` flag on each link — is
+worse than it looks. It is a second record of "how serious is this", maintained
+by hand, drifting out of step with the status field that people already update
+because the board depends on it.
+
+**Earned**, with one honest gap: a task worked on from the backlog warns nobody.
+That is a housekeeping list, not a new field.
 
 ---
 
@@ -257,19 +298,23 @@ Their absence produced no gap anywhere in this example.
    CONCEPT                                     VERDICT
    ───────                                     ───────
    recursion                                   earned
-   versions                                    earned
-   reference not ownership                     earned — load bearing
+   one parent per task                         earned — load bearing
    task document                               earned
    node links with modes                       earned — decisively
    read mode                                   earned
+   affects means the node, not its contents    earned — load bearing
    links to code that does not exist yet       earned
    dependencies at any depth                   earned
    position never blocks                       earned
    resolution by ordering                      earned
    decisions stored, conflicts computed        earned
-   anchors alongside links                     earned — narrowly
+   severity from task status                   earned
    one level per board                         earned
 
+   versions                                    cut, not missed
+   shared children / orphans                   cut, not missed
+   a vague "connected to this node" pointer    cut, verified nothing
+   a provisional flag on links                 cut, status already says it
    blocked_by as a second edge                 cut, not missed
    related_to                                  cut, not missed
    references                                  cut, not missed

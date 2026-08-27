@@ -25,17 +25,18 @@ branch, read through the same scoped client everything else uses.
    │  documents       written by the describe and document      │
    │                  tools                                     │
    │                                                            │
-   │  work            tasks · versions · child references ·     │
-   │                  node links · anchors · notes ·            │
+   │  work            tasks (with parent_id, document,          │
+   │                  node links, events) ·                     │
    │                  conflict decisions                        │
    └───────────────────────────────────────────────────────────┘
 ```
 
 Two consequences follow, and both are accepted deliberately.
 
-**Work is versioned with the code.** Every change to a task is a commit in the
+**Work is committed with the code.** Every change to a task is a commit in the
 same history as the code graph. The record of how a plan changed over time comes
-free, which is why the planning model itself does not need to store history.
+free, which is why the planning model itself does not need to store history
+beyond its events.
 
 **Work is per branch.** An experiment on a branch has its own view of the work,
 and promoting a branch merges the work along with everything else. If real use
@@ -86,7 +87,78 @@ exists.
 
 ---
 
-## 3. One pass per screen, not one pass per card
+## 3. Three storage categories, not two
+
+It is tempting to treat everything as either stored or derived. That split is
+too coarse, and the place it breaks is always the same: whole-project questions.
+
+```
+   ① STORED TRUTH
+      Written by a person or an agent. The three edges plus the task fields.
+      Never computed, never regenerated.
+
+   ② REGENERABLE INDEX
+      Materialized, single writer, rebuilt from stored truth, never hand-edited.
+      Safe to persist, because it can always be thrown away and rebuilt.
+
+   ③ COMPUTED ON READ
+      Everything in the derived table. Never persisted anywhere.
+```
+
+The middle category is the one the original design was missing. The per-level
+batching in section 5 works because a board level is a bounded set of tasks. The
+whole-project queries — every contested node in the project, everything ready
+anywhere — have no such bound, and they are the first thing to break at scale.
+
+Those belong in category ②: a materialized index with a single writer, rebuilt
+from stored truth whenever the parser runs or a link changes.
+
+This preserves the discipline that matters — **no `is_blocked` column that rots
+on a task** — while giving an escape hatch for the queries that genuinely cannot
+be recomputed per request. The test for whether something may be materialized is
+not "is it expensive" but **"can it be rebuilt from stored truth alone, by one
+writer, without a human ever editing it"**.
+
+---
+
+## 4. One evaluation function
+
+Every derived condition is computed by a single pure function.
+
+```
+   evaluate(task, snapshot) -> {
+       blocked, waiting_on_code, ready, verified,
+       contested, progress, blocked_below
+   }
+```
+
+`snapshot` is an **explicit input**, not something the function fetches:
+
+```
+   snapshot = {
+       dependency_statuses   status of every task in depends_on
+       existing_nodes        node ids and qnames that exist in the graph now
+       other_open_links      write-mode links held by other open tasks
+       child_statuses        status of the task's direct children
+   }
+```
+
+**No database access inside the function.** That single constraint is what makes
+this work:
+
+- The API, the UI payloads, the agent, and the tests all call the same function,
+  so no two surfaces can drift into different answers about the same task.
+- It can be snapshot-tested with no database at all. Every rule in
+  [rules.md](rules.md) becomes a table of inputs and expected outputs.
+- Batching stays a caller's concern. Section 5 assembles one snapshot for a
+  whole screen, then calls `evaluate` once per task in memory.
+
+This is the difference between a design that behaves like a rule engine and one
+where the same logic is reimplemented slightly differently in six places.
+
+---
+
+## 5. One pass per screen, not one pass per card
 
 The rule that keeps derivation affordable is that **derived values are computed
 for a whole screen at once**, never per card.
@@ -114,13 +186,13 @@ When somebody opens a board level, the server does roughly this:
 ```
 
 A level with twelve cards costs a handful of queries, not thirty-six. This is
-the same shape as the existing anchor summary endpoint, which already batches
-one existence check across every anchor on the board, so it follows a pattern
-the codebase has already proved.
+the same shape as the node work summary, which batches one existence check
+across every node the board mentions — a pattern the codebase has already
+proved at this scale.
 
 ---
 
-## 4. The three summaries
+## 6. The three summaries
 
 Three computed payloads serve the entire product. Everything on screen reads
 one of them, and nothing recomputes anything for itself.
@@ -150,7 +222,7 @@ added to one of them.
 
 ---
 
-## 5. Rollup, without walking the tree every time
+## 7. Rollup, without walking the tree every time
 
 Rollup is the one genuinely expensive part of the recursive model. A parent
 card wants to show the number of blocked tasks inside it and the union of every
@@ -174,8 +246,8 @@ frontend uses to refetch.
 ```
    WRITES THAT INVALIDATE A LEVEL SUMMARY
      task created, deleted, status changed, moved
-     child reference added, removed, reordered
-     version activated
+     parent changed, or a sibling reordered
+     task soft-deleted or restored
      dependency added or removed
      node link added, removed, or changed
      conflict decision recorded
@@ -186,13 +258,13 @@ That last one is the interesting case, and it is worth being honest about it.
 
 ---
 
-## 6. What happens when the parser runs
+## 8. What happens when the parser runs
 
 The parser rewrites the graph whenever files change. This can change the answer
 to questions the work layer is asking, without anybody touching a task:
 
 - a `create` link becomes fulfilled because the node now exists,
-- a `modify` link becomes unresolved because the node was renamed,
+- a `affects` link becomes unresolved because the node was renamed,
 - a task becomes verified because its last pending create landed.
 
 None of this needs the parser to know that work exists, and that matters,
@@ -217,11 +289,11 @@ acceptable because nothing depends on the badge being instantaneous.
 
 ---
 
-## 7. Answering the two lookups
+## 9. Answering the two lookups
 
-**Task to nodes** is a walk down the containment index over active versions,
-collecting links, then one batched existence check on the node ids gathered.
-One traversal, one query.
+**Task to nodes** is a walk down the `parent_id` index, collecting links, then
+one batched existence check on the node ids gathered. One traversal, one query.
+No deduplication is needed, because a task appears in the subtree exactly once.
 
 **Node to tasks** is a direct read of the link index for that node id, followed
 by a batched read of the tasks it names. Because the index is keyed by node id,
@@ -235,7 +307,7 @@ duplicate-create warning before either node exists.
 
 ---
 
-## 8. Scale, honestly
+## 10. Scale, honestly
 
 The realistic numbers for a project are a few hundred tasks, a few thousand
 node links, and a graph with tens of thousands of nodes. At that size,
@@ -246,16 +318,17 @@ Two things would change the picture, and both have a known answer that is not
 built now:
 
 **Thousands of tasks.** The level board already limits what is read to one
-level, so the board stays fine. The parts that would feel it are the contested
-nodes list and the orphan list, both of which are whole-project questions. Both
-would move from an in-memory pass to a stored query.
+level, so the board stays fine. The part that would feel it is the contested
+nodes list, and any other whole-project question. Those move from an in-memory
+pass to a **regenerable index** — category ② in section 3, which exists exactly
+for this.
 
 **Very deep trees.** The depth ceiling protects the traversal, and the marker
 tells the user that a count is partial rather than pretending it is complete.
 
 ---
 
-## 9. What is deliberately not built
+## 11. What is deliberately not built
 
 **No stored derived state.** No `is_blocked` column, no cached progress count,
 no conflict table. Every one of these would be wrong within minutes of being
@@ -269,7 +342,7 @@ and last write wins, which matches how the rest of the product behaves today.
 **No separate search index.** Finding tasks by text uses whatever the project
 already uses. Nothing in this design depends on search.
 
-**No agent-specific storage.** An agent that proposes a version writes exactly
+**No agent-specific storage.** An agent that proposes a plan writes exactly
 the same records a person writes, with `created_by` naming the run. The reasons
 for that choice are in [12 — Agent seams](12-agent-seams.md).
 

@@ -18,7 +18,7 @@ with modes.
               ◌ function  app.services.listComments     VN-10
               ◌ function  app.services.checkComment     VN-22
 
-   MODIFIES   ◌ class     app.models.Comment            VN-9
+   AFFECTS    ◌ class     app.models.Comment            VN-9
               ◌ function  app.services.createComment    VN-22, VN-30 ⚑
               ● function  app.web.renderPost            VN-12 ⚑, VN-23
 
@@ -27,11 +27,17 @@ with modes.
               ◌ function  app.auth.current_user         VN-9
               ◌ function  app.services.listComments     VN-12
 
-   ANCHORED   ● folder    app/                          VN-3
+   LOCATION   ● folder    app/          derived: nearest container of the above
 ```
 
 Four new nodes, three existing nodes changed, four read. Nobody wrote this list
 on VN-3; every row is traceable to the leaf that claimed it.
+
+The last row is not a link either. `app/` is simply the nearest node containing
+everything above it. Because VN-3's subtree reaches across models, services, and
+web, the nearest common container is the whole application — which is honest,
+and is why the interface would show the node count here instead of a location
+that means nothing.
 
 ### What does one leaf touch?
 
@@ -39,7 +45,7 @@ on VN-3; every row is traceable to the leaf that claimed it.
    VN-9   Comment write path
    ─────────────────────────────────────────────────────────────────────────
    CREATES    ◌ function  app.services.createComment          pending
-   MODIFIES   ◌ class     app.models.Comment                  pending
+   AFFECTS   ◌ class     app.models.Comment                  pending
    READS      ● class     app.models.Post                     live
               ◌ function  app.auth.current_user               missing ⚠
 ```
@@ -57,7 +63,7 @@ show as waiting, and it is why the suggestion in
 ```
    class  app.models.Post                                        ● live
    ─────────────────────────────────────────────────────────────────────────
-   MODIFYING   VN-16  Add an author_id field    ● in progress  ▸ Posts
+   AFFECTING   VN-16  Add an author_id field    ● in progress  ▸ Posts
    READING     VN-3   Add comments              ○ to do        ▸ root
                VN-8   Comment model             ○ to do        ▸ Comments
                VN-9   Comment write path        ○ to do        ▸ Comments
@@ -75,7 +81,7 @@ work.
    function  app.services.createComment                     ◌ planned
    ─────────────────────────────────────────────────────────────────────────
    CREATING    VN-9   Comment write path        ○ to do     ▸ Comments
-   MODIFYING   VN-30  Rate limiting             ○ to do     ▸ root
+   AFFECTING   VN-30  Rate limiting             ○ to do     ▸ root
                VN-22  Detect banned words       ○ to do     ▸ Comments ▸ Moderation
 
    ⏭ sequenced:  VN-9 → VN-30 → VN-22
@@ -90,7 +96,7 @@ in [06](06-conflicts.md).
 ```
    function  app.web.renderPost                                  ● live
    ─────────────────────────────────────────────────────────────────────────
-   MODIFYING   VN-12  Show comments on the page   ○ to do   ▸ Comments
+   AFFECTING   VN-12  Show comments on the page   ○ to do   ▸ Comments
                VN-17  Show the author             ○ to do   ▸ Posts
                VN-23  Hide a comment              ○ to do   ▸ Comments ▸ Moderation
 
@@ -193,7 +199,7 @@ why it can never disagree with the forward view.
 
 Fifteen tasks, three levels, three trees, six dependencies, three collisions,
 eight planned nodes. Everything in the state and touches columns is computed.
-The stored data is only: the tasks, their versions, the ordered child lists,
+The stored data is only: the tasks with their documents, each child's parent_id,
 six dependency edges, the links, and two conflict decisions.
 
 Next: [08 — What each concept earned](08-what-each-concept-earned.md).

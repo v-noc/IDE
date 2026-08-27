@@ -29,12 +29,12 @@ the obvious ones from other task tools.
    contains  (parent/child)         context
    depends_on                       affects
    blocked_by                       references
-   related_to                       anchor
+   related_to
    duplicates
    delegates
 ```
 
-Ten candidates. Here is what happens to each of them.
+Nine candidates. Here is what happens to each of them.
 
 ---
 
@@ -70,7 +70,7 @@ on the other.
 
 **Containment is real structure.** Children are ordered by a `position` field
 (lexorank, like `rank` for board columns), so the tree is completely
-deterministic. There is no hidden conflict between two versions' child lists.
+deterministic. There is no second, competing list of children anywhere.
 
 **Tradeoff.** Finding a task's parents is a simple read of one field. Finding
 its position in the tree requires walking up `parent_id` links. Both operations
@@ -197,7 +197,7 @@ question that fills a database with noise.
 ## Kept, as modes rather than separate types: node links with modes
 
 **What they are.** A task points at graph nodes, and every pointer carries a
-mode: `about`, `read`, `create`, `modify`, or `delete`.
+mode: `read`, `create`, `affects`, or `delete`.
 
 **Why they are one mechanism.** Because the most valuable question in the whole
 system is asked from the code side, not from the work side.
@@ -211,8 +211,8 @@ system is asked from the code side, not from the work side.
    read the links on this node,           read the affects table,
    group them by mode.                    then read the context table,
                                           then merge them, forever,
-   VN-11  modify   ← a collision          in every query, in every
-   VN-30  modify   ← a collision          screen, and hope nobody
+   VN-11  affects   ← a collision          in every query, in every
+   VN-30  affects   ← a collision          screen, and hope nobody
    VN-40  read     ← worth knowing        forgets one of them.
 ```
 
@@ -220,22 +220,19 @@ One list with a mode column answers it in a single pass. Two separate
 relationship types answer it in two passes that have to be kept in step in
 every place the question is asked.
 
-**Why the modes are exactly these five.**
+**Why the modes are exactly these four.**
 
-- `about` is vague, used by anchors, and never triggers collision warnings.
 - `read` means look but do not change.
-- `create`, `modify`, and `delete` are the three things you can do to a
+- `create`, `affects`, and `delete` are the three things you can do to a
   node, and they are distinguished because they behave differently:
   - Two `create` links on the same name are a duplicate.
-  - A `delete` under somebody else's `modify` is severe.
+  - A `delete` under somebody else's `affects` is severe.
   - A `create` is the one mode allowed to point at a node that does not exist yet.
 
-**Anchors are node links with mode `about`.** They live on the task (not on a
-version, since parenthood does not change when you rethink the approach). They
-are soft references, stored as id plus a name snapshot, so a deleted node
-produces a readable warning instead of a broken reference.
+Links are soft references, stored as an id plus a name snapshot, so a deleted
+node produces a readable warning instead of a broken reference.
 
-**Tradeoff.** Five modes is more than one, and people will sometimes choose the
+**Tradeoff.** Four modes is more than one, and people will sometimes choose the
 wrong one. The design accepts this because a wrong mode is detectable. After the
 work lands, the commits say which nodes actually changed, and the system can
 point out that a task marked something `read` and then rewrote it. A mistake
@@ -288,7 +285,7 @@ Anything a person can throw away must not be the target of a stored reference.
    DURABLE                       FRAGILE
    ───────                       ───────
    a task                        a graph node id on its own
-   a graph node id + name        a version's list of steps (removed)
+   a graph node id + name        a graph node's position in a file
 ```
 
 Tasks are durable, so dependencies point at tasks and parents are tasks. Graph
@@ -321,7 +318,7 @@ careful code prevents it forever. So:
    child ──parent_id────────────────►  task         containment
    task  ──depends_on──────────────►  task         ordering
    task  ──node_link with mode────►  graph node    code involvement
-                                        (includes anchors: mode "about")
+                                        read · create · affects · delete
 
    DERIVED, ON EVERY READ
    ──────────────────────
@@ -330,6 +327,7 @@ careful code prevents it forever. So:
    blocks (the reverse view)        from depends_on
    blocked / ready                  from depends_on plus link states
    progress                         from the task's children
+   where the work lives             from the nearest container of its links
    effective links of a parent      from the union of its descendants' links
    contested nodes                  from write-mode links on the same node
    depth / breadcrumb path          from walking up parent_id to root

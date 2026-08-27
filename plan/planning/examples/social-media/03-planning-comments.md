@@ -10,9 +10,8 @@ reaches three levels without the board getting crowded.
 
 ```
    TASK  VN-3   Add comments
-   ACTIVE VERSION  v1  "Separate Comment class"
    ────────────────────────────────────────────────────────────────────────
-   summary     Comments are their own class, linked to a post and an author,
+   description Comments are their own class, linked to a post and an author,
                stored in their own table.
 
    document    ## Approach
@@ -24,8 +23,8 @@ reaches three levels without the board getting crowded.
                ## Why not store them inside Post
                Posts would grow without limit, moderation would have to rewrite
                the whole post row, and listing recent comments across posts
-               would become a scan. That approach is written down as v2 so the
-               reasoning is not lost.
+               would become a scan. Writing that down here means the reasoning
+               survives even though the approach was rejected.
 
                ## Moderation
                Deliberately left as its own task. There is a real choice there
@@ -47,12 +46,14 @@ reaches three levels without the board getting crowded.
 Two things about that document are worth pointing out, because they are the
 habits the whole design is trying to encourage.
 
-**The rejected approach is written down, not deleted.** It also exists as a
-real second version, which is [04](04-alternative-versions.md).
+**The rejected approach is written down, not deleted.** It lives in a section of
+the document, which is where alternatives belong in this model. There is no
+separate version object holding it, and six months from now the reasoning is
+still the first thing a reader finds.
 
 **The moderation decision is pushed down, not buried.** The document says a
-choice exists and names where it lives, and the choice itself becomes two
-versions on VN-11.
+choice exists and names where it lives, and the choice itself is written up in
+VN-11's own document.
 
 ---
 
@@ -77,7 +78,7 @@ versions on VN-11.
      ◦ class     app.models.Comment
 
    VN-11   Comment moderation                              ○ to do
-     (two versions, see below)
+     (a real decision inside it, see below)
 
    VN-12   Show comments on the post page                  ○ to do
      ~ function  app.web.renderPost
@@ -100,32 +101,38 @@ would produce four statuses, four positions, and no extra information.
    TASK  VN-11   Comment moderation                        ○ to do
    ▸ root ▸ Add comments ▸ VN-11
    ────────────────────────────────────────────────────────────────────────
-   ⑂ v1  Keyword filter  ★active   |   v2  Manual review queue
+   document  ## Decision — keyword filter now, review queue later
 
-   v1  Keyword filter
-       summary   A comment is checked against a word list when it is saved.
-                 Failing comments are hidden immediately.
-       document  Ships this week. No new screens. It will produce false
-                 positives, which is acceptable while volume is low.
-       affects   + function  app.services.checkComment
-                 ~ function  app.services.createComment
-       children  1  VN-22  Detect banned words
-                 2  VN-23  Hide a comment from the post page
+             ### Chosen: keyword filter
+             A comment is checked against a word list when it is saved, and
+             failing comments are hidden immediately. Ships this week, no new
+             screens. It will produce false positives, which is acceptable
+             while volume is low.
 
-   v2  Manual review queue
-       summary   Reported comments go into a queue that a moderator works
-                 through.
-       document  Better outcomes, needs an admin screen and a permissions
-                 idea that does not exist yet. Written down so the choice is
-                 recorded rather than argued about again in a month.
-       affects   + class     app.models.Report
-                 + function  app.web.renderModerationQueue
-       children  1  VN-24  Report a comment
-                 2  VN-25  Moderation queue page
+             ### Considered and deferred: manual review queue
+             Reported comments go into a queue a moderator works through.
+             Better outcomes, but it needs an admin screen and a permissions
+             idea that does not exist yet. Written down so the choice is
+             recorded rather than argued about again in a month. If we do it,
+             it will need a Report class and a moderation queue page.
+
+   affects   + function  app.services.checkComment
+             ~ function  app.services.createComment
+
+   children  1  VN-22  Detect banned words
+             2  VN-23  Hide a comment from the post page
 ```
 
+The rejected approach costs one section of one document. It is not a second
+object with its own state machine, its own children, and its own rules about
+what counts while it is inactive — and it is easier to find, because it sits in
+the write-up somebody is already reading.
+
+If the review queue is ever taken up, the honest move is a proposal task whose
+children get reparented under VN-11 once it is accepted.
+
 This is the recursion doing its job. VN-11 was one line in somebody's plan.
-When it turned out to contain a genuine decision, it got versions and children,
+When it turned out to contain a genuine decision, it got a document and children,
 using the same operations as any other task. Nothing was converted, and nothing
 had to be promoted from one type to another.
 
@@ -151,7 +158,7 @@ them.
      ├── VN-8   Comment model               ○ to do
      ├── VN-9   Comment write path          ○ to do
      ├── VN-10  Comment read path           ○ to do
-     ├── VN-11  Comment moderation          ○ to do    ⑂ 2 versions
+     ├── VN-11  Comment moderation          ○ to do    ▸ 2 inside
      │     ├── VN-22  Detect banned words   ○ to do
      │     └── VN-23  Hide a comment        ○ to do
      └── VN-12  Show comments on the page   ○ to do
@@ -171,8 +178,8 @@ Fifteen tasks, three levels deep. The root board still shows four cards.
 
 ## What VN-3 touches, without anybody writing it there
 
-VN-3's own version declares one create link. Everything else is rolled up from
-its descendants.
+VN-3 declares one create link of its own. Everything else is rolled up from its
+descendants.
 
 ```
    EFFECTIVE LINKS OF VN-3
@@ -182,7 +189,7 @@ its descendants.
               function  app.services.listComments     VN-10
               function  app.services.checkComment     VN-22
 
-   modifies   class     app.models.Comment            VN-9
+   affects class     app.models.Comment            VN-9
               function  app.services.createComment    VN-22
               function  app.web.renderPost            VN-12, VN-23
 
@@ -201,4 +208,4 @@ One row in it is doing quiet work already. `app.auth.current_user` is read by
 VN-9 and does not exist, and something in another tree is planning to create
 it. That is where [05](05-dependencies-and-readiness.md) starts.
 
-Next: [04 — Alternative versions](04-alternative-versions.md).
+Next: [05 — Dependencies and readiness](05-dependencies-and-readiness.md).

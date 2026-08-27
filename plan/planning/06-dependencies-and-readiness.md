@@ -134,7 +134,7 @@ different things.
 ```
    BLOCKED                              WAITING ON CODE
    ───────                              ───────────────
-   Something in depends_on is           A read, modify, or delete link points
+   Something in depends_on is           A read, affects, or delete link points
    unfinished. A person wrote this      at a node that does not exist yet.
    edge down.                           Nobody wrote anything; the system
                                         noticed.
@@ -146,7 +146,7 @@ The full computation for one task:
 
 ```
    ready  =  every task in depends_on is done
-             AND every read/modify/delete link points at a node that exists
+             AND every read/affects/delete link points at a node that exists
 ```
 
 An example with both kinds at once:
@@ -195,7 +195,7 @@ Three cases produce a suggestion:
 | Situation | Suggested edge |
 |---|---|
 | A needs a node that B plans to create | A depends on B |
-| A modifies a node that B plans to delete | A depends on B, or the two of them need to talk |
+| A affects a node that B plans to delete | A depends on B, or the two of them need to talk |
 | A and B both plan to create a node with the same name | Not a dependency. A duplicate warning, because one of them is probably unnecessary |
 
 **Tradeoff.** Suggestions depend on people writing links, and on those links
@@ -234,16 +234,16 @@ displays become noise that everybody ignores.
 
 ## 7. Dependencies that point at unusual places
 
-**A dependency on a task nobody is doing.** VN-9 depends on VN-5, and VN-5 is
-not referenced by any active version, so it is orphaned. VN-9 is still blocked,
-correctly, and the chip says so plainly:
+**A dependency on a task sitting in the backlog.** VN-9 depends on VN-5, and
+nobody has scheduled VN-5. VN-9 is still blocked, correctly, and the chip says
+so plainly:
 
 ```
-   ⛔ blocked — VN-5 "Write current_user()", which is not part of any active plan
+   ⛔ blocked — VN-5 "Write current_user()", which is still in the backlog
 ```
 
 That is exactly the situation somebody needs to know about, and the fix is
-either to put VN-5 into a plan or to drop the dependency.
+either to schedule VN-5 or to drop the dependency.
 
 **A dependency on a task in a completely different part of the tree.** Fine,
 and common. The board shows the blocker's breadcrumb so the person can see
@@ -276,14 +276,14 @@ The links people wrote:
 
 ```
    VN-5   create  function app.auth.current_user
-   VN-16  modify  class    app.models.Post
+   VN-16  affects  class    app.models.Post
    VN-8   create  class    app.models.Comment
    VN-9   read    function app.auth.current_user     ← missing
    VN-9   read    class    app.models.Post
    VN-9   create  function app.services.createComment
-   VN-9   modify  class    app.models.Comment
+   VN-9   affects  class    app.models.Comment
    VN-10  read    class    app.models.Comment
-   VN-12  modify  function app.web.renderPost
+   VN-12  affects  function app.web.renderPost
 ```
 
 What the system works out, with nobody writing a single dependency by hand:
@@ -292,7 +292,7 @@ What the system works out, with nobody writing a single dependency by hand:
    VN-9  needs current_user()      ── VN-5 will create it    ⇒ suggest VN-9 → VN-5
    VN-9  needs class Comment       ── VN-8 will create it    ⇒ suggest VN-9 → VN-8
    VN-10 needs class Comment       ── VN-8 will create it    ⇒ suggest VN-10 → VN-8
-   VN-9  reads Post, VN-16 modifies Post                     ⇒ note, not a block
+   VN-9  reads Post, VN-16 affects Post                     ⇒ note, not a block
 ```
 
 After the suggestions are accepted, here is what can be started today:
@@ -314,19 +314,20 @@ for no reason at all.
 
 ---
 
-## 9. Why dependencies do not point at versions
+## 9. Why a dependency points at a task and nothing smaller
 
-A reasonable idea is to let a dependency point at a specific version of a task,
-or at one entry inside a version's child list, so that the record captures
-exactly which piece of somebody else's approach you are waiting for.
+A reasonable idea is to let a dependency point at something more precise than a
+whole task — one paragraph of somebody's plan, or one step inside it — so the
+record captures exactly which piece of their work you are waiting for.
 
-The design does not do that, for one reason: **a version is somebody's current
-description of how they will work, and they are allowed to replace it at any
-time.** A pointer into a version means your dependency breaks whenever they
-change their mind, which is precisely when you most need it to keep working.
+The design does not do that, for one reason: **a plan is somebody's current
+description of how they will work, and they are allowed to rewrite it at any
+time.** A pointer into the inside of a plan breaks whenever they change their
+mind, which is precisely when you most need it to keep working. A task, by
+contrast, only disappears when a person deliberately deletes it.
 
-Nothing is lost by pointing at the task instead, because the precise reason is
-still recorded, just on the other side of the arrow:
+Nothing is lost by pointing at the task, because the precise reason is still
+recorded, just on the other side of the arrow:
 
 ```
    THE EDGE            VN-9  ──depends_on──►  VN-5
@@ -336,12 +337,12 @@ still recorded, just on the other side of the arrow:
 
 The reason lives on the node links, which is where it can be checked. When VN-5
 rewrites its approach, the dependency still holds if the new approach still
-creates that function, and the system will point out that the reason has gone
-if it does not.
+creates that function, and the system points out that the reason has gone if it
+does not.
 
-The interface can still take you straight to the detail: a blocked chip links to
-VN-5, and VN-5 always shows its active version, so the click through is one
-step and never lands on something abandoned.
+If the truth is that you need one small piece of a large task, the right move is
+to make that piece its own task — which costs nothing here, because every piece
+of work is already a task — and point the dependency at it.
 
 ---
 
@@ -361,5 +362,5 @@ to say "this child cannot start until the parent's other work is done". The
 right expression is a dependency on the specific sibling, and the refusal
 message says so, but it does take a moment of learning.
 
-The next file, [07 — Versions and alternatives](07-versions-and-alternatives.md),
-covers what happens when there is more than one idea about how to do a task.
+The next file, [08 — Conflicts and concurrency](08-conflicts-and-concurrency.md),
+covers what happens when two pieces of work want to change the same node.

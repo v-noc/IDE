@@ -68,7 +68,7 @@ node produces exactly the frustration that makes people abandon a tool.
 
 ---
 
-## 6. How deep is too deep
+## 5. How deep is too deep
 
 The design says most trees are two or three levels and does not enforce it.
 Traversals have a ceiling so counts stay honest.
@@ -82,21 +82,25 @@ do instead, which is usually "put this detail in the document".
 
 ---
 
-## 7. What happens to orphans over time
+## 6. How long a soft delete is kept
 
-Orphans appear at the root level, which is right when there are five of them and
-tiring when there are eighty.
+A cascade delete is soft: the subtree keeps its rows with `deleted_at` set, so
+one undo restores all of it. Nothing in the design says when, or whether, those
+rows are ever removed for real.
 
-**Options.** A filter. An archive state. Automatic cleanup after some period.
+**Options.** Keep them forever. Purge after a period. Offer an explicit "empty
+the bin" action.
 
-**Lean: a filter now, an archive state only if the filter proves insufficient.**
-Automatic cleanup is ruled out. Deleting work because it fell out of a plan is
-the one behaviour this design refuses everywhere else, and making an exception
-here would undermine the reason people trust the rest.
+**Lean: keep them forever until storage actually complains, then purge on an
+explicit action rather than a timer.** A timed purge turns undo into a promise
+with an expiry date that nobody remembers, and the failure mode is somebody
+discovering the limit at exactly the wrong moment. If a purge is added, the
+deleted count should be visible somewhere first, so the bin is a place people
+know exists.
 
 ---
 
-## 8. Several boards, and sprints
+## 7. Several boards, and sprints
 
 One board, one set of columns, and a backlog column. No sprints, no
 milestones.
@@ -107,7 +111,7 @@ a scheduling concept, and scheduling has not been designed here at all.
 
 ---
 
-## 9. Whether progress should count deep by default
+## 8. Whether progress should count deep by default
 
 A parent can show progress over its direct children, or over everything
 underneath it. The design defaults to direct, with a deep count available.
@@ -122,7 +126,7 @@ different things.
 
 ---
 
-## 10. Line-level links
+## 9. Line-level links
 
 Every link points at a node, so two tasks changing different parts of the same
 large function are reported as a conflict when they might be fine.
@@ -137,12 +141,12 @@ false alarms, that is also useful information about the codebase.
 
 ---
 
-## 11. Where conversation lives
+## 10. Where conversation lives
 
 Chat between a person and an agent about a task is not part of this model.
 
 **Lean: keep it out, and make the conclusion land on the task.** A decision
-reached in a conversation belongs in the document or in a note, where somebody
+reached in a conversation belongs in the document or in a comment event, where somebody
 can find it. Transcripts belong wherever conversations already live in the
 product.
 
@@ -155,13 +159,16 @@ be reopened without new evidence:
 
 ```
    one entity type. work is recursive.
-   a version refers to children; it never owns them.
-   dependencies connect tasks, never versions or list positions.
-   position in a list is advice and never blocks anything.
+   a task has exactly one parent. there are no shared children.
+   there are no versions. the document holds the approach.
+   deleting a parent deletes its subtree — softly, and reversibly.
+   dependencies connect tasks, never list positions.
+   position among siblings is advice and never blocks anything.
+   the ancestor guard is enforced; the descendant case is dropped, not refused.
    the graph has five node kinds; a field is a sentence, not a node.
    derived values are never stored.
    a conflict is computed; only the human decision about it is stored.
-   nothing deletes somebody's work as a side effect of anything.
+   nothing deletes somebody's work without naming what it is about to delete.
 ```
 
 ---

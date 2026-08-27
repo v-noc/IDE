@@ -15,7 +15,6 @@ that is silently wrong.
    ────────
    Task                 the only work object
      ├── Node link      pointer to a graph node, with a mode
-     ├── Anchor         pointer to a graph node, mode "about"
      ├── Event          typed history entry
      └── Dependency     pointer to another task
 
@@ -47,9 +46,9 @@ DAG.
 | `parent_id` | Another task, or null | null means top-level. Single parent enforced. |
 | `position` | Order among siblings | Lexorank, same scheme as `rank` |
 | `document` | The long write-up, in markdown | The main body of thinking |
-| `node_links` | List of links into the graph | Each with a mode: read, create, modify, delete |
-| `anchors` | List of anchors | Where the work lives, roughly. Mode is "about". |
+| `node_links` | List of links into the graph | Each with a mode: read, create, affects, delete. The only way a task points at code. |
 | `depends_on` | Set of task references | Dependencies, one stored edge |
+| `verified_by_tests` | Test node references, optional | Second verification source; see [05](05-graph-links.md) §6 |
 | `events` | List of typed events | Typed history, replaces prose notes |
 | `deleted_at` | Timestamp, or null | Soft delete for undo |
 | `deleted_batch_id` | Shared by all tasks deleted together | For atomic restore |
@@ -66,10 +65,10 @@ DAG.
 | `depth` | Distance from the nearest root |
 | `blocked` | Something in `depends_on` is not finished |
 | `blocks` | The reverse view of other tasks' `depends_on` |
-| `waiting_on_code` | A `read`, `modify`, or `delete` link points at a node that does not exist |
+| `waiting_on_code` | A `read`, `affects`, or `delete` link points at a node that does not exist |
 | `ready` | Not blocked and not waiting on code |
 | `progress` | Finished children over total |
-| `verified` | Every `create` link now points at a node that really exists |
+| `verified` | A `verified` event exists for this task (see [05](05-graph-links.md) §6) |
 | `contested_nodes` | Nodes where this task and another open task both intend to write |
 
 ### Why the key is flat
@@ -113,15 +112,14 @@ mixing those two jobs is exactly what causes the breakage.
 
 ## Node link
 
-A pointer from a task into the code graph, carrying a mode. Moved from version
-to task directly.
+A pointer from a task into the code graph, carrying a mode. Lives on the task.
 
 | Field | What it holds | Notes |
 |---|---|---|
 | `node_id` | The graph node id, if known | Empty for a node that does not exist yet |
 | `qname` | The full name, such as `app.services.createComment` | Always present, even when `node_id` is empty |
 | `kind` | `folder`, `file`, `class`, `function`, or `call` | The five real kinds, nothing else |
-| `mode` | `read`, `create`, `modify`, or `delete` | `about` is reserved for anchors |
+| `mode` | `read`, `create`, `affects`, or `delete` | Four modes. There is no vague mode. |
 | `note` | Optional sentence about what happens here | This is where a field or a column gets described |
 | `container` | Node id + name snapshot of the file/class | For unresolved `create` links |
 | `added_by`, `added_at` | Who added it and when | |
@@ -133,7 +131,7 @@ to task directly.
 | `live` | The node exists in the graph right now |
 | `pending` | A `create` link whose node does not exist yet. Expected and healthy |
 | `fulfilled` | A `create` link whose node now exists. The claim came true |
-| `missing` | A `read`, `modify`, or `delete` link whose node does not exist. A warning |
+| `missing` | A `read`, `affects`, or `delete` link whose node does not exist. A warning |
 | `unresolved` | The node id existed once and has disappeared, usually after a rename |
 
 ### The note field is where fields and columns live
@@ -143,7 +141,7 @@ This is the practical consequence of the five node kinds rule.
 ```
    TASK  VN-20   "Add author_id and post_id fields to Comment"
 
-     link   mode: modify    kind: class    qname: app.models.Comment
+     link   mode: affects    kind: class    qname: app.models.Comment
      note   "adds author_id pointing at User and post_id pointing at Post,
              both required, both indexed"
 ```
@@ -151,22 +149,30 @@ This is the practical consequence of the five node kinds rule.
 The link says **where**, and the note says **what**. There is no
 `Comment.author_id` node, because the parser does not produce one.
 
----
+### `affects` is about the node itself
 
-## Anchor
+A link's mode describes what happens to **that node**, never to what it
+contains. Adding a method to a class is one link on the new function, and the
+class's involvement is derived from containment:
 
-A pointer from a task into the graph, with the implicit mode `about`.
+```
+   TYPED     create   function  Comment.validate    container: class Comment
+   DERIVED   touches  class Comment · file models.py
+```
 
-| Field | What it holds |
-|---|---|
-| `node_id` | The graph node id |
-| `qname` | The name at the time the anchor was added |
-| `kind` | One of the five node kinds |
+`affects class Comment` is written only when the class itself changes. Without
+this rule two tasks adding different methods to one class would both claim to
+affect the class and be reported as colliding.
 
-Unchanged from the current system. They sit on the task, not on a version,
-because where work lives does not change when the approach changes. They are
-stored as a soft id plus a name snapshot, so a deleted node produces a readable
-warning instead of a broken reference.
+Derived containment carries no state. Only explicit links are `pending`,
+`fulfilled`, `missing`, or `unresolved`.
+
+### Where the work lives is derived
+
+No link is primary, and no field records a location. The location shown in a
+breadcrumb or on the canvas is the nearest container holding every linked node,
+used only when it is specific enough to be useful. Otherwise the linked nodes
+are listed instead. This is a display rule; nothing is stored for it.
 
 ---
 
@@ -256,7 +262,7 @@ task  ──depends_on──► task
 task  ──node_link (with mode)──► graph node
 ```
 
-Anchors are node links with mode `about`. That is all.
+A task points at code in exactly one way.
 
 ---
 
@@ -267,7 +273,6 @@ Anchors are node links with mode `about`. That is all.
    ├─ key, title, description, type, status, priority, labels, rank
    ├─ parent_id = null    (top-level)
    ├─ position = 0.1      (first among siblings)
-   ├─ anchors ────────────► folder  app/comments
    ├─ depends_on ─────────► TASK VN-1  "Authentication"
    ├─ document = "..."
    ├─ node_links[]
