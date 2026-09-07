@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { findNodeByFunctionId, findPathToNode } from "@/features/Dashboard/utils/treeUtils";
 import type { LogNode } from "@/services/logs/api";
 
@@ -10,7 +11,7 @@ export const useNodeRevealer = (tabId: string) => {
     const selectedNode = useProjectStore((s) => s.selectedNode[tabId]);
     const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds[tabId] ?? []);
     const expandNode = useProjectStore((s) => s.expandNode);
-    const setFocusTargetId = useProjectStore((s) => s.setFocusTargetId);
+    const handleNodeSelection = useTabStore((s) => s.handleNodeSelection);
 
     const revealNode = useCallback((targetLogNode: LogNode, rootLogNode: LogNode) => {
         if (!selectedNode || !targetLogNode.function_id || !rootLogNode.function_id) {
@@ -18,7 +19,7 @@ export const useNodeRevealer = (tabId: string) => {
         }
 
         // We only proceed if the current canvas selection matches the trace root.
-        const selectedKey = selectedNode._id.split("/").pop();
+        const selectedKey = selectedNode.id.split("/").pop();
         const rootKey = rootLogNode.function_id.split("/").pop();
 
         if (selectedKey !== rootKey) {
@@ -34,7 +35,7 @@ export const useNodeRevealer = (tabId: string) => {
         }
 
         // Find path from selection root to target
-        const path = findPathToNode(selectedNode, targetCanvasNode._id);
+        const path = findPathToNode(selectedNode, targetCanvasNode.id);
 
 
         if (path) {
@@ -46,10 +47,10 @@ export const useNodeRevealer = (tabId: string) => {
                 }
             });
 
-            // Set focus target for CanvasView to react
-            setFocusTargetId(tabId, targetCanvasNode._id);
+            // Highlight the target node on canvas without disturbing the current root.
+            handleNodeSelection(tabId, targetCanvasNode, "secondary");
         }
-    }, [selectedNode, expandedNodeIds, expandNode, setFocusTargetId]);
+    }, [selectedNode, expandedNodeIds, expandNode, handleNodeSelection, tabId]);
 
     return { revealNode };
 };

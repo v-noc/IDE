@@ -207,7 +207,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const centerTarget = useMemo(() => {
-    const id = centerNode?.id;
+    const id = secondarySelectedNode?.id ?? centerNode?.id;
     if (!id) return null;
     const n = nodes.find((node) => node.id === id);
     if (!n?.measured?.width) return null;
@@ -216,7 +216,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
       x: n.position.x + n.measured.width / 2,
       y: n.position.y + (n.measured.height ?? 0) / 2,
     };
-  }, [nodes, centerNode?.id]);
+  }, [nodes, centerNode?.id, secondarySelectedNode?.id]);
 
   const followSelectionRef = useRef(false);
 
@@ -258,7 +258,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   useEffect(() => {
     followSelectionRef.current = true;
-  }, [centerNode?.id]);
+  }, [centerNode?.id, secondarySelectedNode?.id]);
 
   useEffect(() => {
     if (!centerTarget || !followSelectionRef.current) return;
