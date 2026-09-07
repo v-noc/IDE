@@ -157,11 +157,22 @@ On screen the read-mode links are shown as **Context** and the write-mode links
 as **Affects**, because those are the words people use. That is presentation.
 Underneath there is one list.
 
-**Soft references.** A link is stored as a node id plus a snapshot of the node's
-name and kind. The parser deletes and recreates nodes whenever a file changes,
-so a link that hardened onto an id alone would break constantly. With the
-snapshot, a vanished node produces a readable warning instead of a dangling
-pointer.
+**What a link stores.** A node id, plus a snapshot of the node's name and kind.
+
+The id is the pointer and it is durable. A node's id is assigned once and
+carried in the code itself, in the docstring, so it survives reparses, edits,
+and renames — the id travels with the function because it is written next to
+the function. A link therefore follows the code it points at without any repair
+step. Renaming `createComment` to `create_comment` does not break anything.
+
+The name snapshot is not a fallback pointer. It is there so a link can be
+displayed without joining against the graph, and so that a link whose node has
+genuinely been deleted still reads sensibly — `ƒ app.services.createComment ⚠`
+rather than a bare id. The snapshot is refreshed from the live node whenever the
+link is resolved, so it tracks renames rather than preserving stale names.
+
+A link becomes `unresolved` in one case only: the node it points at no longer
+exists, because the code was deleted.
 
 **Tradeoff.** Four modes is more than one, and people will sometimes pick the
 wrong one. The design accepts this because a wrong mode is detectable: after the
@@ -193,21 +204,25 @@ with the data underneath.
 
 ## The two laws underneath
 
-### Law 1 — Point hard references at durable things only
+### Law 1 — Point at identity, never at description
 
-Anything a person can throw away must not be the target of a stored reference.
+Every stored reference names a thing by its id. Nothing stored ever points at
+something by what it is currently called or where it currently sits.
 
 ```
-   DURABLE                       FRAGILE
-   ───────                       ───────
-   a task                        a graph node id on its own
-   a graph node id + name        a graph node's position in a file
+   IDENTITY — safe to point at        DESCRIPTION — display only
+   ───────────────────────────        ──────────────────────────
+   a task id                          a task title
+   a graph node id                    a node's qualified name
+                                      a node's position in a file
+                                      a node's line number
 ```
 
-Tasks are durable, so dependencies point at tasks and parents are tasks. Graph
-nodes are fragile, because the parser deletes and recreates them whenever a file
-changes, so every pointer into the graph carries the name and kind snapshot from
-above.
+Both kinds of id are durable. A task disappears only when a person deletes it. A
+graph node's id lives in the code's docstring, so it survives every reparse and
+every rename. Names and positions, on the other hand, change constantly and
+mean nothing to a pointer — which is why they are stored as refreshable
+snapshots for display and are never what a link resolves through.
 
 ### Law 2 — One fact, one place
 

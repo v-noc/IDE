@@ -351,38 +351,59 @@ time rather than at merge time.
 
 ## 5. When the graph changes underneath a link
 
-The parser rewrites the graph whenever a file changes. Nodes are deleted and
-recreated all the time. Every pointer from work into the graph is therefore
-stored as a **soft id plus a snapshot of the name and kind**.
+A link stores a **node id plus a snapshot of the name and kind**.
 
 ```
    STORED           node_id: FunctionSchema/abc123
-                    qname:   app.services.createPost
-                    kind:    function
+                    qname:   app.services.createPost     ← snapshot, refreshed
+                    kind:    function                    ← snapshot, refreshed
 ```
 
-When the node id no longer names anything, the link does not break. It becomes
-**unresolved**, and it still reads sensibly because the snapshot is right there.
+The id does the pointing, and it is stable. A node's id is assigned once and
+written into the code's own docstring, so it stays with that function through
+reparses, edits, renames, and moves between files. The parser preserves the id
+of every node that survives; it only issues a new one for code it has never
+seen before.
+
+This means the ordinary churn of editing does not touch links at all.
+
+```
+   WHAT HAPPENS TO THE CODE          WHAT HAPPENS TO THE LINK
+   ────────────────────────          ────────────────────────
+   file reparsed                     nothing
+   body rewritten                    nothing
+   function renamed                  nothing — id travels in the docstring;
+                                       the snapshot refreshes to the new name
+   moved to another file             nothing — same id, new container
+   deleted                           unresolved
+```
+
+The snapshot exists for two reasons, and neither of them is pointing. It lets a
+link render without joining against the graph, and it keeps a link readable
+after its node is gone. It is refreshed from the live node on every resolve, so
+it shows what the code is called *now*, not what it was called when the link was
+written.
+
+**Unresolved has exactly one cause: the code was deleted.** (The one way to
+break a link without deleting anything is to strip the `ID:` line out of a
+docstring by hand, which reads to the parser as new code — see
+[14 — Edge cases](14-edge-cases.md).)
 
 ```
    ┌────────────────────────────────────────────────────┐
    │ ⚠ affects   function app.services.createPost         │
    │   this node no longer exists in the graph           │
    │   [ point at another node ]   [ remove the link ]   │
+   │   [ make it a delete link ]                         │
    └────────────────────────────────────────────────────┘
 ```
 
-The three ordinary reasons a node disappears each have a sensible answer.
-
-| What happened | What the system does |
-|---|---|
-| Renamed | Suggests nodes with a similar name and the same kind, ranked by closeness |
-| Moved to another file | Suggests nodes with the same short name anywhere in the graph |
-| Genuinely deleted | Offers to remove the link, or to change it into a `delete` link, which may be exactly what the work was |
-
-No automatic re-pointing happens. Quietly moving a plan from one function to
-another changes what the plan means, and a visible warning is much better than
-a confident lie.
+Because a deletion is a real deletion rather than an ambiguous
+disappearance, the system does not have to guess what the person meant. It
+offers to remove the link, or to turn it into a `delete` link, which is often
+exactly what the work was. Re-pointing at a different node is available but is
+never automatic, since quietly moving a plan from one function to another
+changes what the plan means.
 
 ---
 
