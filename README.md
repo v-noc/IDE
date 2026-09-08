@@ -246,7 +246,7 @@ Several performance bottlenecks have already been identified (notably in the cal
 
 ## Community & License
 
-V-NOC is licensed under the **Apache License 1.0** — free for personal, commercial, and production use. Modification and redistribution are permitted under the terms of the license. See `LICENSE` for the full text.
+V-NOC is licensed under the **Apache License 2.0** — free for personal, commercial, and production use. Modification and redistribution are permitted under the terms of the license. See `LICENSE` for the full text.
 
 - **Discord:** https://discord.gg/J5nfPHqyBr
 - **Issues & contributions:** PRs and bug reports welcome. Start a thread on Discord if you'd like to discuss before opening a PR.
