@@ -56,6 +56,8 @@ const queryKeys = {
     config: (projectId: string) => [...queryKeys.tests.all, 'config', projectId] as const,
     cases: (projectId: string, nodeId: string) =>
       [...queryKeys.tests.all, 'cases', projectId, nodeId] as const,
+    caseCode: (projectId: string, testId: string) =>
+      [...queryKeys.tests.all, 'cases', 'code', projectId, testId] as const,
   },
   playgrounds: {
     all: ['playgrounds'] as const,

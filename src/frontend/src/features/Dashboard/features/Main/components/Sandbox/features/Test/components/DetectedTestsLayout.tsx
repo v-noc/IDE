@@ -12,11 +12,12 @@ import type { TestCaseItem } from "../types";
 interface DetectedTestsLayoutProps {
   testCases: TestCaseItem[];
   selectedTestId: string;
-  targetFunctionCode: string;
-  targetFunctionName: string;
-  targetFunctionDescription: string;
-  isTargetFunctionCodeLoading?: boolean;
-  isTargetFunctionCodeError?: boolean;
+  testCode: string;
+  testCodePath: string;
+  testCodeTitle: string;
+  testCodeSubtitle: string;
+  isTestCodeLoading?: boolean;
+  isTestCodeError?: boolean;
   onSelectTest: (id: string) => void;
   onBackToEmptyState: () => void;
 }
@@ -24,15 +25,19 @@ interface DetectedTestsLayoutProps {
 export default function DetectedTestsLayout({
   testCases,
   selectedTestId,
-  targetFunctionCode,
-  targetFunctionName,
-  targetFunctionDescription,
-  isTargetFunctionCodeLoading = false,
-  isTargetFunctionCodeError = false,
+  testCode,
+  testCodePath,
+  testCodeTitle,
+  testCodeSubtitle,
+  isTestCodeLoading = false,
+  isTestCodeError = false,
   onSelectTest,
   onBackToEmptyState,
 }: DetectedTestsLayoutProps) {
-  const language = useMemo(() => detectLanguage("target_function.py"), []);
+  const language = useMemo(
+    () => detectLanguage(testCodePath || "test_case.py"),
+    [testCodePath],
+  );
 
   return (
     <div className="h-full w-full p-1">
@@ -81,11 +86,11 @@ export default function DetectedTestsLayout({
             <div className="border-b px-2 pb-2 mb-2 flex items-center justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold text-slate-800">
-                  {targetFunctionName || "Target function code"}
+                  {testCodeTitle || "Test code"}
                 </div>
-                {targetFunctionDescription ? (
+                {testCodeSubtitle ? (
                   <p className="text-xs text-muted-foreground">
-                    {targetFunctionDescription}
+                    {testCodeSubtitle}
                   </p>
                 ) : null}
               </div>
@@ -94,9 +99,9 @@ export default function DetectedTestsLayout({
             <div className="flex-1 min-h-0 overflow-hidden">
               <CodeEditor
                 language={language}
-                value={targetFunctionCode}
-                isLoading={isTargetFunctionCodeLoading}
-                isError={isTargetFunctionCodeError}
+                value={testCode}
+                isLoading={isTestCodeLoading}
+                isError={isTestCodeError}
                 options={{ readOnly: true }}
               />
             </div>

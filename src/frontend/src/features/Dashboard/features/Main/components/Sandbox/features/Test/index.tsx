@@ -9,6 +9,7 @@ import { useParams } from "react-router";
 import {
   useCreateTestConfig,
   type RunTestsResponse,
+  useTestCaseCode,
   useTestCases,
   useTestConfig,
   useUpdateTestConfig,
@@ -16,7 +17,6 @@ import {
 import { useWorkspaceState } from "@/features/Dashboard/features/Main/hooks/useWorkspaceState";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
-import { useCode } from "@/services/code";
 import { toast } from "sonner";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -137,13 +137,13 @@ const Test = forwardRef<TestHandle, TestProps>(
         ) ?? null,
       [normalizedTestCases, selectedTestId],
     );
-    const selectedTargetFunctionId =
-      selectedTestCase?.targetFunctionId ?? undefined;
+    // Test functions have no graph node id on the test case document, so the
+    // source is read from the file by pytest node id instead.
     const {
-      data: targetFunctionCodeData,
-      isLoading: isTargetFunctionCodeLoading,
-      isError: isTargetFunctionCodeError,
-    } = useCode(selectedTargetFunctionId, "function", projectNodeId);
+      data: testCodeData,
+      isLoading: isTestCodeLoading,
+      isError: isTestCodeError,
+    } = useTestCaseCode(selectedTestCase?.nodeId ?? null, projectNodeId);
 
     const isConfigMissing =
       !isConfigLoading &&
@@ -279,15 +279,18 @@ const Test = forwardRef<TestHandle, TestProps>(
       <DetectedTestsLayout
         testCases={normalizedTestCases}
         selectedTestId={selectedTestId}
-        targetFunctionCode={targetFunctionCodeData?.code ?? ""}
-        targetFunctionName={
-          selectedTestCase?.targetFunctionName ?? "Target function code"
+        testCode={testCodeData?.code ?? ""}
+        testCodePath={testCodeData?.path ?? selectedTestCase?.path ?? ""}
+        testCodeTitle={
+          testCodeData?.name ?? selectedTestCase?.name ?? "Test code"
         }
-        targetFunctionDescription={
-          selectedTestCase?.targetFunctionDescription ?? ""
+        testCodeSubtitle={
+          selectedTestCase?.targetFunctionName
+            ? `Covers ${selectedTestCase.targetFunctionName}`
+            : ""
         }
-        isTargetFunctionCodeLoading={isTargetFunctionCodeLoading}
-        isTargetFunctionCodeError={isTargetFunctionCodeError}
+        isTestCodeLoading={isTestCodeLoading}
+        isTestCodeError={isTestCodeError}
         onSelectTest={setSelectedTestId}
         onBackToEmptyState={() => setViewState("empty_tests")}
       />

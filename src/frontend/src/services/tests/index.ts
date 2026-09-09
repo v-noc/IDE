@@ -1,4 +1,4 @@
-export { useTestConfig, useTestCases } from "./queries";
+export { useTestConfig, useTestCases, useTestCaseCode } from "./queries";
 export { useCreateTestConfig, useRunTests, useUpdateTestConfig } from "./mutations";
 export type {
   TestConfigResponse,
@@ -8,4 +8,5 @@ export type {
   RunTestsResponse,
   TestCaseResponse,
   TestCasesResponse,
+  TestCaseCodeResponse,
 } from "./api";

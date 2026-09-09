@@ -70,6 +70,15 @@ export interface TestCasesResponse {
   lines: number[];
 }
 
+export interface TestCaseCodeResponse {
+  test_id: string;
+  name: string;
+  path: string;
+  code: string;
+  line_no: number;
+  end_line_no: number;
+}
+
 function withProjectId(path: string, projectId: string): string {
   const query = new URLSearchParams({ project_id: projectId });
   return `${path}?${query.toString()}`;
@@ -109,5 +118,13 @@ export const testsApi = {
   getTestCases: (nodeId: string, projectId: string): Promise<TestCasesResponse> => {
     const params = new URLSearchParams({ project_id: projectId, node_id: nodeId });
     return api(`${API_ROUTES.TESTS}/cases?${params.toString()}`);
+  },
+
+  getTestCaseCode: (
+    testId: string,
+    projectId: string,
+  ): Promise<TestCaseCodeResponse> => {
+    const params = new URLSearchParams({ project_id: projectId, test_id: testId });
+    return api(`${API_ROUTES.TESTS}/cases/code?${params.toString()}`);
   },
 };
