@@ -137,6 +137,24 @@ async def create_playground(
     return _to_response(created)
 
 
+@router.get(
+    "/owners",
+    response_model=list[PlayGroundResponse],
+)
+async def get_playgrounds_by_owner_node_id(
+    node_id: str = Query(..., min_length=1),
+    play_ground_service: PlayGroundService = Depends(get_play_ground_service),
+) -> list[PlayGroundResponse]:
+    try:
+        items = await play_ground_service.get_by_owner_node_id(node_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return [_to_response(item) for item in items]
+
+
 @router.get("/{playground_id}", response_model=PlayGroundResponse)
 async def get_playground(
     playground_id: str,
@@ -199,24 +217,6 @@ async def delete_playground(
             detail="Playground not found or delete failed",
         )
     return None
-
-
-@router.get(
-    "/owners",
-    response_model=list[PlayGroundResponse],
-)
-async def get_playgrounds_by_owner_node_id(
-    node_id: str = Query(..., min_length=1),
-    play_ground_service: PlayGroundService = Depends(get_play_ground_service),
-) -> list[PlayGroundResponse]:
-    try:
-        items = await play_ground_service.get_by_owner_node_id(node_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    return [_to_response(item) for item in items]
 
 
 @router.post("/run-code", response_model=CodeResponse)

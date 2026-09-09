@@ -1,8 +1,10 @@
+import ast
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 import os
 import re
+import textwrap
 from typing import Optional
 
 from app.core.model.schemas.test_schema import (
@@ -14,6 +16,7 @@ from app.core.model.schemas.test_schema import (
 )
 from app.core.parser.jedi_adapter.manager import JediProjectManager
 from app.core.plugins.pytest_interceptor.runner import run_tests
+from app.core.utils.code_utils import build_abs_file_path
 from app.db.context import ProjectUoW
 
 
@@ -121,6 +124,134 @@ class TestService:
 
     async def get_test_cases_for_node(self, node_id: str):
         return await self.repos.test_repo.get_test_cases_for_node(node_id)
+
+    @staticmethod
+    def _find_test_scope(tree: ast.Module, scope_parts: list[str]):
+        """Walk `Class::func` style pytest scopes down the AST body."""
+        current: ast.AST = tree
+        for raw_part in scope_parts:
+            # Drop the parametrized suffix, e.g. `test_add[1-2]`.
+            part = re.sub(r"\[.*\]$", "", raw_part)
+            body = getattr(current, "body", None)
+            if not body:
+                return None
+            match = next(
+                (
+                    child
+                    for child in body
+                    if isinstance(
+                        child,
+                        (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef),
+                    )
+                    and child.name == part
+                ),
+                None,
+            )
+            if match is None:
+                return None
+            current = match
+        return current if current is not tree else None
+
+    def _resolve_test_file(self, rel_path: str) -> Optional[Path]:
+        """Locate a test file from a pytest node id path.
+
+        Node id paths are relative to pytest's rootdir, which may sit
+        above or below the project root, so both directions are tried
+        before falling back to a name search inside the project.
+        """
+        if os.path.isabs(rel_path):
+            direct = Path(rel_path)
+            return direct if direct.is_file() else None
+
+        project_root = Path(self.uow.project.path)
+        candidate = Path(build_abs_file_path(str(project_root), rel_path))
+        if candidate.is_file():
+            return candidate
+
+        rel_parts = Path(rel_path).parts
+
+        # rootdir below the project root: drop leading segments.
+        for depth in range(1, len(rel_parts)):
+            trimmed = project_root.joinpath(*rel_parts[depth:])
+            if trimmed.is_file():
+                return trimmed
+
+        # rootdir above the project root: climb a few levels.
+        for parent in list(project_root.parents)[:5]:
+            above = parent.joinpath(*rel_parts)
+            if above.is_file():
+                return above
+
+        # Last resort for demo projects: unique basename match.
+        matches = [
+            match
+            for match in project_root.rglob(rel_parts[-1])
+            if match.is_file()
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    def get_test_case_code(self, test_id: str):
+        """Read a test case's source straight from the file.
+
+        Test functions are not linked to graph nodes on the test case
+        document, so the pytest node id (`path::Class::test_name`) is
+        resolved against the file on disk instead.
+        """
+        parts = [part for part in test_id.split("::") if part]
+        if not parts:
+            return None
+
+        rel_path, *scope_parts = parts
+        abs_path = self._resolve_test_file(rel_path)
+        if abs_path is None:
+            print(
+                f"Test file not found for {test_id!r} "
+                f"under project {self.uow.project.path!r}"
+            )
+            return None
+
+        try:
+            source = abs_path.read_text()
+        except OSError as exc:
+            print(f"Failed to read test file {abs_path}: {exc}")
+            return None
+
+        lines = source.splitlines()
+        whole_file = {
+            "test_id": test_id,
+            "name": rel_path,
+            "path": rel_path,
+            "code": source,
+            "line_no": 1,
+            "end_line_no": len(lines),
+        }
+
+        if not scope_parts:
+            return whole_file
+
+        try:
+            tree = ast.parse(source)
+        except SyntaxError as exc:
+            print(f"Failed to parse test file {abs_path}: {exc}")
+            return whole_file
+
+        node = self._find_test_scope(tree, scope_parts)
+        if node is None:
+            return whole_file
+
+        # Include decorators so fixtures/marks stay visible.
+        start = min(
+            [node.lineno] + [dec.lineno for dec in node.decorator_list],
+        )
+        end = node.end_lineno or start
+        return {
+            "test_id": test_id,
+            "name": node.name,
+            "path": rel_path,
+            "code": textwrap.dedent("\n".join(lines[start - 1:end])),
+            "line_no": start,
+            "end_line_no": end,
+        }
 
     async def run_tests_for_owner(self, owner_id: str):
         test_cases = await self.get_test_cases_for_node(owner_id)

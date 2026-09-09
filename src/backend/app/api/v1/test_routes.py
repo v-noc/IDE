@@ -217,6 +217,26 @@ async def run_tests(
     )
 
 
+@router.get("/cases/code")
+async def get_test_case_code(
+    test_id: str = Query(
+        ...,
+        description=(
+            "Pytest node id of the test case, "
+            "e.g. tests/test_x.py::TestClass::test_foo"
+        ),
+    ),
+    test_service: TestService = Depends(get_test_service),
+):
+    code = test_service.get_test_case_code(test_id)
+    if code is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Test case source not found",
+        )
+    return code
+
+
 @router.get("/cases",)
 async def get_test_cases(
     node_id: str = Query(..., description="The ID of the node"),
