@@ -207,7 +207,7 @@ const EnhancedNode = memo(function EnhancedNode({
             isCurrentStepNodeVisible ? "" : undefined
           }
           className={cn(
-            "canvas-node walkthrough-node relative min-w-[300px] max-w-[320px] overflow-hidden rounded-(--radius) border border-border bg-card text-card-foreground transition-shadow",
+            "canvas-node walkthrough-node relative min-w-[350px] max-w-[450px] overflow-hidden rounded-(--radius) border border-border bg-card text-card-foreground transition-shadow",
             isCurrentStepNodeVisible && "walkthrough-active-node",
           )}
           style={hasStatusOverride ? statusStyles : undefined}
@@ -218,62 +218,62 @@ const EnhancedNode = memo(function EnhancedNode({
             manuallyCreated={data.manuallyCreated}
             onAction={onAction}
           >
-          <div style={contentStyles}>
-            <NodeHeader
-              name={data.name}
-              icon={data.mainIcon}
-              iconColor={customIconColor}
-              expandable={data.expandable}
-              expanded={data.expanded}
-              onToggle={data.onToggle}
-              hasCode={Boolean(nodeCode.hasCode)}
-              showCode={nodeCode.showCode}
-              onCodeToggle={handleCodeToggle}
-              status={data.metadata?.status}
-              diffStatus={data.diffStatus as any}
-              taskOpenCount={nodeTaskSummary?.open_count}
-              taskHot={nodeTaskSummary?.hot}
-              onTaskBadgeClick={() => {
-                const firstTaskId = nodeTaskSummary?.open_task_ids[0];
-                if (firstTaskId) setSelectedTaskId(firstTaskId);
-              }}
-            />
-
-            {nodeCode.showCode && nodeCode.hasCode ? (
-              <NodeCodeView
-                code={nodeCode.code}
-                fileName={nodeCode.fileName}
-                language={nodeCode.language}
-                onChange={nodeCode.setCode}
-                onSave={nodeCode.handleSave}
-                hasChanges={nodeCode.hasChanges}
-                isSaving={nodeCode.isSaving}
-                isLoading={nodeCode.isLoading}
-                showDiff={nodeCode.showDiff}
-                originalContent={nodeCode.originalContent}
-                modifiedContent={nodeCode.modifiedContent}
-                isLoadingDiff={nodeCode.isLoadingDiff}
-                diffError={nodeCode.diffError}
-                borderColor={
-                  (statusStyles.borderColor as string) || data.borderColor
-                }
-                iconColor={(statusStyles.color as string) || data.iconColor}
-                nodeId={data.nodeId ?? ""}
-                nodeStartLine={nodeCode.nodeStartLine}
-                isWalkthroughPlaying={nodeCode.isWalkthroughPlaying}
+            <div style={contentStyles}>
+              <NodeHeader
+                name={data.name}
+                icon={data.mainIcon}
+                iconColor={customIconColor}
+                expandable={data.expandable}
+                expanded={data.expanded}
+                onToggle={data.onToggle}
+                hasCode={Boolean(nodeCode.hasCode)}
+                showCode={nodeCode.showCode}
+                onCodeToggle={handleCodeToggle}
+                status={data.metadata?.status}
+                diffStatus={data.diffStatus as any}
+                taskOpenCount={nodeTaskSummary?.open_count}
+                taskHot={nodeTaskSummary?.hot}
+                onTaskBadgeClick={() => {
+                  const firstTaskId = nodeTaskSummary?.open_task_ids[0];
+                  if (firstTaskId) setSelectedTaskId(firstTaskId);
+                }}
               />
-            ) : (
-              <NodeDescription
-                description={data.metadata?.description}
-                fallbackLabel={descriptionFallback}
-              />
-            )}
 
-            <NodeFooter
-              createdAt={data.metadata?.createdAt}
-              updatedAt={data.metadata?.updatedAt}
-            />
-          </div>
+              {nodeCode.showCode && nodeCode.hasCode ? (
+                <NodeCodeView
+                  code={nodeCode.code}
+                  fileName={nodeCode.fileName}
+                  language={nodeCode.language}
+                  onChange={nodeCode.setCode}
+                  onSave={nodeCode.handleSave}
+                  hasChanges={nodeCode.hasChanges}
+                  isSaving={nodeCode.isSaving}
+                  isLoading={nodeCode.isLoading}
+                  showDiff={nodeCode.showDiff}
+                  originalContent={nodeCode.originalContent}
+                  modifiedContent={nodeCode.modifiedContent}
+                  isLoadingDiff={nodeCode.isLoadingDiff}
+                  diffError={nodeCode.diffError}
+                  borderColor={
+                    (statusStyles.borderColor as string) || data.borderColor
+                  }
+                  iconColor={(statusStyles.color as string) || data.iconColor}
+                  nodeId={data.nodeId ?? ""}
+                  nodeStartLine={nodeCode.nodeStartLine}
+                  isWalkthroughPlaying={nodeCode.isWalkthroughPlaying}
+                />
+              ) : (
+                <NodeDescription
+                  description={data.metadata?.description}
+                  fallbackLabel={descriptionFallback}
+                />
+              )}
+
+              <NodeFooter
+                createdAt={data.metadata?.createdAt}
+                updatedAt={data.metadata?.updatedAt}
+              />
+            </div>
           </NodeContextMenu>
 
           <Handle
