@@ -25,6 +25,7 @@ from app.db.errors import DatabaseError
 from app.core.model.schemas import StructureGroupSchema
 from app.core.cache_setup import DEFAULT_TTL
 from loguru import logger
+from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
 
 
@@ -152,6 +153,10 @@ async def create_project(
 
     tree_builder = TreeBuilder(children)
     tree = tree_builder.build()
+
+    # The cached GET /all response would otherwise keep serving the
+    # pre-creation project list until its TTL (DEFAULT_TTL) expires.
+    await FastAPICache.clear()
 
     return ProjectTreeNode(**project_node.model_dump(), children=tree)
 

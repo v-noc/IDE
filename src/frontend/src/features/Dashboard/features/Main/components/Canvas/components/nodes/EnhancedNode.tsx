@@ -128,7 +128,6 @@ const EnhancedNode = memo(function EnhancedNode({
         cStyles.filter = "grayscale(100%) brightness(2)"; // Brighten to make white text pop on red
         sStyles.backgroundColor = "#dc2626"; // red-600
         sStyles.color = "#ffffff";
-        sStyles.pointerEvents = "none";
       }
     }
 

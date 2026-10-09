@@ -83,6 +83,7 @@ async def init_cache(app) -> None:
             coder=OrjsonCoder,
         )
     else:
+        print("Using no-op backend")
         app.state.redis = None
         FastAPICache.init(
             NoOpBackend(),

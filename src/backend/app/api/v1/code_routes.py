@@ -128,6 +128,12 @@ async def get_code(
             else:
                 code_details = {"compare_to": compare_to_code_details,
                                 **compare_to_code_details, "code": ""}
+        elif code_details is not None:
+            # Element exists at the current ref but not at compare_to (i.e.
+            # it was removed going from here to there) — attach an
+            # empty-code stub so the frontend renders a removed-diff
+            # (code on the left, empty on the right) instead of plain code.
+            code_details["compare_to"] = {**code_details, "code": ""}
 
     if code_details is None:
         raise HTTPException(

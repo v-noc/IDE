@@ -30,11 +30,17 @@ export function useSocketSync() {
       });
     };
 
-    // When project structure changes
+    // When project structure changes (e.g. a watcher-triggered resync after
+    // files changed on disk) — invalidate the tree AND every cached code
+    // detail/descendants query, since resync doesn't know which specific
+    // element ids changed and the tree alone won't refresh open code views.
     const onProjectUpdated = (data: { project_id: string }) => {
       console.log('🔄 Project updated:', data.project_id);
       queryClient.invalidateQueries({
         queryKey: queryKeys.projects.tree(data.project_id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.code.all,
       });
     };
 

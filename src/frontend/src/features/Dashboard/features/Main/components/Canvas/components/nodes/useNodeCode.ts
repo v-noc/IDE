@@ -60,7 +60,10 @@ export function useNodeCode({ nodeId, targetKey, nodeType }: UseNodeCodeOptions)
 
   const hasCode =
     (codeData?.code && codeData.code.length > 0) ||
-    (editorValue && editorValue.length > 0);
+    (editorValue && editorValue.length > 0) ||
+    // Added/removed diff nodes have empty code on one side — the other
+    // side (compare_to) still has content worth showing in the diff view.
+    (codeData?.compare_to?.code && codeData.compare_to.code.length > 0);
 
   const fileName = codeData?.file_name || codeData?.file_path || "";
   const language = detectLanguage(codeData?.file_path || codeData?.file_name || "");

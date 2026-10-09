@@ -18,7 +18,7 @@ import { mergeStructureAndLazyChildren } from "@/features/Dashboard/utils/mergeC
 const EMPTY_METADATA_MAP = new Map<string, NodeMetadata>();
 
 // Constants for card size - Adjust these to match your actual CSS node size!
-const NODE_WIDTH = 450;
+const NODE_WIDTH = 350;
 const NODE_HEIGHT = 150;
 
 interface UseEnhancedTreeLayoutProps {

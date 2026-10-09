@@ -286,6 +286,22 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
 
             queries.append(WQ().insert_document(Doc(schema)))
 
+        # Deleting a function/class whose CallSchema edges still point at it
+        # (target_function/target_class) leaves those edges with zero values
+        # on a cardinality-one property, which TerminusDB's schema check
+        # rejects for the *whole* transaction. Find and cascade-delete any
+        # such dangling call edges in the same batch.
+        if delete:
+            dangling_call_ids = await self._find_dangling_call_ids(delete)
+            for call_id in dangling_call_ids:
+                queries.append(WQ().woql_and(
+                    WQ().opt(
+                        WQ().triple("v:call_parent", "call_children", call_id)
+                        .delete_triple("v:call_parent", "call_children", call_id)
+                    ),
+                    WQ().delete_document(call_id),
+                ))
+
         # build delete operations
         for delete_id in delete:
             field = "function_children"
@@ -353,6 +369,30 @@ class CodeElementRepo(BaseRepo[CodeNode, CodeSchema]):
                 ok = False
                 break
         return ok
+
+    async def _find_dangling_call_ids(self, deleted_ids: List[str]) -> List[str]:
+        """CallSchema ids whose target_function/target_class is about to be deleted."""
+        query = WQ().select("v:call_id").woql_and(
+            WQ().woql_or(
+                WQ().woql_and(
+                    WQ().triple("v:call_id", "target_function", "v:target"),
+                    WQ().member("v:target", deleted_ids),
+                ),
+                WQ().woql_and(
+                    WQ().triple("v:call_id", "target_class", "v:target"),
+                    WQ().member("v:target", deleted_ids),
+                ),
+            )
+        )
+        try:
+            result = await self.client.query(query)
+        except Exception as exc:
+            print(f"error finding dangling call edges: {exc}")
+            return []
+
+        bindings = result.get("bindings") or []
+        call_ids = {b["call_id"] for b in bindings if b.get("call_id")}
+        return list(call_ids)
 
     async def get_node_lineage(self, node_id: str) -> list[Any]:
         query = WQ().select("v:target_doc").woql_and(
