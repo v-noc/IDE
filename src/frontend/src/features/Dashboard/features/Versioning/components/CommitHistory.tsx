@@ -62,7 +62,7 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
 
   if (emptyMessage) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 py-8 text-center text-sm text-slate-500">
+      <div className="flex flex-1 items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
         {emptyMessage}
       </div>
     );
@@ -70,7 +70,7 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
 
   if (isError) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 py-8 text-center text-sm text-red-500">
+      <div className="flex flex-1 items-center justify-center px-4 py-8 text-center text-sm text-destructive">
         Failed to load commits
       </div>
     );
@@ -86,7 +86,7 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
 
   if (commits.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center px-4 py-8 text-center text-sm text-slate-500">
+      <div className="flex flex-1 items-center justify-center px-4 py-8 text-center text-sm text-muted-foreground">
         No commits yet
       </div>
     );
@@ -115,16 +115,16 @@ const CommitHistory: React.FC<CommitHistoryProps> = ({
           <button
             onClick={onPrevPage}
             disabled={!hasPrevPage}
-            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
           >
             <ChevronLeft size={16} />
             Previous
           </button>
-          <span className="text-xs text-slate-500">Page {page + 1}</span>
+          <span className="text-xs text-muted-foreground">Page {page + 1}</span>
           <button
             onClick={onNextPage}
             disabled={!hasNextPage}
-            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
           >
             Next
             <ChevronRight size={16} />

@@ -35,22 +35,22 @@ const CommitItem: React.FC<CommitItemProps> = ({
 
   const containerClassName = `relative flex gap-2 pb-0 group cursor-pointer rounded-xl transition-all duration-200 p-3 mb-2 ${
     isActive
-      ? "bg-blue-50/80 ring-1 ring-blue-200 shadow-sm"
+      ? "bg-primary/10 ring-1 ring-primary/30 shadow-sm"
       : isCompareTarget
-        ? "bg-violet-50/90 ring-1 ring-violet-300 shadow-sm"
-        : "hover:bg-slate-50/90"
+        ? "bg-chart-5/10 ring-1 ring-chart-5/30 shadow-sm"
+        : "hover:bg-accent/60"
   }`;
 
   const avatarClassName = `z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-all duration-200 ${
     isActive
-      ? "bg-blue-600 text-white shadow-sm"
+      ? "bg-primary text-primary-foreground shadow-sm"
       : isCompareTarget
-        ? "bg-violet-600 text-white shadow-sm"
-        : "bg-slate-100 text-slate-500 group-hover:bg-slate-200 group-hover:text-slate-700"
+        ? "bg-chart-5 text-primary-foreground shadow-sm"
+        : "bg-muted text-muted-foreground group-hover:bg-accent group-hover:text-foreground"
   }`;
 
   const authorClassName = `text-[13px] font-bold truncate transition-colors ${
-    isActive ? "text-primary" : isCompareTarget ? "text-indigo-700" : "text-slate-900"
+    isActive ? "text-primary" : isCompareTarget ? "text-chart-5" : "text-foreground"
   }`;
 
   return (
@@ -59,7 +59,7 @@ const CommitItem: React.FC<CommitItemProps> = ({
         <div onClick={onClick} className={containerClassName}>
           {/* Connector Line */}
           {!isLast && (
-            <div className="absolute left-[26px] top-[38px] bottom-[-8px] w-px bg-slate-200 transition-colors" />
+            <div className="absolute left-[26px] top-[38px] bottom-[-8px] w-px bg-border transition-colors" />
           )}
 
           {/* Avatar / Icon */}
@@ -76,30 +76,30 @@ const CommitItem: React.FC<CommitItemProps> = ({
                   <span
                     className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
                       isActive
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-indigo-100 text-indigo-700"
+                        ? "bg-primary/15 text-primary"
+                        : "bg-chart-5/15 text-chart-5"
                     }`}
                   >
                     {isActive ? "Checked out" : "Compare"}
                   </span>
                 )}
               </div>
-              <span className="shrink-0 text-[10px] font-medium text-slate-400">
+              <span className="shrink-0 text-[10px] font-medium text-muted-foreground">
                 {timePart}
               </span>
             </div>
 
-            <span className="text-[10px] font-medium text-slate-400">
+            <span className="text-[10px] font-medium text-muted-foreground">
               {datePart || commit.timestamp}
             </span>
 
             <div
               className={`mt-0.5 min-w-0 truncate text-[12px] leading-4 transition-colors ${
                 isActive
-                  ? "text-slate-800"
+                  ? "text-foreground"
                   : isCompareTarget
-                    ? "text-violet-700"
-                    : "text-slate-600"
+                    ? "text-chart-5"
+                    : "text-muted-foreground"
               }`}
             >
               {commit.message}

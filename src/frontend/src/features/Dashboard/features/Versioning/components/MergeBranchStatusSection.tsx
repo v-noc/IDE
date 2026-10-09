@@ -27,20 +27,20 @@ export function MergeBranchStatusSection({
   onClose,
 }: MergeBranchStatusSectionProps) {
   return (
-    <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 sm:block hidden">
+    <div className="flex items-center gap-2 border-l border-border pl-3">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground sm:block hidden">
         Merge
       </span>
-      <div className="flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50/30 p-0.5 pr-1 shadow-sm">
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 text-slate-700">
-          <GitBranch className="size-3 text-emerald-500" />
+      <div className="flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 p-0.5 pr-1 shadow-sm">
+        <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-card px-2 py-0.5 text-foreground">
+          <GitBranch className="size-3 text-primary" />
           <span className="max-w-[120px] truncate">{sourceBranch}</span>
         </span>
 
         <Button
           variant="ghost"
           size="icon"
-          className="size-5 rounded-full text-emerald-500 hover:bg-emerald-100"
+          className="size-5 rounded-full text-primary hover:bg-primary/15"
           onClick={onSwapBranches}
           title="Swap merge direction"
           disabled={!targetBranch}
@@ -51,14 +51,14 @@ export function MergeBranchStatusSection({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-white px-2 py-0.5 text-slate-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-card px-2 py-0.5 text-foreground hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-70"
               disabled={isLoadingBranches || mergeCandidates.length === 0}
             >
-              <GitMerge className="size-3 text-emerald-500" />
+              <GitMerge className="size-3 text-primary" />
               <span className="max-w-[120px] truncate">
                 {targetBranch ?? "Select branch"}
               </span>
-              <ChevronDown className="size-3 text-emerald-500" />
+              <ChevronDown className="size-3 text-primary" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[200px]">
@@ -81,7 +81,7 @@ export function MergeBranchStatusSection({
 
         <button
           onClick={onClose}
-          className="ml-1 rounded-full p-0.5 text-emerald-500 hover:bg-emerald-100"
+          className="ml-1 rounded-full p-0.5 text-primary hover:bg-primary/15"
           title="Close merge banner"
         >
           <X className="size-3" />

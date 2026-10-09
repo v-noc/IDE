@@ -56,7 +56,11 @@ class PlayGroundRepo:
             WQ()
             .select("v:playground_doc")
             .woql_and(
-                WQ().triple("v:playground", owner_field, owner_id),
+                WQ().triple(
+                    "v:playground",
+                    owner_field,
+                    WQ().string(owner_id)
+                ),
                 WQ().read_document("v:playground", "v:playground_doc"),
             )
         )
@@ -67,4 +71,3 @@ class PlayGroundRepo:
             return []
 
         return [row["playground_doc"] for row in result.get("bindings", [])]
-

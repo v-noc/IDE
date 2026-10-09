@@ -42,23 +42,23 @@ const BranchDropdown: React.FC<BranchDropdownProps> = ({
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-50",
+            "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent",
             triggerClassName,
           )}
           disabled={isLoading}
         >
-          <GitBranch className="size-4 shrink-0 text-slate-600" />
+          <GitBranch className="size-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate text-left text-xs">
             {currentBranch}
           </span>
-          <ChevronDown className="size-4 shrink-0 text-slate-500" />
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
         className={cn("min-w-[200px]", className)}
       >
-        <DropdownMenuLabel className="text-xs font-medium text-slate-500">
+        <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
           Branches
         </DropdownMenuLabel>
         {branches.map((branch) => (
@@ -66,10 +66,10 @@ const BranchDropdown: React.FC<BranchDropdownProps> = ({
             key={branch.id}
             onClick={() => onSelectBranch(branch.name)}
             className={`flex items-center gap-2 ${
-              branch.name === currentBranch ? "bg-slate-100" : ""
+              branch.name === currentBranch ? "bg-accent" : ""
             }`}
           >
-            <GitBranch className="size-4 shrink-0 text-slate-600" />
+            <GitBranch className="size-4 shrink-0 text-muted-foreground" />
             <span className="truncate text-sm">{branch.name}</span>
           </DropdownMenuItem>
         ))}
@@ -78,7 +78,7 @@ const BranchDropdown: React.FC<BranchDropdownProps> = ({
             <DropdownMenuSeparator />
             {onNewBranch && (
               <DropdownMenuItem onClick={onNewBranch} className="gap-2 text-sm">
-                <Plus className="size-4 shrink-0 text-slate-600 " />
+                <Plus className="size-4 shrink-0 text-muted-foreground " />
                 New Branch
               </DropdownMenuItem>
             )}
@@ -87,7 +87,7 @@ const BranchDropdown: React.FC<BranchDropdownProps> = ({
                 onClick={onMergeBranches}
                 className="gap-2 text-sm"
               >
-                <GitMerge className="size-4 shrink-0 text-slate-600" />
+                <GitMerge className="size-4 shrink-0 text-muted-foreground" />
                 Merge Branches
               </DropdownMenuItem>
             )}

@@ -35,7 +35,7 @@ export function VersioningStatusActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-7 text-slate-400">
+        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground">
           <MoreVertical className="size-4" />
         </Button>
       </DropdownMenuTrigger>
