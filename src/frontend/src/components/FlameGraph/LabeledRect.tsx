@@ -1,17 +1,16 @@
 import React from "react";
 
 interface LabeledRectProps {
+    ariaLabel?: string;
     backgroundColor: string;
     color: string;
-    disableDefaultTooltips?: boolean;
     height: number;
     isDimmed?: boolean;
     label: string;
-    onClick?: (e: React.MouseEvent) => void;
+    onActivate?: () => void;
     onMouseEnter?: (e: React.MouseEvent) => void;
     onMouseLeave?: (e: React.MouseEvent) => void;
     onMouseMove?: (e: React.MouseEvent) => void;
-    tooltip?: string;
     width: number;
     x: number;
     y: number;
@@ -21,17 +20,16 @@ const MIN_WIDTH_TO_DISPLAY_TEXT = 30; // 30px
 const TEXT_HEIGHT = 14; // Approximate
 
 export const LabeledRect: React.FC<LabeledRectProps> = ({
+    ariaLabel,
     backgroundColor,
     color,
-    disableDefaultTooltips,
     height,
     isDimmed = false,
     label,
-    onClick,
+    onActivate,
     onMouseEnter,
     onMouseLeave,
     onMouseMove,
-    tooltip,
     width,
     x,
     y,
@@ -43,15 +41,21 @@ export const LabeledRect: React.FC<LabeledRectProps> = ({
         onMouseLeave={onMouseLeave}
         onMouseMove={onMouseMove}
     >
-        {!disableDefaultTooltips && (
-            <title>{tooltip != null ? tooltip : label}</title>
-        )}
         <rect
             width={width}
             height={height}
             fill={backgroundColor || "#3b82f6"}
-            onClick={onClick}
-            className="cursor-pointer stroke-white/30 hover:brightness-95 transition-all"
+            onClick={onActivate}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onActivate?.();
+                }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label={ariaLabel || label}
+            className="cursor-pointer stroke-white/30 hover:brightness-95 transition-all outline-none focus-visible:stroke-blue-500 focus-visible:stroke-2"
             style={{
                 opacity: isDimmed ? 0.5 : 1,
             }}

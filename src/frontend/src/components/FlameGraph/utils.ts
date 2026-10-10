@@ -46,7 +46,8 @@ export function transformChartData(rawData: FlameGraphNode): ChartData {
         sourceNode: FlameGraphNode,
         depth: number,
         leftOffset: number,
-        totalWidthRatio: number // normalized width of this node relative to root
+        totalWidthRatio: number, // normalized width of this node relative to root
+        parentUid: string | null
     ): ChartNode {
         const {
             children,
@@ -64,6 +65,7 @@ export function transformChartData(rawData: FlameGraphNode): ChartData {
             depth,
             left: leftOffset,
             name,
+            parentUid,
             source: sourceNode,
             width: totalWidthRatio,
         });
@@ -103,7 +105,8 @@ export function transformChartData(rawData: FlameGraphNode): ChartData {
                     sourceChildNode,
                     depth + 1,
                     currentChildLeft,
-                    childWidthRatio
+                    childWidthRatio,
+                    uidOrCounter
                 );
 
                 // Advance left position for the next sibling
@@ -115,7 +118,7 @@ export function transformChartData(rawData: FlameGraphNode): ChartData {
     }
 
     // Start conversion
-    convertNode(rawData, 0, 0, (rawData.value || 0) / globalMaxValue);
+    convertNode(rawData, 0, 0, (rawData.value || 0) / globalMaxValue, null);
 
     const rootUid = rawData.id || '_0';
 
@@ -125,4 +128,23 @@ export function transformChartData(rawData: FlameGraphNode): ChartData {
         nodes,
         root: rootUid,
     };
+}
+
+/**
+ * Walks the parentUid chain from a node back to the root, returning uids
+ * ordered root-first. Used to render the breadcrumb trail.
+ */
+export function getPathToRoot(data: ChartData, uid: string): string[] {
+    const path: string[] = [];
+    let current: string | null = uid;
+
+    // Guard against malformed/cyclic parent chains instead of looping forever.
+    const seen = new Set<string>();
+    while (current && data.nodes[current] && !seen.has(current)) {
+        seen.add(current);
+        path.unshift(current);
+        current = data.nodes[current].parentUid;
+    }
+
+    return path;
 }

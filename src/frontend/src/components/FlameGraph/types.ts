@@ -14,6 +14,7 @@ export interface ChartNode {
     depth: number;
     left: number;
     name: string;
+    parentUid: string | null;
     source: FlameGraphNode;
     tooltip?: string;
     width: number;
@@ -26,6 +27,12 @@ export interface ChartData {
     root: string;
 }
 
+export interface HoverInfo {
+    node: ChartNode;
+    clientX: number;
+    clientY: number;
+}
+
 export interface ItemData {
     data: ChartData;
     focusedNode: ChartNode;
@@ -34,4 +41,5 @@ export interface ItemData {
     width: number;
     rowHeight: number;
     onSelect?: (node: FlameGraphNode) => void;
+    onHover: (info: HoverInfo | null) => void;
 }

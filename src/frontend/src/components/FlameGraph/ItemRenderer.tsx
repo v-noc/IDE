@@ -45,19 +45,26 @@ export const ItemRenderer: React.FC<ItemRendererProps> = ({
                 return (
                     <LabeledRect
                         key={uid}
+                        ariaLabel={`${node.name}, ${node.source.value.toFixed(2)}ms`}
                         backgroundColor={node.backgroundColor}
                         color={node.color}
                         height={data.rowHeight}
                         isDimmed={index < focusedNode.depth}
                         label={node.name}
-                        onClick={() => {
+                        onActivate={() => {
                             focusNode(uid);
                             onSelect?.(node.source);
                         }}
+                        onMouseEnter={(e) =>
+                            data.onHover({ node, clientX: e.clientX, clientY: e.clientY })
+                        }
+                        onMouseMove={(e) =>
+                            data.onHover({ node, clientX: e.clientX, clientY: e.clientY })
+                        }
+                        onMouseLeave={() => data.onHover(null)}
                         width={w}
                         x={x}
                         y={0} // FixedSizeList handles Y via style
-                        tooltip={`${node.name} (${node.source.value.toFixed(2)}ms)`}
                     />
                 );
             })}
