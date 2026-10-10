@@ -6,11 +6,14 @@ import { type FlameGraphNode } from "@/components/FlameGraph/types";
  * It uses effective duration for values and extracts function names.
  */
 export function mapLogToFlameNode(node: LogTreeNode): FlameGraphNode {
-  // Determine duration: Use its own 'duration_ms' or its exit child's duration
-  const exitChild = (node.children || []).find((c) => c.event_type === "exit");
-  const duration = exitChild?.duration_ms
+  // Determine duration: a call either completes ('exit') or throws ('error') —
+  // both carry duration_ms, so either can close out this frame's timing.
+  const closingChild = (node.children || []).find(
+    (c) => c.event_type === "exit" || c.event_type === "error",
+  );
+  const duration = closingChild?.duration_ms;
 
-  // Filter children to remove technical 'exit'/'error' nodes that are 
+  // Filter children to remove technical 'exit'/'error' nodes that are
   // already represented in the parent's data or as separate bars.
   // In a flame graph, we usually only care about the nested calls ('enter').
   const children = (node.children ?? [])
@@ -18,7 +21,7 @@ export function mapLogToFlameNode(node: LogTreeNode): FlameGraphNode {
     .map(mapLogToFlameNode);
 
   return {
-    id: node._id || Math.random().toString(),
+    id: node.id || Math.random().toString(),
     name: node.message || "untitled",
     value: duration ?? 0,
     functionId: node.function_id || undefined,

@@ -157,7 +157,7 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
             <div className="w-5" />
           )}
           <span className="font-mono text-[10px] opacity-60 select-all">
-            {node._id?.slice(0, 8)}
+            {node.id?.slice(0, 8)}
           </span>
         </div>
 
@@ -245,7 +245,7 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
       {isExpanded &&
         filteredChildren.map((child) => (
           <LogRow
-            key={child._id}
+            key={child.id}
             node={child}
             depth={depth + 1}
             onViewFlameChart={onViewFlameChart}

@@ -6,7 +6,6 @@ import { mapLogToFlameNode } from "./utils/mapping";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { type LogTreeNode } from "@/services/logs";
-import { useResizeObserver } from "@/hooks/useResizeObserver";
 import { useNodeRevealer } from "./hooks/useNodeRevealer";
 import type { LogNode } from "@/services/logs/api";
 
@@ -19,7 +18,6 @@ export const LogsContainer: React.FC<{ tabId: string }> = ({ tabId }) => {
   const [viewMode, setViewMode] = useState<"list" | "chart">("list");
   const [selectedLogForChart, setSelectedLogForChart] =
     useState<LogTreeNode | null>(null);
-  const { ref, width } = useResizeObserver();
   const { revealNode } = useNodeRevealer(tabId);
 
   const handleViewFlameChart = (node: LogTreeNode) => {
@@ -42,10 +40,7 @@ export const LogsContainer: React.FC<{ tabId: string }> = ({ tabId }) => {
 
   if (viewMode === "chart" && selectedLogForChart) {
     return (
-      <div
-        className="w-full h-full flex flex-col bg-card border border-border rounded-lg overflow-hidden shadow-sm"
-        ref={ref}
-      >
+      <div className="w-full h-full flex flex-col bg-card border border-border rounded-lg overflow-hidden shadow-sm">
         <div className="flex items-center justify-between border-b border-border bg-muted/30 p-2">
           <Button
             variant="ghost"
@@ -57,14 +52,13 @@ export const LogsContainer: React.FC<{ tabId: string }> = ({ tabId }) => {
             Back to List
           </Button>
           <span className="text-xs font-medium text-muted-foreground">
-            Trace: {selectedLogForChart.message || selectedLogForChart._id}
+            Trace: {selectedLogForChart.message || selectedLogForChart.id}
           </span>
           <div className="w-20" /> {/* Spacer for balance */}
         </div>
-        <div className="flex-1 overflow-auto p-4">
+        <div className="flex-1 min-h-0 overflow-hidden p-4">
           <FlameGraph
             data={[mapLogToFlameNode(selectedLogForChart)]}
-            width={width - 32} // Padding adjustment
             rowHeight={20}
             onSelect={(n) => {
               if (n.functionId && selectedLogForChart) {
@@ -125,7 +119,7 @@ export const LogsContainer: React.FC<{ tabId: string }> = ({ tabId }) => {
         {!isLoading &&
           logs.map((node) => (
             <LogRow
-              key={node._id}
+              key={node.id}
               node={node}
               onViewFlameChart={() => handleViewFlameChart(node)}
               onSelect={(target, root) => revealNode(target, root)}
