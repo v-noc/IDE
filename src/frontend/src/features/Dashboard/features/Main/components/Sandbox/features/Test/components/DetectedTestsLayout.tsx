@@ -45,7 +45,7 @@ export default function DetectedTestsLayout({
         <ResizablePanel defaultSize={25} minSize={18}>
           <div className="h-full rounded-lg border border-border bg-card p-3 flex flex-col">
             <div className="border-b pb-2 mb-2">
-              <div className="text-sm font-semibold text-slate-800">
+              <div className="text-sm font-semibold text-foreground">
                 Detected test cases
               </div>
             </div>
@@ -61,10 +61,10 @@ export default function DetectedTestsLayout({
                     className={`w-full rounded border px-3 py-2 text-left transition-colors ${
                       isSelected
                         ? "border-primary bg-accent/50"
-                        : "border-slate-200 hover:bg-accent/30"
+                        : "border-border hover:bg-accent/30"
                     }`}
                   >
-                    <div className="text-sm font-medium text-slate-800 truncate">
+                    <div className="text-sm font-medium text-foreground truncate">
                       {testCase.name}
                     </div>
                     {testCase.description ? (
@@ -85,7 +85,7 @@ export default function DetectedTestsLayout({
           <div className="h-full rounded-lg border border-border bg-card p-2 flex flex-col">
             <div className="border-b px-2 pb-2 mb-2 flex items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-semibold text-slate-800">
+                <div className="text-sm font-semibold text-foreground">
                   {testCodeTitle || "Test code"}
                 </div>
                 {testCodeSubtitle ? (

@@ -42,7 +42,7 @@ export default function TestConfigDialog({
           <div className="grid gap-2">
             <Label htmlFor="enabled">Test execution</Label>
             <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <span className="text-sm text-slate-700">Enable test execution</span>
+              <span className="text-sm text-foreground">Enable test execution</span>
               <input
                 id="enabled"
                 type="checkbox"

@@ -17,7 +17,7 @@ export default function NoTestCasesState({
             <Beaker className="size-7 text-muted-foreground" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-lg font-semibold text-slate-800">
+            <h3 className="text-lg font-semibold text-foreground">
               No test cases found
             </h3>
             <p className="text-sm text-muted-foreground">

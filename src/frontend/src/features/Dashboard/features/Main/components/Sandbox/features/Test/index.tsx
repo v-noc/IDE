@@ -340,7 +340,7 @@ const Test = forwardRef<TestHandle, TestProps>(
           {latestRunResult && isResultPanelOpen && (
             <aside className="w-[45%] shrink-0 rounded-lg border border-border bg-card flex flex-col">
               <div className="px-3 py-2 border-b flex items-center justify-between">
-                <div className="text-sm font-semibold text-slate-800">
+                <div className="text-sm font-semibold text-foreground">
                   Output
                 </div>
                 <Button
@@ -353,7 +353,7 @@ const Test = forwardRef<TestHandle, TestProps>(
                 </Button>
               </div>
 
-              <ScrollArea className="flex-1">
+              <ScrollArea className="flex-1 min-h-0">
                 <div className="p-3">
                   <pre className="text-xs whitespace-break-spaces wrap-break-word">
                     {latestRawOutput || "No subprocess output from last run."}
