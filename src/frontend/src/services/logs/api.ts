@@ -2,7 +2,7 @@ import { api } from "@/lib/api";
 import API_ROUTES from "@/lib/apiRoutes";
 
 export interface LogNode {
-  _id: string;
+  id: string;
   _key: string;
   timestamp: string;
   event_type: "enter" | "exit" | "error" | "log";
@@ -23,5 +23,5 @@ export interface LogTreeNode extends LogNode {
 
 export const logsApi = {
   getLogTree: (functionId: string, projectId: string): Promise<LogTreeNode[]> =>
-    api(`${API_ROUTES.LOGS}/log-tree?function_id=${functionId}&project_id=${projectId}`),
+    api(`${API_ROUTES.LOGS}log-tree?function_id=${functionId}&project_id=${projectId}`),
 };
