@@ -10,6 +10,7 @@ import { NodeFooter } from "./NodeFooter";
 import { useNodeCode } from "./useNodeCode";
 import { NodeContextMenu } from "@/features/Dashboard/components/NodeContextMenu";
 import { useNodeHandlers } from "@/features/Dashboard/hooks/useNodeHandlers";
+import { useActiveCoverageForNode } from "@/features/Dashboard/store/useTestCoverageStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import {
@@ -68,6 +69,7 @@ const EnhancedNode = memo(function EnhancedNode({
   const activeTabId = useTabStore((s) => s.activeTabId);
   const nodeId = data.nodeId ?? "";
   const { projectId } = useParams();
+  const coveredLines = useActiveCoverageForNode(activeTabId, nodeId);
   const { data: anchorSummary } = useAnchorSummary(projectId);
   const { data: taskBoard } = useTaskBoard(projectId);
   const setSelectedTaskId = useProjectStore((s) => s.setSelectedTaskId);
@@ -259,6 +261,7 @@ const EnhancedNode = memo(function EnhancedNode({
                   iconColor={(statusStyles.color as string) || data.iconColor}
                   nodeId={data.nodeId ?? ""}
                   nodeStartLine={nodeCode.nodeStartLine}
+                  coveredLines={coveredLines}
                   isWalkthroughPlaying={nodeCode.isWalkthroughPlaying}
                 />
               ) : (

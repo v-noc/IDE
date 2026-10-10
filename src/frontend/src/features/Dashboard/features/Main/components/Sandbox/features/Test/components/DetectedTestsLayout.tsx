@@ -6,8 +6,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CoverageView from "./CoverageView";
 import type { TestCaseItem } from "../types";
 
 interface DetectedTestsLayoutProps {
@@ -20,12 +18,6 @@ interface DetectedTestsLayoutProps {
   isTestCodeLoading?: boolean;
   isTestCodeError?: boolean;
   onSelectTest: (id: string) => void;
-  coverageSource?: string;
-  coverageStartLine?: number;
-  coveredLines?: number[];
-  targetFunctionName?: string;
-  isCoverageLoading?: boolean;
-  isCoverageError?: boolean;
 }
 
 export default function DetectedTestsLayout({
@@ -38,12 +30,6 @@ export default function DetectedTestsLayout({
   isTestCodeLoading = false,
   isTestCodeError = false,
   onSelectTest,
-  coverageSource = "",
-  coverageStartLine = 1,
-  coveredLines = [],
-  targetFunctionName,
-  isCoverageLoading = false,
-  isCoverageError = false,
 }: DetectedTestsLayoutProps) {
   const language = useMemo(
     () => detectLanguage(testCodePath || "test_case.py"),

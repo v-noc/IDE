@@ -16,6 +16,7 @@ import {
 } from "@/services/tests";
 import { useWorkspaceState } from "@/features/Dashboard/features/Main/hooks/useWorkspaceState";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
+import useTestCoverageStore from "@/features/Dashboard/store/useTestCoverageStore";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
 import { toast } from "sonner";
 import { X } from "lucide-react";
@@ -267,6 +268,34 @@ const Test = forwardRef<TestHandle, TestProps>(
       });
     }, [isConfigCreated, isConfigMissing, normalizedTestCases.length]);
 
+    const setActiveCoverage = useTestCoverageStore((s) => s.setActiveCoverage);
+
+    // Covered-line highlighting elsewhere (main code editor, canvas) should
+    // only be offered while a test case for this node is actually selected
+    // here — not merely because coverage data exists for it.
+    useEffect(() => {
+      if (
+        viewState === "detected_tests" &&
+        selectedTestId &&
+        nodeIdForTestCases
+      ) {
+        setActiveCoverage(tabId, {
+          nodeId: nodeIdForTestCases,
+          lines: testCasesResponse?.lines ?? [],
+        });
+      } else {
+        setActiveCoverage(tabId, null);
+      }
+      return () => setActiveCoverage(tabId, null);
+    }, [
+      viewState,
+      selectedTestId,
+      nodeIdForTestCases,
+      testCasesResponse,
+      tabId,
+      setActiveCoverage,
+    ]);
+
     if (isConfigLoading) {
       return (
         <div className="h-full w-full rounded-lg border border-border bg-card p-8 flex items-center justify-center text-sm text-muted-foreground">
@@ -292,7 +321,6 @@ const Test = forwardRef<TestHandle, TestProps>(
         isTestCodeLoading={isTestCodeLoading}
         isTestCodeError={isTestCodeError}
         onSelectTest={setSelectedTestId}
-        onBackToEmptyState={() => setViewState("empty_tests")}
       />
     );
 

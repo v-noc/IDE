@@ -1,10 +1,12 @@
-import React, { memo, lazy, Suspense, useState } from "react";
+import React, { memo, lazy, Suspense, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
-import { Save, Copy, Check, Maximize2 } from "lucide-react";
+import { Save, Copy, Check, Maximize2, Eye, EyeOff } from "lucide-react";
 import { DiffEditor, type Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { CodeViewDialog } from "./CodeViewDialog";
 import { useWalkthroughMonaco } from "@/features/Dashboard/features/Agent/walkthrough/hooks/useWalkthroughMonaco";
+import { useCoverageHighlight } from "@/components/CodeEditor/useCoverageHighlight";
+import CoverageSummary from "@/components/CodeEditor/CoverageSummary";
 
 // Lazy load Monaco Editor
 const CodeEditor = lazy(() => import("@/components/CodeEditor"));
@@ -36,6 +38,8 @@ interface NodeCodeViewProps {
   nodeId?: string;
   nodeStartLine?: number;
   isWalkthroughPlaying?: boolean;
+  /** Absolute (file-relative) line numbers executed by tests, for coverage highlighting. */
+  coveredLines?: number[];
 }
 
 export const NodeCodeView = memo(function NodeCodeView({
@@ -57,6 +61,7 @@ export const NodeCodeView = memo(function NodeCodeView({
   nodeId = "",
   nodeStartLine,
   isWalkthroughPlaying = false,
+  coveredLines = [],
 }: NodeCodeViewProps) {
   const { resolvedTheme } = useTheme();
   const monacoTheme = resolvedTheme === "light" ? "vs" : "vs-dark";
@@ -71,11 +76,31 @@ export const NodeCodeView = memo(function NodeCodeView({
     codeLoaded,
   );
 
+  const {
+    onMount: coverageOnMount,
+    hasCoverage,
+    showCoverage,
+    toggleCoverage,
+  } = useCoverageHighlight(coveredLines, nodeStartLine ?? 1);
+
+  const codeLineCount = code.length > 0 ? code.split("\n").length : 0;
+  const coveredCount = useMemo(() => {
+    if (!showCoverage) return 0;
+    const covered = new Set(coveredLines);
+    const start = nodeStartLine ?? 1;
+    let count = 0;
+    for (let i = 0; i < codeLineCount; i++) {
+      if (covered.has(start + i)) count++;
+    }
+    return count;
+  }, [showCoverage, coveredLines, nodeStartLine, codeLineCount]);
+
   const handleEditorMount = (
     editorInstance: editor.IStandaloneCodeEditor,
     monacoApi: Monaco,
   ) => {
     walkthroughOnMount(editorInstance, monacoApi);
+    coverageOnMount(editorInstance, monacoApi);
   };
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -126,6 +151,21 @@ export const NodeCodeView = memo(function NodeCodeView({
               </>
             )}
           </button>
+          {!showDiff && hasCoverage && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCoverage();
+              }}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all hover:bg-muted active:scale-95 ${
+                showCoverage ? "bg-muted" : ""
+              }`}
+              style={{ color: iconColor }}
+            >
+              {showCoverage ? <EyeOff size={14} /> : <Eye size={14} />}
+              <span>{showCoverage ? "Hide coverage" : "Show coverage"}</span>
+            </button>
+          )}
           <div className="w-px h-4 bg-border mx-1" />
           <button
             onClick={() => setIsExpanded(true)}
@@ -135,6 +175,11 @@ export const NodeCodeView = memo(function NodeCodeView({
           </button>
         </div>
       </div>
+      {showCoverage && (
+        <div className="px-4 py-1.5 bg-card border-b border-border" style={{ borderColor }}>
+          <CoverageSummary total={codeLineCount} coveredCount={coveredCount} compact />
+        </div>
+      )}
       <CodeViewDialog
         isOpen={isExpanded}
         onClose={() => setIsExpanded(false)}

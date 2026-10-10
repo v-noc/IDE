@@ -226,6 +226,15 @@
   opacity: 0.35;
 }
 
+/* Test coverage line decorations */
+.monaco-editor .coverage-line-covered {
+  background-color: color-mix(in oklch, oklch(0.72 0.19 149) 16%, transparent);
+}
+
+.monaco-editor .coverage-line-covered-margin {
+  border-left: 3px solid color-mix(in oklch, oklch(0.72 0.19 149) 70%, transparent);
+}
+
 .walkthrough-monaco-spotlight {
   position: absolute;
   pointer-events: none;
