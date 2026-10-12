@@ -58,6 +58,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
     documents,
     selectedDocumentId: activeDocId,
     selectedDocument,
+    isDocumentsLoading,
     nodeKey,
     projectId,
     selectDocument,
@@ -175,6 +176,7 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
           tabValue={tabValue}
           onTabValueChange={setTabValue}
           selectedDocument={selectedDocument}
+          isDocumentLoading={isDocumentsLoading}
           nodeId={nodeKey}
           projectId={projectId ?? ""}
           openTaskCount={openTaskCount}

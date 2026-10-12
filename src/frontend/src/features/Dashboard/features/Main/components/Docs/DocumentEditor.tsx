@@ -18,6 +18,7 @@ import { filterSuggestionItems } from "@blocknote/core/extensions";
 import { debounce } from "remeda";
 import { useUpdateDocument } from "@/services/documents";
 import type { DocumentData } from "@/services/documents";
+import { Skeleton } from "@/components/ui/skeleton";
 import { VersionDiffExtension } from "./Version";
 import { useDocumentDiff } from "./hooks/useDocumentDiff";
 
@@ -26,6 +27,14 @@ export interface DocumentEditorProps {
    * The document to edit. If undefined, shows empty state.
    */
   document?: DocumentData | null;
+
+  /**
+   * Whether the document (or the list it's selected from) is still being
+   * fetched. While true, a loading skeleton is shown instead of the
+   * "No document selected" empty state, so a slow fetch doesn't flash as
+   * "nothing here" before the real content arrives.
+   */
+  isLoading?: boolean;
 
   /**
    * Optional callback when document content changes.
@@ -61,6 +70,7 @@ export interface DocumentEditorProps {
 
 export function DocumentEditor({
   document,
+  isLoading = false,
   onChange,
   nodeId = "",
   projectId = "",
@@ -241,6 +251,24 @@ export function DocumentEditor({
       });
     }
   };
+
+  // Loading state - avoid flashing the "No document" empty state while a
+  // fetch (e.g. from navigating via a link/focus) is still in flight.
+  if (isLoading && !document) {
+    return (
+      <div className="h-full w-full overflow-auto bg-background">
+        <div className="mx-auto max-w-4xl xl:max-w-5xl px-6 sm:px-8 lg:px-16 py-12 space-y-3">
+          <Skeleton className="h-6 w-2/5" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-5/6 mt-6" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+      </div>
+    );
+  }
 
   // Empty state
   if (!document) {

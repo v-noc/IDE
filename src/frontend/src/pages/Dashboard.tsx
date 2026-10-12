@@ -24,6 +24,7 @@ import { useVersioningStore } from "@/features/Dashboard/features/Versioning/sto
 import AgentOverlay from "@/features/Dashboard/features/Agent";
 import VersioningStatusBanner from "@/features/Dashboard/features/Versioning/components/VersioningStatusBanner";
 import { useDashboardDeepLinkFocus } from "@/features/Dashboard/hooks/useDashboardDeepLinkFocus";
+import { Loader2 } from "lucide-react";
 
 /**
  * Dashboard Page - Entry point for the IDE dashboard.
@@ -87,7 +88,7 @@ const Dashboard = () => {
         main={
           <div className="flex h-full min-h-0 w-full flex-col">
             <VersioningStatusBanner />
-            <div className="min-h-0 flex-1">
+            <div className="relative min-h-0 flex-1">
               <RightSidebar>
                 {tabStack.map((tab) => (
                   <div
@@ -102,6 +103,14 @@ const Dashboard = () => {
                   </div>
                 ))}
               </RightSidebar>
+              {focusLinkPending && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Opening shared link...
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         }

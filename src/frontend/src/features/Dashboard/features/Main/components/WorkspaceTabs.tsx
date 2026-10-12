@@ -13,6 +13,7 @@ interface WorkspaceTabsProps {
   onTabValueChange: (value: string) => void;
   headerSlot: React.ReactNode;
   selectedDocument: DocumentData | null | undefined;
+  isDocumentLoading?: boolean;
   nodeId?: string;
   projectId?: string;
   openTaskCount?: number;
@@ -30,6 +31,7 @@ export function WorkspaceTabs({
   onTabValueChange,
   headerSlot,
   selectedDocument,
+  isDocumentLoading = false,
   nodeId,
   projectId = "",
   openTaskCount = 0,
@@ -94,6 +96,7 @@ export function WorkspaceTabs({
           <DocumentEditor
             key={selectedDocument?.id || "new"}
             document={selectedDocument || null}
+            isLoading={isDocumentLoading}
             nodeId={nodeId ?? ""}
             projectId={projectId}
             autoSave={true}
