@@ -35,11 +35,18 @@ const DocumentsList: React.FC = () => {
   );
   const setSelectedDocumentId = useProjectStore((s) => s.setSelectedDocumentId);
   const projectId = useProjectStore((s) => s.projectData?.id);
+  // Mirrors useWorkspaceState's effectiveNode resolution so a document
+  // created here lands under the same node the main editor/doc list reads
+  // from (a directly-selected "call" node resolves to its target, same as
+  // a call reached via secondarySelectedNode).
   const nodeKey = useMemo(() => {
     if (secondarySelectedNode) {
       return (secondarySelectedNode as CallNodeTree).target
         ? ((secondarySelectedNode as CallNodeTree)?.target?.id ?? "")
         : secondarySelectedNode.id;
+    }
+    if (selectedNode?.node_type === "call") {
+      return (selectedNode as unknown as CallNodeTree)?.target?.id;
     }
     return selectedNode?.id;
   }, [selectedNode, secondarySelectedNode]);

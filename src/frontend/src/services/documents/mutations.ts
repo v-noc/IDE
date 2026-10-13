@@ -1,18 +1,31 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { documentsApi, type CreateDocumentRequest, type UpdateDocumentRequest } from "./api";
+import { documentsApi, type CreateDocumentRequest, type DocumentData, type UpdateDocumentRequest } from "./api";
 import queryKeys from "@/lib/queryKeys";
 
 /**
  * Create document mutation.
- * Automatically invalidates the cache so all consumers update.
+ * Writes the new document into every cached list for this node directly
+ * (same pattern as useUpdateDocument) so consumers reflect it immediately
+ * instead of waiting on a refetch of the invalidated query.
  */
 export const useCreateDocument = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ payload, projectId }: { payload: CreateDocumentRequest; projectId: string }) =>
       documentsApi.createDocument(payload, projectId),
-    onSuccess: (_, { payload, projectId }) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.documents.list(payload.node_id, projectId) });
+    onSuccess: (createdDocument, { payload, projectId }) => {
+      const queryKey = queryKeys.documents.list(payload.node_id, projectId);
+      queryClient.setQueriesData<DocumentData[]>(
+        { queryKey, exact: false },
+        (oldData) => {
+          if (!oldData) return [createdDocument];
+          if (oldData.some((doc) => doc.id === createdDocument.id)) return oldData;
+          return [...oldData, createdDocument];
+        },
+      );
+      // Catch any other key variants (e.g. a different branch/commit scope)
+      // and keep things eventually consistent with the server.
+      queryClient.invalidateQueries({ queryKey });
     },
   });
 };
