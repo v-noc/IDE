@@ -72,6 +72,12 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const secondarySelectedNode = useProjectStore(
     useShallow((s) => s.secondarySelectedNode[tabId]),
   );
+  // Visual-only pointer, e.g. a log row reveal. Takes priority over
+  // secondarySelectedNode for canvas ring/centering/layout, but never affects
+  // what the Logs/Code/Docs/Playground panels are scoped to.
+  const highlightedNode = useProjectStore(
+    useShallow((s) => s.highlightedNode[tabId]),
+  );
   const expandedNodeIds = useProjectStore(
     useShallow((s) => s.expandedNodeIds[tabId] ?? []),
   );
@@ -108,8 +114,10 @@ const CanvasView: React.FC<CanvasViewProps> = ({
     [],
   );
 
-  const effectiveSelectedNode = secondarySelectedNode
-    ? secondarySelectedNode
+  const canvasPreviewNode = highlightedNode ?? secondarySelectedNode;
+
+  const effectiveSelectedNode = canvasPreviewNode
+    ? canvasPreviewNode
     : centerNode;
 
   const lazyParentIds = useMemo(() => {
@@ -175,11 +183,11 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   const nodesWithState = useMemo(() => {
     const primaryId = centerNode?.id;
-    const secondaryId = secondarySelectedNode?.id;
+    const previewId = canvasPreviewNode?.id;
 
     return initialNodes.map((node) => {
       const isCanvasSelected =
-        node.id === primaryId || node.id === secondaryId;
+        node.id === primaryId || node.id === previewId;
 
       if (isTourPlaying && walkthroughForegroundNodeId) {
         const isForeground = node.id === walkthroughForegroundNodeId;
@@ -198,7 +206,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   }, [
     initialNodes,
     centerNode?.id,
-    secondarySelectedNode?.id,
+    canvasPreviewNode?.id,
     isTourPlaying,
     walkthroughForegroundNodeId,
   ]);
@@ -207,7 +215,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const centerTarget = useMemo(() => {
-    const id = secondarySelectedNode?.id ?? centerNode?.id;
+    const id = canvasPreviewNode?.id ?? centerNode?.id;
     if (!id) return null;
     const n = nodes.find((node) => node.id === id);
     if (!n?.measured?.width) return null;
@@ -216,7 +224,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
       x: n.position.x + n.measured.width / 2,
       y: n.position.y + (n.measured.height ?? 0) / 2,
     };
-  }, [nodes, centerNode?.id, secondarySelectedNode?.id]);
+  }, [nodes, centerNode?.id, canvasPreviewNode?.id]);
 
   const followSelectionRef = useRef(false);
 
@@ -258,7 +266,7 @@ const CanvasView: React.FC<CanvasViewProps> = ({
 
   useEffect(() => {
     followSelectionRef.current = true;
-  }, [centerNode?.id, secondarySelectedNode?.id]);
+  }, [centerNode?.id, canvasPreviewNode?.id]);
 
   useEffect(() => {
     if (!centerTarget || !followSelectionRef.current) return;

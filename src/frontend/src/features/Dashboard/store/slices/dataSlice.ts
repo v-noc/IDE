@@ -52,6 +52,7 @@ export const createDataSlice: StateCreator<
       state.focusedNode = {};
       state.selectedNode = {};
       state.secondarySelectedNode = {};
+      state.highlightedNode = {};
       state.selectedDocumentId = {};
       state.expandedNodeIds = {};
       state.activeNodeId = {};

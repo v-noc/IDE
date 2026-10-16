@@ -38,6 +38,7 @@ export const createFocusSlice: StateCreator<
     state.focusedNode[tabId] = node;
     state.selectedNode[tabId] = node;
     state.secondarySelectedNode[tabId] = null;
+    state.highlightedNode[tabId] = null;
   }),
 
   pushFocusBulk: (tabId: string, nodes: AnyNodeTree[]) => set((state) => {
@@ -51,6 +52,7 @@ export const createFocusSlice: StateCreator<
       state.focusedNode[tabId] = lastNode;
       state.selectedNode[tabId] = lastNode;
       state.secondarySelectedNode[tabId] = null;
+      state.highlightedNode[tabId] = null;
     }
   }),
 

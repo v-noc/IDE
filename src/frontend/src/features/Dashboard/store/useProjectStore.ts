@@ -28,6 +28,7 @@ const useProjectStore = create<ProjectStore>()(
           delete state.focusTargetId[tabId];
           delete state.selectedNode[tabId];
           delete state.secondarySelectedNode[tabId];
+          delete state.highlightedNode[tabId];
           delete state.selectedDocumentId[tabId];
           delete state.expandedNodeIds[tabId];
           delete state.activeNodeId[tabId];

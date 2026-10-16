@@ -20,7 +20,7 @@ export interface TabActions {
   setActiveTabId: (tabId: string) => void;
   destroyTabBranch: (tabId: string) => void;
   updateTabLayouts: (layouts: { tabId: string; size: number }[]) => void;
-  handleNodeSelection: (tabId: string, node: any, selectionType: "promte" | "secondary" | "primary") => void;
+  handleNodeSelection: (tabId: string, node: any, selectionType: "promte" | "secondary" | "primary" | "highlight") => void;
 }
 
 export type TabStore = TabState & TabActions;
@@ -99,7 +99,7 @@ const useTabStore = create<TabStore>()(
           });
         }),
 
-      handleNodeSelection: (tabId, node, selectionType: "promte" | "secondary" | "primary") => {
+      handleNodeSelection: (tabId, node, selectionType: "promte" | "secondary" | "primary" | "highlight") => {
         const currentTab = get().tabs[tabId];
         if (!currentTab) return;
 
@@ -123,6 +123,12 @@ const useTabStore = create<TabStore>()(
         }
         else if (selectionType == "primary") {
           useProjectStore.getState().setSelectedNode(tabId, node);
+        }
+        else if (selectionType == "highlight") {
+          // Visual-only pointer (e.g. revealing a log row's node on canvas) -
+          // must not change what selectedNode/secondarySelectedNode-driven
+          // panels (logs/code/docs/playground) are scoped to.
+          useProjectStore.getState().setHighlightedNode(tabId, node);
         }
 
         // 2. If it's a CallNode, create a new child tab (Portal)
