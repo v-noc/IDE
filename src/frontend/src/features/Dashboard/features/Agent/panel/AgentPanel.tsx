@@ -1,3 +1,4 @@
+import { UnderConstructionOverlay } from "@/components/common/UnderConstructionOverlay";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import useTabStore from "@/features/Dashboard/store/useTabStore";
 import { findNodeByKey } from "@/features/Dashboard/utils/findNode";
@@ -20,7 +21,7 @@ export function AgentPanel() {
   };
 
   return (
-    <div className="agent-v2 flex h-full w-full min-w-[420px] flex-col border-l border-agent-border bg-agent-bg-panel">
+    <div className="agent-v2 relative flex h-full w-full min-w-[420px] flex-col border-l border-agent-border bg-agent-bg-panel">
       <PanelHeader conversationStatus={conversation?.status} />
       <ChatThread
         conversation={conversation}
@@ -28,6 +29,7 @@ export function AgentPanel() {
         onFocusNode={focusNode}
       />
       <Composer onFocusNode={focusNode} />
+      <UnderConstructionOverlay />
     </div>
   );
 }

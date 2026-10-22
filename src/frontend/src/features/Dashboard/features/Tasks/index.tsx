@@ -1,3 +1,4 @@
+import { UnderConstructionOverlay } from "@/components/common/UnderConstructionOverlay";
 import { useCallback } from "react";
 import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { DEFAULT_LIST_COLLAPSED } from "@/features/Dashboard/store/slices/tasksSlice";
@@ -78,7 +79,7 @@ export function TasksBoard({ projectId, tabId, onNavigateToNode }: TasksBoardPro
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="relative flex h-full flex-col overflow-hidden">
       <FilterBar
         view={taskView}
         filters={taskFilters}
@@ -132,6 +133,7 @@ export function TasksBoard({ projectId, tabId, onNavigateToNode }: TasksBoardPro
       )}
 
       <NewTaskModal projectId={projectId} />
+      <UnderConstructionOverlay />
     </div>
   );
 }

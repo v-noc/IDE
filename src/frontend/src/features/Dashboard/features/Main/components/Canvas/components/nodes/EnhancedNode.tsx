@@ -208,7 +208,7 @@ const EnhancedNode = memo(function EnhancedNode({
             isCurrentStepNodeVisible ? "" : undefined
           }
           className={cn(
-            "canvas-node walkthrough-node relative min-w-[350px] max-w-[450px] overflow-hidden rounded-(--radius) border border-border bg-card text-card-foreground transition-shadow",
+            "canvas-node walkthrough-node relative w-[350px] overflow-hidden rounded-(--radius) border border-border bg-card text-card-foreground transition-shadow",
             isCurrentStepNodeVisible && "walkthrough-active-node",
           )}
           style={hasStatusOverride ? statusStyles : undefined}
