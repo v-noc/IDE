@@ -24,7 +24,7 @@ class JediProjectManager:
         logger.info(f"Initialized Jedi Project at: {project_path}")
 
     def get_script(self, path: str) -> jedi.Script:
-        project = jedi.Project(path=str(self.project_path.parent))
+        project = jedi.Project(path=str(self.project_path))
         env = jedi.InterpreterEnvironment()
         return jedi.Script(path=path, project=project, environment=env)
 
