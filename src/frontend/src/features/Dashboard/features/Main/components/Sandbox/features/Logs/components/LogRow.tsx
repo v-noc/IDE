@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { type LogTreeNode } from "@/services/logs";
 import { LogDetails } from "./LogDetails";
+import { countDescendantIssues } from "../utils/issues";
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,12 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
   const filteredChildren = (node.children || []).filter(
     (c) => c.event_type !== "exit" && c.event_type !== "error"
   );
+
+  // Issues hidden below this row; only surfaced while collapsed.
+  const hidden = countDescendantIssues(node);
+  const showHiddenErrors = !isExpanded && hidden.errors > 0;
+  const showHiddenWarnings =
+    !isExpanded && hidden.errors === 0 && hidden.warnings > 0;
 
   const exitChild = (node.children || []).find((c) => c.event_type === "exit");
   const effectiveDurationMs: number | null =
@@ -161,7 +168,25 @@ export const LogRow: React.FC<LogRowProps> = ({ node, depth = 0, onViewFlameChar
           </span>
         </div>
 
-        <div className="flex-1 px-4 min-w-0">
+        <div className="flex-1 px-4 min-w-0 flex items-center gap-2">
+          {showHiddenErrors && (
+            <Badge
+              variant="destructive"
+              className="shrink-0 gap-1 px-1.5 py-0 text-[10px]"
+              title={`${hidden.errors} error${hidden.errors > 1 ? "s" : ""} inside — expand to view`}
+            >
+              <CircleAlert className="size-3" /> {hidden.errors}
+            </Badge>
+          )}
+          {showHiddenWarnings && (
+            <Badge
+              variant="secondary"
+              className="shrink-0 gap-1 px-1.5 py-0 text-[10px] bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-400/15 dark:text-amber-300 dark:border-amber-400/30"
+              title={`${hidden.warnings} warning${hidden.warnings > 1 ? "s" : ""} inside — expand to view`}
+            >
+              <AlertTriangle className="size-3" /> {hidden.warnings}
+            </Badge>
+          )}
           <span
             className={cn(
               "text-sm truncate block font-medium transition-colors",
