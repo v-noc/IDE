@@ -19,5 +19,7 @@ class OrjsonCoder(Coder):
     @classmethod
     def _default(cls, obj: Any) -> Any:
         if hasattr(obj, "model_dump"):
-            return obj.model_dump()
+            return obj.model_dump(mode="json")
+        if isinstance(obj, (set, frozenset)):
+            return list(obj)
         raise TypeError(f"Type not serializable: {type(obj)}")
