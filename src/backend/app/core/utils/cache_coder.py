@@ -9,7 +9,7 @@ class OrjsonCoder(Coder):
         return orjson.dumps(
             value,
             default=cls._default,
-            option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_PASSTHROUGH_DATETIME,
+            option=orjson.OPT_SERIALIZE_NUMPY,
         )
 
     @classmethod
