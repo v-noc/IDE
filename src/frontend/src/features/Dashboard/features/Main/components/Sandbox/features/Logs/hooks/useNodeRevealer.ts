@@ -32,7 +32,7 @@ export const useNodeRevealer = (tabId: string) => {
     const secondarySelectedNode = useProjectStore((s) => s.secondarySelectedNode[tabId]);
     const effectiveNode = toEffectiveNode(selectedNode, secondarySelectedNode);
     const expandedNodeIds = useProjectStore((s) => s.expandedNodeIds[tabId] ?? []);
-    const expandNode = useProjectStore((s) => s.expandNode);
+    const expandNodesBulk = useProjectStore((s) => s.expandNodesBulk);
     const handleNodeSelection = useTabStore((s) => s.handleNodeSelection);
 
     const revealNode = useCallback((targetLogNode: LogNode, rootLogNode: LogNode) => {
@@ -61,13 +61,11 @@ export const useNodeRevealer = (tabId: string) => {
 
 
         if (path) {
-            path.forEach(id => {
-                if (!expandedNodeIds.includes(id)) {
-                    // Collect key after the last slash
-                    const key = id.includes("/") ? id.split("/").pop()! : id;
-                    expandNode(tabId, key);
-                }
-            });
+            // Canvas/sidebar match on full node ids, so expand with the full id.
+            const toExpand = path.filter(id => !expandedNodeIds.includes(id));
+            if (toExpand.length) {
+                expandNodesBulk(tabId, toExpand);
+            }
 
             // Highlight the target node on canvas only - must not disturb
             // selectedNode/secondarySelectedNode, which is what the Logs (and
@@ -76,7 +74,7 @@ export const useNodeRevealer = (tabId: string) => {
             // row's node, causing the log list to refilter out from under the user.
             handleNodeSelection(tabId, targetCanvasNode, "highlight");
         }
-    }, [effectiveNode, expandedNodeIds, expandNode, handleNodeSelection, tabId]);
+    }, [effectiveNode, expandedNodeIds, expandNodesBulk, handleNodeSelection, tabId]);
 
     return { revealNode };
 };

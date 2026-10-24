@@ -132,14 +132,10 @@ export function DocumentEditor({
     if (!editor) return;
 
     if (!document) {
-      // Clear editor if no document
-      try {
-        // Replace with empty blocks array
-        editor.replaceBlocks(editor.document, []);
-        lastAppliedDataRef.current = null;
-      } catch (err) {
-        console.error("Error clearing editor:", err);
-      }
+      // The editor view isn't mounted in the empty state, so replaceBlocks
+      // throws on stale block ids. Just reset; the next document load
+      // replaces all content anyway.
+      lastAppliedDataRef.current = null;
       return;
     }
 

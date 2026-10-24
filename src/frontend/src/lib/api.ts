@@ -75,6 +75,9 @@ async function apiClient<T>(
 
   const config: RequestInit = {
     method: body ? 'POST' : 'GET',
+    // React Query owns caching; never let the browser answer from its HTTP cache,
+    // or a refetch right after a write can return a stale response.
+    cache: 'no-store',
     headers: {
       'Content-Type': 'application/json',
       ...(branch ? { "X-Vnoc-Branch": branch } : {}),
