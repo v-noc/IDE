@@ -10,6 +10,7 @@ from watchdog.events import (
     FileModifiedEvent,
     FileCreatedEvent,
     FileDeletedEvent,
+    FileMovedEvent,
 )
 from watchdog.observers import Observer
 from watchdog.observers.api import ObservedWatch
@@ -28,29 +29,31 @@ class ChangeHandler(FileSystemEventHandler):
     def _trigger(self):
         self.callback()
 
-    def on_modified(self, event: FileModifiedEvent):
-
-        logger.info(f"File modified: {event.src_path}")
+    def _schedule(self):
         if self.timer:
             self.timer.cancel()
         self.timer = Timer(self.debounce_seconds, self._trigger)
         self.timer.start()
+
+    def on_modified(self, event: FileModifiedEvent):
+        if event.is_directory:
+            return
+        logger.info(f"File modified: {event.src_path}")
+        self._schedule()
 
     def on_created(self, event: FileCreatedEvent):
-
         logger.info(f"File created: {event.src_path}")
-        if self.timer:
-            self.timer.cancel()
-        self.timer = Timer(self.debounce_seconds, self._trigger)
-        self.timer.start()
+        self._schedule()
 
     def on_deleted(self, event: FileDeletedEvent):
-
         logger.info(f"File deleted: {event.src_path}")
-        if self.timer:
-            self.timer.cancel()
-        self.timer = Timer(self.debounce_seconds, self._trigger)
-        self.timer.start()
+        self._schedule()
+
+    def on_moved(self, event: FileMovedEvent):
+        # Atomic saves (write temp + rename over target) only emit a move on
+        # Linux/inotify, with no modified event for the target file.
+        logger.info(f"File moved: {event.src_path} -> {event.dest_path}")
+        self._schedule()
 
 
 class ProjectWatcher:
@@ -65,6 +68,10 @@ class ProjectWatcher:
 
     def start(self):
         """Starts the observer thread."""
+        logger.info(
+            f"ProjectWatcher.start path={self.project_path} "
+            f"is_dir={self.project_path.is_dir()} alive={self.observer.is_alive()}"
+        )
         if not self.project_path.is_dir():
             logger.error(f"Path is not a directory: {self.project_path}")
             return

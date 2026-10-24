@@ -45,6 +45,11 @@ class WatcherService:
 
     def start_watching(self, project_node: ProjectNode):
         project_id = project_node.id
+        logger.info(
+            f"start_watching called: project={project_id} "
+            f"path={project_node.local_path!r} "
+            f"known={project_id in self.watchers}"
+        )
 
         # Helper to run async socket events from the sync thread
 
@@ -106,6 +111,10 @@ class WatcherService:
 
         if project_id in self.watchers:
             watcher = self.watchers[project_id]
+            logger.info(
+                f"Existing watcher for {project_id}: "
+                f"running={watcher.is_running()} paused={watcher.is_paused()}"
+            )
             if not watcher.is_running():
                 watcher.start()
             elif watcher.is_paused():
@@ -191,7 +200,16 @@ class WatcherService:
         watcher = ProjectWatcher(project_node.local_path, resync_project)
         watcher.start()
         self.watchers[project_id] = watcher
-        print(f"Started watching project {project_id}")
+        logger.info(
+            f"Started watching project {project_id} "
+            f"running={watcher.is_running()} paused={watcher.is_paused()}"
+        )
+
+    def ensure_watching(self, project_node: ProjectNode):
+        """Start a watcher only if none is running; never resumes a paused one."""
+        watcher = self.watchers.get(project_node.id)
+        if watcher is None or not watcher.is_running():
+            self.start_watching(project_node)
 
     def stop_watching(self, project_id: str):
         watcher = self.watchers.get(project_id)
@@ -206,6 +224,7 @@ class WatcherService:
     def pause_watching(self, project_id: str):
         """Pause watching by unscheduling the watch (non-blocking)."""
         watcher = self.watchers.get(project_id)
+        logger.info(f"pause_watching {project_id}: watcher={'yes' if watcher else 'no'}")
         if watcher:
             # Use pause() instead of stop() to avoid joining thread
             # from callback
@@ -213,6 +232,7 @@ class WatcherService:
 
     def resume_watching(self, project_id: str):
         watcher = self.watchers.get(project_id)
+        logger.info(f"resume_watching {project_id}: watcher={'yes' if watcher else 'no'}")
         if watcher:
             watcher.start()
 

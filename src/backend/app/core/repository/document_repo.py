@@ -1,5 +1,6 @@
 
 from typing import Optional
+from loguru import logger
 from app.db.async_terminus_client import AsyncClient
 from app.core.repository.base_repo import BaseRepo
 from app.core.model.nodes import DocumentNode
@@ -22,10 +23,11 @@ class DocumentRepo(BaseRepo[DocumentNode, DocumentSchema]):
             result = await self.client.query(query)
 
             items_raw = [row["document_doc"] for row in result["bindings"]]
-        except Exception as exc:
-            print(exc)
+        except Exception:
+            logger.exception(f"get_by_parent_node failed for {node_id}")
             return []
 
+        logger.info(f"get_by_parent_node {node_id}: {len(items_raw)} documents")
         return [DocumentNode.from_raw_dict(item_raw) for item_raw in items_raw]
 
     async def add_to_parent_node(self, document_id: str, node_id: str):
