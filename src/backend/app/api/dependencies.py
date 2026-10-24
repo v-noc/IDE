@@ -1,5 +1,6 @@
 from typing import Optional
-from fastapi import Depends, Header, HTTPException, Query, status
+from fastapi import Depends, Header, HTTPException, Query, Request, status
+from loguru import logger
 from app.core.services.project_service import ProjectService
 from app.core.services.code_element_service import CodeElementService
 
@@ -35,6 +36,7 @@ async def get_request_db_context(
 
 
 async def get_project_node(
+    request: Request,
     project_id: str = Query(..., description="The ID of the project"),
     project_service: ProjectService = Depends(get_project_service),
 ) -> ProjectNode:
@@ -51,12 +53,23 @@ async def get_project_node(
         )
 
     try:
-        return ProjectNode.from_raw_dict(project)
+        project_node = ProjectNode.from_raw_dict(project)
     except (TypeError, KeyError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Invalid project payload for id: {project_id}",
         ) from exc
+
+    # The watcher registry is empty after a backend restart (--reload), and the
+    # frontend may not refetch the tree, so start it on any project-scoped request.
+    watcher_service = getattr(request.app.state, "watcher_service", None)
+    if watcher_service is not None:
+        try:
+            watcher_service.ensure_watching(project_node)
+        except Exception:
+            logger.exception("Failed to ensure project watcher")
+
+    return project_node
 
 
 async def get_project_uow(

@@ -193,19 +193,25 @@ async def get_project(
     return project_tree
 
 
+def ensure_project_watched(
+    project_node: ProjectNode = Depends(get_project_node),
+    watcher_service: WatcherService = Depends(get_watcher_service),
+) -> None:
+    """Start the file watcher. Runs as a dependency so cache hits don't skip it."""
+    watcher_service.start_watching(project_node)
+
+
 @router.get("/structure", response_model=ProjectTreeNode)
 @cache(expire=DEFAULT_TTL)
 async def get_project_structure(
+    _watched: None = Depends(ensure_project_watched),
     project_node: ProjectNode = Depends(get_project_node),
     exclude_groups: bool = Query(
         False, description="Omit structure-group documents from the tree"
     ),
     project_service: ProjectService = Depends(get_project_service_with_uow),
-    watcher_service: WatcherService = Depends(get_watcher_service),
 ) -> dict:
     """Load folder/file/(optional) structure-group shell only — no code elements."""
-    watcher_service.start_watching(project_node)
-
     exclude_types = _exclude_types_for_groups(exclude_groups)
     structure_nodes, version = await project_service.get_structure(
         exclude_types=exclude_types,
