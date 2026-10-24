@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 
 import { useWorkspaceState } from "./hooks/useWorkspaceState";
@@ -37,7 +37,12 @@ const Workspace = ({ tabId }: WorkspaceProps) => {
   } = useWorkspaceState(tabId);
   const { handlePromote } = useWorkspaceActions(tabId);
 
-  const [tabValue, setTabValue] = useState("docs");
+  const tabValue = useProjectStore((s) => s.workspaceTab[tabId] ?? "docs");
+  const setWorkspaceTab = useProjectStore((s) => s.setWorkspaceTab);
+  const setTabValue = useCallback(
+    (value: string) => setWorkspaceTab(tabId, value),
+    [setWorkspaceTab, tabId],
+  );
   const [isSandboxOpen, setIsSandboxOpen] = useState(false);
   const queryClient = useQueryClient();
   const pushFocus = useProjectStore((s) => s.pushFocus);

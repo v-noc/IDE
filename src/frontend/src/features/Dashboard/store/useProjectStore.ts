@@ -33,6 +33,7 @@ const useProjectStore = create<ProjectStore>()(
           delete state.expandedNodeIds[tabId];
           delete state.activeNodeId[tabId];
           delete state.isDocSidebarOpen[tabId];
+          delete state.workspaceTab[tabId];
           delete state.docSidebarSize[tabId];
           delete state.lensTaskId[tabId];
           delete state.taskView[tabId];

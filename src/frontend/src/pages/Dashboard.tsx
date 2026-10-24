@@ -46,8 +46,10 @@ const Dashboard = () => {
   const selectedTaskId = useProjectStore((s) => s.selectedTaskId);
   const queryClient = useQueryClient();
   const pushFocus = useProjectStore((s) => s.pushFocus);
+  const setWorkspaceTab = useProjectStore((s) => s.setWorkspaceTab);
 
   const handleTaskNavigateToNode = (nodeId: string) => {
+    setWorkspaceTab(activeTabId, "canvas");
     const projectKey = projectData?.id ?? "";
     const node = findNodeByIdWithDescendantCache(
       queryClient,
