@@ -55,6 +55,11 @@ export const createTasksSlice: StateCreator<
   setSelectedTaskId: (taskId) =>
     set((state) => {
       state.selectedTaskId = taskId;
+      // The canvas lens belongs to the open task; drop it when the panel
+      // closes or another task is opened.
+      for (const tabId of Object.keys(state.lensTaskId)) {
+        if (state.lensTaskId[tabId] !== taskId) state.lensTaskId[tabId] = null;
+      }
     }),
 
   setLensTaskId: (tabId, taskId) =>
