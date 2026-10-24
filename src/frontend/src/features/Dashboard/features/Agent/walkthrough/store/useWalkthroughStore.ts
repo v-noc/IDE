@@ -17,6 +17,7 @@ import {
   firstStepIdForVisit,
 } from "./flatten";
 import { toast } from "sonner";
+import useProjectStore from "@/features/Dashboard/store/useProjectStore";
 import { captureSavedView, restoreSavedView } from "../executor/restoreView";
 import { prepareTour } from "../executor/prepareTour";
 import { queryClient } from "@/lib/queryClient";
@@ -210,6 +211,7 @@ export const useWalkthroughStore = create<WalkthroughState>()(
           // layout is final before the first step. Step 0 focuses the tour root at
           // zoom 1; later steps slide at the current zoom when needed. The tour
           // drives the camera alone while playing.
+          useProjectStore.getState().setWorkspaceTab(tabId, "canvas");
           await prepareTour(queryClient, tabId, session);
 
           set((state) => {
@@ -294,6 +296,7 @@ export const useWalkthroughStore = create<WalkthroughState>()(
             return;
           }
 
+          useProjectStore.getState().setWorkspaceTab(tabId, "canvas");
           if (!tourPrepared) {
             await prepareTour(queryClient, tabId, session);
           }
