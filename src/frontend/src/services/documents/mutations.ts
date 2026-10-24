@@ -43,8 +43,9 @@ export const useUpdateDocument = (nodeId: string, projectId: string) => {
     onSuccess: (updatedDocument, variables) => {
       // Update the cache directly without invalidating/refetching
       // This prevents cursor glitches and keeps UI in sync between main view and right sidebar
-      queryClient.setQueryData<typeof updatedDocument[]>(
-        queryKeys.documents.list(nodeId, projectId),
+      // List queries are keyed with extra branch/commit segments, so match by prefix.
+      queryClient.setQueriesData<typeof updatedDocument[]>(
+        { queryKey: queryKeys.documents.list(nodeId, projectId), exact: false },
         (oldData) => {
           if (!oldData) return oldData;
 
