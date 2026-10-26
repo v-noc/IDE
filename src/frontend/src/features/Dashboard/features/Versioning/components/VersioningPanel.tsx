@@ -16,7 +16,7 @@ import BranchDropdown from "./BranchDropdown";
 import CreateBranchDialog from "./CreateBranchDialog";
 import RemoteSyncAuthDialog from "./RemoteSyncAuthDialog";
 import { usePushToRemote, usePullFromRemote } from "@/services/versioning";
-import { isCommitListDisabled } from "../config/commitListEnv";
+import { isCommitListDisabledFor } from "../config/commitListEnv";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -90,7 +90,7 @@ const VersioningPanel: React.FC<{ tabId: string }> = ({ tabId }) => {
   const hasPrevPage = page > 0;
   const displayedCommitId = checkedOutCommitId ?? headCommitId;
 
-  const commitListDisabled = isCommitListDisabled();
+  const commitListDisabled = isCommitListDisabledFor(projectData?.id);
   const commitHistoryEmptyMessage = commitListDisabled
     ? "Commit history is temporarily disabled."
     : !projectData?.id || !historyNodeId
