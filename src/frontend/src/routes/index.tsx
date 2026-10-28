@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { homeRoute } from "./HomePage";
 import { dashboardRoute } from "./Dashboard";
@@ -7,6 +7,10 @@ export const router = createBrowserRouter([
   {
     path: "/",
 
-    children: [homeRoute, dashboardRoute],
+    children: [
+      homeRoute,
+      dashboardRoute,
+      { path: "*", element: <Navigate to="/" replace /> },
+    ],
   },
 ]);
