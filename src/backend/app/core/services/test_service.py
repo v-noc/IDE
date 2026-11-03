@@ -325,32 +325,35 @@ class TestService:
         return None
 
     async def _resolve_scope_node_ids(self, scope_coverages: dict[str, ScopeCoverage]) -> None:
-        function_qnames = [
-            qname for qname, cov in scope_coverages.items() if cov.scope.type == "function"
-        ]
-        class_qnames = [
-            qname for qname, cov in scope_coverages.items() if cov.scope.type == "class"
-        ]
-        module_qnames = [
-            qname for qname, cov in scope_coverages.items() if cov.scope.type == "module"
-        ]
+        # Graph qnames are prefixed with the project name (see
+        # FileProcessor.qname_for_rel_path); Jedi qnames are relative to the
+        # project root, so add the prefix before looking nodes up.
+        prefix = f"{self.uow.project.name}."
 
-        function_nodes = await self.repos.code_element_repo.get_by_qnames(function_qnames, doc_type="FunctionSchema")
-        class_nodes = await self.repos.code_element_repo.get_by_qnames(class_qnames, doc_type="ClassSchema")
-        file_nodes = await self.repos.structure_repo.get_by_qnames(module_qnames, doc_type="FileSchema")
+        def graph_qnames(scope_type: str) -> list[str]:
+            return [
+                prefix + qname
+                for qname, cov in scope_coverages.items()
+                if cov.scope.type == scope_type
+            ]
+
+        function_nodes = await self.repos.code_element_repo.get_by_qnames(graph_qnames("function"), doc_type="FunctionSchema")
+        class_nodes = await self.repos.code_element_repo.get_by_qnames(graph_qnames("class"), doc_type="ClassSchema")
+        file_nodes = await self.repos.structure_repo.get_by_qnames(graph_qnames("module"), doc_type="FileSchema")
 
         function_by_qname = {node.qname: node for node in function_nodes}
         class_by_qname = {node.qname: node for node in class_nodes}
 
         for qname, coverage in scope_coverages.items():
+            graph_qname = prefix + qname
             if coverage.scope.type == "function":
-                node = function_by_qname.get(qname)
+                node = function_by_qname.get(graph_qname)
                 coverage.scope.node_id = node.id if node else None
             elif coverage.scope.type == "class":
-                node = class_by_qname.get(qname)
+                node = class_by_qname.get(graph_qname)
                 coverage.scope.node_id = node.id if node else None
             elif coverage.scope.type == "module":
-                node = file_nodes.get(qname)
+                node = file_nodes.get(graph_qname)
                 coverage.scope.node_id = node.id if node else None
 
     @staticmethod
@@ -564,6 +567,7 @@ class TestService:
         if not os.path.isabs(test_path):
             test_path = os.path.join(self.uow.project.path, test_path)
 
+        print("ussed test_path", test_path)
         config = await self.get_test_config()
         if python_executable is None and config:
             python_executable = config.get("executable_path")
