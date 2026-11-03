@@ -17,6 +17,11 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "INFO"
 
+    # Runtime switches: set to false in .env to turn off the file watcher
+    # (no auto-resync on disk changes) or Socket.IO (no /ws mount, no emits).
+    ENABLE_WATCHER: bool = True
+    ENABLE_WEBSOCKET: bool = True
+
     # fastapi-cache2 + Redis. If false, use a no-op backend.
     ENABLE_CACHE: bool = False
     REDIS_URL: Optional[str] = None

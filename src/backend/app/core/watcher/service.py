@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from threading import Lock
 from fastapi import Depends, Request
 
+from app.config.settings import get_settings
 from app.core.model.nodes import ProjectNode
 from app.core.watcher.project_watcher import ProjectWatcher
 from app.core.socket.manager import get_socket_manager
@@ -44,6 +45,9 @@ class WatcherService:
             self.db = db
 
     def start_watching(self, project_node: ProjectNode):
+        if not get_settings().ENABLE_WATCHER:
+            logger.debug("File watcher disabled (ENABLE_WATCHER=false)")
+            return
         project_id = project_node.id
         logger.info(
             f"start_watching called: project={project_id} "

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config.settings import get_settings
 from app.core.socket.manager import get_socket_manager
 
 from .api import root
@@ -34,13 +35,17 @@ async def lifespan(app: FastAPI):
     app.state.watcher_service = watcher_service
 
     # Init Socket Manager (creates the server instance)
-    _ = get_socket_manager()
-    print("🔌 Socket.IO server initialized and ready")
+    if get_settings().ENABLE_WEBSOCKET:
+        _ = get_socket_manager()
+        print("🔌 Socket.IO server initialized and ready")
+    else:
+        print("🔌 Socket.IO disabled (ENABLE_WEBSOCKET=false)")
+    if not get_settings().ENABLE_WATCHER:
+        print("👁️ File watcher disabled (ENABLE_WATCHER=false)")
 
     await init_cache(app)
 
     from app.agent.llm.providers import validate_llm_settings
-    from app.config.settings import get_settings
 
     validate_llm_settings()
 
@@ -84,7 +89,8 @@ app.add_exception_handler(Exception, generic_exception_handler)
 
 # MOUNT SOCKET.IO
 # This handles the /socket.io/ path automatically
-socket_manager = get_socket_manager()
-app.mount("/ws", socket_manager.app)
+if get_settings().ENABLE_WEBSOCKET:
+    socket_manager = get_socket_manager()
+    app.mount("/ws", socket_manager.app)
 # Include the main router
 app.include_router(root.router, prefix="/api/v1")

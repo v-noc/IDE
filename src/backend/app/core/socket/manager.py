@@ -3,6 +3,8 @@ import logging
 from typing import Any
 from datetime import datetime
 
+from app.config.settings import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -163,6 +165,8 @@ class SocketManager:
         self, project_id: str, event: str, data: Any
     ):
         """Emit an event to all users viewing a specific project."""
+        if not get_settings().ENABLE_WEBSOCKET:
+            return
         try:
             # Normalize project_id for room matching
             # (frontend joins with key only)
